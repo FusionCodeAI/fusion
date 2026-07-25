@@ -21,4 +21,4 @@ jobs:
       - name: Publish package to JSR
         run: |
           cd crates/codegen/xai-grok-pager/npm/fusion
-          npx jsr publish --allow-dirty
+          npx jsr publish --allow-dirty --allow-slow-types
