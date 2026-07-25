@@ -188,3 +188,63 @@ jobs:
             ```bash
             curl -sSL https://raw.githubusercontent.com/${{ github.repository }}/main/scripts/install.sh | sh
             ```
+
+  # ── NPM & JSR Publish ────────────────────────────────────────────────────────
+  publish-npm-jsr:
+    name: Publish to npm & JSR
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write # required for JSR provenance / OIDC publishing
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          registry-url: 'https://registry.npmjs.org'
+
+      - name: Download all built binaries
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+          merge-multiple: true
+
+      - name: Assemble npm packages
+        shell: bash
+        run: |
+          mkdir -p target/aarch64-apple-darwin/release
+          mkdir -p target/x86_64-apple-darwin/release
+          mkdir -p target/x86_64-unknown-linux-gnu/release
+          mkdir -p target/aarch64-linux-android/release
+          mkdir -p target/x86_64-pc-windows-msvc/release
+
+          tar -xzf artifacts/fusion-${GITHUB_REF_NAME}-aarch64-apple-darwin.tar.gz -C target/aarch64-apple-darwin/release/ || true
+          tar -xzf artifacts/fusion-${GITHUB_REF_NAME}-x86_64-apple-darwin.tar.gz -C target/x86_64-apple-darwin/release/ || true
+          tar -xzf artifacts/fusion-${GITHUB_REF_NAME}-x86_64-unknown-linux-gnu.tar.gz -C target/x86_64-unknown-linux-gnu/release/ || true
+          tar -xzf artifacts/fusion-${GITHUB_REF_NAME}-aarch64-linux-android.tar.gz -C target/aarch64-linux-android/release/ || true
+          tar -xzf artifacts/fusion-${GITHUB_REF_NAME}-x86_64-pc-windows-msvc.tar.gz -C target/x86_64-pc-windows-msvc/release/ || true
+
+          cd crates/codegen/xai-grok-pager/npm/fusion
+          node scripts/assemble-platform-packages.js
+
+      - name: Publish to npm
+        if: ${{ env.NPM_TOKEN != '' }}
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: |
+          cd crates/codegen/xai-grok-pager/npm
+          for dir in fusion-*; do
+            if [ -d "$dir" ]; then
+              (cd "$dir" && npm publish --access public || true)
+            fi
+          done
+          (cd fusion && npm publish --access public || true)
+
+      - name: Publish to JSR
+        run: |
+          cd crates/codegen/xai-grok-pager/npm/fusion
+          npx jsr publish --allow-dirty || true
