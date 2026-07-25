@@ -9,23 +9,27 @@
 
 ## Install
 
-### One-Liner (macOS, Linux, Termux)
+### Global Installation
+
 ```bash
+# Standalone Script (macOS, Linux, Termux)
 curl -fsSL https://fusioncode.app/install | bash
-```
 
-### npm / npx (Universal, No OS Warnings)
-```bash
-npx @fusioncode/cli login
-# or install globally
+# npm
 npm i -g @fusioncode/cli
+
+# JSR / Deno
+deno install -g -n fusion jsr:@fusioncode/cli
 ```
 
-### JSR
+### Run Without Installing
+
 ```bash
+# npm / npx
+npx @fusioncode/cli login
+
+# JSR
 npx jsr run @fusioncode/cli login
-# or with Deno
-deno run jsr:@fusioncode/cli login
 ```
 
 
