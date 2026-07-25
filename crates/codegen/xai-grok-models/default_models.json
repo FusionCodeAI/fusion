@@ -6,8 +6,8 @@
   "models": [
     {
       "model": "minmax",
-      "name": "Minimax Code (Default)",
-      "description": "Fusion primary default code model powered by Minimax",
+      "name": "Minimax 2.7 Code (Default)",
+      "description": "Fusion primary default code model powered by Minimax 2.7",
       "context_window": 500000,
       "temperature": 0.7,
       "top_p": 0.95,
@@ -16,8 +16,8 @@
     },
     {
       "model": "kimi",
-      "name": "Kimi Code",
-      "description": "Fusion secondary code model powered by Kimi K2.7",
+      "name": "Kimi 2.6 Code",
+      "description": "Fusion secondary code model powered by Moonshot Kimi K2.6",
       "context_window": 131072,
       "temperature": 0.7,
       "top_p": 0.95,
@@ -105,9 +105,9 @@
       "supported_in_api": true
     },
     {
-      "model": "cloudflare-kimi-k2.7",
-      "name": "Kimi K2.7 Code (Workers AI)",
-      "description": "Moonshot Kimi K2.7 Code model on Workers AI",
+      "model": "cloudflare-kimi-k2.6",
+      "name": "Kimi K2.6 Code (Workers AI)",
+      "description": "Moonshot Kimi K2.6 Code model on Workers AI",
       "context_window": 131072,
       "temperature": 0.7,
       "top_p": 0.95,
