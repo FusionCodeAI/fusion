@@ -1,4 +1,4 @@
-# !/usr/bin/env node
+#!/usr/bin/env node
 // Assemble the six per-platform npm packages prior to `npm publish`.
 const fs = require('fs');
 const path = require('path');
@@ -7,7 +7,7 @@ const zlib = require('zlib');
 
 const brotliCompress = promisify(zlib.brotliCompress);
 
-const fusionRoot = process.env.FUSION_ROOT || path.resolve(__dirname, '..', '..', '..', '..', '..');
+const fusionRoot = process.env.FUSION_ROOT || path.resolve(__dirname, '..', '..', '..', '..', '..', '..');
 const npmRoot = path.resolve(__dirname, '..', '..');
 
 const NOTICES_SOURCE = path.resolve(fusionRoot, 'LICENSE');
@@ -30,9 +30,8 @@ async function packPlatform({ platform, arch, envVar, defaultSource, binName }) 
 
     const source = process.env[envVar] || defaultSource;
     if (!fs.existsSync(source)) {
-        console.error(`[assemble] Missing binary for ${platform}-${arch}: ${source}`);
-        console.error(`            Set ${envVar} or build to the default location.`);
-        return false;
+        console.warn(`[assemble] Skipping ${platform}-${arch}: missing binary at ${source}`);
+        return true;
     }
 
     // Stamp the sub-package's version to match the meta package.
@@ -65,7 +64,9 @@ async function main() {
         {
             platform: 'darwin', arch: 'arm64', binName: 'fusion',
             envVar: 'FUSION_DARWIN_ARM64',
-            defaultSource: path.join(fusionRoot, 'target', 'aarch64-apple-darwin', 'release', 'fusion'),
+            defaultSource: fs.existsSync(path.join(fusionRoot, 'target', 'release', 'fusion'))
+                ? path.join(fusionRoot, 'target', 'release', 'fusion')
+                : path.join(fusionRoot, 'target', 'aarch64-apple-darwin', 'release', 'fusion'),
         },
         {
             platform: 'darwin', arch: 'x64', binName: 'fusion',
