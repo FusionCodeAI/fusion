@@ -9,20 +9,32 @@
 
 ## Install
 
-Install `fusion` globally:
+Install `fusion` globally across all platforms:
 
+### npm (Recommended — macOS, Windows, Linux)
 ```bash
-# npm (Recommended — macOS, Windows, Linux)
 npm i -g @fusioncode/cli
+```
 
-# Homebrew (macOS & Linux)
+### Windows (Scoop / PowerShell)
+```powershell
+scoop bucket add fusion https://github.com/theaungmyatmoe/fusion
+scoop install fusion
+```
+
+### macOS & Linux (Homebrew)
+```bash
 brew tap theaungmyatmoe/fusion https://github.com/theaungmyatmoe/fusion
 brew install fusion
+```
 
-# Standalone Script (macOS, Linux, Termux)
+### Standalone Script (macOS, Linux, Termux)
+```bash
 curl -fsSL https://fusioncode.app/install | bash
+```
 
-# JSR / Deno
+### JSR / Deno
+```bash
 deno install -g -n fusion jsr:@fusioncode/cli
 ```
 
