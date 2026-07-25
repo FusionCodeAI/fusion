@@ -2036,6 +2036,8 @@ pub enum Effect {
     PreparePromptImagePreview {
         preparation: crate::prompt_images::PromptImagePreviewPreparation,
     },
+    /// Spawn the Fusion browser login flow (token init → open browser → poll).
+    FusionLogin,
 }
 /// Outcome of an `x.ai/subagent/cancel` request, telling dispatch whether the
 /// pager must finalize the subagent row itself.
@@ -2709,6 +2711,11 @@ pub enum TaskResult {
     },
     /// Shared prompt-image preview state was resolved off-thread.
     PromptImagePreviewPrepared,
+    /// Fusion browser login completed (success or failure/timeout).
+    FusionLoginComplete {
+        /// `Some(email)` on success, `None` on timeout/failure.
+        email: Option<String>,
+    },
 }
 #[cfg(test)]
 mod tests {

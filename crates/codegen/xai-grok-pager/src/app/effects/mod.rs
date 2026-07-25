@@ -2801,6 +2801,86 @@ pub(crate) fn execute(
                     }
                 });
         }
+        Effect::FusionLogin => {
+            tasks.spawn(async move {
+                let api_base = std::env::var("FUSION_API_BASE_URL")
+                    .unwrap_or_else(|_| "https://api.fusioncode.app".to_string());
+                let web_base = std::env::var("FUSION_WEB_BASE_URL")
+                    .unwrap_or_else(|_| "https://fusioncode.app".to_string());
+
+                let client = reqwest::Client::new();
+                let init_url = format!("{api_base}/api/cli/token/init");
+
+                let resp = match client.post(&init_url).send().await {
+                    Ok(r) => r,
+                    Err(e) => {
+                        tracing::error!("Failed to initialize CLI token: {e}");
+                        return TaskResult::FusionLoginComplete { email: None };
+                    }
+                };
+
+                if !resp.status().is_success() {
+                    tracing::error!("Fusion API returned error initializing token");
+                    return TaskResult::FusionLoginComplete { email: None };
+                }
+
+                let Ok(init_data) = resp.json::<serde_json::Value>().await else {
+                    return TaskResult::FusionLoginComplete { email: None };
+                };
+
+                let Some(token_id) = init_data.get("tokenId").and_then(|v| v.as_str()) else {
+                    return TaskResult::FusionLoginComplete { email: None };
+                };
+
+                let auth_url = format!("{web_base}/cli-auth?token={token_id}");
+                crate::app::link_opener::open_url_if_safe(&auth_url, crate::terminal::hyperlinks::SchemeFilter::Standard);
+
+                let poll_url = format!("{api_base}/api/cli/token/{token_id}/poll");
+                let max_polls = 150; // 5 minutes timeout
+
+                for _ in 0..max_polls {
+                    tokio::time::sleep(std::time::Duration::from_secs(2)).await;
+
+                    let poll_resp = match client.get(&poll_url).send().await {
+                        Ok(r) => r,
+                        Err(_) => continue,
+                    };
+
+                    if let Ok(data) = poll_resp.json::<serde_json::Value>().await {
+                        let status = data.get("status").and_then(|v| v.as_str()).unwrap_or("");
+                        if status == "authorized" {
+                            if let Some(key) = data.get("apiKey").and_then(|v| v.as_str()) {
+                                let email = data.get("userEmail").and_then(|v| v.as_str()).map(|s| s.to_string());
+                                let grok_home = xai_grok_shell::util::grok_home::grok_home();
+                                let _ = xai_grok_shell::auth::store_api_key(&grok_home, key);
+
+                                let config_path = grok_home.join("fusion.toml");
+                                if let Some(parent) = config_path.parent() {
+                                    let _ = std::fs::create_dir_all(parent);
+                                }
+
+                                let content = std::fs::read_to_string(&config_path).unwrap_or_default();
+                                let mut doc: toml_edit::DocumentMut = content
+                                    .parse()
+                                    .unwrap_or_else(|_| toml_edit::DocumentMut::new());
+
+                                doc["provider"]["fusion"]["api_key"] = toml_edit::value(key);
+                                let _ = std::fs::write(&config_path, doc.to_string());
+
+                                unsafe { std::env::set_var("XAI_API_KEY", key) };
+
+                                tracing::info!("CLI login authorized successfully!");
+                                return TaskResult::FusionLoginComplete { email };
+                            }
+                        } else if status == "expired" || status == "invalid" {
+                            break;
+                        }
+                    }
+                }
+
+                TaskResult::FusionLoginComplete { email: None }
+            });
+        }
         Effect::ShareSession { agent_id, session_id } => {
             use xai_grok_shell::session::{ShareSessionRequest, ShareSessionResponse};
             let tx = acp_tx.clone();

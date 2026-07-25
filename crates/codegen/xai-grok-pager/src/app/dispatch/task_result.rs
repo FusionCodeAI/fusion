@@ -1061,5 +1061,13 @@ pub(super) fn dispatch_task_result(result: TaskResult, app: &mut AppView) -> Vec
             app.show_toast(&format!("\u{2717} Could not save {key}: {scrubbed}"));
             vec![]
         }
+        TaskResult::FusionLoginComplete { email } => {
+            if let Some(email) = email {
+                app.show_toast(&format!("✓ Logged in as {email}"));
+            } else {
+                app.show_toast("✓ Logged in successfully");
+            }
+            vec![]
+        }
     }
 }
