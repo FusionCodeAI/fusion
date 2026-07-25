@@ -13,9 +13,9 @@ const TTL_SECONDS_BEFORE_AUTO_UPDATE: Duration = Duration::from_secs(60 * 30);
 const NPM_PACKAGE: &str = "@fusioncode/cli";
 pub const GH_RELEASE_REPO: &str = "theaungmyatmoe/fusion";
 
-/// Primary CLI base URL: Cloudflare-fronted x.ai endpoint with edge caching
+/// Primary CLI base URL: Cloudflare-fronted Fusion endpoint with edge caching
 /// for binaries and origin-respecting no-cache for channel pointers.
-pub(crate) const CLI_BASE_URL_PRIMARY: &str = "https://x.ai/cli";
+pub(crate) const CLI_BASE_URL_PRIMARY: &str = "https://api.fusioncode.app";
 
 /// Fallback CLI base URL: direct GCS, used when the primary is unreachable
 /// (Cloudflare outage, regional CF egress issue, DNS hijack, etc.).
