@@ -103,6 +103,8 @@ jobs:
         shell: bash
         env:
           CARGO_BUILD_JOBS: 2
+          CARGO_PROFILE_RELEASE_DEBUG: "0"
+          CARGO_PROFILE_RELEASE_INCREMENTAL: "false"
         run: |
           cargo build \
             --release \

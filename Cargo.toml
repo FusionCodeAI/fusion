@@ -324,8 +324,9 @@ zbus = { version = "5" }
 zstd = "0.13"
 
 [profile.release]
-incremental = true
+incremental = false
 panic = "abort"
+debug = 0
 
 # Hardened release profile for shipping to end users (alpha + stable).
 # Use `cargo build --profile release-dist` for distribution builds.
