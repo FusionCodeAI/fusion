@@ -93,7 +93,7 @@ default-bazel = [
     "jemalloc",
     "sandbox-enforce",
     ]
-jemalloc = ["dep:tikv-jemallocator", "dep:tikv-jemalloc-sys", "dep:tikv-jemalloc-ctl"]
+jemalloc = ["dep:tikv-jemallocator?", "dep:tikv-jemalloc-sys?", "dep:tikv-jemalloc-ctl?"]
 # Forward the sandbox-enforcement feature to the library.
 sandbox-enforce = ["xai-grok-pager/sandbox-enforce"]
 release-dist = ["xai-grok-pager/release-dist"]
