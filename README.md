@@ -9,37 +9,17 @@
 
 ## Install
 
-### Global Installation
+Install `fusion` globally:
 
 ```bash
+# npm (Recommended — macOS, Windows, Linux)
+npm i -g @fusioncode/cli
+
 # Standalone Script (macOS, Linux, Termux)
 curl -fsSL https://fusioncode.app/install | bash
 
-# npm (global CLI)
-npm i -g @fusioncode/cli
-
-# JSR / Deno (global CLI)
+# JSR / Deno
 deno install -g -n fusion jsr:@fusioncode/cli
-```
-
-### Run Without Installing
-
-```bash
-# npm / npx
-npx @fusioncode/cli login
-
-# JSR
-npx jsr run @fusioncode/cli login
-```
-
-### Add as Project Dependency
-
-```bash
-# JSR (npm / yarn / pnpm / bun)
-npx jsr add @fusioncode/cli
-
-# Deno
-deno add jsr:@fusioncode/cli
 ```
 
 
