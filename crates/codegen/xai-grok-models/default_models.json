@@ -25,9 +25,9 @@
       "supported_in_api": true
     },
     {
-      "model": "cloudflare-kimi-k2.7",
-      "name": "Kimi K2.7 Code",
-      "description": "Moonshot Kimi K2.7 Code model on Workers AI",
+      "model": "grok-3",
+      "name": "Grok 3",
+      "description": "xAI Grok 3 Flagship Reasoning Model",
       "context_window": 131072,
       "temperature": 0.7,
       "top_p": 0.95,
@@ -35,70 +35,10 @@
       "supported_in_api": true
     },
     {
-      "model": "cloudflare-glm-5-2",
-      "name": "GLM 5.2 Coder",
-      "description": "Zhipu GLM-5.2 Agentic Code model on Workers AI",
-      "context_window": 262144,
-      "temperature": 0.7,
-      "top_p": 0.95,
-      "api_backend": "chat_completions",
-      "supported_in_api": true
-    },
-    {
-      "model": "cloudflare-glm-4-7-flash",
-      "name": "GLM 4.7 Flash",
-      "description": "Zhipu GLM-4.7-Flash Multilingual model on Workers AI",
+      "model": "grok-3-mini",
+      "name": "Grok 3 Mini",
+      "description": "xAI Grok 3 Fast Lightweight Model",
       "context_window": 131072,
-      "temperature": 0.7,
-      "top_p": 0.95,
-      "api_backend": "chat_completions",
-      "supported_in_api": true
-    },
-    {
-      "model": "cloudflare-qwen-coder",
-      "name": "Qwen 2.5 Coder 32B",
-      "description": "Qwen 2.5 Coder 32B Instruct on Workers AI",
-      "context_window": 32768,
-      "temperature": 0.7,
-      "top_p": 0.95,
-      "api_backend": "chat_completions",
-      "supported_in_api": true
-    },
-    {
-      "model": "cloudflare-qwen-3",
-      "name": "Qwen3 30B-A3B",
-      "description": "Qwen3 30B-A3B FP8 model on Workers AI",
-      "context_window": 32768,
-      "temperature": 0.7,
-      "top_p": 0.95,
-      "api_backend": "chat_completions",
-      "supported_in_api": true
-    },
-    {
-      "model": "cloudflare-gemma-3-27b",
-      "name": "Gemma 3 27B",
-      "description": "Google Gemma 3 27B IT on Workers AI",
-      "context_window": 131072,
-      "temperature": 0.7,
-      "top_p": 0.95,
-      "api_backend": "chat_completions",
-      "supported_in_api": true
-    },
-    {
-      "model": "cloudflare-llama-3-3-70b",
-      "name": "Llama 3.3 70B",
-      "description": "Llama 3.3 70B Instruct FP8 Fast on Workers AI",
-      "context_window": 8192,
-      "temperature": 0.7,
-      "top_p": 0.95,
-      "api_backend": "chat_completions",
-      "supported_in_api": true
-    },
-    {
-      "model": "cloudflare-deepseek-r1",
-      "name": "DeepSeek R1 8B",
-      "description": "DeepSeek R1 8B Qwen3 model on Workers AI",
-      "context_window": 16384,
       "temperature": 0.7,
       "top_p": 0.95,
       "api_backend": "chat_completions",
@@ -139,6 +79,86 @@
       "name": "DeepSeek Coder",
       "description": "DeepSeek Coder V2 model",
       "context_window": 64000,
+      "temperature": 0.7,
+      "top_p": 0.95,
+      "api_backend": "chat_completions",
+      "supported_in_api": true
+    },
+    {
+      "model": "cloudflare-kimi-k2.7",
+      "name": "Kimi K2.7 Code (Workers AI)",
+      "description": "Moonshot Kimi K2.7 Code model on Workers AI",
+      "context_window": 131072,
+      "temperature": 0.7,
+      "top_p": 0.95,
+      "api_backend": "chat_completions",
+      "supported_in_api": true
+    },
+    {
+      "model": "cloudflare-glm-5-2",
+      "name": "GLM 5.2 Coder (Workers AI)",
+      "description": "Zhipu GLM-5.2 Agentic Code model on Workers AI",
+      "context_window": 262144,
+      "temperature": 0.7,
+      "top_p": 0.95,
+      "api_backend": "chat_completions",
+      "supported_in_api": true
+    },
+    {
+      "model": "cloudflare-glm-4-7-flash",
+      "name": "GLM 4.7 Flash (Workers AI)",
+      "description": "Zhipu GLM-4.7-Flash Multilingual model on Workers AI",
+      "context_window": 131072,
+      "temperature": 0.7,
+      "top_p": 0.95,
+      "api_backend": "chat_completions",
+      "supported_in_api": true
+    },
+    {
+      "model": "cloudflare-qwen-coder",
+      "name": "Qwen 2.5 Coder 32B (Workers AI)",
+      "description": "Qwen 2.5 Coder 32B Instruct on Workers AI",
+      "context_window": 32768,
+      "temperature": 0.7,
+      "top_p": 0.95,
+      "api_backend": "chat_completions",
+      "supported_in_api": true
+    },
+    {
+      "model": "cloudflare-qwen-3",
+      "name": "Qwen3 30B-A3B (Workers AI)",
+      "description": "Qwen3 30B-A3B FP8 model on Workers AI",
+      "context_window": 32768,
+      "temperature": 0.7,
+      "top_p": 0.95,
+      "api_backend": "chat_completions",
+      "supported_in_api": true
+    },
+    {
+      "model": "cloudflare-gemma-3-27b",
+      "name": "Gemma 3 27B (Workers AI)",
+      "description": "Google Gemma 3 27B IT on Workers AI",
+      "context_window": 131072,
+      "temperature": 0.7,
+      "top_p": 0.95,
+      "api_backend": "chat_completions",
+      "supported_in_api": true
+    },
+    {
+      "model": "cloudflare-llama-3-3-70b",
+      "name": "Llama 3.3 70B (Workers AI)",
+      "description": "Llama 3.3 70B Instruct FP8 Fast on Workers AI",
+      "context_window": 8192,
+      "temperature": 0.7,
+      "top_p": 0.95,
+      "api_backend": "chat_completions",
+      "supported_in_api": true
+    },
+    {
+      "model": "cloudflare-deepseek-r1",
+      "name": "DeepSeek R1 8B (Workers AI)",
+      "description": "DeepSeek R1 8B Qwen3 model on Workers AI",
+      "context_window": 16384,
       "temperature": 0.7,
       "top_p": 0.95,
       "api_backend": "chat_completions",
