@@ -1,13 +1,33 @@
 {
-  "default": "minmax",
-  "web_search": "minmax",
-  "image_description": "minmax",
-  "session_summary": "minmax",
+  "default": "MiniMaxAI/MiniMax-M2.7",
+  "web_search": "MiniMaxAI/MiniMax-M2.7",
+  "image_description": "MiniMaxAI/MiniMax-M2.7",
+  "session_summary": "MiniMaxAI/MiniMax-M2.7",
   "models": [
     {
+      "model": "MiniMaxAI/MiniMax-M2.7",
+      "name": "MiniMax M2.7 (Default)",
+      "description": "Fusion primary default code model powered by MiniMax-M2.7",
+      "context_window": 500000,
+      "temperature": 0.7,
+      "top_p": 0.95,
+      "api_backend": "chat_completions",
+      "supported_in_api": true
+    },
+    {
+      "model": "moonshotai/Kimi-K2.6",
+      "name": "Moonshot Kimi K2.6",
+      "description": "Fusion code model powered by Moonshot Kimi-K2.6",
+      "context_window": 131072,
+      "temperature": 0.7,
+      "top_p": 0.95,
+      "api_backend": "chat_completions",
+      "supported_in_api": true
+    },
+    {
       "model": "minmax",
-      "name": "Minimax 2.7 Code (Default)",
-      "description": "Fusion primary default code model powered by Minimax 2.7",
+      "name": "MiniMax M2.7 Alias",
+      "description": "Short alias for MiniMaxAI/MiniMax-M2.7",
       "context_window": 500000,
       "temperature": 0.7,
       "top_p": 0.95,
@@ -16,8 +36,8 @@
     },
     {
       "model": "kimi",
-      "name": "Kimi 2.6 Code",
-      "description": "Fusion secondary code model powered by Moonshot Kimi K2.6",
+      "name": "Kimi K2.6 Alias",
+      "description": "Short alias for moonshotai/Kimi-K2.6",
       "context_window": 131072,
       "temperature": 0.7,
       "top_p": 0.95,
@@ -39,146 +59,6 @@
       "name": "Fusion Engine",
       "description": "Best for advanced coding and deep reasoning tasks",
       "context_window": 500000,
-      "temperature": 0.7,
-      "top_p": 0.95,
-      "api_backend": "chat_completions",
-      "supported_in_api": true
-    },
-    {
-      "model": "grok-3",
-      "name": "Grok 3",
-      "description": "xAI Grok 3 Flagship Reasoning Model",
-      "context_window": 131072,
-      "temperature": 0.7,
-      "top_p": 0.95,
-      "api_backend": "chat_completions",
-      "supported_in_api": true
-    },
-    {
-      "model": "grok-3-mini",
-      "name": "Grok 3 Mini",
-      "description": "xAI Grok 3 Fast Lightweight Model",
-      "context_window": 131072,
-      "temperature": 0.7,
-      "top_p": 0.95,
-      "api_backend": "chat_completions",
-      "supported_in_api": true
-    },
-    {
-      "model": "gpt-4o",
-      "name": "OpenAI GPT-4o",
-      "description": "GPT-4o flagship model",
-      "context_window": 128000,
-      "temperature": 0.7,
-      "top_p": 0.95,
-      "api_backend": "chat_completions",
-      "supported_in_api": true
-    },
-    {
-      "model": "gpt-4o-mini",
-      "name": "OpenAI GPT-4o Mini",
-      "description": "GPT-4o Mini model",
-      "context_window": 128000,
-      "temperature": 0.7,
-      "top_p": 0.95,
-      "api_backend": "chat_completions",
-      "supported_in_api": true
-    },
-    {
-      "model": "deepseek-chat",
-      "name": "DeepSeek Chat",
-      "description": "DeepSeek Chat V3 model",
-      "context_window": 64000,
-      "temperature": 0.7,
-      "top_p": 0.95,
-      "api_backend": "chat_completions",
-      "supported_in_api": true
-    },
-    {
-      "model": "deepseek-coder",
-      "name": "DeepSeek Coder",
-      "description": "DeepSeek Coder V2 model",
-      "context_window": 64000,
-      "temperature": 0.7,
-      "top_p": 0.95,
-      "api_backend": "chat_completions",
-      "supported_in_api": true
-    },
-    {
-      "model": "cloudflare-kimi-k2.6",
-      "name": "Kimi K2.6 Code (Workers AI)",
-      "description": "Moonshot Kimi K2.6 Code model on Workers AI",
-      "context_window": 131072,
-      "temperature": 0.7,
-      "top_p": 0.95,
-      "api_backend": "chat_completions",
-      "supported_in_api": true
-    },
-    {
-      "model": "cloudflare-glm-5-2",
-      "name": "GLM 5.2 Coder (Workers AI)",
-      "description": "Zhipu GLM-5.2 Agentic Code model on Workers AI",
-      "context_window": 262144,
-      "temperature": 0.7,
-      "top_p": 0.95,
-      "api_backend": "chat_completions",
-      "supported_in_api": true
-    },
-    {
-      "model": "cloudflare-glm-4-7-flash",
-      "name": "GLM 4.7 Flash (Workers AI)",
-      "description": "Zhipu GLM-4.7-Flash Multilingual model on Workers AI",
-      "context_window": 131072,
-      "temperature": 0.7,
-      "top_p": 0.95,
-      "api_backend": "chat_completions",
-      "supported_in_api": true
-    },
-    {
-      "model": "cloudflare-qwen-coder",
-      "name": "Qwen 2.5 Coder 32B (Workers AI)",
-      "description": "Qwen 2.5 Coder 32B Instruct on Workers AI",
-      "context_window": 32768,
-      "temperature": 0.7,
-      "top_p": 0.95,
-      "api_backend": "chat_completions",
-      "supported_in_api": true
-    },
-    {
-      "model": "cloudflare-qwen-3",
-      "name": "Qwen3 30B-A3B (Workers AI)",
-      "description": "Qwen3 30B-A3B FP8 model on Workers AI",
-      "context_window": 32768,
-      "temperature": 0.7,
-      "top_p": 0.95,
-      "api_backend": "chat_completions",
-      "supported_in_api": true
-    },
-    {
-      "model": "cloudflare-gemma-3-27b",
-      "name": "Gemma 3 27B (Workers AI)",
-      "description": "Google Gemma 3 27B IT on Workers AI",
-      "context_window": 131072,
-      "temperature": 0.7,
-      "top_p": 0.95,
-      "api_backend": "chat_completions",
-      "supported_in_api": true
-    },
-    {
-      "model": "cloudflare-llama-3-3-70b",
-      "name": "Llama 3.3 70B (Workers AI)",
-      "description": "Llama 3.3 70B Instruct FP8 Fast on Workers AI",
-      "context_window": 8192,
-      "temperature": 0.7,
-      "top_p": 0.95,
-      "api_backend": "chat_completions",
-      "supported_in_api": true
-    },
-    {
-      "model": "cloudflare-deepseek-r1",
-      "name": "DeepSeek R1 8B (Workers AI)",
-      "description": "DeepSeek R1 8B Qwen3 model on Workers AI",
-      "context_window": 16384,
       "temperature": 0.7,
       "top_p": 0.95,
       "api_backend": "chat_completions",
