@@ -1,13 +1,14 @@
 {
     "name": "@fusioncode/cli",
-    "version": "0.1.0",
+    "version": "0.1.1",
     "description": "Bring Fusion into your terminal",
     "license": "Apache-2.0",
     "bin": {
         "fusion": "bin/fusion.js"
     },
     "files": [
-        "bin/"
+        "bin/",
+        "README.md"
     ],
     "os": [
         "darwin",
@@ -31,11 +32,11 @@
         "@iarna/toml": "^3.0.0"
     },
     "optionalDependencies": {
-        "@fusioncode/cli-darwin-arm64": "0.1.0",
-        "@fusioncode/cli-darwin-x64": "0.1.0",
-        "@fusioncode/cli-linux-arm64": "0.1.0",
-        "@fusioncode/cli-linux-x64": "0.1.0",
-        "@fusioncode/cli-win32-arm64": "0.1.0",
-        "@fusioncode/cli-win32-x64": "0.1.0"
+        "@fusioncode/cli-darwin-arm64": "0.1.1",
+        "@fusioncode/cli-darwin-x64": "0.1.1",
+        "@fusioncode/cli-linux-arm64": "0.1.1",
+        "@fusioncode/cli-linux-x64": "0.1.1",
+        "@fusioncode/cli-win32-arm64": "0.1.1",
+        "@fusioncode/cli-win32-x64": "0.1.1"
     }
 }

@@ -1,61 +1,75 @@
-# Grok
+# Fusion
 
-Bring Grok into your terminal. Fast, flicker-free CLI built for plans, subagents, and parallel work.
+**Fusion** is a terminal-first AI coding agent — **made by Fusion AI**.
 
-**[Homepage](https://x.ai/cli)** | **[Documentation](https://docs.x.ai/build/overview)**
+| Desktop | Mobile (Termux) |
+|:---:|:---:|
+| ![Fusion TUI](docs/screenshot.png) | ![Fusion on Termux](docs/screenshot_mobile.png) |
+
 
 ## Install
 
+Install `fusion` globally across all platforms:
+
+### npm (Recommended — macOS, Windows, Linux)
 ```bash
-curl -fsSL https://x.ai/cli/install.sh | bash
+npm i -g @fusioncode/cli
 ```
 
-Or install with npm:
-
-```bash
-npm i -g @xai-official/grok
+### Windows (Scoop / PowerShell)
+```powershell
+scoop bucket add fusion https://github.com/theaungmyatmoe/fusion
+scoop install fusion
 ```
 
-## Get Started
-
+### macOS & Linux (Homebrew)
 ```bash
-# Launch the interactive TUI
-grok
-
-# Run a single task
-grok -p "Explain this codebase"
+brew tap theaungmyatmoe/fusion https://github.com/theaungmyatmoe/fusion
+brew install fusion
 ```
 
-On first launch, Grok opens your browser to authenticate. For CI or headless environments, use an API key from [console.x.ai](https://console.x.ai):
-
+### Standalone Script (macOS, Linux, Termux)
 ```bash
-export XAI_API_KEY="xai-..."
+curl -fsSL https://fusioncode.app/install | bash
 ```
 
-## Update
-
+### JSR / Deno
 ```bash
-grok update
+deno install -g -n fusion jsr:@fusioncode/cli
 ```
 
-Or if installed via npm:
+
+## Usage
 
 ```bash
-npm i -g @xai-official/grok@latest
+fusion login                    # sign in via browser OAuth
+fusion                          # interactive TUI
+fusion -p "fix the bug"         # single-turn prompt
+fusion --always-approve         # auto-approve tool execution
 ```
 
-## Supported Platforms
+### Sign In Flow
 
-| Platform | Architecture |
-|---|---|
-| macOS | Apple Silicon (arm64) |
-| Linux | x86_64, arm64 |
-| Windows | x86_64 |
+```bash
+$ fusion login
 
-## Documentation
+  Initializing Fusion login session…
 
-For full documentation including configuration, MCP servers, custom models, headless mode, agent mode, and more, visit [docs.x.ai/build/overview](https://docs.x.ai/build/overview).
+  Opening browser to sign in to Fusion…
+  If browser does not open automatically, visit:
+    https://fusioncode.app/cli-auth?token=...
 
-## Feedback
+  Waiting for authorization…
 
-Run `/feedback` inside Grok to report issues or send feedback directly.
+  ✓ Logged in as user@example.com
+    API key saved to: ~/.fusion/fusion.toml
+
+  You can now run `fusion` to start the AI agent.
+```
+
+> For configuration, build instructions, architecture details, and the full CLI reference see **[docs/DETAILS.md](docs/DETAILS.md)**.
+
+
+## License
+
+MIT OR Apache-2.0

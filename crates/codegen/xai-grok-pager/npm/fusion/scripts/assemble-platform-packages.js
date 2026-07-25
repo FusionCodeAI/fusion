@@ -42,6 +42,10 @@ async function packPlatform({ platform, arch, envVar, defaultSource, binName }) 
     if (fs.existsSync(NOTICES_SOURCE)) {
         fs.copyFileSync(NOTICES_SOURCE, path.join(pkgDir, NOTICES_NAME));
     }
+    const README_SOURCE = path.resolve(fusionRoot, 'README.md');
+    if (fs.existsSync(README_SOURCE)) {
+        fs.copyFileSync(README_SOURCE, path.join(pkgDir, 'README.md'));
+    }
 
     // Brotli-compress into the sub-package's bin/.
     const outBr = path.join(pkgDir, 'bin', `${binName}.br`);

@@ -1,11 +1,75 @@
-# @xai-official/grok-darwin-x64
+# Fusion
 
-Platform-specific binary for [`@xai-official/grok`](https://www.npmjs.com/package/@xai-official/grok) on darwin-x64.
+**Fusion** is a terminal-first AI coding agent — **made by Fusion AI**.
 
-Do not install this package directly. Install the main package instead:
+| Desktop | Mobile (Termux) |
+|:---:|:---:|
+| ![Fusion TUI](docs/screenshot.png) | ![Fusion on Termux](docs/screenshot_mobile.png) |
 
-```sh
-npm install -g @xai-official/grok
+
+## Install
+
+Install `fusion` globally across all platforms:
+
+### npm (Recommended — macOS, Windows, Linux)
+```bash
+npm i -g @fusioncode/cli
 ```
 
-The main package will automatically pull the correct binary for your platform via `optionalDependencies`.
+### Windows (Scoop / PowerShell)
+```powershell
+scoop bucket add fusion https://github.com/theaungmyatmoe/fusion
+scoop install fusion
+```
+
+### macOS & Linux (Homebrew)
+```bash
+brew tap theaungmyatmoe/fusion https://github.com/theaungmyatmoe/fusion
+brew install fusion
+```
+
+### Standalone Script (macOS, Linux, Termux)
+```bash
+curl -fsSL https://fusioncode.app/install | bash
+```
+
+### JSR / Deno
+```bash
+deno install -g -n fusion jsr:@fusioncode/cli
+```
+
+
+## Usage
+
+```bash
+fusion login                    # sign in via browser OAuth
+fusion                          # interactive TUI
+fusion -p "fix the bug"         # single-turn prompt
+fusion --always-approve         # auto-approve tool execution
+```
+
+### Sign In Flow
+
+```bash
+$ fusion login
+
+  Initializing Fusion login session…
+
+  Opening browser to sign in to Fusion…
+  If browser does not open automatically, visit:
+    https://fusioncode.app/cli-auth?token=...
+
+  Waiting for authorization…
+
+  ✓ Logged in as user@example.com
+    API key saved to: ~/.fusion/fusion.toml
+
+  You can now run `fusion` to start the AI agent.
+```
+
+> For configuration, build instructions, architecture details, and the full CLI reference see **[docs/DETAILS.md](docs/DETAILS.md)**.
+
+
+## License
+
+MIT OR Apache-2.0
