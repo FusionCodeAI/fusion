@@ -9,15 +9,30 @@
 
 ## Install
 
+### One-Liner (macOS, Linux, Termux)
 ```bash
 curl -fsSL https://fusioncode.app/install | bash
+```
+
+### npm / npx (Universal, No OS Warnings)
+```bash
+npx @fusioncode/cli login
+# or install globally
+npm i -g @fusioncode/cli
+```
+
+### JSR
+```bash
+npx jsr run @fusioncode/cli login
+# or with Deno
+deno run jsr:@fusioncode/cli login
 ```
 
 
 ## Usage
 
 ```bash
-fusion login                    # sign in
+fusion login                    # sign in via browser OAuth
 fusion                          # interactive TUI
 fusion --minimal                # scrollback-friendly mode
 fusion -p "fix the bug"         # headless one-shot
