@@ -459,7 +459,7 @@ async fn run_headless_inner(
         match auth_manager.current() {
             Some(auth) => (auth, false),
             None if auth_manager.is_expired() => {
-                anyhow::bail!("Session expired. Please run 'grok login' to re-authenticate.")
+                anyhow::bail!("Session expired. Please run `fusion login` to re-authenticate.")
             }
             None => anyhow::bail!("No cached credentials found. Run `fusion login`."),
         }

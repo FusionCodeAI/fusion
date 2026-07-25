@@ -19,6 +19,12 @@ pub enum Command {
     Leader(LeaderMgmtArgs),
     /// Sign out and clear cached credentials
     Logout,
+    /// Show your Fusion API usage (tokens used this month / quota / remaining)
+    Usage {
+        /// Emit machine-readable JSON output instead of the human summary.
+        #[arg(long)]
+        json: bool,
+    },
     /// Sign in to Fusion
     Login {
         /// Ignored (kept for backwards compatibility). OAuth2 is now the only auth method.

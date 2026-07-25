@@ -9,16 +9,20 @@
 # Environment variables always override file config.
 # Also supports zencode.json (JSON) for backward compatibility.
 
-# Model to use (default: Kimi 2.7 Code via Cloudflare Workers AI)
-model = "@cf/moonshotai/kimi-k2.7-code"
-# small_model = "@cf/moonshotai/kimi-k2.7-code"
+# Model to use (default: MiniMax M2.7 via the Fusion Gateway).
+# The Fusion Gateway (api.fusioncode.app) authenticates with the `fc_` API
+# key saved by `fusion login`. Gateway-supported models:
+#   MiniMaxAI/MiniMax-M2.7  (default),  moonshotai/Kimi-K2.6,  fusion,  kimi
+model = "MiniMaxAI/MiniMax-M2.7"
+# small_model = "MiniMaxAI/MiniMax-M2.7"
 
 # Auto-approve all tool actions (use carefully!)
 yolo = false
 
 [provider]
-# Which provider to use by default: "cloudflare", "xai", "openai", "auto"
-default = "cloudflare"
+# Fusion Gateway is the primary (main) provider. OAuth/xAI/OpenAI are
+# secondary. `fusion login` saves the API key under [provider.fusion].
+default = "fusion"
 
 # Prefer real credentials in ~/.config/fusion/fusion.toml or env vars.
 # Template placeholders here are ignored by the loader, but keeping them

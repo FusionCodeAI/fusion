@@ -68,7 +68,8 @@
             &mut app
         ));
         assert!(app.is_api_key_auth);
-        assert!(!app.usage_visible);
+        // Fusion API keys are first-class: `/usage` is visible for them.
+        assert!(app.usage_visible);
         assert!(app.tier_restricted_commands.is_empty());
         assert!(app.voice_mode_enabled);
 

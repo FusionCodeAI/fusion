@@ -29,7 +29,7 @@ use xai_grok_telemetry::events::ManualAuthSurface;
 use super::model::UserInfo;
 use super::model::{
     AuthMode, GrokAuth, early_invalidation, is_expired, is_expired_with_buffer, lookup_auth,
-    token_suffix,
+    lookup_auth_or_api_key, token_suffix,
 };
 use super::refresh::{RefreshOutcome, TokenRefresher, resolve_refresh_credential};
 use super::storage::{
@@ -299,7 +299,10 @@ impl AuthManager {
 
         let (auth, auth_read_detail, initial_disk_state) = match read_auth_json(&path) {
             Ok(map) => {
-                let found = lookup_auth(&map, &scope);
+                // Fusion API key is the primary auth path: prefer the
+                // configured (xAI OIDC) scope, then fall back to the
+                // `xai::api_key` scope written by `fusion login`.
+                let found = lookup_auth_or_api_key(&map, &scope);
                 // If lookup_auth skipped a legacy WebLogin token, remove the
                 // stale scope entry from auth.json so it is not re-evaluated
                 // on every launch.
@@ -1065,7 +1068,7 @@ impl AuthManager {
     fn read_disk_auth_silent(&self) -> Option<GrokAuth> {
         read_auth_json(&self.path)
             .ok()
-            .and_then(|map| lookup_auth(&map, &self.scope))
+            .and_then(|map| lookup_auth_or_api_key(&map, &self.scope))
     }
 
     /// Wire-valid token present in on-disk `auth.json`, judged by actual expiry
@@ -1093,7 +1096,10 @@ impl AuthManager {
     pub(crate) fn read_disk_auth_with_state(&self) -> (Option<GrokAuth>, DiskAuthState) {
         let (auth, state, err_detail) = match read_auth_json(&self.path) {
             Ok(map) => {
-                let found = lookup_auth(&map, &self.scope);
+                // Fusion API key is the primary auth path: prefer the
+                // configured (xAI OIDC) scope, then fall back to the
+                // `xai::api_key` scope written by `fusion login`.
+                let found = lookup_auth_or_api_key(&map, &self.scope);
                 let state = if found.is_some() {
                     DiskAuthState::Ok
                 } else {
@@ -1816,7 +1822,7 @@ impl AuthManager {
     /// different valid token (a sibling process wrote a fresher one).
     pub(crate) fn pick_up_sibling_token(&self) {
         let auth = match read_auth_json(&self.path) {
-            Ok(map) => lookup_auth(&map, &self.scope),
+            Ok(map) => lookup_auth_or_api_key(&map, &self.scope),
             _ => None,
         };
         if let Some(ref a) = auth

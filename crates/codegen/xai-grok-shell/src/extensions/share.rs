@@ -173,10 +173,9 @@ async fn upload_share_data_to_gcs(
 fn require_xai_auth_for_share(
     auth_manager: &crate::auth::AuthManager,
 ) -> Result<crate::auth::GrokAuth, acp::Error> {
-    super::auth_gate::require_xai_auth(
+    super::auth_gate::require_fusion_auth(
         auth_manager,
         "Authentication required to share session",
-        "Share session is disabled. Run `fusion login` to authenticate.",
     )
 }
 
@@ -252,39 +251,27 @@ mod tests {
     }
 
     #[test]
-    fn share_rejects_non_xai_auth_with_actionable_grok_login_message() {
+    fn share_accepts_fusion_api_key_auth() {
         let dir = tempdir().expect("tempdir");
         let mgr = Arc::new(crate::auth::AuthManager::new(
             dir.path(),
             GrokComConfig::default(),
         ));
 
-        // API key is the simplest non-xAI credential (External and enterprise OIDC
-        // are also rejected the same way).
-        let non_xai = GrokAuth {
+        // A Fusion API key is the primary auth path and must be accepted by
+        // share (previously it was rejected with a "run fusion login" nag).
+        let api_key = GrokAuth {
             auth_mode: AuthMode::ApiKey,
-            key: "xai-test-key".into(),
+            key: "fusion-test-key".into(),
             create_time: Utc::now(),
             ..Default::default()
         };
-        mgr.hot_swap(non_xai);
+        mgr.hot_swap(api_key);
 
-        let err = require_xai_auth_for_share(&mgr)
-            .expect_err("non-xAI accounts (API key, External, enterprise IdP) must be rejected");
-
-        // This is the key assertion the review asked for: we must test the *exact*
-        // actionable data string for the non-xAI path (distinct from the generic
-        // "Authentication required to share session" path).
-        let serialized =
-            serde_json::to_value(&err).expect("acp::Error serializes to JSON-RPC shape");
-        let data = serialized
-            .get("data")
-            .and_then(|v| v.as_str())
-            .expect("auth_required error carries a data string");
-
-        assert_eq!(
-            data,
-            "Share session is disabled. Run `fusion login` to authenticate."
+        let res = require_xai_auth_for_share(&mgr);
+        assert!(
+            res.is_ok(),
+            "Fusion API keys must authenticate share (primary auth path)"
         );
     }
 }

@@ -1276,7 +1276,12 @@ impl AppView {
                 .subscription_tier
                 .as_deref()
                 .is_some_and(is_api_key_label);
-        self.usage_visible = meta.team_name.is_none() && !self.is_api_key_auth;
+        // `/usage` is available for every non-team identity, including Fusion
+        // API keys (the primary auth path). The `Effect::FetchBilling` path
+        // calls the Fusion-native `GET /v1/usage` endpoint with the API key,
+        // so API-key users can see their usage. Teams are excluded because
+        // usage is billed at the team level elsewhere.
+        self.usage_visible = meta.team_name.is_none();
         self.apply_tier_restrictions();
         if self.is_api_key_auth {
             self.ensure_voice_for_api_key();
@@ -6508,7 +6513,8 @@ pub(crate) mod tests {
             ..Default::default()
         });
         assert!(app.is_api_key_auth);
-        assert!(!app.usage_visible);
+        // Fusion API keys are first-class: `/usage` is visible for them.
+        assert!(app.usage_visible);
         assert!(app.tier_restricted_commands.is_empty());
         assert_tier_restricted_commands_present(&app);
         assert!(!app.is_voice_tier_restricted());

@@ -141,6 +141,26 @@ impl GrokAuth {
         }
     }
 
+    /// `true` when this credential is a Fusion API key (`fusion login` or
+    /// `fusion login --api-key`). Fusion API keys are the primary,
+    /// first-class authentication path in this build; OAuth/xAI session
+    /// auth is secondary. Gates that need *any* valid Fusion identity
+    /// (billing, usage, share, …) should prefer [`is_authenticated`].
+    pub fn is_fusion_api_key(&self) -> bool {
+        matches!(self.auth_mode, AuthMode::ApiKey) && !self.key.is_empty()
+    }
+
+    /// `true` when this credential can authenticate against the Fusion
+    /// gateway — i.e. a non-empty key. This is the broad "is the user
+    /// logged in" predicate: it accepts a Fusion API key (primary) as
+    /// well as xAI OAuth / external session tokens (secondary). Use this
+    /// instead of [`is_xai_auth`] for feature gates that should work for
+    /// any valid Fusion identity, reserving `is_xai_auth` for features
+    /// that genuinely require a grok.com subscription principal.
+    pub fn is_authenticated(&self) -> bool {
+        !self.key.is_empty()
+    }
+
     /// `true` when this auth can access grok.com managed MCP connectors.
     pub fn is_managed_mcp_eligible(&self) -> bool {
         self.is_xai_auth() || self.auth_mode == AuthMode::WebLogin
@@ -318,6 +338,27 @@ pub fn lookup_auth(map: &AuthStore, scope: &str) -> Option<GrokAuth> {
     Some(auth)
 }
 
+/// Look up auth, preferring the Fusion API-key scope (`xai::api_key`) — the
+/// canonical credential written by `fusion login` — and falling back to the
+/// configured (xAI OIDC) scope when no API key is present.
+///
+/// `fusion login` (browser + `--api-key`) persists the credential under the
+/// `xai::api_key` scope. A stale entry left under the xAI OIDC scope (e.g. an
+/// older login that wrote there) must NOT take precedence over the current
+/// API key — otherwise the client sends the stale key, the gateway 401s, and
+/// the user is told to re-login on every launch (the "login again and again"
+/// bug). The Fusion API key is the primary, first-class auth path; an xAI
+/// OIDC session (when present and no API key exists) is the secondary path
+/// used by OAuth users.
+pub fn lookup_auth_or_api_key(map: &AuthStore, scope: &str) -> Option<GrokAuth> {
+    if let Some(auth) = map.get(API_KEY_SCOPE) {
+        if auth.auth_mode != AuthMode::WebLogin {
+            return Some(auth.clone());
+        }
+    }
+    lookup_auth(map, scope)
+}
+
 /// Early-invalidation buffer. Override with `GROK_AUTH_EARLY_INVALIDATION_SECS`
 /// for testing (e.g. `=5` to shrink the buffer to 5 seconds).
 pub(super) fn early_invalidation() -> Duration {
@@ -448,6 +489,33 @@ mod tests {
         let mut map = AuthStore::new();
         map.insert("scope".into(), make_auth(AuthMode::ApiKey));
         assert!(lookup_auth(&map, "scope").is_some());
+    }
+
+    #[test]
+    fn lookup_auth_or_api_key_prefers_api_key_scope() {
+        // The "login again and again" bug: a stale key left under the xAI OIDC
+        // scope must NOT take precedence over the current Fusion API key in the
+        // `xai::api_key` scope (where `fusion login` writes).
+        let mut map = AuthStore::new();
+        map.insert("oidc-scope".into(), make_auth(AuthMode::Oidc));
+        map.insert(super::API_KEY_SCOPE.into(), make_auth(AuthMode::ApiKey));
+        let auth = lookup_auth_or_api_key(&map, "oidc-scope").expect("API key scope wins");
+        assert!(matches!(auth.auth_mode, AuthMode::ApiKey));
+    }
+
+    #[test]
+    fn lookup_auth_or_api_key_falls_back_to_oidc_scope() {
+        // OAuth users with no API key still resolve via the OIDC scope.
+        let mut map = AuthStore::new();
+        map.insert("oidc-scope".into(), make_auth(AuthMode::Oidc));
+        let auth = lookup_auth_or_api_key(&map, "oidc-scope").expect("OIDC scope fallback");
+        assert!(matches!(auth.auth_mode, AuthMode::Oidc));
+    }
+
+    #[test]
+    fn lookup_auth_or_api_key_returns_none_when_empty() {
+        let map = AuthStore::new();
+        assert!(lookup_auth_or_api_key(&map, "oidc-scope").is_none());
     }
 
     /// subscriptionTier present → deserializes to Some.

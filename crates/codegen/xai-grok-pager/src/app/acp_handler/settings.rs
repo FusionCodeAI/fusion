@@ -117,12 +117,14 @@ pub(super) fn handle_settings_update(notif: &acp::ExtNotification, app: &mut App
     }
     // Tier before voice: same payload may set "API Key" and voice_mode_enabled=false.
     // Always recompute is_api_key_auth from the tier so a later Free/Fusion
-    // stamp does not leave API-key bypass / hidden `/usage` stuck.
+    // stamp does not leave API-key bypass / `/usage` visibility stuck.
     if let Some(v) = update.subscription_tier_display {
         let was_api_key = app.is_api_key_auth;
         let is_key = super::super::app_view::is_api_key_label(&v);
         app.is_api_key_auth = is_key;
-        app.usage_visible = !is_key && app.team_name.is_none();
+        // `/usage` is available for Fusion API keys (primary auth path) and
+        // all other non-team identities; only teams are excluded.
+        app.usage_visible = app.team_name.is_none();
         app.subscription_tier = Some(v);
         app.apply_tier_restrictions();
         // Leaving API Key → free/X Basic without a voice field: drop force-on.

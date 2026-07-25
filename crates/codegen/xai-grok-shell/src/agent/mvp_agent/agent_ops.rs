@@ -64,7 +64,10 @@ impl MvpAgent {
     }
     fn has_proxy_credentials(&self) -> bool {
         self.cfg.borrow().endpoints.deployment_key.is_some()
-            || self.auth_manager.current_or_expired().is_some_and(|a| a.is_xai_auth())
+            || self
+                .auth_manager
+                .current_or_expired()
+                .is_some_and(|a| a.is_xai_auth() || a.is_fusion_api_key())
     }
     /// `true` for session-based ACP auth methods.
     fn is_session_based_auth(&self) -> bool {
@@ -401,7 +404,7 @@ impl MvpAgent {
         let user_token = self
             .auth_manager
             .current_or_expired()
-            .filter(|a| a.is_xai_auth())
+            .filter(|a| a.is_xai_auth() || a.is_fusion_api_key())
             .map(|a| a.key.clone());
         let cfg = self.cfg.borrow();
         let base_url = cfg.endpoints.resolve_feedback_base_url();

@@ -35,7 +35,7 @@ mod meta;
 pub use error::{AuthError, RefreshTokenError, RefreshTokenFailedReason};
 pub use manager::{AuthManager, shared_api_key_provider};
 pub use meta::{AuthMeta, GateInfo};
-pub use model::{AuthMode, GrokAuth, lookup_auth};
+pub use model::{AuthMode, GrokAuth, lookup_auth, lookup_auth_or_api_key};
 pub(crate) use model::{TOKEN_TTL, UserInfo, is_expired, token_suffix};
 pub(crate) use refresh::DiagnosticUploader;
 pub use storage::{

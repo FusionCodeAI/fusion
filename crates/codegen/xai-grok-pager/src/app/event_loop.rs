@@ -716,9 +716,11 @@ pub(crate) async fn run(
         app.is_api_key_auth = app.auth_methods.iter().any(|m| {
             m.id().0.as_ref() == xai_grok_shell::agent::auth_method::XAI_API_KEY_METHOD_ID
         });
-        // No AuthMeta on this path — hide `/usage` for API keys.
+        // `/usage` is available for Fusion API keys (primary auth path): the
+        // `Effect::FetchBilling` path fetches from the Fusion-native
+        // `GET /v1/usage` endpoint with the API key.
         if app.is_api_key_auth {
-            app.usage_visible = false;
+            app.usage_visible = true;
         }
     }
 

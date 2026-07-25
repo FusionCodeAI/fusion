@@ -116,6 +116,90 @@ async fn fusion_api_key_login(key: &str) -> anyhow::Result<()> {
     Ok(())
 }
 
+/// `fusion usage` — fetch and print the authenticated user's Fusion API usage
+/// from `GET {api_base}/v1/usage`, using the API key stored in
+/// `~/.fusion/auth.json` / `~/.fusion/fusion.toml` or the `FUSION_API_KEY` /
+/// `CLOUDFLARE_API_KEY` env vars. Works for Fusion API keys (primary auth)
+/// as well as xAI session tokens (secondary).
+async fn fusion_usage_cli(json: bool) -> anyhow::Result<()> {
+    let api_base = default_api_base_url().await;
+
+    let grok_home = xai_grok_shell::util::grok_home::grok_home();
+    let api_key = xai_grok_shell::auth::read_api_key(&grok_home)
+        .or_else(|| std::env::var("FUSION_API_KEY").ok())
+        .or_else(|| std::env::var("CLOUDFLARE_API_KEY").ok())
+        .or_else(|| std::env::var("XAI_API_KEY").ok())
+        .filter(|k| !k.trim().is_empty());
+
+    let api_key = match api_key {
+        Some(k) => k,
+        None => anyhow::bail!(
+            "Not logged in to Fusion. Run `fusion login` (or `fusion login --api-key <KEY>`) first."
+        ),
+    };
+
+    let url = format!("{api_base}/v1/usage");
+    let resp = reqwest::Client::new()
+        .get(&url)
+        .header("Authorization", format!("Bearer {api_key}"))
+        .send()
+        .await
+        .map_err(|e| anyhow::anyhow!("Could not reach Fusion API ({url}): {e}"))?;
+
+    let status = resp.status();
+    if status == reqwest::StatusCode::UNAUTHORIZED {
+        anyhow::bail!(
+            "Fusion API rejected your key (401). Run `fusion login` to re-authenticate."
+        );
+    }
+    if !status.is_success() {
+        let body = resp.text().await.unwrap_or_default();
+        anyhow::bail!("Fusion API returned status {status}: {body}");
+    }
+
+    let usage: serde_json::Value = resp
+        .json()
+        .await
+        .map_err(|e| anyhow::anyhow!("Failed to parse usage response: {e}"))?;
+
+    if json {
+        println!("{}", serde_json::to_string_pretty(&usage)?);
+        return Ok(());
+    }
+
+    let email = usage
+        .get("user_email")
+        .and_then(|v| v.as_str())
+        .unwrap_or("(unknown)");
+    let used = usage
+        .get("used_tokens_this_month")
+        .and_then(|v| v.as_u64())
+        .unwrap_or(0);
+    let quota = usage
+        .get("quota_tokens")
+        .and_then(|v| v.as_u64())
+        .unwrap_or(0);
+    let remaining = usage
+        .get("remaining_tokens")
+        .and_then(|v| v.as_u64())
+        .unwrap_or(0);
+
+    let pct = if quota > 0 {
+        (used as f64 / quota as f64) * 100.0
+    } else {
+        0.0
+    };
+
+    eprintln!("  Fusion API usage ({email})");
+    eprintln!("    Used this month : {used} tokens ({pct:.1}%)");
+    eprintln!("    Quota           : {quota} tokens");
+    eprintln!("    Remaining       : {remaining} tokens");
+    eprintln!();
+    eprintln!("  Fetched from {url}");
+
+    Ok(())
+}
+
 /// Ensure any API key configured in fusion.toml or environment variables
 /// (FUSION_API_KEY, CLOUDFLARE_API_KEY) is synced to auth.json store on startup.
 fn sync_fusion_toml_key_to_auth_store() {
@@ -2109,6 +2193,11 @@ async fn async_main() -> Result<()> {
                 let config = AgentConfig::new_from_toml_cfg(&config)
                     .map_err(|e| anyhow::anyhow!("Failed to create agent config: {e}"))?;
                 xai_grok_shell::auth::run_cli_logout(&config)?;
+                xai_grok_shell::instrumentation::finalize_and_exit(0);
+            }
+            Command::Usage { json } => {
+                init_tracing_simple("cli");
+                fusion_usage_cli(json).await?;
                 xai_grok_shell::instrumentation::finalize_and_exit(0);
             }
             Command::Wrap(ref wrap_args) => {

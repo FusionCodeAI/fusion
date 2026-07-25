@@ -38,6 +38,52 @@ const DEFAULT_CLIENT_IDENTIFIER: &str = "grok-shell";
 
 /// Product identifier baked into User-Agent strings.
 const AGENT_PRODUCT: &str = "grok-shell";
+
+/// Sanitize a serialized chat-completions request body so no message content
+/// part has an empty `text` string. Upstream providers (and the Fusion
+/// Gateway's MiniMax/Kimi backends) reject `content[i].text: must not be
+/// empty` with a 400, which surfaces as a hard turn failure. The client can
+/// emit empty text parts for empty tool results or assistant turns, so this
+/// is the single chokepoint that guarantees a non-empty string reaches the
+/// wire. Mutates the `messages` array in place; no-op when absent.
+pub(crate) fn sanitize_empty_text_parts(body: &mut serde_json::Value) {
+    let Some(messages) = body.get_mut("messages").and_then(|m| m.as_array_mut()) else {
+        return;
+    };
+    for msg in messages {
+        let Some(content) = msg.get_mut("content") else {
+            continue;
+        };
+        match content {
+            serde_json::Value::String(s) if s.is_empty() => *content = serde_json::Value::String(" ".to_string()),
+            serde_json::Value::Null => *content = serde_json::Value::String(" ".to_string()),
+            serde_json::Value::Array(parts) => {
+                if parts.is_empty() {
+                    *content = serde_json::Value::String(" ".to_string());
+                    continue;
+                }
+                for part in parts.iter_mut() {
+                    match part {
+                        serde_json::Value::String(s) if s.is_empty() => {
+                            *part = serde_json::Value::String(" ".to_string());
+                        }
+                        serde_json::Value::Object(obj) => {
+                            if obj.get("type").and_then(|v| v.as_str()) == Some("text") {
+                                if let Some(text) = obj.get_mut("text")
+                                    && text.as_str().is_some_and(|t| t.is_empty())
+                                {
+                                    *text = serde_json::Value::String(" ".to_string());
+                                }
+                            }
+                        }
+                        _ => {}
+                    }
+                }
+            }
+            _ => {}
+        }
+    }
+}
 const ANTHROPIC_DEFAULT_MAX_TOKENS: u32 = 128_000;
 
 /// Per-request `x-grok-*` headers. Optional fields are skipped when empty/`None`.
@@ -861,9 +907,15 @@ impl SamplingClient {
             deployment_id: payload.x_grok_deployment_id.as_deref(),
             user_id: payload.x_grok_user_id.as_deref(),
         };
+        let mut request_body = serde_json::to_value(&payload)
+            .map_err(|e| {
+                tracing::error!("Failed to serialize chat completion request: {}", e);
+                SamplingError::Serialization(e)
+            })?;
+        sanitize_empty_text_parts(&mut request_body);
         let http_request = grok_headers
             .apply(self.post(self.endpoint("chat/completions")))
-            .json(&payload);
+            .json(&request_body);
 
         let response = http_request.send().await.map_err(|e| {
             // Log at debug level; errors are surfaced to the caller.
@@ -919,10 +971,16 @@ impl SamplingClient {
             deployment_id: payload.x_grok_deployment_id.as_deref(),
             user_id: payload.x_grok_user_id.as_deref(),
         };
+        let mut request_body = serde_json::to_value(&streaming_request)
+            .map_err(|e| {
+                tracing::error!("Failed to serialize streaming chat request: {}", e);
+                SamplingError::Serialization(e)
+            })?;
+        sanitize_empty_text_parts(&mut request_body);
         let http_request = grok_headers
             .apply(self.post(self.endpoint("chat/completions")))
             .header(ACCEPT, HeaderValue::from_static("text/event-stream"))
-            .json(&streaming_request);
+            .json(&request_body);
 
         let built_request = http_request.build().map_err(|e| {
             tracing::error!("Failed to build HTTP request: {}", e);
@@ -2012,6 +2070,48 @@ mod tests {
     use super::*;
     use indexmap::IndexMap;
     use xai_grok_sampling_types::types::ChatRequestMessage;
+
+    #[test]
+    fn sanitize_replaces_empty_string_content_with_space() {
+        let mut body = serde_json::json!({
+            "messages": [
+                { "role": "user", "content": "" },
+                { "role": "assistant", "content": null },
+                { "role": "user", "content": "ok" },
+            ]
+        });
+        sanitize_empty_text_parts(&mut body);
+        let msgs = body["messages"].as_array().unwrap();
+        assert_eq!(msgs[0]["content"].as_str().unwrap(), " ");
+        assert_eq!(msgs[1]["content"].as_str().unwrap(), " ");
+        assert_eq!(msgs[2]["content"].as_str().unwrap(), "ok");
+    }
+
+    #[test]
+    fn sanitize_replaces_empty_text_part_in_array_content() {
+        let mut body = serde_json::json!({
+            "messages": [
+                { "role": "user", "content": [{ "type": "text", "text": "" }, { "type": "text", "text": "hi" }] },
+                { "role": "user", "content": [] },
+                { "role": "user", "content": ["a", "", "b"] },
+            ]
+        });
+        sanitize_empty_text_parts(&mut body);
+        let msgs = body["messages"].as_array().unwrap();
+        assert_eq!(msgs[0]["content"][0]["text"].as_str().unwrap(), " ");
+        assert_eq!(msgs[0]["content"][1]["text"].as_str().unwrap(), "hi");
+        // empty array → single space string
+        assert_eq!(msgs[1]["content"].as_str().unwrap(), " ");
+        // empty string element in array → space
+        assert_eq!(msgs[2]["content"][1].as_str().unwrap(), " ");
+    }
+
+    #[test]
+    fn sanitize_noops_when_messages_absent() {
+        let mut body = serde_json::json!({ "model": "x" });
+        sanitize_empty_text_parts(&mut body);
+        assert_eq!(body["model"].as_str().unwrap(), "x");
+    }
 
     fn minimal_config() -> SamplerConfig {
         SamplerConfig {
