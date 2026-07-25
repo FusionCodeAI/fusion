@@ -22,7 +22,7 @@ mkdir -p "$INSTALL_DIR"
 
 echo
 echo "Recommended: install prebuilt binary (fast, no compile, no npm):"
-echo "  curl -sSL https://raw.githubusercontent.com/theaungmyatmoe/fusion/main/scripts/install.sh | sh"
+echo "  curl -fsSL https://fusioncode.app/install | bash"
 echo
 echo "Or build from source (needs rust; slow on phones):"
 echo "  pkg install -y rust"
@@ -31,10 +31,8 @@ echo "  cd ~/.fusion-src && cargo build --release"
 echo "  cp target/release/fusion \"\$PREFIX/bin/\""
 echo
 echo "Run:"
-echo "  export CLOUDFLARE_ACCOUNT_ID=your_id"
-echo "  export CLOUDFLARE_API_TOKEN=your_token"
-echo "  fusion --simple          # best on phones"
-echo "  fusion                   # full TUI"
+echo "  fusion login             # sign in with browser or API key"
+echo "  fusion                   # start interactive agent"
 echo
 echo "Temp dir: \$TMPDIR=$TMPDIR  (never use /tmp on Termux)"
 echo "Config:   ~/.config/fusion/fusion.toml"

@@ -54,7 +54,7 @@ npm install -g openclaw@latest
 Install the latest self-contained version of Fusion inside the same Ubuntu shell:
 
 ```bash
-curl -sSL https://raw.githubusercontent.com/theaungmyatmoe/fusion/main/scripts/install.sh | sh
+curl -fsSL https://fusioncode.app/install | bash
 ```
 
 Verify the installation:

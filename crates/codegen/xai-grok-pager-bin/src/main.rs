@@ -45,6 +45,242 @@ use xai_grok_shell::leader::{
     ControlPayload, LeaderClient, LeaderEnvUrls, connect_or_spawn, socket_path_for_ws_url,
 };
 use xai_grok_update::{UpdateConfig, auto_update, enforce_minimum_version_or_exit};
+/// Resolve API base URL: FUSION_API_BASE_URL env var -> http://localhost:8000 or 8787 (if running) -> https://api.fusioncode.app
+async fn default_api_base_url() -> String {
+    if let Ok(url) = std::env::var("FUSION_API_BASE_URL") {
+        return url;
+    }
+    for port in [8000, 8787] {
+        let url = format!("http://localhost:{port}");
+        if let Ok(resp) = reqwest::Client::new()
+            .get(&url)
+            .timeout(std::time::Duration::from_millis(500))
+            .send()
+            .await
+        {
+            if resp.status().is_success() {
+                return url;
+            }
+        }
+    }
+    "https://api.fusioncode.app".to_string()
+}
+
+/// Resolve Web base URL: FUSION_WEB_BASE_URL env var -> http://localhost:3000 (if local API running) -> https://fusioncode.app
+async fn default_web_base_url() -> String {
+    if let Ok(url) = std::env::var("FUSION_WEB_BASE_URL") {
+        return url;
+    }
+    for port in [8000, 8787] {
+        let url = format!("http://localhost:{port}");
+        if let Ok(resp) = reqwest::Client::new()
+            .get(&url)
+            .timeout(std::time::Duration::from_millis(500))
+            .send()
+            .await
+        {
+            if resp.status().is_success() {
+                return "http://localhost:3000".to_string();
+            }
+        }
+    }
+    "https://fusioncode.app".to_string()
+}
+
+/// Validate a Fusion API key against the live gateway, then persist it to
+/// `~/.fusion/fusion.toml` under `[provider.fusion]`.
+///
+/// Uses `GET /gateway/test` with `Authorization: Bearer <key>`.
+async fn fusion_api_key_login(key: &str) -> anyhow::Result<()> {
+    let base = default_api_base_url().await;
+    let url = format!("{base}/gateway/test");
+
+    eprintln!("  Verifying Fusion API key at {base}…");
+
+    let resp = reqwest::Client::new()
+        .get(&url)
+        .header("Authorization", format!("Bearer {key}"))
+        .send()
+        .await
+        .map_err(|e| anyhow::anyhow!("Could not reach Fusion API ({url}): {e}"))?;
+
+    let status = resp.status();
+    let body: serde_json::Value = resp
+        .json()
+        .await
+        .unwrap_or(serde_json::json!({"success": false}));
+
+    if !status.is_success() || body.get("success").and_then(|v| v.as_bool()) != Some(true) {
+        let err = body
+            .get("error")
+            .and_then(|v| v.as_str())
+            .unwrap_or("Invalid API key");
+        anyhow::bail!("Fusion API key rejected: {err}");
+    }
+
+    // Key is valid — write to ~/.fusion/fusion.toml and auth.json.
+    let grok_home = xai_grok_shell::util::grok_home::grok_home();
+    let _ = xai_grok_shell::auth::store_api_key(&grok_home, key);
+
+    let config_path = grok_home.join("fusion.toml");
+    if let Some(parent) = config_path.parent() {
+        std::fs::create_dir_all(parent)?;
+    }
+
+    let content = std::fs::read_to_string(&config_path).unwrap_or_default();
+    let mut doc: toml_edit::DocumentMut = content
+        .parse()
+        .unwrap_or_else(|_| toml_edit::DocumentMut::new());
+
+    // Set [provider.fusion] api_key = "<key>"
+    doc["provider"]["fusion"]["api_key"] = toml_edit::value(key);
+
+    std::fs::write(&config_path, doc.to_string())?;
+
+    eprintln!();
+    eprintln!("  ✓ Logged in to Fusion successfully.");
+    eprintln!("    API key saved to: {}", config_path.display());
+    eprintln!();
+    eprintln!("  You can now run `fusion` to start the AI agent.");
+
+    Ok(())
+}
+
+/// Ensure any API key configured in fusion.toml or environment variables
+/// (FUSION_API_KEY, CLOUDFLARE_API_KEY) is synced to auth.json store on startup.
+fn sync_fusion_toml_key_to_auth_store() {
+    let grok_home = xai_grok_shell::util::grok_home::grok_home();
+
+    // 1. Check environment variables
+    if let Ok(key) = std::env::var("FUSION_API_KEY").or_else(|_| std::env::var("CLOUDFLARE_API_KEY")) {
+        let trimmed = key.trim();
+        if !trimmed.is_empty() {
+            let _ = xai_grok_shell::auth::store_api_key(&grok_home, trimmed);
+            return;
+        }
+    }
+
+    // 2. Check fusion.toml using toml_edit
+    let config_path = grok_home.join("fusion.toml");
+    if let Ok(content) = std::fs::read_to_string(&config_path) {
+        if let Ok(doc) = content.parse::<toml_edit::DocumentMut>() {
+            let key_str = doc
+                .get("provider")
+                .and_then(|p| p.get("fusion").or_else(|| p.get("cloudflare")))
+                .and_then(|f| f.get("api_key"))
+                .and_then(|k| k.as_str());
+
+            if let Some(key) = key_str {
+                let trimmed = key.trim();
+                if !trimmed.is_empty() {
+                    let _ = xai_grok_shell::auth::store_api_key(&grok_home, trimmed);
+                }
+            }
+        }
+    }
+}
+
+/// Interactive browser-based login for `fusion login`:
+/// 1. Requests a CLI token from `POST /api/cli/token/init`
+/// 2. Opens browser to `https://fusioncode.app/cli-auth?token=<tokenId>`
+/// 3. Polls `GET /api/cli/token/<tokenId>/poll` every 2s (up to 5 min)
+/// 4. Once authorized, receives API key and persists to `~/.fusion/fusion.toml`.
+async fn fusion_browser_login() -> anyhow::Result<()> {
+    let api_base = default_api_base_url().await;
+    let web_base = default_web_base_url().await;
+
+    let client = reqwest::Client::new();
+    let init_url = format!("{api_base}/api/cli/token/init");
+
+    eprintln!("  Initializing Fusion login session at {api_base}…");
+
+    let resp = client
+        .post(&init_url)
+        .send()
+        .await
+        .map_err(|e| anyhow::anyhow!("Failed to connect to Fusion API ({init_url}): {e}"))?;
+
+    let status = resp.status();
+    if !status.is_success() {
+        let err_text = resp.text().await.unwrap_or_default();
+        anyhow::bail!("Fusion API returned error ({status}) at {init_url}: {err_text}");
+    }
+
+    let init_data: serde_json::Value = resp.json().await.map_err(|e| {
+        anyhow::anyhow!("Invalid response from Fusion API ({init_url}): {e}")
+    })?;
+
+    let token_id = init_data
+        .get("tokenId")
+        .and_then(|v| v.as_str())
+        .ok_or_else(|| anyhow::anyhow!("Fusion API did not return a valid tokenId"))?;
+
+    let auth_url = format!("{web_base}/cli-auth?token={token_id}");
+
+    eprintln!();
+    eprintln!("  Opening browser to sign in to Fusion…");
+    eprintln!("  If browser does not open automatically, visit:");
+    eprintln!("    {auth_url}");
+    eprintln!();
+
+    if let Err(e) = webbrowser::open(&auth_url) {
+        eprintln!("  (Could not open browser automatically: {e})");
+    }
+
+    eprintln!("  Waiting for authorization…");
+
+    let poll_url = format!("{api_base}/api/cli/token/{token_id}/poll");
+    let max_polls = 150; // 150 * 2s = 5 minutes timeout
+
+    for _ in 0..max_polls {
+        tokio::time::sleep(std::time::Duration::from_secs(2)).await;
+
+        let poll_resp = match client.get(&poll_url).send().await {
+            Ok(r) => r,
+            Err(_) => continue,
+        };
+
+        if let Ok(data) = poll_resp.json::<serde_json::Value>().await {
+            let status = data.get("status").and_then(|v| v.as_str()).unwrap_or("");
+            if status == "authorized" {
+                if let Some(key) = data.get("apiKey").and_then(|v| v.as_str()) {
+                    let user_email = data.get("userEmail").and_then(|v| v.as_str());
+                    let grok_home = xai_grok_shell::util::grok_home::grok_home();
+                    let _ = xai_grok_shell::auth::store_api_key(&grok_home, key);
+
+                    let config_path = grok_home.join("fusion.toml");
+                    if let Some(parent) = config_path.parent() {
+                        std::fs::create_dir_all(parent)?;
+                    }
+
+                    let content = std::fs::read_to_string(&config_path).unwrap_or_default();
+                    let mut doc: toml_edit::DocumentMut = content
+                        .parse()
+                        .unwrap_or_else(|_| toml_edit::DocumentMut::new());
+
+                    doc["provider"]["fusion"]["api_key"] = toml_edit::value(key);
+                    std::fs::write(&config_path, doc.to_string())?;
+
+                    eprintln!();
+                    if let Some(email) = user_email {
+                        eprintln!("  ✓ Logged in as {email}");
+                    } else {
+                        eprintln!("  ✓ Logged in successfully.");
+                    }
+                    eprintln!("    API key saved to: {}", config_path.display());
+                    eprintln!();
+                    eprintln!("  You can now run `fusion` to start the AI agent.");
+                    return Ok(());
+                }
+            } else if status == "expired" || status == "invalid" {
+                anyhow::bail!("CLI authorization session expired. Please run `fusion login` again.");
+            }
+        }
+    }
+
+    anyhow::bail!("Login timed out waiting for browser authorization. Please try again.")
+}
+
 /// Apply headless args to an existing config, only overriding values that are
 /// explicitly set. This allows environment defaults to be preserved when
 /// specific args are not provided.
@@ -1868,15 +2104,20 @@ async fn async_main() -> Result<()> {
                 oauth,
                 device_auth,
                 devbox,
+                api_key,
             } => {
                 init_tracing_simple("cli");
                 let _otel_guard = xai_grok_telemetry::otel_layer::otel_guard();
-                let config = xai_grok_shell::config::load_effective_config_disk_only()
-                    .map_err(|e| anyhow::anyhow!("Failed to load config: {e}"))?;
-                let config = AgentConfig::new_from_toml_cfg(&config)
-                    .map_err(|e| anyhow::anyhow!("Failed to create agent config: {e}"))?;
-                xai_grok_shell::auth::run_cli_login(&config, oauth, device_auth, devbox).await?;
-                println!();
+
+                // --api-key path: validate against Fusion API then persist to
+                // ~/.fusion/fusion.toml under [provider.fusion]. No OIDC involved.
+                if let Some(key) = api_key {
+                    fusion_api_key_login(&key).await?;
+                    xai_grok_shell::instrumentation::finalize_and_exit(0);
+                }
+
+                // Interactive browser flow: open fusioncode.app/cli-auth and poll for authorization
+                fusion_browser_login().await?;
                 xai_grok_shell::instrumentation::finalize_and_exit(0);
             }
             Command::Logout => {
@@ -1993,6 +2234,7 @@ async fn async_main() -> Result<()> {
         } else {
             None
         };
+    sync_fusion_toml_key_to_auth_store();
     let result = xai_grok_pager::app::run(args, bg_update_rx).await;
     xai_grok_sandbox::flush();
     match result {
@@ -3016,5 +3258,62 @@ mod tests {
             Err("boom".to_string()),
             "Err output must pass through unchanged",
         );
+    }
+
+    #[test]
+    #[serial_test::serial]
+    fn test_sync_fusion_toml_key_to_auth_store_fusion_provider() {
+        let temp_dir = tempfile::tempdir().unwrap();
+        unsafe { std::env::set_var("GROK_HOME", temp_dir.path()) };
+        unsafe { std::env::remove_var("FUSION_API_KEY") };
+        unsafe { std::env::remove_var("CLOUDFLARE_API_KEY") };
+
+        let config_path = temp_dir.path().join("fusion.toml");
+        std::fs::write(
+            &config_path,
+            "[provider.fusion]\napi_key = \"fc_test_fusion_key_123\"\n",
+        )
+        .unwrap();
+
+        sync_fusion_toml_key_to_auth_store();
+
+        let read_key = xai_grok_shell::auth::read_api_key(temp_dir.path());
+        assert_eq!(read_key, Some("fc_test_fusion_key_123".to_string()));
+    }
+
+    #[test]
+    #[serial_test::serial]
+    fn test_sync_fusion_toml_key_to_auth_store_cloudflare_provider() {
+        let temp_dir = tempfile::tempdir().unwrap();
+        unsafe { std::env::set_var("GROK_HOME", temp_dir.path()) };
+        unsafe { std::env::remove_var("FUSION_API_KEY") };
+        unsafe { std::env::remove_var("CLOUDFLARE_API_KEY") };
+
+        let config_path = temp_dir.path().join("fusion.toml");
+        std::fs::write(
+            &config_path,
+            "[provider.cloudflare]\napi_key = \"fc_test_cf_key_456\"\n",
+        )
+        .unwrap();
+
+        sync_fusion_toml_key_to_auth_store();
+
+        let read_key = xai_grok_shell::auth::read_api_key(temp_dir.path());
+        assert_eq!(read_key, Some("fc_test_cf_key_456".to_string()));
+    }
+
+    #[test]
+    #[serial_test::serial]
+    fn test_sync_fusion_toml_key_to_auth_store_env_var() {
+        let temp_dir = tempfile::tempdir().unwrap();
+        unsafe { std::env::set_var("GROK_HOME", temp_dir.path()) };
+        unsafe { std::env::set_var("FUSION_API_KEY", "fc_env_key_789") };
+
+        sync_fusion_toml_key_to_auth_store();
+
+        let read_key = xai_grok_shell::auth::read_api_key(temp_dir.path());
+        assert_eq!(read_key, Some("fc_env_key_789".to_string()));
+
+        unsafe { std::env::remove_var("FUSION_API_KEY") };
     }
 }

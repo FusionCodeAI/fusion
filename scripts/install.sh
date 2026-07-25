@@ -1,6 +1,6 @@
 #!/bin/sh
 # Fusion — one-line installer
-# curl -sSL https://raw.githubusercontent.com/theaungmyatmoe/fusion/main/scripts/install.sh | sh
+# curl -fsSL https://fusioncode.app/install | bash
 #
 # Downloads the latest GitHub release binary for this platform.
 # Release assets (see .github/workflows/release.yml):
@@ -255,4 +255,8 @@ case ":$PATH:" in
 esac
 
 echo ""
-info "Run: fusion --help"
+ok "To get started, sign in and run Fusion:"
+echo ""
+echo "  fusion login"
+echo "  fusion"
+echo ""

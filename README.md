@@ -10,7 +10,7 @@
 ## Install
 
 ```bash
-curl -sSL https://raw.githubusercontent.com/theaungmyatmoe/fusion/main/scripts/install.sh | sh
+curl -fsSL https://fusioncode.app/install | bash
 ```
 
 

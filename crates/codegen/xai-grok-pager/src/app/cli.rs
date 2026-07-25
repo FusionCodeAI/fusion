@@ -25,13 +25,13 @@ pub enum Command {
         #[arg(long, hide = true)]
         legacy: bool,
         /// Use Fusion OAuth via auth.x.ai.
-        #[arg(long = "oauth", alias = "oidc", conflicts_with_all = ["device_auth"])]
+        #[arg(long = "oauth", alias = "oidc", conflicts_with_all = ["device_auth", "api_key"])]
         oauth: bool,
         /// Use device-code authentication for headless/remote environments.
         #[arg(
             long = "device-auth",
             visible_alias = "device-code",
-            conflicts_with_all = ["oauth"]
+            conflicts_with_all = ["oauth", "api_key"]
         )]
         device_auth: bool,
         /// Authenticate for remote development environments (hidden).
@@ -41,6 +41,16 @@ pub enum Command {
         /// `devbox-login` is enabled (`arg(skip)` otherwise → always false).
         #[arg(skip)]
         devbox: bool,
+        /// Sign in with a Fusion API key (from https://fusionapi.dev/dashboard).
+        ///
+        /// Saves the key to ~/.fusion/fusion.toml under [provider.fusion].
+        /// Skips OAuth — useful for CI, headless servers, and Termux.
+        #[arg(
+            long = "api-key",
+            value_name = "KEY",
+            conflicts_with_all = ["oauth", "device_auth"]
+        )]
+        api_key: Option<String>,
     },
     /// Manage MCP server configurations
     Mcp(crate::mcp_cmd::McpArgs),
