@@ -34,9 +34,27 @@ deno run jsr:@fusioncode/cli login
 ```bash
 fusion login                    # sign in via browser OAuth
 fusion                          # interactive TUI
-fusion --minimal                # scrollback-friendly mode
-fusion -p "fix the bug"         # headless one-shot
-fusion --always-approve -p "…"  # auto-approve all tools
+fusion -p "fix the bug"         # single-turn prompt
+fusion --always-approve         # auto-approve tool execution
+```
+
+### Sign In Flow
+
+```bash
+$ fusion login
+
+  Initializing Fusion login session…
+
+  Opening browser to sign in to Fusion…
+  If browser does not open automatically, visit:
+    https://fusioncode.app/cli-auth?token=...
+
+  Waiting for authorization…
+
+  ✓ Logged in as user@example.com
+    API key saved to: ~/.fusion/fusion.toml
+
+  You can now run `fusion` to start the AI agent.
 ```
 
 > For configuration, build instructions, architecture details, and the full CLI reference see **[docs/DETAILS.md](docs/DETAILS.md)**.
