@@ -100,6 +100,7 @@ jobs:
       # ── Build ──────────────────────────────────────────────────────────────
       - name: Build (native Linux/macOS)
         if: "!matrix.android"
+        shell: bash
         env:
           CARGO_BUILD_JOBS: 2
         run: |
@@ -111,6 +112,7 @@ jobs:
 
       - name: Strip Linux binary
         if: "matrix.target == 'x86_64-unknown-linux-gnu'"
+        shell: bash
         run: strip "target/${{ matrix.target }}/release/${{ matrix.binary }}"
 
       - name: Build Android ARM64 (NDK)
