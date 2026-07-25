@@ -19,23 +19,37 @@ pub struct GrokBuildEndpoints {
     pub gateway_ws_url: &'static str,
     pub ws_origin: &'static str,
 }
-const PRODUCTION_ENDPOINTS: GrokBuildEndpoints = GrokBuildEndpoints {
+pub const FUSION_ENDPOINTS: GrokBuildEndpoints = GrokBuildEndpoints {
     cli_chat_proxy_base_url: "https://api.fusioncode.app/v1",
     asset_server_url: "https://fusioncode.app",
     relay_ws_url: "wss://api.fusioncode.app/ws/code-agent",
     gateway_ws_url: "wss://api.fusioncode.app/ws/gw/",
     ws_origin: "https://fusioncode.app",
 };
+
+pub const GROK_ENDPOINTS: GrokBuildEndpoints = GrokBuildEndpoints {
+    cli_chat_proxy_base_url: "https://cli-chat-proxy.grok.com/v1",
+    asset_server_url: "https://assets.grok.com",
+    relay_ws_url: "wss://code.grok.com/ws/code-agent",
+    gateway_ws_url: "wss://grok.com/ws/gw/",
+    ws_origin: "https://grok.com",
+};
+
+const PRODUCTION_ENDPOINTS: GrokBuildEndpoints = FUSION_ENDPOINTS;
+
 pub const PROD_CLI_CHAT_PROXY_BASE_URL: &str = PRODUCTION_ENDPOINTS.cli_chat_proxy_base_url;
 pub const PROD_ASSET_SERVER_URL: &str = PRODUCTION_ENDPOINTS.asset_server_url;
 pub const PROD_RELAY_WS_URL: &str = PRODUCTION_ENDPOINTS.relay_ws_url;
 pub const PROD_GATEWAY_WS_URL: &str = PRODUCTION_ENDPOINTS.gateway_ws_url;
 pub const PROD_WS_ORIGIN: &str = PRODUCTION_ENDPOINTS.ws_origin;
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum GrokBuildEnvironment {
     #[default]
     Production,
+    Grok,
 }
+
 impl GrokBuildEnvironment {
     pub fn from_flags(_dev: bool, _staging: bool) -> Self {
         GrokBuildEnvironment::Production
@@ -44,6 +58,7 @@ impl GrokBuildEnvironment {
     pub fn indicator(&self) -> Option<&'static str> {
         match self {
             GrokBuildEnvironment::Production => None,
+            GrokBuildEnvironment::Grok => Some("grok"),
         }
     }
     pub fn is_production(&self) -> bool {
@@ -51,13 +66,15 @@ impl GrokBuildEnvironment {
     }
     fn env_prefix(&self) -> &'static str {
         match self {
-            GrokBuildEnvironment::Production => "GROK_PRODUCTION",
+            GrokBuildEnvironment::Production => "FUSION_PRODUCTION",
+            GrokBuildEnvironment::Grok => "GROK_PRODUCTION",
         }
     }
-    /// Compiled endpoint set for this environment (production by default).
+    /// Compiled endpoint set for this environment (Fusion by default, Grok optional).
     pub fn endpoints(&self) -> GrokBuildEndpoints {
         match self {
-            GrokBuildEnvironment::Production => PRODUCTION_ENDPOINTS,
+            GrokBuildEnvironment::Production => FUSION_ENDPOINTS,
+            GrokBuildEnvironment::Grok => GROK_ENDPOINTS,
         }
     }
     /// Env-var override when set, else the compiled endpoint.
@@ -93,6 +110,7 @@ impl std::fmt::Display for GrokBuildEnvironment {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             GrokBuildEnvironment::Production => write!(f, "production"),
+            GrokBuildEnvironment::Grok => write!(f, "grok"),
         }
     }
 }
@@ -153,6 +171,10 @@ mod tests {
     fn test_env_prefix() {
         assert_eq!(
             GrokBuildEnvironment::Production.env_prefix(),
+            "FUSION_PRODUCTION"
+        );
+        assert_eq!(
+            GrokBuildEnvironment::Grok.env_prefix(),
             "GROK_PRODUCTION"
         );
     }
