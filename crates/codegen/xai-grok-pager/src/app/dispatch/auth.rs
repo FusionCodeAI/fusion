@@ -439,7 +439,7 @@ pub(crate) fn dispatch_fusion_login(app: &mut AppView) -> Vec<Effect> {
 
     tokio::spawn(async move {
         let api_base = std::env::var("FUSION_API_BASE_URL")
-            .unwrap_or_else(|_| "https://api.fusioncode.app/v1".to_string());
+            .unwrap_or_else(|_| "https://api.fusioncode.app".to_string());
         let web_base = std::env::var("FUSION_WEB_BASE_URL")
             .unwrap_or_else(|_| "https://fusioncode.app".to_string());
 
@@ -500,6 +500,11 @@ pub(crate) fn dispatch_fusion_login(app: &mut AppView) -> Vec<Effect> {
 
                         doc["provider"]["fusion"]["api_key"] = toml_edit::value(key);
                         let _ = std::fs::write(&config_path, doc.to_string());
+
+                        // Update the env var so the running process picks up the new key
+                        // for subsequent chat completion requests.
+                        unsafe { std::env::set_var("XAI_API_KEY", key) };
+
                         tracing::info!("CLI login authorized successfully!");
                         break;
                     }
