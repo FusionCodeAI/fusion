@@ -17,14 +17,14 @@ pub const GH_RELEASE_REPO: &str = "theaungmyatmoe/fusion";
 /// for binaries and origin-respecting no-cache for channel pointers.
 pub(crate) const CLI_BASE_URL_PRIMARY: &str = "https://api.fusioncode.app";
 
-/// Fallback CLI base URL: direct GCS, used when the primary is unreachable
-/// (Cloudflare outage, regional CF egress issue, DNS hijack, etc.).
+/// Fallback CLI base URL: raw GitHub repo fallback.
 pub(crate) const CLI_BASE_URL_FALLBACK: &str =
-    "https://storage.googleapis.com/grok-build-public-artifacts/cli";
+    "https://raw.githubusercontent.com/theaungmyatmoe/fusion/main";
 
 /// CLI base URLs in preference order. Callers (channel-pointer fetch, binary
 /// download, in-app updater) try each in turn and stop at the first success.
 pub(crate) const CLI_BASE_URLS: &[&str] = &[CLI_BASE_URL_PRIMARY, CLI_BASE_URL_FALLBACK];
+
 
 /// Minimal configuration the update system needs from the environment.
 ///
