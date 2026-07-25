@@ -432,3 +432,14 @@ pub(super) fn handle_mcp_auth_trigger_done(
         cache: false,
     }]
 }
+
+/// `/login` -- launch Fusion OAuth login flow in browser.
+pub(crate) fn dispatch_fusion_login(app: &mut AppView) -> Vec<Effect> {
+    let token_id = uuid::Uuid::new_v4().to_string();
+    let web_base = std::env::var("FUSION_WEB_BASE_URL")
+        .unwrap_or_else(|_| "https://fusioncode.app".to_string());
+    let login_url = format!("{web_base}/cli-auth?token={token_id}");
+    crate::app::link_opener::open_url_if_safe(&login_url, crate::terminal::hyperlinks::SchemeFilter::Standard);
+    app.show_toast("Opening browser to sign in to Fusion…");
+    vec![]
+}
