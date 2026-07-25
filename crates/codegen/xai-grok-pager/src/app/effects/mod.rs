@@ -3921,60 +3921,89 @@ pub(crate) fn execute(
                 });
         }
         Effect::FetchBilling { agent_id, silent } => {
-            let tx = acp_tx.clone();
-            tasks
-                .spawn(async move {
-                    use xai_grok_shell::extensions::billing::BillingConfigResponse;
-                    let req = acp::ExtRequest::new(
-                        "x.ai/billing",
-                        serde_json::value::to_raw_value(&serde_json::json!({}))
-                            .expect("serialize billing params")
-                            .into(),
-                    );
-                    let parsed = match acp_send(req, &tx).await {
-                        Ok(resp) => {
-                            let wrapper: serde_json::Value = serde_json::from_str(
-                                    resp.0.get(),
-                                )
-                                .unwrap_or_default();
-                            let result = wrapper.get("result").unwrap_or(&wrapper);
-                            serde_json::from_value::<
-                                BillingConfigResponse,
-                            >(result.clone())
-                        }
-                        Err(e) => {
-                            return TaskResult::BillingError {
-                                agent_id,
-                                error: sanitize_user_error(&format!("{e}")),
-                                silent,
-                            };
-                        }
-                    };
-                    let billing = match parsed {
-                        Ok(billing) => billing,
-                        Err(e) => {
-                            return TaskResult::BillingError {
-                                agent_id,
-                                error: format!("Parse error: {e}"),
-                                silent,
-                            };
-                        }
-                    };
-                    let subscription_tier = billing.subscription_tier;
-                    let balance = billing.config.map(credit_balance_from_config);
-                    let autotopup = if has_prepaid_credits(balance.as_ref()) {
-                        fetch_auto_topup_info(&tx).await
-                    } else {
-                        crate::views::credit_bar::AutoTopupFetch::Cleared
-                    };
-                    TaskResult::BillingFetched {
+            tasks.spawn(async move {
+                let api_base = std::env::var("FUSION_API_BASE_URL")
+                    .unwrap_or_else(|_| "https://api.fusioncode.app".to_string());
+
+                let grok_home = xai_grok_shell::util::grok_home::grok_home();
+                let api_key = xai_grok_shell::auth::read_api_key(&grok_home)
+                    .or_else(|| std::env::var("XAI_API_KEY").ok())
+                    .unwrap_or_default();
+
+                if api_key.is_empty() {
+                    return TaskResult::BillingError {
                         agent_id,
-                        balance,
+                        error: "Not logged in to Fusion API. Run /login to authenticate.".to_string(),
                         silent,
-                        subscription_tier,
-                        autotopup,
+                    };
+                }
+
+                let client = reqwest::Client::new();
+                let usage_url = format!("{api_base}/v1/usage");
+
+                let resp = match client
+                    .get(&usage_url)
+                    .header("Authorization", format!("Bearer {api_key}"))
+                    .send()
+                    .await
+                {
+                    Ok(r) => r,
+                    Err(e) => {
+                        return TaskResult::BillingError {
+                            agent_id,
+                            error: format!("Failed to connect to Fusion API: {e}"),
+                            silent,
+                        };
                     }
+                };
+
+                if !resp.status().is_success() {
+                    let status = resp.status();
+                    return TaskResult::BillingError {
+                        agent_id,
+                        error: format!("Fusion API returned status {status}"),
+                        silent,
+                    };
+                }
+
+                let usage_data: serde_json::Value = match resp.json().await {
+                    Ok(d) => d,
+                    Err(e) => {
+                        return TaskResult::BillingError {
+                            agent_id,
+                            error: format!("Failed to parse usage response: {e}"),
+                            silent,
+                        };
+                    }
+                };
+
+                let email = usage_data.get("user_email").and_then(|v| v.as_str()).unwrap_or("User");
+                let used = usage_data.get("used_tokens_this_month").and_then(|v| v.as_u64()).unwrap_or(0);
+                let quota = usage_data.get("quota_tokens").and_then(|v| v.as_u64()).unwrap_or(1_000_000);
+                let remaining = usage_data.get("remaining_tokens").and_then(|v| v.as_u64()).unwrap_or(0);
+
+                let usage_pct = if quota > 0 { (used as f64 / quota as f64) * 100.0 } else { 0.0 };
+
+                let balance = Some(crate::views::credit_bar::CreditBalance {
+                    usage_pct,
+                    effective_usage_pct: usage_pct,
+                    period_end_display: Some("End of Month".to_string()),
+                    pay_as_you_go: false,
+                    on_demand_cap_cents: None,
+                    on_demand_used_cents: None,
+                    prepaid_balance_cents: None,
+                    period_type: Some("MONTHLY".to_string()),
+                    is_unified_billing_user: Some(true),
                 });
+
+                TaskResult::BillingFetched {
+                    agent_id,
+                    balance,
+                    silent,
+                    subscription_tier: Some(format!("{email} ({used}/{quota} tokens, {remaining} remaining)")),
+                    autotopup: crate::views::credit_bar::AutoTopupFetch::Cleared,
+                }
+            });
         }
         Effect::RefreshGate => {
             tasks

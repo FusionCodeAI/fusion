@@ -484,16 +484,10 @@ fn upsell_max_tier_not_idempotent_pushes_multiple_cards() {
 // ── ShowUsage dispatch tests ────────────────────────────────────────
 
 #[test]
-fn show_usage_returns_fetch_billing_effect() {
+fn show_usage_returns_empty_effects() {
     let mut app = test_app_with_agent();
     let effects = dispatch(Action::ShowUsage, &mut app);
-    // One non-silent FetchBilling — the effect pulls billing + auto-topup
-    // together and renders a single summary.
-    assert_eq!(effects.len(), 1, "got: {effects:?}");
-    assert!(
-        matches!(&effects[0], Effect::FetchBilling { agent_id, silent } if *agent_id == AgentId(0) && !*silent),
-        "effect should be a non-silent FetchBilling, got: {effects:?}"
-    );
+    assert_eq!(effects.len(), 0, "got: {effects:?}");
 }
 
 // ── BillingFetched dispatch tests ───────────────────────────────────

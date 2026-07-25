@@ -264,8 +264,6 @@ pub(super) fn dispatch_show_usage(app: &mut AppView) -> Vec<Effect> {
         }
         return vec![];
     }
-    // Non-silent fetch: the effect also pulls the auto top-up rule so the
-    // summary can render usage, prepaid credits, and auto top-up together.
     vec![Effect::FetchBilling {
         agent_id: id,
         silent: false,
