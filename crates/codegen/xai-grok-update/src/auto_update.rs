@@ -38,8 +38,8 @@ fn manual_install_cmd() -> &'static str {
 /// Build a reinstall hint for a known installer type.
 fn reinstall_hint(installer: &str) -> String {
     match installer {
-        "npm" => "Please reinstall via npm:\n  npm i -g @xai-official/grok".to_string(),
-        "gh-release" => "Please reinstall via GitHub Releases:\n  gh release download --repo xai-org-shared/grok-build --pattern 'grok-*' --output grok && chmod +x grok".to_string(),
+        "npm" => "Please reinstall via npm:\n  npm i -g @fusioncode/cli".to_string(),
+        "gh-release" => "Please reinstall via GitHub Releases:\n  gh release download --repo theaungmyatmoe/fusion --pattern 'fusion-*' --output fusion && chmod +x fusion".to_string(),
         _ => format!("Please reinstall via:\n  {}", manual_install_cmd()),
     }
 }
