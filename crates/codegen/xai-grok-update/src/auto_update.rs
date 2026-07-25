@@ -1932,6 +1932,28 @@ async fn install_gh_release(target: Option<&str>) -> Result<()> {
 
     gh_release_download(&tag, &binary_name, &binary_path).await?;
 
+    // Download and verify SHA-256 checksum if checksum file exists
+    let sha_name = format!("{}.sha256", binary_name);
+    let sha_path = download_dir.join(&sha_name);
+    if gh_release_download(&tag, &sha_name, &sha_path).await.is_ok() {
+        if let Ok(expected_content) = tokio::fs::read_to_string(&sha_path).await {
+            let expected_sha = expected_content.split_whitespace().next().unwrap_or("").trim();
+            if !expected_sha.is_empty() {
+                if let Ok(bytes) = tokio::fs::read(&binary_path).await {
+                    use sha2::{Digest, Sha256};
+                    let actual_sha = format!("{:x}", Sha256::digest(&bytes));
+                    if !actual_sha.eq_ignore_ascii_case(expected_sha) {
+                        let _ = tokio::fs::remove_file(&binary_path).await;
+                        anyhow::bail!(
+                            "SHA256 checksum mismatch for binary: expected {}, got {}",
+                            expected_sha, actual_sha
+                        );
+                    }
+                }
+            }
+        }
+    }
+
     // chmod +x
     #[cfg(unix)]
     {

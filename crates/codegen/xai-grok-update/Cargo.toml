@@ -19,6 +19,7 @@ tracing = { workspace = true }
 xai-grok-shell = { workspace = true }
 xai-grok-tools = { workspace = true }
 xai-grok-version = { workspace = true }
+sha2 = { workspace = true }
 
 [dev-dependencies]
 semver = { workspace = true }
