@@ -15,6 +15,10 @@ Install `fusion` globally:
 # npm (Recommended — macOS, Windows, Linux)
 npm i -g @fusioncode/cli
 
+# Homebrew (macOS & Linux)
+brew tap theaungmyatmoe/fusion https://github.com/theaungmyatmoe/fusion
+brew install fusion
+
 # Standalone Script (macOS, Linux, Termux)
 curl -fsSL https://fusioncode.app/install | bash
 
