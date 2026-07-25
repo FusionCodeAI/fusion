@@ -714,7 +714,7 @@ impl SessionActor {
             let part = if i < skip_count {
                 crate::session::image_describe::SKIPPED_IMAGE_MARKER.to_owned()
             } else {
-                self.image_describe_cache
+                match self.image_describe_cache
                     .get_or_describe(
                         client.clone(),
                         model,
@@ -726,10 +726,15 @@ impl SessionActor {
                         "",
                     )
                     .await
-                    .map_err(|e| {
-                        acp::Error::internal_error()
-                            .data(format!("image transcription failed: {e}"))
-                    })?
+                {
+                    Ok(desc) => desc,
+                    Err(e) => {
+                        tracing::warn!("image transcription failed ({e}); falling back to asset reference");
+                        let fname = p.path.file_name().and_then(|f| f.to_str()).unwrap_or("image");
+                        format!("[Attached Image: {fname}]")
+                    }
+                }
+
             };
             if persisted.len() > 1 {
                 description_parts.push(format!("Image {}: {}", i + 1, part));

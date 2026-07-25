@@ -461,7 +461,7 @@ pub async fn describe_user_images(
         .with_model(model)
         .with_temperature(0.2)
         .with_max_output_tokens(4_096);
-    const DESCRIBE_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(240);
+    const DESCRIBE_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(10);
     let response = tokio::time::timeout(DESCRIBE_TIMEOUT, client.conversation_collect(request))
         .await
         .map_err(|_| {
@@ -470,6 +470,7 @@ pub async fn describe_user_images(
                 DESCRIBE_TIMEOUT.as_secs()
             ))
         })?
+
         .map_err(|e| DescribeError::Sampling(format!("{e}")))?;
     let text = response
         .assistant()
