@@ -348,7 +348,6 @@ pub fn read_api_key(grok_home: &Path) -> Option<String> {
 /// Uses the corrupt-recovery reader so a malformed auth.json (e.g. from a
 /// previous crash) can be healed when the user sets an API key.
 pub fn store_api_key(grok_home: &Path, api_key: &str) -> std::io::Result<()> {
-    unsafe { std::env::set_var("XAI_API_KEY", api_key) };
     let path = grok_home.join("auth.json");
     let mut map = read_auth_json_or_empty_recovering_corrupt(&path)?;
     map.insert(
