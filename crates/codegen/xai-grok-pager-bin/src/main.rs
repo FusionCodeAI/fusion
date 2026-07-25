@@ -47,44 +47,14 @@ use xai_grok_shell::leader::{
 use xai_grok_update::{UpdateConfig, auto_update, enforce_minimum_version_or_exit};
 /// Resolve API base URL: FUSION_API_BASE_URL env var -> http://localhost:8000 or 8787 (if running) -> https://api.fusioncode.app
 async fn default_api_base_url() -> String {
-    if let Ok(url) = std::env::var("FUSION_API_BASE_URL") {
-        return url;
-    }
-    for port in [8000, 8787] {
-        let url = format!("http://localhost:{port}");
-        if let Ok(resp) = reqwest::Client::new()
-            .get(&url)
-            .timeout(std::time::Duration::from_millis(500))
-            .send()
-            .await
-        {
-            if resp.status().is_success() {
-                return url;
-            }
-        }
-    }
-    "https://api.fusioncode.app".to_string()
+    std::env::var("FUSION_API_BASE_URL")
+        .unwrap_or_else(|_| "https://api.fusioncode.app".to_string())
 }
 
-/// Resolve Web base URL: FUSION_WEB_BASE_URL env var -> http://localhost:3000 (if local API running) -> https://fusioncode.app
+/// Resolve Web base URL: FUSION_WEB_BASE_URL env var -> https://fusioncode.app
 async fn default_web_base_url() -> String {
-    if let Ok(url) = std::env::var("FUSION_WEB_BASE_URL") {
-        return url;
-    }
-    for port in [8000, 8787] {
-        let url = format!("http://localhost:{port}");
-        if let Ok(resp) = reqwest::Client::new()
-            .get(&url)
-            .timeout(std::time::Duration::from_millis(500))
-            .send()
-            .await
-        {
-            if resp.status().is_success() {
-                return "http://localhost:3000".to_string();
-            }
-        }
-    }
-    "https://fusioncode.app".to_string()
+    std::env::var("FUSION_WEB_BASE_URL")
+        .unwrap_or_else(|_| "https://fusioncode.app".to_string())
 }
 
 /// Validate a Fusion API key against the live gateway, then persist it to
