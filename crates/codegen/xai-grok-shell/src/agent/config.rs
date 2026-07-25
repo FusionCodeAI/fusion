@@ -3354,6 +3354,7 @@ struct DefaultModelJson {
     agent_type: String,
     inference_idle_timeout_secs: Option<u64>,
     hidden: bool,
+    base_url: Option<String>,
     reasoning_effort: Option<ReasoningEffort>,
     #[serde(default)]
     supports_reasoning_effort: bool,
@@ -3396,10 +3397,17 @@ fn default_models(endpoints: &EndpointsConfig) -> IndexMap<String, ModelEntryCon
             let context_window = m
                 .context_window
                 .unwrap_or_else(|| NonZeroU64::new(200_000).expect("200000 is non-zero"));
+            let base_url = if let Some(ref u) = m.base_url {
+                u.clone()
+            } else if m.model.starts_with("grok-") || m.model.contains("xai") {
+                "https://api.x.ai/v1".to_string()
+            } else {
+                endpoints.resolve_inference_base_url()
+            };
             let config = ModelEntryConfig {
                 id: m.id,
                 model: m.model,
-                base_url: endpoints.resolve_inference_base_url(),
+                base_url,
                 api_base_url: Some(endpoints.xai_api_base_url.clone()),
                 name: m.name,
                 description: m.description,
