@@ -52,6 +52,7 @@ ansi-to-tui = { workspace = true }
 portable-pty = "0.9"
 
 # Utilities
+reqwest = { workspace = true }
 derive_more = { workspace = true, features = ["deref", "deref_mut"] }
 anyhow = { workspace = true }
 clap = { workspace = true, features = ["derive"] }
