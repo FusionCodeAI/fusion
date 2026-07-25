@@ -103,6 +103,9 @@ impl XaiProtoBuilder {
         protos: impl IntoIterator<Item = &'a Path>,
         includes: impl IntoIterator<Item = &'a Path>,
     ) -> anyhow::Result<()> {
+        if cfg!(windows) {
+            return Ok(());
+        }
         let includes = Vec::from_iter(includes);
 
         if let Some(protoc) = protoc {
