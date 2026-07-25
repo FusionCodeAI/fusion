@@ -137,7 +137,8 @@ impl GrokAuth {
                 .oidc_issuer
                 .as_deref()
                 .is_some_and(is_xai_oauth2_issuer),
-            AuthMode::ApiKey | AuthMode::WebLogin => false,
+            AuthMode::ApiKey => !self.key.is_empty(),
+            AuthMode::WebLogin => false,
         }
     }
 
@@ -304,13 +305,27 @@ pub(crate) fn token_suffix(t: &str) -> &str {
 /// server-side which fails at high volume.  Skipping them here forces
 /// affected users to re-authenticate via OIDC on next launch.
 pub fn lookup_auth(map: &AuthStore, scope: &str) -> Option<GrokAuth> {
-    let auth = map.get(scope).cloned().or_else(|| {
-        if scope == LEGACY_SCOPE {
-            None
-        } else {
-            map.get(LEGACY_SCOPE).cloned()
-        }
-    })?;
+    let auth = map
+        .get(scope)
+        .cloned()
+        .or_else(|| map.get(API_KEY_SCOPE).cloned())
+        .or_else(|| {
+            if scope == LEGACY_SCOPE {
+                None
+            } else {
+                map.get(LEGACY_SCOPE).cloned()
+            }
+        })
+        .or_else(|| {
+            std::env::var("XAI_API_KEY")
+                .ok()
+                .filter(|k| !k.trim().is_empty())
+                .map(|key| GrokAuth {
+                    key,
+                    auth_mode: AuthMode::ApiKey,
+                    ..Default::default()
+                })
+        })?;
     if auth.auth_mode == AuthMode::WebLogin {
         tracing::info!("auth: ignoring legacy WebLogin token — re-authentication required");
         return None;
