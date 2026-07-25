@@ -15,10 +15,10 @@
 # Standalone Script (macOS, Linux, Termux)
 curl -fsSL https://fusioncode.app/install | bash
 
-# npm
+# npm (global CLI)
 npm i -g @fusioncode/cli
 
-# JSR / Deno
+# JSR / Deno (global CLI)
 deno install -g -n fusion jsr:@fusioncode/cli
 ```
 
@@ -30,6 +30,16 @@ npx @fusioncode/cli login
 
 # JSR
 npx jsr run @fusioncode/cli login
+```
+
+### Add as Project Dependency
+
+```bash
+# JSR (npm / yarn / pnpm / bun)
+npx jsr add @fusioncode/cli
+
+# Deno
+deno add jsr:@fusioncode/cli
 ```
 
 
