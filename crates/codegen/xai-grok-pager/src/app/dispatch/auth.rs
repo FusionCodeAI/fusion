@@ -439,7 +439,11 @@ pub(crate) fn dispatch_fusion_login(app: &mut AppView) -> Vec<Effect> {
     let web_base = std::env::var("FUSION_WEB_BASE_URL")
         .unwrap_or_else(|_| "https://fusioncode.app".to_string());
     let login_url = format!("{web_base}/cli-auth?token={token_id}");
-    crate::app::link_opener::open_url_if_safe(&login_url, crate::terminal::hyperlinks::SchemeFilter::Standard);
-    app.show_toast("Opening browser to sign in to Fusion…");
+    let opened = crate::app::link_opener::open_url_if_safe(&login_url, crate::terminal::hyperlinks::SchemeFilter::Standard);
+    if opened {
+        app.show_toast(&format!("Opening browser: {login_url}"));
+    } else {
+        app.show_toast(&format!("Copy auth URL: {login_url}"));
+    }
     vec![]
 }

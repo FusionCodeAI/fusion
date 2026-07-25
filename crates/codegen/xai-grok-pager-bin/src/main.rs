@@ -218,13 +218,25 @@ async fn fusion_browser_login() -> anyhow::Result<()> {
     let auth_url = format!("{web_base}/cli-auth?token={token_id}");
 
     eprintln!();
-    eprintln!("  Opening browser to sign in to Fusion…");
-    eprintln!("  If browser does not open automatically, visit:");
-    eprintln!("    {auth_url}");
+    eprintln!("  🔑 Opening browser to sign in to Fusion…");
+    eprintln!("  If browser does not open automatically, copy and visit:");
+    eprintln!("    \x1b[1;36m{auth_url}\x1b[0m");
     eprintln!();
 
-    if let Err(e) = webbrowser::open(&auth_url) {
-        eprintln!("  (Could not open browser automatically: {e})");
+    let mut opened = false;
+    #[cfg(not(any(target_os = "macos", target_os = "windows")))]
+    {
+        if std::process::Command::new("termux-open-url").arg(&auth_url).spawn().is_ok()
+            || std::process::Command::new("termux-open").arg(&auth_url).spawn().is_ok()
+        {
+            opened = true;
+        }
+    }
+
+    if !opened {
+        if let Err(e) = webbrowser::open(&auth_url) {
+            eprintln!("  (Automatic browser launch unavailable: {e})");
+        }
     }
 
     eprintln!("  Waiting for authorization…");

@@ -37,7 +37,13 @@ pub fn open_url(url: &str) {
     #[cfg(target_os = "windows")]
     let cmd = "cmd";
     #[cfg(not(any(target_os = "macos", target_os = "windows")))]
-    let cmd = "xdg-open";
+    let cmd = if std::process::Command::new("termux-open-url").arg("--version").stdout(std::process::Stdio::null()).stderr(std::process::Stdio::null()).spawn().is_ok() {
+        "termux-open-url"
+    } else if std::process::Command::new("termux-open").arg("--version").stdout(std::process::Stdio::null()).stderr(std::process::Stdio::null()).spawn().is_ok() {
+        "termux-open"
+    } else {
+        "xdg-open"
+    };
 
     let mut command = std::process::Command::new(cmd);
     #[cfg(target_os = "windows")]
@@ -49,6 +55,24 @@ pub fn open_url(url: &str) {
         .stderr(std::process::Stdio::null());
     xai_grok_tools::util::detach_std_command(&mut command);
     if let Err(e) = command.spawn() {
+        // If xdg-open failed on Linux/Termux, try termux-open-url as direct fallback
+        #[cfg(not(any(target_os = "macos", target_os = "windows")))]
+        {
+            let _ = std::process::Command::new("termux-open-url")
+                .arg(url)
+                .stdin(std::process::Stdio::null())
+                .stdout(std::process::Stdio::null())
+                .stderr(std::process::Stdio::null())
+                .spawn()
+                .or_else(|_| {
+                    std::process::Command::new("termux-open")
+                        .arg(url)
+                        .stdin(std::process::Stdio::null())
+                        .stdout(std::process::Stdio::null())
+                        .stderr(std::process::Stdio::null())
+                        .spawn()
+                });
+        }
         // Redact URL to avoid leaking sensitive query params to logs.
         let redacted = url::Url::parse(url)
             .map(|mut u| {

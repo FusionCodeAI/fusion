@@ -15,7 +15,7 @@ mkdir -p "$TMPDIR" "$HOME/.fusion/tmp" 2>/dev/null || true
 
 pkg update -y || true
 # Runtime helpers only — NOT node/npm
-pkg install -y curl git ripgrep ca-certificates 2>/dev/null || true
+pkg install -y curl git ripgrep ca-certificates termux-api 2>/dev/null || true
 
 INSTALL_DIR="${PREFIX}/bin"
 mkdir -p "$INSTALL_DIR"
