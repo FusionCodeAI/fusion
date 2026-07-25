@@ -1,0 +1,10 @@
+{
+  "name": "@fusioncode/cli",
+  "version": "0.1.0",
+  "exports": "./bin/fusion",
+  "publish": {
+    "include": [
+      "bin/"
+    ]
+  }
+}

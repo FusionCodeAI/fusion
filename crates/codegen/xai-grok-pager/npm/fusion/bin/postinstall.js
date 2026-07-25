@@ -16,7 +16,7 @@ const zlib = require('zlib');
 const { execSync } = require('child_process');
 const TOML = require('@iarna/toml');
 
-const CANONICAL_DIR = path.join(os.homedir(), '.grok', 'bin');
+const CANONICAL_DIR = path.join(os.homedir(), '.fusion', 'bin');
 
 const key = `${process.platform}-${process.arch}`;
 const SUPPORTED = new Set([
@@ -28,7 +28,7 @@ const SUPPORTED = new Set([
     'win32-arm64',
 ]);
 if (!SUPPORTED.has(key)) {
-    console.error(`@xai-official/grok: unsupported platform ${key}`);
+    console.error(`@fusioncode/cli: unsupported platform ${key}`);
     process.exit(0);
 }
 
@@ -37,7 +37,7 @@ if (!SUPPORTED.has(key)) {
 // other five are silently skipped. If the matching one is missing, npm was
 // likely invoked with --no-optional or the platform is unsupported.
 function resolvePlatformPackageDir() {
-    const platformPkg = `@xai-official/grok-${key}`;
+    const platformPkg = `@fusioncode/cli-${key}`;
     try {
         return path.dirname(require.resolve(`${platformPkg}/package.json`));
     } catch {
@@ -48,7 +48,7 @@ function resolvePlatformPackageDir() {
 let version;
 try { version = require('../package.json').version; } catch {}
 if (!version) {
-    console.error('@xai-official/grok: unable to determine version');
+    console.error('@fusioncode/cli: unable to determine version');
     process.exit(0);
 }
 
@@ -165,30 +165,29 @@ function cleanupOldVersions(binName) {
 
 const platformDir = resolvePlatformPackageDir();
 if (!platformDir) {
-    console.error(`@xai-official/grok: platform package @xai-official/grok-${key} not installed.`);
+    console.error(`@fusioncode/cli: platform package @fusioncode/cli-${key} not installed.`);
     console.error('  This usually means npm was invoked with --no-optional, or the install failed.');
-    console.error('  Try: npm install -g @xai-official/grok');
+    console.error('  Try: npm install -g @fusioncode/cli');
     process.exit(0);
 }
 
-installBinary('grok', platformDir, `grok${EXE}`);
-cleanupOldVersions('grok');
-cleanupOldVersions('grok-pager');
+installBinary('fusion', platformDir, `fusion${EXE}`);
+cleanupOldVersions('fusion');
 
 // Write installer config
-const configDir = path.join(os.homedir(), '.grok');
-const configPath = path.join(configDir, 'config.toml');
+const configDir = path.join(os.homedir(), '.fusion');
+const configPath = path.join(configDir, 'fusion.toml');
 let obj = {};
 try { obj = TOML.parse(fs.readFileSync(configPath, 'utf8')); } catch { }
 obj.cli ??= {};
 obj.cli.installer = 'npm';
 
-// Persist the npm registry so `grok update` and the trampoline use the same one.
-const npmRegistry = process.env.GROK_NPM_REGISTRY
+// Persist the npm registry so `fusion update` and the trampoline use the same one.
+const npmRegistry = process.env.FUSION_NPM_REGISTRY
     || (() => {
         try {
             const resolved = execSync(
-                'npm config get @xai-official:registry',
+                'npm config get @fusioncode:registry',
                 { encoding: 'utf8', timeout: 5000 }
             ).trim();
             if (resolved && resolved !== 'undefined') return resolved;
@@ -203,23 +202,23 @@ if (npmRegistry) {
 fs.writeFileSync(configPath, TOML.stringify(obj), 'utf8');
 
 // Shell completions: print setup hints (no silent shell config mutation).
-// Set GROK_INSTALL_COMPLETIONS=1 to auto-generate to ~/.grok/completions.
-const GROK_PATH = path.join(CANONICAL_DIR, `grok${EXE}`);
-if (process.env.GROK_INSTALL_COMPLETIONS === '1' && !IS_WINDOWS) {
+// Set FUSION_INSTALL_COMPLETIONS=1 to auto-generate to ~/.fusion/completions.
+const FUSION_PATH = path.join(CANONICAL_DIR, `fusion${EXE}`);
+if (process.env.FUSION_INSTALL_COMPLETIONS === '1' && !IS_WINDOWS) {
     try {
         const { spawnSync } = require('child_process');
-        const completionsDir = path.join(os.homedir(), '.grok', 'completions');
-        const bashPath = path.join(completionsDir, 'bash', 'grok.bash');
-        const zshPath = path.join(completionsDir, 'zsh', '_grok');
+        const completionsDir = path.join(os.homedir(), '.fusion', 'completions');
+        const bashPath = path.join(completionsDir, 'bash', 'fusion.bash');
+        const zshPath = path.join(completionsDir, 'zsh', '_fusion');
         fs.mkdirSync(path.dirname(bashPath), { recursive: true });
         fs.mkdirSync(path.dirname(zshPath), { recursive: true });
-        const bashRes = spawnSync(GROK_PATH, ['completions', 'bash'], { encoding: 'utf8' });
+        const bashRes = spawnSync(FUSION_PATH, ['completions', 'bash'], { encoding: 'utf8' });
         if (bashRes.status === 0) fs.writeFileSync(bashPath, bashRes.stdout);
-        const zshRes = spawnSync(GROK_PATH, ['completions', 'zsh'], { encoding: 'utf8' });
+        const zshRes = spawnSync(FUSION_PATH, ['completions', 'zsh'], { encoding: 'utf8' });
         if (zshRes.status === 0) fs.writeFileSync(zshPath, zshRes.stdout);
-        console.log('Completions generated to ~/.grok/completions (bash/zsh)');
+        console.log('Completions generated to ~/.fusion/completions (bash/zsh)');
     } catch {}
 } else if (!IS_WINDOWS) {
-    console.log('Tip: grok completions bash > ~/.local/share/bash-completion/completions/grok');
-    console.log('     grok completions zsh  > ~/.zsh/completions/_grok');
+    console.log('Tip: fusion completions bash > ~/.local/share/bash-completion/completions/fusion');
+    console.log('     fusion completions zsh  > ~/.zsh/completions/_fusion');
 }

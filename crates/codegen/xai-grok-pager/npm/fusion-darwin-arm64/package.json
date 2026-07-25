@@ -1,7 +1,7 @@
 {
-    "name": "@xai-official/grok-darwin-x64",
-    "version": "0.2.3",
-    "description": "darwin-x64 binary for @xai-official/grok. Do not install directly; install @xai-official/grok instead.",
+    "name": "@fusioncode/cli-darwin-arm64",
+    "version": "0.1.0",
+    "description": "darwin-arm64 binary for @fusioncode/cli. Do not install directly; install @fusioncode/cli instead.",
     "license": "Apache-2.0",
     "files": [
         "bin/",
@@ -11,7 +11,7 @@
         "darwin"
     ],
     "cpu": [
-        "x64"
+        "arm64"
     ],
     "publishConfig": {
         "access": "public"

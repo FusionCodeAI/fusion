@@ -1,14 +1,14 @@
 {
-    "name": "@xai-official/grok-linux-arm64",
-    "version": "0.2.3",
-    "description": "linux-arm64 binary for @xai-official/grok. Do not install directly; install @xai-official/grok instead.",
+    "name": "@fusioncode/cli-win32-arm64",
+    "version": "0.1.0",
+    "description": "win32-arm64 binary for @fusioncode/cli. Do not install directly; install @fusioncode/cli instead.",
     "license": "Apache-2.0",
     "files": [
         "bin/",
         "THIRD_PARTY_NOTICES.md"
     ],
     "os": [
-        "linux"
+        "win32"
     ],
     "cpu": [
         "arm64"

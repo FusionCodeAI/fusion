@@ -1,7 +1,7 @@
 {
-    "name": "@xai-official/grok-win32-arm64",
-    "version": "0.2.3",
-    "description": "win32-arm64 binary for @xai-official/grok. Do not install directly; install @xai-official/grok instead.",
+    "name": "@fusioncode/cli-win32-x64",
+    "version": "0.1.0",
+    "description": "win32-x64 binary for @fusioncode/cli. Do not install directly; install @fusioncode/cli instead.",
     "license": "Apache-2.0",
     "files": [
         "bin/",
@@ -11,7 +11,7 @@
         "win32"
     ],
     "cpu": [
-        "arm64"
+        "x64"
     ],
     "publishConfig": {
         "access": "public"

@@ -18,11 +18,11 @@ const fs = require('fs');
 const os = require('os');
 const zlib = require('zlib');
 
-const pkgName = '@xai-official/grok';
+const pkgName = '@fusioncode/cli';
 const IS_WINDOWS = process.platform === 'win32';
 const EXE = IS_WINDOWS ? '.exe' : '';
-const BIN_NAME = `grok${EXE}`;
-const CANONICAL_DIR = path.join(os.homedir(), '.grok', 'bin');
+const BIN_NAME = `fusion${EXE}`;
+const CANONICAL_DIR = path.join(os.homedir(), '.fusion', 'bin');
 const CANONICAL_PATH = path.join(CANONICAL_DIR, BIN_NAME);
 
 function readLocalVersion() {
@@ -33,7 +33,7 @@ function readLocalVersion() {
 // matching optional dependency wasn't installed (unsupported platform, or
 // npm refused to install optionalDependencies).
 function resolvePlatformPackageDir() {
-    const platformPkg = `@xai-official/grok-${process.platform}-${process.arch}`;
+    const platformPkg = `@fusioncode/cli-${process.platform}-${process.arch}`;
     try {
         return path.dirname(require.resolve(`${platformPkg}/package.json`));
     } catch {
@@ -56,7 +56,7 @@ function decompressBrotli(brPath, outPath) {
 function bootstrapCanonical(sourceBinPath, version) {
     try {
         fs.mkdirSync(CANONICAL_DIR, { recursive: true });
-        const versionedName = `grok-${version}${EXE}`;
+        const versionedName = `fusion-${version}${EXE}`;
         const versionedPath = path.join(CANONICAL_DIR, versionedName);
         if (!fs.existsSync(versionedPath)) {
             const tmpPath = versionedPath + `.tmp.${process.pid}`;
@@ -97,7 +97,7 @@ function resolveBinary() {
     const platformDir = resolvePlatformPackageDir();
     if (!platformDir) {
         console.error(`${pkgName}: no platform binary installed for ${process.platform}-${process.arch}.`);
-        console.error(`  Expected sibling package @xai-official/grok-${process.platform}-${process.arch}.`);
+        console.error(`  Expected sibling package @fusioncode/cli-${process.platform}-${process.arch}.`);
         console.error(`  This usually means npm skipped optionalDependencies (e.g. --no-optional)`);
         console.error(`  or the platform is not supported.`);
         process.exit(1);
@@ -125,7 +125,7 @@ function resolveBinary() {
 }
 
 const execPath = resolveBinary();
-const childEnv = { ...process.env, GROK_MANAGED_BY_NPM: '1' };
+const childEnv = { ...process.env, FUSION_MANAGED_BY_NPM: '1' };
 const child = spawn(execPath, process.argv.slice(2), { stdio: 'inherit', env: childEnv });
 child.on('exit', (code, signal) => {
     if (signal) {
