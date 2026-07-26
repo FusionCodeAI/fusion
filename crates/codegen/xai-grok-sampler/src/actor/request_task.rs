@@ -30,10 +30,25 @@ use crate::stream::{stream_chat_completions, stream_messages, stream_responses};
 use crate::types::RequestId;
 
 /// Default per-chunk idle timeout when neither config nor caller
-/// supplies one. Matches the shell's session-level default
-/// (5 minutes -- long enough for cold-start reasoning, short enough
-/// to detect dead streams before the user gives up).
-const DEFAULT_IDLE_TIMEOUT_SECS: u64 = 300;
+/// supplies one. Kept in sync with the shell's session-level default
+/// (120s) so a stream that stops producing chunks surfaces a failure
+/// quickly instead of freezing the chat for minutes.
+pub(crate) const DEFAULT_IDLE_TIMEOUT_SECS: u64 = 120;
+
+/// How many times an `IdleTimeout` is resampled before giving up. Kept
+/// separate from the transport `max_retries` budget so an idle stall
+/// never burns the full 15-retry transport budget. Each idle retry gets
+/// a fresh idle-timeout window; the first also rebuilds the HTTP client
+/// as HTTP/1.1 to escape a poisoned HTTP/2 connection pool.
+const IDLE_TIMEOUT_RETRY_BUDGET: u32 = 2;
+
+/// Hard wall-clock cap for a single inference request across all
+/// attempts. Guards against a trickling stream that keeps sending
+/// content chunks (resetting the per-chunk idle timer) but never
+/// terminates. Well above the 120s idle timeout × (1 + budget) ≈ 360s
+/// of realistic idle-retry worst case, so it only fires on genuinely
+/// pathological streams.
+const DEFAULT_TURN_DEADLINE_SECS: u64 = 480;
 
 /// Result type for the `submit_and_collect` oneshot. Carries the rich
 /// `SamplingError` so callers can inspect retryability, status code,
@@ -120,17 +135,44 @@ pub(crate) async fn run_request_task(
     let doom_policy = config.doom_loop_recovery;
     let doom_max_retries = doom_policy.map_or(0, |p| p.max_retries);
     let mut doom_retry_count: u32 = 0;
+    // Idle-timeout resamples keep their own budget too: a stalled stream is
+    // often a transient HTTP/2 pool poisoning or a gateway hiccup, and a
+    // fresh connection (HTTP/1.1 on the first retry) recovers it. Capped
+    // at `IDLE_TIMEOUT_RETRY_BUDGET` so it can't amplify indefinitely.
+    let mut idle_retry_count: u32 = 0;
+    // Hard wall-clock cap across all attempts. A trickling stream that
+    // keeps sending content chunks (resetting the per-chunk idle timer)
+    // but never terminates is caught here.
+    let turn_deadline = tokio::time::Instant::now()
+        + Duration::from_secs(DEFAULT_TURN_DEADLINE_SECS);
 
     loop {
         if cancel_token.is_cancelled() {
             handle_cancellation(&event_tx, &request_id, &mut completion_tx);
             return request_id;
         }
+        if tokio::time::Instant::now() >= turn_deadline {
+            let elapsed = DEFAULT_TURN_DEADLINE_SECS;
+            let err = SamplingError::EventStreamError(format!(
+                "turn deadline exceeded after {elapsed}s without completion"
+            ));
+            tracing::warn!(
+                target: crate::sampling_log::TARGET,
+                retry_count,
+                idle_retry_count,
+                doom_retry_count,
+                elapsed_secs = elapsed,
+                "turn-wide wall-clock deadline exceeded; aborting request"
+            );
+            emit_failed(&event_tx, &request_id, &err);
+            send_completion(&mut completion_tx, Err(err));
+            return request_id;
+        }
 
         // Once the resample budget is spent, the attempt runs with the abort
         // disarmed so it can complete and be accepted as-is.
         let doom_check = doom_policy.filter(|_| doom_retry_count < doom_max_retries);
-        let outcome = run_one_attempt(
+        let attempt = run_one_attempt(
             &client,
             request.clone(),
             request_id.clone(),
@@ -139,15 +181,37 @@ pub(crate) async fn run_request_task(
             &cancel_token,
             doom_check,
         )
-        .instrument(sampling_span.clone())
-        .await;
+        .instrument(sampling_span.clone());
+        // Enforce the turn deadline during the attempt itself, so a
+        // trickling stream that never trips the per-chunk idle timeout
+        // (because it keeps emitting content) is still bounded.
+        let outcome = match tokio::time::timeout_at(turn_deadline, attempt).await {
+            Ok(outcome) => outcome,
+            Err(_elapsed) => {
+                let elapsed = DEFAULT_TURN_DEADLINE_SECS;
+                let err = SamplingError::EventStreamError(format!(
+                    "turn deadline exceeded after {elapsed}s mid-attempt"
+                ));
+                tracing::warn!(
+                    target: crate::sampling_log::TARGET,
+                    retry_count,
+                    idle_retry_count,
+                    doom_retry_count,
+                    elapsed_secs = elapsed,
+                    "turn-wide wall-clock deadline exceeded mid-attempt; aborting request"
+                );
+                emit_failed(&event_tx, &request_id, &err);
+                send_completion(&mut completion_tx, Err(err));
+                return request_id;
+            }
+        };
 
         match outcome {
             AttemptOutcome::Completed {
                 response,
                 mut metrics,
             } => {
-                metrics.attempts = retry_count + doom_retry_count + 1;
+                metrics.attempts = retry_count + doom_retry_count + idle_retry_count + 1;
                 if let Some(policy) = doom_policy {
                     let confident = policy.confident_triggers(&response.doom_loop_signals);
                     if !confident.is_empty() {
@@ -232,6 +296,57 @@ pub(crate) async fn run_request_task(
                         doom_max_retries,
                         &error,
                     );
+                    tokio::time::sleep(backoff).await;
+                    continue;
+                }
+                // Idle-timeout resamples run on their own budget, mirroring
+                // doom-loop: a stalled stream is often a transient HTTP/2
+                // pool poisoning or a gateway hiccup. The first idle retry
+                // rebuilds the HTTP client as HTTP/1.1 to escape a poisoned
+                // connection pool. Once the budget is spent, fall through to
+                // the generic classifier (which classifies IdleTimeout as
+                // Fatal) so the turn ends cleanly instead of looping forever.
+                if let SamplingError::IdleTimeout { elapsed_secs } = &error
+                    && idle_retry_count < IDLE_TIMEOUT_RETRY_BUDGET
+                {
+                    idle_retry_count += 1;
+                    let backoff = retry_mod::retry_backoff_with_jitter(idle_retry_count);
+                    tracing::warn!(
+                        target: crate::sampling_log::TARGET,
+                        elapsed_secs,
+                        attempt = idle_retry_count,
+                        max_retries = IDLE_TIMEOUT_RETRY_BUDGET,
+                        outcome = "resampled",
+                        "idle-timeout recovery: discarding the stalled attempt and resampling"
+                    );
+                    emit_retrying(
+                        &event_tx,
+                        &request_id,
+                        idle_retry_count,
+                        IDLE_TIMEOUT_RETRY_BUDGET,
+                        &error,
+                    );
+                    // Rebuild the HTTP client as HTTP/1.1 on the first idle
+                    // retry to escape a poisoned HTTP/2 connection pool — a
+                    // common cause of mid-chat stalls on shared gateways.
+                    if idle_retry_count == 1 && !config.force_http1 {
+                        let mut http1_config = config.clone();
+                        http1_config.force_http1 = true;
+                        match SamplingClient::new(http1_config) {
+                            Ok(fresh) => {
+                                client = fresh;
+                                tracing::info!(
+                                    "rebuilt sampling client with HTTP/1.1 fallback for idle-timeout retry"
+                                );
+                            }
+                            Err(rebuild_err) => {
+                                tracing::warn!(
+                                    error = %rebuild_err,
+                                    "failed to rebuild HTTP/1.1 client for idle-timeout retry; reusing existing client"
+                                );
+                            }
+                        }
+                    }
                     tokio::time::sleep(backoff).await;
                     continue;
                 }
@@ -729,9 +844,15 @@ fn handle_cancellation(
         request_id: request_id.clone(),
         error: info,
     });
+    // Cancellation is a client-side termination, NOT an auth failure.
+    // Mapping it to `Auth` would send `handle_sampling_failure` down a
+    // phantom token-refresh path. Use a transport-level error so the
+    // session surfaces a clean terminal failure.
     send_completion(
         completion_tx,
-        Err(SamplingError::Auth("request cancelled".to_string())),
+        Err(SamplingError::EventStreamError(
+            "request cancelled".to_string(),
+        )),
     );
 }
 
@@ -857,5 +978,27 @@ mod tests {
             SamplingError::EventStreamError(msg) => assert_eq!(msg, "first"),
             other => panic!("expected EventStreamError, got {other:?}"),
         }
+    }
+
+    /// Lock in the stall-recovery knobs so a careless change is caught.
+    ///
+    /// The idle timeout (120s) × (1 + budget 2) = 360s worst-case idle wait
+    /// before a Fatal, well under the 480s turn deadline. If these drift such
+    /// that the deadline is below the idle worst case, the deadline would fire
+    /// during legitimate idle retries instead of only on pathological streams.
+    #[test]
+    fn stall_recovery_budgets_are_consistent() {
+        assert_eq!(DEFAULT_IDLE_TIMEOUT_SECS, 120);
+        assert_eq!(IDLE_TIMEOUT_RETRY_BUDGET, 2);
+        assert_eq!(DEFAULT_TURN_DEADLINE_SECS, 480);
+        let idle_worst_case =
+            DEFAULT_IDLE_TIMEOUT_SECS * (1 + u64::from(IDLE_TIMEOUT_RETRY_BUDGET));
+        assert!(
+            idle_worst_case < DEFAULT_TURN_DEADLINE_SECS,
+            "turn deadline ({DEFAULT_TURN_DEADLINE_SECS}s) must exceed the \
+             idle-retry worst case ({idle_worst_case}s) so the deadline only \
+             fires on pathological trickling streams, not on legitimate idle \
+             retries"
+        );
     }
 }

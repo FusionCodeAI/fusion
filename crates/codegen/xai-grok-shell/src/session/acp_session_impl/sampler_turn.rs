@@ -686,14 +686,25 @@ impl SessionActor {
             && crate::auth::devbox_login::is_devbox_environment()
             && let Some(ref am) = self.auth_manager
         {
+            let pre_key = am.current_or_expired().map(|a| a.key);
             match am.try_devbox_recovery().await {
                 Ok(auth) => {
-                    tracing::info!(
-                        session_id = % self.session_info.id.0, user_id = % auth.user_id,
-                        "auth recovery: sampler 401, devbox re-mint, retrying"
-                    );
-                    self.prepare_sampler_for_turn().await;
-                    return Ok(SamplerFailureRecovery::RefreshAuthAndResubmit);
+                    if pre_key.as_deref() == Some(auth.key.as_str()) && pre_key.is_some() {
+                        tracing::warn!(
+                            session_id = % self.session_info.id.0,
+                            user_id = % auth.user_id,
+                            "auth recovery: devbox re-mint returned the same token \
+                             (no rotation); refusing to resubmit into a guaranteed 401"
+                        );
+                        // Fall through to terminal failure.
+                    } else {
+                        tracing::info!(
+                            session_id = % self.session_info.id.0, user_id = % auth.user_id,
+                            "auth recovery: sampler 401, devbox re-mint, retrying"
+                        );
+                        self.prepare_sampler_for_turn().await;
+                        return Ok(SamplerFailureRecovery::RefreshAuthAndResubmit);
+                    }
                 }
                 Err(e) => {
                     tracing::warn!(
@@ -709,31 +720,54 @@ impl SessionActor {
             }
         }
         if auth_recovery_eligible && let Some(ref am) = self.auth_manager {
+            // Capture the rejected key so we can detect a no-op refresh
+            // (the authority returned the same token). Without this guard,
+            // a "successful" refresh that didn't actually rotate the key
+            // would resubmit, 401 again, and repeat up to MAX_RETRIES —
+            // wasting the user's time on a credential that can never work.
+            let pre_key = am.current_or_expired().map(|a| a.key);
             if am
                 .try_recover_unauthorized(crate::auth::recovery::RecoverySource::Turn)
                 .await
             {
-                tracing::info!(
+                let post_key = am.current_or_expired().map(|a| a.key);
+                if pre_key.as_deref() == post_key.as_deref() && pre_key.is_some() {
+                    tracing::warn!(
+                        session_id = % self.session_info.id.0,
+                        "auth recovery: 401 refresh returned the same token \
+                         (no rotation); refusing to resubmit into a guaranteed 401"
+                    );
+                    xai_grok_telemetry::unified_log::warn(
+                        "auth recovery: 401 refresh returned the same token (no rotation)",
+                        Some(self.session_info.id.0.as_ref()),
+                        None,
+                    );
+                    // Fall through to terminal failure instead of a
+                    // pointless refresh→401→refresh loop.
+                } else {
+                    tracing::info!(
+                        session_id = % self.session_info.id.0,
+                        "auth recovery: sampler 401, recovered, retrying"
+                    );
+                    xai_grok_telemetry::unified_log::info(
+                        "auth recovery: sampler 401, recovered, retrying",
+                        Some(self.session_info.id.0.as_ref()),
+                        None,
+                    );
+                    self.prepare_sampler_for_turn().await;
+                    return Ok(SamplerFailureRecovery::RefreshAuthAndResubmit);
+                }
+            } else {
+                tracing::warn!(
                     session_id = % self.session_info.id.0,
-                    "auth recovery: sampler 401, recovered, retrying"
+                    "auth recovery: sampler 401, refresh failed"
                 );
-                xai_grok_telemetry::unified_log::info(
-                    "auth recovery: sampler 401, recovered, retrying",
+                xai_grok_telemetry::unified_log::warn(
+                    "auth recovery: sampler 401, refresh failed",
                     Some(self.session_info.id.0.as_ref()),
                     None,
                 );
-                self.prepare_sampler_for_turn().await;
-                return Ok(SamplerFailureRecovery::RefreshAuthAndResubmit);
             }
-            tracing::warn!(
-                session_id = % self.session_info.id.0,
-                "auth recovery: sampler 401, refresh failed"
-            );
-            xai_grok_telemetry::unified_log::warn(
-                "auth recovery: sampler 401, refresh failed",
-                Some(self.session_info.id.0.as_ref()),
-                None,
-            );
         }
         if matches!(error.kind, SamplingErrorKind::IdleTimeout) {
             self.signals_handle().record_idle_timeout();

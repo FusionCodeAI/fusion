@@ -1160,10 +1160,16 @@ impl AgentBuilder {
             is_non_interactive: self.is_non_interactive,
             system_prompt_label: self.system_prompt_label,
         };
-        let system_prompt = prompt_context
-            .render(&tool_bridge)
-            .await
-            .unwrap_or_default();
+        let system_prompt = match prompt_context.render(&tool_bridge).await {
+            Some(rendered) => rendered,
+            None => {
+                tracing::error!(
+                    "system prompt render returned None at agent build; the \
+                     agent will start with an empty system prompt"
+                );
+                String::new()
+            }
+        };
         if let Some(rendered) = tool_bridge
             .render_prompt(&definition.description, &prompt_context.placeholders())
             .await

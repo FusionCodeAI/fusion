@@ -90,7 +90,7 @@ pub fn resolve_auto_compact_threshold_percent_from_tiers(
 
 /// Client default per-compaction wall-clock budget (seconds). Fleet p99 of
 /// successful compactions is ~181s (≈225s at 400K+ input), so 300s clears the
-/// legit tail with margin while cutting a runaway from the ~600s deadline.
+/// legit tail with margin while cutting a runaway from the ~480s turn deadline.
 pub const DEFAULT_COMPACTION_WALL_CLOCK_BUDGET_SECS: u64 = 300;
 
 /// Below this, a configured budget is almost certainly a misconfig (fleet

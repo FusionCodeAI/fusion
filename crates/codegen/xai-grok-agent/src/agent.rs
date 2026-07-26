@@ -227,11 +227,22 @@ impl Agent {
     pub async fn finalize_prompt(&mut self) {
         self.prompt_context.build_timestamp_utc = chrono::Utc::now().to_rfc3339();
 
-        self.system_prompt = self
-            .prompt_context
-            .render(&self.tool_bridge)
-            .await
-            .unwrap_or_default();
+        match self.prompt_context.render(&self.tool_bridge).await {
+            Some(rendered) => {
+                self.system_prompt = rendered;
+            }
+            None => {
+                // Render failure must NOT silently wipe the system prompt —
+                // an empty prompt makes the model "forget" all instructions
+                // and tool descriptions, producing a stuck-feeling turn.
+                // Keep the last good prompt and log loudly so the failure
+                // is diagnosable instead of a silent regression.
+                tracing::error!(
+                    "system prompt render returned None; keeping the previous \
+                     rendered prompt instead of replacing it with an empty string"
+                );
+            }
+        }
     }
 
     /// Re-render the system prompt for a different definition, reusing
@@ -248,7 +259,16 @@ impl Agent {
             ctx.agents_md_files.clear();
         }
 
-        ctx.render(&self.tool_bridge).await.unwrap_or_default()
+        match ctx.render(&self.tool_bridge).await {
+            Some(rendered) => rendered,
+            None => {
+                tracing::error!(
+                    "render_prompt_for_definition: render returned None; \
+                     falling back to an empty system prompt"
+                );
+                String::new()
+            }
+        }
     }
 }
 

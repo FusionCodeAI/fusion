@@ -71,9 +71,26 @@ impl SamplerActor {
                             self.state.remove(&request_id);
                         }
                         Err(join_err) => {
-                            tracing::warn!(
+                            // The per-request task panicked or was aborted.
+                            // We cannot recover its `RequestId` from a
+                            // `JoinError`, so we cannot remove its
+                            // `active_requests` entry here or emit a targeted
+                            // `Failed` event. That is acceptable:
+                            //   - `submit_and_collect` callers own a
+                            //     `CancelOnDrop` RAII guard that fires a
+                            //     `Cancel` command on drop, which removes the
+                            //     stale entry when the caller's future returns
+                            //     (the oneshot returns `Err(RecvError)`).
+                            //   - The oneshot's `Err` is mapped to a
+                            //     transport-level `SamplingError` (NOT `Auth`),
+                            //     so the session surfaces a clear terminal
+                            //     failure instead of a phantom auth-retry loop.
+                            tracing::error!(
                                 error = %join_err,
-                                "request task panicked or was aborted"
+                                "request task panicked or was aborted; \
+                                 caller will receive a transport error via the \
+                                 completion oneshot and its RAII guard will \
+                                 clean up the stale active_requests entry"
                             );
                         }
                     }

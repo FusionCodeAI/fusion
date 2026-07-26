@@ -149,8 +149,15 @@ impl SamplerHandle {
                 request_id: cancel_id,
             });
         completion_rx.await.unwrap_or_else(|_| {
-            Err(SamplingError::Auth(
-                "sampler actor dropped before completion".to_string(),
+            // The per-request task terminated without sending a completion
+            // (panic, abort, or actor shutdown). This is NOT an auth failure —
+            // mapping it to `Auth` would send `handle_sampling_failure` down a
+            // phantom token-refresh + resubmit loop, chasing a credential
+            // problem that doesn't exist. Surface it as a transport-level
+            // error so the session reports a clear terminal failure and the
+            // user can re-prompt.
+            Err(SamplingError::EventStreamError(
+                "sampler request task terminated unexpectedly".to_string(),
             ))
         })
     }

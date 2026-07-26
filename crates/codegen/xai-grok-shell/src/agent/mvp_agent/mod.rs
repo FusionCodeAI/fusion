@@ -1197,7 +1197,13 @@ fn resolve_inference_idle_timeout_secs(
         .or_else(|| models.values().find(|entry| entry.info.model == model))
         .and_then(|entry| entry.info.inference_idle_timeout_secs);
     let remote = remote_settings.and_then(|s| s.inference_idle_timeout_secs);
-    per_model.or(remote).unwrap_or(600).max(10)
+    // Default 120s (down from 600s): a genuinely stalled stream should surface
+    // a failure in ~2 minutes, not silently freeze the chat for 10 minutes.
+    // The idle-timeout resample budget in the sampler retries a couple of
+    // times before giving up, so a transient stall recovers automatically.
+    // Per-model config or remote settings can raise this for slow
+    // cold-start reasoning models.
+    per_model.or(remote).unwrap_or(120).max(10)
 }
 /// Parse the client-advertised `x.ai/hunkTracker.mode` string. Case-insensitive
 /// and trimmed. Absent/blank/`off`/`disabled` => `None`; unknown => `AllDirty`.

@@ -2030,7 +2030,12 @@ impl SamplingClient {
         request: ConversationRequest,
     ) -> Result<ConversationResponse> {
         let request_id = crate::types::RequestId::random();
-        let idle_timeout = std::time::Duration::from_secs(300);
+        // Use the shared default so auxiliary paths (recap, dream,
+        // side-questions) get the same fast-fail idle timeout as the
+        // main turn path — no 5-minute silent freeze on a stalled model.
+        let idle_timeout = std::time::Duration::from_secs(
+            crate::actor::request_task::DEFAULT_IDLE_TIMEOUT_SECS,
+        );
         let result = match self.api_backend() {
             ApiBackend::ChatCompletions => {
                 let (raw, meta) = self.conversation_stream(request).await?;
