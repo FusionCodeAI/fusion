@@ -1,6 +1,6 @@
 {
   "name": "@fusioncode/cli",
-  "version": "0.1.1",
+  "version": "0.2.5",
   "license": "Apache-2.0",
   "exports": "./bin/fusion.js",
   "publish": {

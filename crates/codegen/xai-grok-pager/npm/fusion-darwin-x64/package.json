@@ -1,6 +1,6 @@
 {
     "name": "@fusioncode/cli-darwin-x64",
-    "version": "0.1.0",
+    "version": "0.2.5",
     "description": "darwin-x64 binary for @fusioncode/cli. Do not install directly; install @fusioncode/cli instead.",
     "license": "Apache-2.0",
     "files": [
