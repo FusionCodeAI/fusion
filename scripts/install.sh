@@ -9,6 +9,8 @@
 #   x86_64-unknown-linux-gnu       ← Linux x86_64
 #   aarch64-linux-android          ← Termux / Android ARM64 (native NDK)
 #   aarch64-apple-darwin           ← macOS Apple Silicon
+#   x86_64-apple-darwin            ← macOS Intel
+#   x86_64-pc-windows-msvc         ← Windows x64 (Git Bash / MSYS2)
 #
 # Older releases used aarch64-unknown-linux-musl for Termux; we fall back to
 # that as a secondary candidate if the primary asset is not found.
@@ -41,7 +43,6 @@ need_cmd curl
 need_cmd tar
 need_cmd mktemp
 need_cmd grep
-need_cmd cut
 need_cmd head
 
 # Detect platform
@@ -103,6 +104,11 @@ elif [ "$OS" = "darwin" ]; then
 elif [ "$OS" = "linux" ]; then
     PLATFORM="linux"
     INSTALL_DIR="${HOME}/.local/bin"
+elif printf '%s' "$OS" | grep -q "mingw\|msys\|cygwin"; then
+    # Git Bash / MSYS2 / Cygwin on Windows
+    PLATFORM="windows"
+    INSTALL_DIR="${HOME}/bin"
+    BINARY="fusion.exe"
 else
     err "Unsupported OS: $OS"
 fi
@@ -126,6 +132,9 @@ case "$PLATFORM" in
         ;;
     macos)
         TARGET="${TARGET_ARCH}-apple-darwin"
+        ;;
+    windows)
+        TARGET="${TARGET_ARCH}-pc-windows-msvc"
         ;;
     *)
         err "Unsupported platform: $PLATFORM"
@@ -210,8 +219,27 @@ info "Downloading $DOWNLOAD_URL..."
 
 case "$DOWNLOAD_URL" in
     *.tar.gz)
-        curl -fsSL "$DOWNLOAD_URL" | tar xz -C "$WORK"
-        # Release archives ship the binary at the archive root as "fusion".
+        curl -fsSL "$DOWNLOAD_URL" -o "$WORK/archive.tar.gz"
+        # Verify SHA256 checksum if the .sha256 asset exists
+        SHA256_URL="${DOWNLOAD_URL}.sha256"
+        if curl -fsSL "$SHA256_URL" -o "$WORK/archive.tar.gz.sha256" 2>/dev/null; then
+            EXPECTED=$(cat "$WORK/archive.tar.gz.sha256" | awk '{print $1}')
+            if command -v sha256sum >/dev/null 2>&1; then
+                ACTUAL=$(sha256sum "$WORK/archive.tar.gz" | awk '{print $1}')
+            elif command -v shasum >/dev/null 2>&1; then
+                ACTUAL=$(shasum -a 256 "$WORK/archive.tar.gz" | awk '{print $1}')
+            else
+                info "Warning: cannot verify checksum (sha256sum/shasum not found)"
+                ACTUAL=""
+            fi
+            if [ -n "$ACTUAL" ] && [ "$ACTUAL" != "$EXPECTED" ]; then
+                err "SHA256 mismatch!\n  expected: $EXPECTED\n  got:      $ACTUAL"
+            fi
+            if [ -n "$ACTUAL" ]; then
+                info "Checksum verified"
+            fi
+        fi
+        tar xzf "$WORK/archive.tar.gz" -C "$WORK"
         if [ -f "$WORK/$BINARY" ]; then
             FOUND="$WORK/$BINARY"
         elif [ -f "$WORK/bin/$BINARY" ]; then
