@@ -1,13 +1,23 @@
 {
-  "default": "MiniMaxAI/MiniMax-M2.7",
-  "web_search": "MiniMaxAI/MiniMax-M2.7",
-  "image_description": "MiniMaxAI/MiniMax-M2.7",
-  "session_summary": "MiniMaxAI/MiniMax-M2.7",
+  "default": "deepseek-ai/DeepSeek-V4-Flash-0731",
+  "web_search": "deepseek-ai/DeepSeek-V4-Flash-0731",
+  "image_description": "deepseek-ai/DeepSeek-V4-Flash-0731",
+  "session_summary": "deepseek-ai/DeepSeek-V4-Flash-0731",
   "models": [
     {
+      "model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+      "name": "DeepSeek V4 Flash (Default)",
+      "description": "Lightning fast, optimized for coding",
+      "context_window": 128000,
+      "temperature": 0.7,
+      "top_p": 0.95,
+      "api_backend": "chat_completions",
+      "supported_in_api": true
+    },
+    {
       "model": "MiniMaxAI/MiniMax-M2.7",
-      "name": "MiniMax M2.7 (Default)",
-      "description": "Fusion primary default code model powered by MiniMax-M2.7",
+      "name": "MiniMax M2.7",
+      "description": "Balanced power for everyday development",
       "context_window": 500000,
       "temperature": 0.7,
       "top_p": 0.95,
@@ -17,7 +27,7 @@
     {
       "model": "moonshotai/Kimi-K2.6",
       "name": "Moonshot Kimi K2.6",
-      "description": "Fusion code model powered by Moonshot Kimi-K2.6",
+      "description": "Deep reasoning, strong at complex tasks",
       "context_window": 131072,
       "temperature": 0.7,
       "top_p": 0.95,

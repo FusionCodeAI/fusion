@@ -1,6 +1,6 @@
 {
     "name": "@fusioncode/cli-linux-x64",
-    "version": "0.2.5",
+    "version": "0.2.6",
     "description": "linux-x64 binary for @fusioncode/cli. Do not install directly; install @fusioncode/cli instead.",
     "license": "Apache-2.0",
     "files": [
