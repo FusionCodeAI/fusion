@@ -1,0 +1,48 @@
+[package]
+name = "fusion"
+version = "0.3.0"
+edition = "2021"
+description = "Fast, lightweight, cross-platform AI coding assistant with subagents and advisors"
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/theaungmyatmoe/fusion"
+
+[dependencies]
+# Async Runtime
+async-trait = "0.1"
+tokio = { version = "1", features = ["rt-multi-thread", "macros", "signal", "process", "io-util", "sync", "time", "fs", "io-std"] }
+futures = "0.3"
+
+# Networking & Streaming (Pure Rust TLS - Android/Termux & Windows friendly)
+reqwest = { version = "0.12", default-features = false, features = ["rustls-tls-native-roots", "json", "stream"] }
+eventsource-stream = "0.2"
+
+# Serialization & CLI
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+clap = { version = "4", features = ["derive", "env"] }
+
+# Terminal & UI (Lightweight inline Ratatui + Crossterm)
+ratatui = { version = "0.29", default-features = false, features = ["crossterm"] }
+crossterm = { version = "0.28", features = ["event-stream"] }
+
+# File system, Search & Diffs
+ignore = "0.4.22"
+globset = "0.4.15"
+regex = "1"
+similar = "2"
+dirs = "6"
+
+# Utility
+anyhow = "1"
+thiserror = "2"
+uuid = { version = "1", features = ["v4", "fast-rng", "serde"] }
+chrono = { version = "0.4", default-features = false, features = ["clock", "std"] }
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+
+[profile.release]
+opt-level = 3
+lto = "thin"
+codegen-units = 1
+panic = "abort"
+strip = true

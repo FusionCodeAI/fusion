@@ -1,0 +1,264 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  # ── Tag validation ──────────────────────────────────────────────────────────
+  tag-check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate tag matches Cargo.toml version
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo_ver="$(grep -m1 '^version' crates/codegen/xai-grok-pager-bin/Cargo.toml \
+                        | sed -E 's/version *= *"([^"]+)".*/\1/')"
+          if [[ "${GITHUB_REF_TYPE:-}" == "tag" ]]; then
+            tag_ver="${GITHUB_REF_NAME#v}"
+            [[ "${tag_ver}" == "${cargo_ver}" ]] \
+              || { echo "❌ Tag v${tag_ver} ≠ Cargo.toml ${cargo_ver}"; exit 1; }
+            echo "✅ Tag and Cargo.toml agree (${tag_ver})"
+          else
+            echo "✅ Manual release workflow dispatched for version ${cargo_ver}"
+          fi
+  build:
+    name: Build ${{ matrix.target }}
+    needs: tag-check
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # ── Linux x86_64 — native on ubuntu-22.04 (older glibc = wider compat)
+          - target: x86_64-unknown-linux-gnu
+            os: ubuntu-22.04
+            binary: fusion
+            android: false
+
+          # ── Termux / Android ARM64 — native NDK build ───────────────────────
+          - target: aarch64-linux-android
+            os: ubuntu-latest
+            binary: fusion
+            android: true
+
+          # ── macOS Apple Silicon ─────────────────────────────────────────────
+          - target: aarch64-apple-darwin
+            os: macos-latest
+            binary: fusion
+            android: false
+
+          # ── macOS Intel ─────────────────────────────────────────────────────
+          - target: x86_64-apple-darwin
+            os: macos-latest
+            binary: fusion
+            android: false
+
+          # ── Windows x64 ──────────────────────────────────────────────────────
+          - target: x86_64-pc-windows-msvc
+            os: windows-latest
+            binary: fusion.exe
+            android: false
+
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 180
+
+    steps:
+      - uses: actions/checkout@v4
+
+      # protobuf codegen (xai-grok-tools-api etc.) needs a real protoc on PATH.
+      # bin/protoc is a DotSlash wrapper and fails in CI without dotslash.
+      - name: Install protoc
+        uses: arduino/setup-protoc@v3
+        with:
+          version: "29.3"
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: "1.92.0"
+          # Don't add the android target here — build-linux.sh does it via rustup.
+          # Only add the target for non-android builds.
+          targets: ${{ matrix.android == false && matrix.target || '' }}
+
+      # ── Cache ─────────────────────────────────────────────────────────────
+      - name: Cache cargo registry
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-${{ matrix.target }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-${{ matrix.target }}-cargo-
+
+      # ── Build ──────────────────────────────────────────────────────────────
+      - name: Build (native Linux/macOS)
+        if: "!matrix.android"
+        shell: bash
+        env:
+          CARGO_BUILD_JOBS: 2
+          CARGO_PROFILE_RELEASE_DEBUG: "0"
+          CARGO_PROFILE_RELEASE_INCREMENTAL: "false"
+        run: |
+          cargo build \
+            --release \
+            --target ${{ matrix.target }} \
+            --features release-dist \
+            -p xai-grok-pager-bin
+
+      - name: Strip Linux binary
+        if: "matrix.target == 'x86_64-unknown-linux-gnu'"
+        shell: bash
+        run: strip "target/${{ matrix.target }}/release/${{ matrix.binary }}"
+
+      - name: Build Android ARM64 (NDK)
+        if: matrix.android
+        run: |
+          ./scripts/build-linux.sh arm64
+
+      # ── Package ────────────────────────────────────────────────────────────
+      - name: Package binary
+        shell: bash
+        run: |
+          TAG="${GITHUB_REF_NAME}"
+          if [[ "${TAG}" != v* ]]; then
+            cargo_ver="$(grep -m1 '^version' crates/codegen/xai-grok-pager-bin/Cargo.toml \
+                          | sed -E 's/version *= *"([^"]+)".*/\1/')"
+            TAG="v${cargo_ver}"
+          fi
+          ARTIFACT="fusion-${TAG}-${{ matrix.target }}"
+          mkdir -p dist
+          if [ "${{ matrix.android }}" = "true" ]; then
+            # build-linux.sh already compiled, stripped, and placed it in dist/
+            mv "dist/fusion-linux-aarch64" "dist/${{ matrix.binary }}"
+          else
+            cp "target/${{ matrix.target }}/release/${{ matrix.binary }}" "dist/${{ matrix.binary }}"
+          fi
+          cd dist
+          tar czf "${ARTIFACT}.tar.gz" "${{ matrix.binary }}"
+          # Produce a checksum (Linux: sha256sum, macOS: shasum)
+          if command -v sha256sum >/dev/null 2>&1; then
+            sha256sum "${ARTIFACT}.tar.gz" > "${ARTIFACT}.tar.gz.sha256"
+          else
+            shasum -a 256 "${ARTIFACT}.tar.gz" > "${ARTIFACT}.tar.gz.sha256"
+          fi
+          rm "${{ matrix.binary }}"
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: fusion-${{ matrix.target }}
+          path: dist/*
+
+  # ── GitHub Release ──────────────────────────────────────────────────────────
+  release:
+    name: Create GitHub Release
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+          merge-multiple: true
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: artifacts/**/*
+          generate_release_notes: true
+          body: |
+            ## Fusion ${{ github.ref_name }}
+
+            ### Downloads
+
+            | Platform | File |
+            |----------|------|
+            | Linux x86_64 | `fusion-${{ github.ref_name }}-x86_64-unknown-linux-gnu.tar.gz` |
+            | Termux / Android ARM64 | `fusion-${{ github.ref_name }}-aarch64-linux-android.tar.gz` |
+            | macOS Apple Silicon | `fusion-${{ github.ref_name }}-aarch64-apple-darwin.tar.gz` |
+            | macOS Intel | `fusion-${{ github.ref_name }}-x86_64-apple-darwin.tar.gz` |
+            | Windows x64 | `fusion-${{ github.ref_name }}-x86_64-pc-windows-msvc.tar.gz` |
+
+            ### Install (Termux / Android)
+            ```bash
+            curl -sSL https://raw.githubusercontent.com/${{ github.repository }}/main/scripts/install.sh | sh
+            ```
+
+            ### Install (one-liner, all platforms)
+            ```bash
+            curl -sSL https://raw.githubusercontent.com/${{ github.repository }}/main/scripts/install.sh | sh
+            ```
+
+  # ── NPM & JSR Publish ────────────────────────────────────────────────────────
+  publish-npm-jsr:
+    name: Publish to npm & JSR
+    needs: build
+    runs-on: ubuntu-latest
+    env:
+      NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
+    permissions:
+      contents: read
+      id-token: write # required for JSR provenance / OIDC publishing
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          registry-url: 'https://registry.npmjs.org'
+
+      - name: Download all built binaries
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+          merge-multiple: true
+
+      - name: Assemble npm packages
+        shell: bash
+        run: |
+          mkdir -p target/aarch64-apple-darwin/release
+          mkdir -p target/x86_64-apple-darwin/release
+          mkdir -p target/x86_64-unknown-linux-gnu/release
+          mkdir -p target/aarch64-linux-android/release
+          mkdir -p target/x86_64-pc-windows-msvc/release
+
+          tar -xzf artifacts/fusion-${GITHUB_REF_NAME}-aarch64-apple-darwin.tar.gz -C target/aarch64-apple-darwin/release/ || true
+          tar -xzf artifacts/fusion-${GITHUB_REF_NAME}-x86_64-apple-darwin.tar.gz -C target/x86_64-apple-darwin/release/ || true
+          tar -xzf artifacts/fusion-${GITHUB_REF_NAME}-x86_64-unknown-linux-gnu.tar.gz -C target/x86_64-unknown-linux-gnu/release/ || true
+          tar -xzf artifacts/fusion-${GITHUB_REF_NAME}-aarch64-linux-android.tar.gz -C target/aarch64-linux-android/release/ || true
+          tar -xzf artifacts/fusion-${GITHUB_REF_NAME}-x86_64-pc-windows-msvc.tar.gz -C target/x86_64-pc-windows-msvc/release/ || true
+
+          cd crates/codegen/xai-grok-pager/npm/fusion
+          node scripts/assemble-platform-packages.js
+
+      - name: Publish to npm
+        if: ${{ env.NPM_TOKEN != '' }}
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: |
+          cd crates/codegen/xai-grok-pager/npm
+          for dir in fusion-*; do
+            if [ -d "$dir" ]; then
+              (cd "$dir" && npm publish --access public || true)
+            fi
+          done
+          (cd fusion && npm publish --access public || true)
+
+      - name: Publish to JSR
+        run: |
+          cd crates/codegen/xai-grok-pager/npm/fusion
+          npx jsr publish --allow-dirty --allow-slow-types || true

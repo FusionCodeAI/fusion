@@ -1,0 +1,105 @@
+name: CI
+
+on:
+  push:
+    branches: [ main, dev, 'feat/**' ]
+  pull_request:
+    branches: [ main, dev ]
+
+# One active CI per branch/PR — cancel superseding runs from rapid pushes.
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+  # Limit parallelism on GitHub runners to avoid OOM during the large monorepo build.
+  CARGO_BUILD_JOBS: 2
+
+jobs:
+  # ── Fast path: compile + unit tests (every push/PR) ─────────────────────────
+  build:
+    name: Build & Test (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ ubuntu-latest, macos-latest ]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 90
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install protoc
+        uses: arduino/setup-protoc@v3
+        with:
+          version: "29.3"
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Install Rust (from rust-toolchain.toml)
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: "1.92.0"
+          components: rustfmt, clippy
+
+      - name: Cache cargo
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: ${{ runner.os }}-cargo-
+
+      # check is enough to catch compile breaks; full `cargo build` of the binary
+      # is redundant with musl release on main and makes every push very slow.
+      - name: cargo check (fusion)
+        run: cargo check -p xai-grok-pager-bin
+
+      - name: Run unit tests (core crates)
+        run: |
+          cargo test -p xai-grok-agent -p xai-grok-models -p xai-grok-config --lib -- --test-threads=2
+
+  # ── Linux release build check (main only) ───────────────────────────────────
+  linux-release-check:
+    name: Linux release build check
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-22.04
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install protoc
+        uses: arduino/setup-protoc@v3
+        with:
+          version: "29.3"
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: "1.92.0"
+          targets: x86_64-unknown-linux-gnu
+
+      - name: Cache cargo
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ubuntu-release-check-${{ hashFiles('**/Cargo.lock') }}
+
+      - name: Build release binary
+        run: |
+          cargo build \
+            --release \
+            --target x86_64-unknown-linux-gnu \
+            -p xai-grok-pager-bin
+
+      - name: Verify binary
+        run: |
+          file target/x86_64-unknown-linux-gnu/release/fusion
+          ldd  target/x86_64-unknown-linux-gnu/release/fusion 2>&1 || true
