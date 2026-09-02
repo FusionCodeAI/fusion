@@ -3,6 +3,7 @@ use serde_json::{json, Value};
 use similar::{ChangeTag, TextDiff};
 use std::path::{Path, PathBuf};
 
+use crate::tools::file::atomic_write;
 use crate::tools::types::{Tool, ToolContext};
 
 /// Resolve a relative or absolute path against a working directory.
@@ -145,7 +146,8 @@ pub fn apply_exact_edit(
     let matches_count = current_content.matches(old_text).count();
 
     if matches_count == 0 {
-        // Diagnostic check: test if mismatch is due to CRLF / LF differences
+        // Diagnostic check: is the mismatch caused by CRLF / LF differences?
+        // Also suggest the closest matching line so the model can self-correct.
         let normalized_content = current_content.replace("\r\n", "\n");
         let normalized_old = old_text.replace("\r\n", "\n");
         let normalized_matches = normalized_content.matches(&normalized_old).count();
@@ -161,8 +163,9 @@ pub fn apply_exact_edit(
 
         anyhow::bail!(
             "old_text not found in '{}'. Ensure old_text matches the file content exactly, \
-            including whitespace, indentation, and line breaks.",
-            path_display
+            including whitespace, indentation, and line breaks.{}",
+            path_display,
+            suggest_closest_line(current_content, old_text).unwrap_or_default(),
         );
     }
 
@@ -176,6 +179,61 @@ pub fn apply_exact_edit(
     }
 
     Ok(current_content.replacen(old_text, new_text, 1))
+}
+
+/// Build a short hint pointing at the closest matching line when `old_text`
+/// cannot be found, to help diagnose near-miss edits (e.g. wrong indentation).
+/// Returns `None` when no line is remotely similar.
+fn suggest_closest_line(content: &str, old_text: &str) -> Option<String> {
+    let needle: Vec<char> = old_text.chars().take(200).collect();
+    if needle.is_empty() {
+        return None;
+    }
+
+    let mut best: Option<(f64, usize, &str)> = None;
+    for (idx, line) in content.lines().enumerate() {
+        let haystack: Vec<char> = line.chars().collect();
+        let score = trigram_similarity(&needle, &haystack);
+        if best.map_or(true, |(b, _, _)| score > b) {
+            best = Some((score, idx + 1, line));
+        }
+    }
+
+    let (score, line_no, line) = best?;
+    if score < 0.35 {
+        return None;
+    }
+
+    let truncated: String = line.chars().take(120).collect();
+    Some(format!(
+        " Closest matching line is {} (similarity {:.0}%): `{}`",
+        line_no,
+        score * 100.0,
+        truncated
+    ))
+}
+
+/// Cheap trigram-overlap similarity between two char sequences (0.0..=1.0).
+fn trigram_similarity(a: &[char], b: &[char]) -> f64 {
+    if a.len() < 3 || b.len() < 3 {
+        return 0.0;
+    }
+
+    let trigrams = |s: &[char]| -> std::collections::HashMap<[char; 3], usize> {
+        let mut m = std::collections::HashMap::new();
+        for w in s.windows(3) {
+            *m.entry([w[0], w[1], w[2]]).or_insert(0usize) += 1;
+        }
+        m
+    };
+
+    let (ta, tb) = (trigrams(a), trigrams(b));
+    let common: usize = ta
+        .iter()
+        .map(|(g, ca)| std::cmp::min(*ca, *tb.get(g).unwrap_or(&0)))
+        .sum();
+    let total: usize = ta.values().sum::<usize>().max(tb.values().sum::<usize>());
+    if total == 0 { 0.0 } else { common as f64 / total as f64 }
 }
 
 // ---------------------------------------------------------------------------
@@ -267,9 +325,9 @@ impl Tool for EditFileTool {
 
         let updated_content = apply_exact_edit(&current_content, old_text, new_text, path_str)?;
 
-        tokio::fs::write(&full_path, updated_content.as_bytes())
+        atomic_write(&full_path, updated_content.as_bytes())
             .await
-            .map_err(|e| anyhow::anyhow!("Failed to write updated file '{}': {e}", full_path.display()))?;
+            .map_err(|e| anyhow::anyhow!("Failed to update file '{}': {e}", full_path.display()))?;
 
         let stats = compute_diff_stats(&current_content, &updated_content);
         let unified_diff = generate_unified_diff(&current_content, &updated_content, path_str, 3);
@@ -331,6 +389,77 @@ mod tests {
         let content = "hello";
         let err = apply_exact_edit(content, "", "world", "test.txt").unwrap_err();
         assert!(err.to_string().contains("old_text cannot be empty"));
+    }
+
+    #[test]
+    fn test_apply_exact_edit_not_found_suggests_closest_line() {
+        let content = "fn main() {\n    println!(\"hello\");\n}\n";
+        // Near-miss: wrong indentation only.
+        let old = "println!(\"hello\");";
+        let content_indented = "fn main() {\n        println!(\"hello\");\n}\n";
+
+        let err = apply_exact_edit(content_indented, old, "x", "t.rs").unwrap_err();
+        assert!(
+            err.to_string().contains("Closest matching line is 2"),
+            "missing closest-line hint: {err}"
+        );
+        // Sanity: the unmodified content still errors plainly.
+        let err2 = apply_exact_edit(content, "totally absent text!!", "x", "t.rs").unwrap_err();
+        assert!(err2.to_string().contains("old_text not found in 't.rs'"));
+    }
+
+    #[test]
+    fn test_trigram_similarity_bounds() {
+        let a: Vec<char> = "hello world".chars().collect();
+        let identical: Vec<char> = "hello world".chars().collect();
+        let unrelated: Vec<char> = "zzz".chars().collect();
+
+        assert_eq!(trigram_similarity(&a, &identical), 1.0);
+        assert_eq!(trigram_similarity(&a, &unrelated), 0.0);
+        // Too-short inputs score 0.
+        let tiny: Vec<char> = "ab".chars().collect();
+        assert_eq!(trigram_similarity(&tiny, &a), 0.0);
+    }
+
+    #[tokio::test]
+    async fn test_edit_tool_uses_atomic_write() {
+        let temp_dir = std::env::temp_dir().join(format!(
+            "fusion_edit_atomic_test_{}",
+            uuid::Uuid::new_v4()
+        ));
+        tokio::fs::create_dir_all(&temp_dir).await.unwrap();
+
+        let file_path = temp_dir.join("atomic.txt");
+        tokio::fs::write(&file_path, "alpha\nbeta\ngamma\n")
+            .await
+            .unwrap();
+
+        let tool = EditFileTool::new();
+        let ctx = ToolContext {
+            cwd: temp_dir.clone(),
+            env: std::collections::HashMap::new(),
+        };
+
+        let args = json!({
+            "path": "atomic.txt",
+            "old_text": "beta",
+            "new_text": "BETA"
+        });
+
+        tool.execute(args, &ctx).await.unwrap();
+        let updated = tokio::fs::read_to_string(&file_path).await.unwrap();
+        assert_eq!(updated, "alpha\nBETA\ngamma\n");
+
+        // No .tmp.* siblings leaked next to the file.
+        let siblings: Vec<_> = std::fs::read_dir(&temp_dir)
+            .unwrap()
+            .filter_map(|e| e.ok())
+            .map(|e| e.file_name().to_string_lossy().into_owned())
+            .filter(|n| n.contains(".tmp."))
+            .collect();
+        assert!(siblings.is_empty(), "temp files leaked: {siblings:?}");
+
+        let _ = tokio::fs::remove_dir_all(&temp_dir).await;
     }
 
     #[test]

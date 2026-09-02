@@ -7,6 +7,7 @@ use serde::{Deserialize, Serialize};
 use crate::config::Config;
 use crate::provider::types::Message;
 use crate::provider::LlmClient;
+use crate::agent::consensus::{resolve_consensus, ConsensusResolution, ConsensusStrategy};
 
 /// Assessed risk level from an advisor.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
@@ -19,6 +20,26 @@ pub enum RiskLevel {
 }
 
 impl RiskLevel {
+    /// Lowercase identifier used in JSON payloads and prompts.
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            RiskLevel::Low => "low",
+            RiskLevel::Medium => "medium",
+            RiskLevel::High => "high",
+            RiskLevel::Critical => "critical",
+        }
+    }
+
+    /// Parses a case-insensitive risk level string; unknown values degrade to Low.
+    pub fn parse_risk_level(raw: &str) -> Self {
+        match raw.trim().to_lowercase().as_str() {
+            "critical" | "crit" | "severe" | "4" => RiskLevel::Critical,
+            "high" | "3" => RiskLevel::High,
+            "medium" | "med" | "moderate" | "2" => RiskLevel::Medium,
+            _ => RiskLevel::Low,
+        }
+    }
+
     /// Returns true if the risk is Critical.
     pub fn is_critical(&self) -> bool {
         matches!(self, RiskLevel::Critical)
@@ -403,6 +424,39 @@ impl AdvisorEngine {
     pub fn format_critiques(critiques: &[AdvisorCritique]) -> String {
         format_critiques_for_system_prompt(critiques)
     }
+
+    /// Evaluates critiques according to the given consensus strategy.
+    pub fn resolve_consensus(
+        critiques: &[AdvisorCritique],
+        strategy: ConsensusStrategy,
+    ) -> ConsensusResolution {
+        resolve_consensus(critiques, strategy)
+    }
+
+    /// Queries all advisors in parallel and immediately resolves the consensus.
+    pub async fn consult_with_consensus(
+        &self,
+        user_request: &str,
+        proposed_action: &str,
+        strategy: ConsensusStrategy,
+    ) -> (Vec<AdvisorCritique>, ConsensusResolution) {
+        let critiques = self.consult(user_request, proposed_action).await;
+        let resolution = resolve_consensus(&critiques, strategy);
+        (critiques, resolution)
+    }
+
+    /// Reviews a tool call in parallel and immediately resolves the consensus.
+    pub async fn critique_tool_call_with_consensus(
+        &self,
+        user_request: &str,
+        tool_name: &str,
+        tool_args: &serde_json::Value,
+        strategy: ConsensusStrategy,
+    ) -> (Vec<AdvisorCritique>, ConsensusResolution) {
+        let critiques = self.critique_tool_call(user_request, tool_name, tool_args).await;
+        let resolution = resolve_consensus(&critiques, strategy);
+        (critiques, resolution)
+    }
 }
 
 /// Fans out consultation queries to all provided advisors in parallel.
@@ -526,20 +580,18 @@ async fn consult_single_advisor(
 fn parse_advisor_response(advisor: &Advisor, raw_content: &str) -> AdvisorCritique {
     let trimmed = raw_content.trim();
 
-    // Try extracting JSON from code block if enclosed in ```json ... ```
+    // Extract JSON from a fenced code block, an inline JSON object, or the raw text.
     let json_str = if let Some(start) = trimmed.find("```json") {
         let after_start = &trimmed[start + 7..];
-        if let Some(end) = after_start.find("```") {
-            after_start[..end].trim()
-        } else {
-            after_start.trim()
+        match after_start.find("```") {
+            Some(end) => after_start[..end].trim(),
+            None => after_start.trim(),
         }
     } else if let Some(start) = trimmed.find("```") {
         let after_start = &trimmed[start + 3..];
-        if let Some(end) = after_start.find("```") {
-            after_start[..end].trim()
-        } else {
-            after_start.trim()
+        match after_start.find("```") {
+            Some(end) => after_start[..end].trim(),
+            None => after_start.trim(),
         }
     } else if let Some(start) = trimmed.find('{') {
         if let Some(end) = trimmed.rfind('}') {
@@ -552,18 +604,11 @@ fn parse_advisor_response(advisor: &Advisor, raw_content: &str) -> AdvisorCritiq
     };
 
     if let Ok(parsed) = serde_json::from_str::<AdvisorResponseJson>(json_str) {
-        let risk = match parsed
+        let risk = parsed
             .risk_level
             .as_deref()
-            .unwrap_or("low")
-            .to_lowercase()
-            .as_str()
-        {
-            "critical" => RiskLevel::Critical,
-            "high" => RiskLevel::High,
-            "medium" => RiskLevel::Medium,
-            _ => RiskLevel::Low,
-        };
+            .map(RiskLevel::parse_risk_level)
+            .unwrap_or(RiskLevel::Low);
 
         return AdvisorCritique {
             advisor: advisor.name.clone(),
@@ -799,19 +844,255 @@ mod tests {
         assert!(summary.contains("SecurityAdvisor: ⚠ (CRITICAL)"));
     }
 
+    #[test]
+    fn test_risk_level_as_str_and_roundtrip() {
+        assert_eq!(RiskLevel::Low.as_str(), "low");
+        assert_eq!(RiskLevel::Medium.as_str(), "medium");
+        assert_eq!(RiskLevel::High.as_str(), "high");
+        assert_eq!(RiskLevel::Critical.as_str(), "critical");
+
+        for level in [
+            RiskLevel::Low,
+            RiskLevel::Medium,
+            RiskLevel::High,
+            RiskLevel::Critical,
+        ] {
+            assert_eq!(RiskLevel::parse_risk_level(level.as_str()), level);
+        }
+    }
+
+    #[test]
+    fn test_parse_risk_level_case_and_variants() {
+        assert_eq!(RiskLevel::parse_risk_level("CRITICAL"), RiskLevel::Critical);
+        assert_eq!(RiskLevel::parse_risk_level("  High  "), RiskLevel::High);
+        assert_eq!(RiskLevel::parse_risk_level("moderate"), RiskLevel::Medium);
+        assert_eq!(RiskLevel::parse_risk_level("med"), RiskLevel::Medium);
+        assert_eq!(RiskLevel::parse_risk_level("severe"), RiskLevel::Critical);
+        assert_eq!(RiskLevel::parse_risk_level("4"), RiskLevel::Critical);
+        assert_eq!(RiskLevel::parse_risk_level("2"), RiskLevel::Medium);
+
+        // Unknown values degrade to Low rather than failing.
+        assert_eq!(RiskLevel::parse_risk_level(""), RiskLevel::Low);
+        assert_eq!(RiskLevel::parse_risk_level("bananas"), RiskLevel::Low);
+    }
+
+    #[test]
+    fn test_parse_advisor_response_inline_json_object() {
+        // JSON embedded in surrounding prose without code fences must be extracted.
+        let advisor = Advisor::security();
+        let raw = "Sure! Here is my assessment: {\"approved\": false, \"risk_level\": \"HIGH\", \"critique\": \"Pipes untrusted input into a shell.\", \"suggestions\": [\"Validate input first\"]} Thanks!";
+
+        let critique = parse_advisor_response(&advisor, raw);
+        assert_eq!(critique.advisor, "SecurityAdvisor");
+        assert!(!critique.approved);
+        assert_eq!(critique.risk_level, RiskLevel::High);
+        assert_eq!(critique.critique, "Pipes untrusted input into a shell.");
+        assert_eq!(critique.suggestions, vec!["Validate input first"]);
+    }
+
+    #[test]
+    fn test_parse_advisor_response_missing_fields_defaults() {
+        let advisor = Advisor::architecture();
+
+        // Missing risk_level defaults to Low; missing approved defaults true for Low risk.
+        let partial = r#"{"critique": "Reasonable plan."}"#;
+        let critique = parse_advisor_response(&advisor, partial);
+        assert!(critique.approved);
+        assert_eq!(critique.risk_level, RiskLevel::Low);
+        assert_eq!(critique.critique, "Reasonable plan.");
+        assert!(critique.suggestions.is_empty());
+
+        // Missing approved defaults false when the assessed risk is High.
+        let partial_high = r#"{"risk_level": "critical", "critique": "Monolithic design risk."}"#;
+        let high_critique = parse_advisor_response(&advisor, partial_high);
+        assert!(!high_critique.approved);
+        assert_eq!(high_critique.risk_level, RiskLevel::Critical);
+    }
+
+    #[test]
+    fn test_parse_advisor_response_risk_string_variants() {
+        let advisor = Advisor::code_review();
+
+        for (raw, expected) in [
+            (r#"{"approved": true, "risk_level": "low"}"#, RiskLevel::Low),
+            (r#"{"approved": true, "risk_level": "Medium"}"#, RiskLevel::Medium),
+            (r#"{"approved": false, "risk_level": "high"}"#, RiskLevel::High),
+            (r#"{"approved": false, "risk_level": "severe"}"#, RiskLevel::Critical),
+            (r#"{"approved": true, "risk_level": "mystery"}"#, RiskLevel::Low),
+        ] {
+            let critique = parse_advisor_response(&advisor, raw);
+            assert_eq!(critique.risk_level, expected, "raw: {raw}");
+        }
+    }
+
+    #[test]
+    fn test_parse_advisor_response_non_json_flagged_text() {
+        // Non-JSON responses with caution words fall back to text heuristics.
+        let advisor = Advisor::security();
+
+        let warn = parse_advisor_response(&advisor, "Proceed with caution: the command overwrites a config file.");
+        assert!(warn.approved);
+        assert_eq!(warn.risk_level, RiskLevel::Medium);
+
+        let danger = parse_advisor_response(&advisor, "Danger: this deletes git history.");
+        assert_eq!(danger.risk_level, RiskLevel::High);
+
+        let blocked = parse_advisor_response(&advisor, "Disapproved: secret leakage risk in proposed action.");
+        assert!(!blocked.approved);
+    }
+
+    #[test]
+    fn test_parse_advisor_response_preserves_focus() {
+        let advisor = Advisor::architecture();
+        let critique = parse_advisor_response(&advisor, r#"{"approved": true, "risk_level": "low", "critique": "OK"}"#);
+        assert_eq!(critique.focus, advisor.focus);
+    }
+
+    #[test]
+    fn test_critique_evaluation_helpers_empty_and_low() {
+        // Empty set: all-approved vacuously true, highest risk defaults to Low.
+        assert!(AdvisorEngine::is_all_approved(&[]));
+        assert!(!AdvisorEngine::has_critical_risk(&[]));
+        assert!(!AdvisorEngine::has_high_or_critical_risk(&[]));
+        assert_eq!(AdvisorEngine::highest_risk(&[]), RiskLevel::Low);
+
+        // Low-risk approvals only.
+        let low = vec![AdvisorCritique {
+            advisor: "ArchitectureAdvisor".to_string(),
+            focus: "Architecture".to_string(),
+            approved: true,
+            risk_level: RiskLevel::Low,
+            critique: "Fine.".to_string(),
+            suggestions: vec![],
+        }];
+        assert!(AdvisorEngine::is_all_approved(&low));
+        assert!(!AdvisorEngine::has_high_or_critical_risk(&low));
+        assert_eq!(AdvisorEngine::highest_risk(&low), RiskLevel::Low);
+    }
+
+    #[test]
+    fn test_format_critiques_helpers_empty() {
+        assert_eq!(format_critiques_for_system_prompt(&[]), String::new());
+        assert_eq!(format_critiques_summary(&[]), "No advisor critiques.");
+    }
+
+    #[test]
+    fn test_format_critiques_for_system_prompt_renders_suggestions() {
+        let critiques = vec![AdvisorCritique {
+            advisor: "SecurityAdvisor".to_string(),
+            focus: "Security".to_string(),
+            approved: false,
+            risk_level: RiskLevel::High,
+            critique: "Secrets in diff.".to_string(),
+            suggestions: vec!["Strip secrets before commit".to_string()],
+        }];
+
+        let formatted = format_critiques_for_system_prompt(&critiques);
+        assert!(formatted.contains("### Advisor Critiques & Safety Notes:"));
+        assert!(formatted.contains("Risk: HIGH"));
+        assert!(formatted.contains("Strip secrets before commit"));
+
+        let summary = format_critiques_summary(&critiques);
+        assert!(summary.contains("SecurityAdvisor: ⚠ (HIGH)"));
+    }
+
+    #[test]
+    fn test_advisor_critique_predicates() {
+        let critique = AdvisorCritique {
+            advisor: "CodeReviewAdvisor".to_string(),
+            focus: "Code quality".to_string(),
+            approved: true,
+            risk_level: RiskLevel::Medium,
+            critique: "Minor concerns.".to_string(),
+            suggestions: vec![],
+        };
+
+        assert!(critique.is_approved());
+        assert!(!critique.is_critical());
+        assert!(!critique.is_high_or_critical());
+
+        let critical = AdvisorCritique {
+            risk_level: RiskLevel::Critical,
+            ..critique.clone()
+        };
+        assert!(critical.is_critical());
+        assert!(critical.is_high_or_critical());
+    }
+
+    #[test]
+    fn test_advisor_equality_and_registry_lookup() {
+        let a = Advisor::security();
+        let b = Advisor::security();
+        let other = Advisor::code_review();
+
+        assert_eq!(a, b);
+        assert_ne!(a, other);
+
+        let mut reg = AdvisorRegistry::default_advisors();
+        assert!(reg.get("SecurityAdvisor").is_some());
+        assert!(reg.get("SECURITYADVISOR").is_some());
+        assert!(reg.get("Securityadvisor").is_some());
+
+        let copied: Vec<Advisor> = (&reg).into();
+        assert_eq!(copied.len(), 3);
+        assert_eq!(copied[1], Advisor::security());
+    }
+
+    #[test]
+    fn test_registry_duplicate_names_last_wins_lookup() {
+        let mut reg = AdvisorRegistry::new();
+        reg.register(Advisor::new("CustomAdvisor", "focus-a", "prompt-a"));
+        reg.register(Advisor::new("CustomAdvisor", "focus-b", "prompt-b"));
+        assert_eq!(reg.len(), 2);
+
+        let found = reg.get("customadvisor").expect("duplicate name must be found");
+        assert_eq!(found.focus, "focus-a");
+    }
+
+    #[test]
+    fn test_consensus_resolution_via_engine() {
+        let client = LlmClient::new();
+        let config = Config::default();
+        let engine = AdvisorEngine::with_advisors(client, config, Vec::new());
+
+        let critiques = vec![AdvisorCritique {
+            advisor: "ArchitectureAdvisor".to_string(),
+            focus: "Architecture".to_string(),
+            approved: true,
+            risk_level: RiskLevel::Low,
+            critique: "Clean.".to_string(),
+            suggestions: vec![],
+        }];
+
+        let resolution = AdvisorEngine::resolve_consensus(&critiques, ConsensusStrategy::Unanimous);
+        assert!(resolution.is_approved());
+        assert_eq!(resolution.total_advisors, 1);
+        assert_eq!(resolution.approved_count, 1);
+
+        let dissent = vec![AdvisorCritique {
+            advisor: "SecurityAdvisor".to_string(),
+            focus: "Security".to_string(),
+            approved: false,
+            risk_level: RiskLevel::Critical,
+            critique: "Veto.".to_string(),
+            suggestions: vec![],
+        }];
+        let rejected = AdvisorEngine::resolve_consensus(&dissent, ConsensusStrategy::SecurityVeto);
+        assert!(!rejected.is_approved());
+    }
+
     #[tokio::test]
-    async fn test_critique_disabled_returns_empty() {
+    async fn test_consult_with_consensus_structure() {
         let client = LlmClient::new();
         let mut config = Config::default();
-        config.advisors_enabled = false;
+        config.advisors_enabled = false; // Avoid real network calls in the test.
 
         let engine = AdvisorEngine::new(client, config);
-        let critiques = engine.critique_plan("Make a website", "Use React").await;
-        assert!(critiques.is_empty());
-
-        let tool_critiques = engine
-            .critique_tool_call("List files", "bash", &serde_json::json!({"command": "ls"}))
+        let (critiques, resolution) = engine
+            .consult_with_consensus("Refactor module", "Split file in two", ConsensusStrategy::Unanimous)
             .await;
-        assert!(tool_critiques.is_empty());
+        assert!(critiques.is_empty());
+        assert_eq!(resolution.total_advisors, 0);
+        assert!(resolution.is_approved());
     }
 }

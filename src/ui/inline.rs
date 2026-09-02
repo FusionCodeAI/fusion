@@ -2,13 +2,14 @@ use crossterm::{cursor, execute, terminal};
 use ratatui::{
     backend::CrosstermBackend,
     buffer::Buffer,
-    layout::{Alignment, Constraint, Direction, Layout, Rect},
-    style::{Color, Modifier, Style},
-    text::{Line, Span, Text},
+    layout::Rect,
+    style::{Color, Style},
+    text::Line,
     widgets::{Block, BorderType, Borders, Paragraph, Widget, Wrap},
     Frame, Terminal, TerminalOptions, Viewport,
 };
 use std::io::{stdout, Stdout, Write};
+use crate::ui::theme::Theme;
 
 /// Information displayed in the inline status bar.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
@@ -84,6 +85,7 @@ pub struct InlineTerminal {
     last_cols: u16,
     last_rows: u16,
     is_active: bool,
+    theme: Theme,
 }
 
 impl InlineTerminal {
@@ -107,12 +109,34 @@ impl InlineTerminal {
             last_cols: cols,
             last_rows: rows,
             is_active: true,
+            theme: Theme::auto(),
         })
     }
 
     /// Create an inline terminal with the default height (4 rows).
     pub fn try_default() -> std::io::Result<Self> {
         Self::new(DEFAULT_INLINE_HEIGHT)
+    }
+
+    /// Create an inline terminal with the given height and custom theme.
+    pub fn with_theme(mut self, theme: Theme) -> Self {
+        self.theme = theme;
+        self
+    }
+
+    /// Set the active theme.
+    pub fn set_theme(&mut self, theme: Theme) {
+        self.theme = theme;
+    }
+
+    /// Get a reference to the active theme.
+    pub fn theme(&self) -> &Theme {
+        &self.theme
+    }
+
+    /// Get a mutable reference to the active theme.
+    pub fn theme_mut(&mut self) -> &mut Theme {
+        &mut self.theme
     }
 
     /// Clamp viewport height so it fits safely in current terminal rows.
@@ -316,46 +340,33 @@ impl InlineTerminal {
 
     /// Insert a status line snapshot into scrollback before moving on.
     pub fn insert_before_status(&mut self, info: &StatusInfo) -> std::io::Result<()> {
+        let theme = self.theme.clone();
+        self.insert_before_status_themed(info, &theme)
+    }
+
+    /// Insert a status line snapshot into scrollback using a specific theme.
+    pub fn insert_before_status_themed(&mut self, info: &StatusInfo, theme: &Theme) -> std::io::Result<()> {
         let (cols, _) = Self::terminal_size();
         let is_compact = cols < 60;
-
-        let mut spans = Vec::new();
-        spans.push(Span::styled("✦ ", Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD)));
-        spans.push(Span::styled(&info.provider, Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD)));
-        spans.push(Span::raw("/"));
-        spans.push(Span::styled(&info.model, Style::default().fg(Color::White).add_modifier(Modifier::BOLD)));
-
-        if let Some(agent) = &info.active_agent {
-            spans.push(Span::raw(" │ "));
-            spans.push(Span::styled(format!("Agent:{}", agent), Style::default().fg(Color::Magenta)));
-        }
-
-        if let Some(advisor) = &info.active_advisor {
-            spans.push(Span::raw(" │ "));
-            spans.push(Span::styled(format!("Advisor:{}", advisor), Style::default().fg(Color::Yellow)));
-        }
-
-        if !info.status.is_empty() {
-            spans.push(Span::raw(" │ "));
-            spans.push(Span::styled(&info.status, Style::default().fg(Color::Green)));
-        }
-
-        if !is_compact {
-            if let Some(tokens) = &info.token_usage {
-                spans.push(Span::raw(" │ "));
-                spans.push(Span::styled(tokens, Style::default().fg(Color::DarkGray)));
-            }
-        }
-
+        let spans = theme.build_status_spans(info, is_compact);
         let paragraph = Paragraph::new(Line::from(spans));
         self.insert_before_widget(1, paragraph)
     }
 
-    /// Render a standard status bar in the inline area.
+    /// Render a standard status bar in the inline area using the active theme.
     pub fn render_status(&mut self, info: &StatusInfo) -> std::io::Result<()> {
+        let theme = self.theme.clone();
         self.draw(|f| {
             let size = f.area();
-            render_status_bar(f, size, info);
+            theme.render_status_bar(f, size, info);
+        })
+    }
+
+    /// Render a status bar in the inline area with an explicit theme override.
+    pub fn render_status_themed(&mut self, info: &StatusInfo, theme: &Theme) -> std::io::Result<()> {
+        self.draw(|f| {
+            let size = f.area();
+            theme.render_status_bar(f, size, info);
         })
     }
 
@@ -410,82 +421,12 @@ pub fn calculate_text_height(text: &str, width: u16) -> u16 {
 
 /// Helper function to render a clean, compact, Termux-friendly status bar inside a Frame area.
 pub fn render_status_bar(f: &mut Frame, area: Rect, info: &StatusInfo) {
-    let cols = area.width;
-    let is_compact = cols < 60; // Mobile / Termux portrait friendly
+    render_status_bar_themed(f, area, info, &Theme::auto());
+}
 
-    let mut spans = Vec::new();
-
-    // Provider & Model tag
-    spans.push(Span::styled(
-        " ✦ ",
-        Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD),
-    ));
-    spans.push(Span::styled(
-        &info.provider,
-        Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD),
-    ));
-    spans.push(Span::raw("/"));
-    spans.push(Span::styled(
-        &info.model,
-        Style::default().fg(Color::White).add_modifier(Modifier::BOLD),
-    ));
-
-    // Agent tag if active
-    if let Some(agent) = &info.active_agent {
-        spans.push(Span::raw(" │ "));
-        spans.push(Span::styled(
-            if is_compact {
-                format!("A:{}", agent)
-            } else {
-                format!("Agent: {}", agent)
-            },
-            Style::default().fg(Color::Magenta).add_modifier(Modifier::BOLD),
-        ));
-    }
-
-    // Advisor tag if active
-    if let Some(advisor) = &info.active_advisor {
-        spans.push(Span::raw(" │ "));
-        spans.push(Span::styled(
-            if is_compact {
-                format!("Adv:{}", advisor)
-            } else {
-                format!("Advisor: {}", advisor)
-            },
-            Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD),
-        ));
-    }
-
-    // Status message
-    if !info.status.is_empty() {
-        spans.push(Span::raw(" │ "));
-        spans.push(Span::styled(
-            &info.status,
-            Style::default().fg(Color::Green),
-        ));
-    }
-
-    // Token usage if space permits
-    if !is_compact {
-        if let Some(tokens) = &info.token_usage {
-            spans.push(Span::raw(" │ "));
-            spans.push(Span::styled(
-                tokens,
-                Style::default().fg(Color::DarkGray),
-            ));
-        }
-    }
-
-    let paragraph = Paragraph::new(Line::from(spans))
-        .block(
-            Block::default()
-                .borders(Borders::TOP)
-                .border_type(BorderType::Plain)
-                .border_style(Style::default().fg(Color::DarkGray)),
-        )
-        .wrap(Wrap { trim: true });
-
-    f.render_widget(paragraph, area);
+/// Helper function to render a status bar with an explicit Theme.
+pub fn render_status_bar_themed(f: &mut Frame, area: Rect, info: &StatusInfo, theme: &Theme) {
+    theme.render_status_bar(f, area, info);
 }
 
 /// Helper to render an informational card with a colored border.
@@ -530,6 +471,30 @@ pub fn render_critique_card(
         .wrap(Wrap { trim: true });
 
     f.render_widget(paragraph, area);
+}
+
+/// Helper to render an informational card with an explicit theme.
+pub fn render_card_themed(
+    f: &mut Frame,
+    area: Rect,
+    title: &str,
+    content: &str,
+    theme: &Theme,
+    border_color: Option<Color>,
+) {
+    theme.render_card(f, area, title, content, border_color);
+}
+
+/// Helper to render an advisor critique card inside an inline Frame using explicit theme semantics.
+pub fn render_critique_card_themed(
+    f: &mut Frame,
+    area: Rect,
+    advisor_name: &str,
+    approved: bool,
+    critique: &str,
+    theme: &Theme,
+) {
+    theme.render_critique_card(f, area, advisor_name, approved, critique);
 }
 
 #[cfg(test)]
@@ -621,5 +586,80 @@ mod tests {
         // Test that clamp and adaptive height never produce 0
         let h = InlineTerminal::termux_adaptive_height(4);
         assert!(h >= 1);
+    }
+
+    #[test]
+    fn test_render_status_bar_themed_tokyo_night() {
+        let backend = TestBackend::new(80, 2);
+        let mut terminal = Terminal::new(backend).unwrap();
+
+        let theme = Theme::tokyo_night();
+        let info = StatusInfo::new("anthropic", "claude-3-5-sonnet")
+            .with_agent("Coder")
+            .with_status("Working");
+
+        terminal.draw(|f| {
+            let area = f.area();
+            render_status_bar_themed(f, area, &info, &theme);
+        }).unwrap();
+
+        let buffer = terminal.backend().buffer();
+        let text: String = buffer.content().iter().map(|c| c.symbol()).collect();
+        assert!(text.contains('✦'));
+        assert!(text.contains("anthropic"));
+    }
+
+    #[test]
+    fn test_render_status_bar_themed_high_contrast() {
+        let backend = TestBackend::new(80, 2);
+        let mut terminal = Terminal::new(backend).unwrap();
+
+        let theme = Theme::high_contrast_dark();
+        let info = StatusInfo::new("openai", "gpt-4o")
+            .with_status("Generating");
+
+        terminal.draw(|f| {
+            let area = f.area();
+            render_status_bar_themed(f, area, &info, &theme);
+        }).unwrap();
+
+        let buffer = terminal.backend().buffer();
+        let text: String = buffer.content().iter().map(|c| c.symbol()).collect();
+        assert!(text.contains('✦'));
+        assert!(text.contains("openai"));
+    }
+
+    #[test]
+    fn test_render_card_themed() {
+        let backend = TestBackend::new(60, 4);
+        let mut terminal = Terminal::new(backend).unwrap();
+
+        let theme = Theme::monokai();
+        terminal.draw(|f| {
+            let area = f.area();
+            render_card_themed(f, area, "Monokai Note", "Testing themed card", &theme, None);
+        }).unwrap();
+
+        let buffer = terminal.backend().buffer();
+        let text: String = buffer.content().iter().map(|c| c.symbol()).collect();
+        assert!(text.contains("Monokai"));
+        assert!(text.contains("Note"));
+    }
+
+    #[test]
+    fn test_render_critique_card_themed() {
+        let backend = TestBackend::new(70, 5);
+        let mut terminal = Terminal::new(backend).unwrap();
+
+        let theme = Theme::dracula();
+        terminal.draw(|f| {
+            let area = f.area();
+            render_critique_card_themed(f, area, "DraculaAdvisor", true, "LGTM", &theme);
+        }).unwrap();
+
+        let buffer = terminal.backend().buffer();
+        let text: String = buffer.content().iter().map(|c| c.symbol()).collect();
+        assert!(text.contains('✓'));
+        assert!(text.contains("DraculaAdvisor"));
     }
 }

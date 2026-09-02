@@ -3,9 +3,13 @@
 //! Enables IDEs, editors (such as Zed, JetBrains, Neovim), and external tools
 //! to drive Fusion as an ACP coding agent over standard I/O (stdio) or generic async streams.
 
+pub mod events;
+pub mod json_stream;
 pub mod server;
 pub mod types;
 
+pub use events::*;
+pub use json_stream::*;
 pub use server::AcpServer;
 pub use types::*;
 

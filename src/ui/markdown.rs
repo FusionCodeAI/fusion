@@ -1,22 +1,64 @@
 use std::io::{stdout, Write};
 
-/// Width used for code block borders and horizontal rules in terminal output.
-const BORDER_WIDTH: usize = 50;
+use super::spinner::SpinnerStyle;
+
+/// Fixed width (in characters) of rendered code-block borders and horizontal rules.
+const BORDER_WIDTH: usize = 60;
 
 /// Streaming markdown renderer for the terminal.
 /// Supports ANSI-formatted headers, bullet/numbered lists, task lists, bold, italic,
 /// inline code, blockquotes, horizontal rules, and bordered code blocks with language tags.
+///
+/// Chunks fed via [`push`](Self::push) may split lines, ANSI tokens, or table rows at
+/// arbitrary byte boundaries; the renderer buffers the trailing partial line until a
+/// newline (or [`finish`](Self::finish)) arrives.
 #[derive(Debug, Clone)]
 pub struct MarkdownRenderer {
+    /// Partial line still awaiting its newline.
     buffer: String,
     in_code_block: bool,
     code_lang: String,
     stream_stdout: bool,
+    table_streamer: super::table::MarkdownTableStreamer,
+    /// Optional inline spinner shown while the model is streaming text.
+    spinner: Option<StreamSpinner>,
+    /// Frames consumed so far; advanced each time a spinner frame is printed.
+    spinner_frame_idx: usize,
 }
 
-impl Default for MarkdownRenderer {
+/// Inline spinner rendered at the start of the current streaming line.
+/// Mirrors the visual language of `super::spinner` without spawning a task.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct StreamSpinner {
+    style: SpinnerStyle,
+    message: String,
+}
+
+impl StreamSpinner {
+    /// Create an inline spinner with a Braille animation and the given message.
+    pub fn new(message: impl Into<String>) -> Self {
+        Self {
+            style: SpinnerStyle::Braille,
+            message: message.into(),
+        }
+    }
+
+    /// Set the animation style.
+    pub fn with_style(mut self, style: SpinnerStyle) -> Self {
+        self.style = style;
+        self
+    }
+
+    /// Returns the visible width of this spinner's rendered form.
+    fn width(&self) -> usize {
+        // frame + space + message
+        1 + 1 + self.message.chars().count()
+    }
+}
+
+impl Default for StreamSpinner {
     fn default() -> Self {
-        Self::new()
+        Self::new("")
     }
 }
 
@@ -28,6 +70,9 @@ impl MarkdownRenderer {
             in_code_block: false,
             code_lang: String::new(),
             stream_stdout: true,
+            table_streamer: super::table::MarkdownTableStreamer::new(),
+            spinner: None,
+            spinner_frame_idx: 0,
         }
     }
 
@@ -38,6 +83,9 @@ impl MarkdownRenderer {
             in_code_block: false,
             code_lang: String::new(),
             stream_stdout: false,
+            table_streamer: super::table::MarkdownTableStreamer::new(),
+            spinner: None,
+            spinner_frame_idx: 0,
         }
     }
 
@@ -51,31 +99,92 @@ impl MarkdownRenderer {
         &self.code_lang
     }
 
+    /// Returns the buffered (not yet newline-terminated) text.
+    pub fn pending(&self) -> &str {
+        &self.buffer
+    }
+
+    /// Set (or replace) the inline spinner at runtime.
+    pub fn set_spinner(&mut self, spinner: Option<StreamSpinner>) {
+        if spinner.is_none() {
+            self.spinner_frame_idx = 0;
+        }
+        self.spinner = spinner;
+    }
+
+    /// Advance the spinner animation by one frame.
+    pub fn tick_spinner(&mut self) {
+        if self.spinner.is_some() {
+            self.spinner_frame_idx = self.spinner_frame_idx.wrapping_add(1);
+        }
+    }
+
     /// Reset the internal state of the renderer.
     pub fn reset(&mut self) {
         self.buffer.clear();
         self.in_code_block = false;
         self.code_lang.clear();
+        self.table_streamer = super::table::MarkdownTableStreamer::new();
+        self.spinner = None;
+        self.spinner_frame_idx = 0;
+    }
+
+    /// Emit a fully rendered line: into the output buffer and, when streaming,
+    /// straight to stdout with an inline flush.
+    fn emit(&mut self, formatted: &str, output: &mut String) {
+        output.push_str(formatted);
+        output.push('\n');
+        if self.stream_stdout {
+            print!("{}\n", formatted);
+            let _ = stdout().flush();
+        }
+    }
+
+    /// Render one buffered line, dispatching tables to the table streamer.
+    fn render_buffered_line(&mut self, line: &str, output: &mut String) {
+        let trimmed = line.trim();
+        if !self.in_code_block && super::table::is_markdown_table_line(trimmed) {
+            self.table_streamer.feed_line(line);
+            return;
+        }
+
+        if self.table_streamer.is_buffering() {
+            let table_out = self.table_streamer.flush();
+            self.emit(&table_out, output);
+        }
+
+        let formatted = render_line(line, &mut self.in_code_block, &mut self.code_lang);
+        self.emit(&formatted, output);
     }
 
     /// Feed a streaming token or text chunk into the renderer.
     /// Returns any newly formatted output produced.
     pub fn push(&mut self, chunk: &str) -> String {
+        // Normalize CRLF / lone CR to LF so Windows and odd chunk splits do not
+        // leak carriage returns into rendered output.
+        let normalized: String;
+        let chunk = if chunk.contains('\r') {
+            normalized = chunk.replace("\r\n", "\n").replace('\r', "\n");
+            &normalized
+        } else {
+            chunk
+        };
+
         self.buffer.push_str(chunk);
+
+        // First real content clears the pending inline spinner (it only shows
+        // while nothing has streamed yet).
+        if !self.buffer.trim().is_empty() {
+            self.spinner = None;
+        }
+
         let mut output = String::new();
 
         while let Some(newline_pos) = self.buffer.find('\n') {
-            let line = self.buffer[..newline_pos].to_string();
-            self.buffer.drain(..=newline_pos);
-
-            let formatted = render_line(&line, &mut self.in_code_block, &mut self.code_lang);
-            output.push_str(&formatted);
-            output.push('\n');
-
-            if self.stream_stdout {
-                print!("{}\n", formatted);
-                let _ = stdout().flush();
-            }
+            // Take the complete line including the newline in one memmove.
+            let line: String = self.buffer.drain(..=newline_pos).collect();
+            let line = line.trim_end_matches('\n');
+            self.render_buffered_line(line, &mut output);
         }
 
         output
@@ -87,13 +196,12 @@ impl MarkdownRenderer {
 
         if !self.buffer.is_empty() {
             let line = std::mem::take(&mut self.buffer);
-            let formatted = render_line(&line, &mut self.in_code_block, &mut self.code_lang);
-            output.push_str(&formatted);
-            output.push('\n');
-            if self.stream_stdout {
-                print!("{}\n", formatted);
-                let _ = stdout().flush();
-            }
+            self.render_buffered_line(&line, &mut output);
+        }
+
+        if self.table_streamer.is_buffering() {
+            let table_out = self.table_streamer.flush();
+            self.emit(&table_out, &mut output);
         }
 
         if self.in_code_block {
@@ -111,7 +219,11 @@ impl MarkdownRenderer {
     }
 }
 
-/// One-shot helper to print formatted markdown to stdout.
+impl Default for MarkdownRenderer {
+    fn default() -> Self {
+        Self::new()
+    }
+}
 pub fn print_markdown(text: &str) {
     let rendered = render_markdown(text);
     print!("{}", rendered);
@@ -123,12 +235,40 @@ pub fn render_markdown(text: &str) -> String {
     let mut in_code_block = false;
     let mut code_lang = String::new();
     let mut output = String::new();
+    let mut table_lines = Vec::new();
+
+    let flush_table = |output: &mut String, table_lines: &mut Vec<&str>, in_code_block: &mut bool, code_lang: &mut String| {
+        if table_lines.is_empty() {
+            return;
+        }
+        let lines: Vec<&str> = std::mem::take(table_lines);
+        if lines.len() >= 2 && super::table::is_markdown_delimiter_line(lines[1]) {
+            let table_text = lines.join("\n");
+            let rendered_table = super::table::render_markdown_table(&table_text);
+            output.push_str(&rendered_table);
+            output.push('\n');
+        } else {
+            for l in lines {
+                let rendered = render_line(l, in_code_block, code_lang);
+                output.push_str(&rendered);
+                output.push('\n');
+            }
+        }
+    };
 
     for line in text.lines() {
-        let rendered = render_line(line, &mut in_code_block, &mut code_lang);
-        output.push_str(&rendered);
-        output.push('\n');
+        let trimmed = line.trim();
+        if !in_code_block && super::table::is_markdown_table_line(trimmed) {
+            table_lines.push(line);
+        } else {
+            flush_table(&mut output, &mut table_lines, &mut in_code_block, &mut code_lang);
+            let rendered = render_line(line, &mut in_code_block, &mut code_lang);
+            output.push_str(&rendered);
+            output.push('\n');
+        }
     }
+
+    flush_table(&mut output, &mut table_lines, &mut in_code_block, &mut code_lang);
 
     if in_code_block {
         output.push_str(&format!("\x1b[38;5;240m└{}\x1b[0m\n", "─".repeat(BORDER_WIDTH)));

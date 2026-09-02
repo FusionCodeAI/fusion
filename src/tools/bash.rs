@@ -115,9 +115,9 @@ impl BashTool {
         let mut cmd = Self::build_command(trimmed_cmd);
 
         cmd.current_dir(working_dir);
-        if let Some(env_vars) = env {
-            cmd.envs(env_vars);
-        }
+        // Sanitize environment to strip API keys, secrets, and credentials before spawning subprocess
+        let cleaner = crate::tools::env_cleaner::EnvCleaner::default();
+        cleaner.apply_to_tokio_command(&mut cmd, env);
 
         cmd.stdin(std::process::Stdio::null());
         cmd.stdout(std::process::Stdio::piped());
@@ -524,5 +524,56 @@ mod tests {
         assert!(out.success);
         assert_eq!(out.exit_code, Some(0));
         assert!(out.stdout.contains("direct"));
+    }
+
+    #[tokio::test]
+    async fn test_bash_strips_api_keys_and_secrets() {
+        let temp = TestDir::new();
+        let mut base_env = HashMap::new();
+        base_env.insert(
+            "OPENAI_API_KEY".to_string(),
+            "sk-proj-super-secret-key-12345".to_string(),
+        );
+        base_env.insert("SAFE_APP_ENV".to_string(), "production-v2".to_string());
+
+        let ctx = ToolContext {
+            cwd: temp.path().to_path_buf(),
+            env: base_env,
+        };
+
+        let tool = BashTool::new();
+        #[cfg(not(windows))]
+        let cmd_str = "echo OPENAI=$OPENAI_API_KEY ANTHROPIC=$ANTHROPIC_API_KEY SAFE=$SAFE_APP_ENV";
+        #[cfg(windows)]
+        let cmd_str = "echo OPENAI=%OPENAI_API_KEY% ANTHROPIC=%ANTHROPIC_API_KEY% SAFE=%SAFE_APP_ENV%";
+
+        let res = tool
+            .execute(
+                json!({
+                    "command": cmd_str,
+                    "env": {
+                        "ANTHROPIC_API_KEY": "sk-ant-super-secret-key-67890"
+                    }
+                }),
+                &ctx,
+            )
+            .await
+            .unwrap();
+
+        assert!(
+            !res.contains("sk-proj-super-secret-key-12345"),
+            "OpenAI API key leaked in command output: {}",
+            res
+        );
+        assert!(
+            !res.contains("sk-ant-super-secret-key-67890"),
+            "Anthropic API key leaked in command output: {}",
+            res
+        );
+        assert!(
+            res.contains("production-v2"),
+            "Safe variable missing from command output: {}",
+            res
+        );
     }
 }

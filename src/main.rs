@@ -1,52 +1,42 @@
-use clap::Parser;
+use clap::{CommandFactory, Parser};
+pub use fusion::cli::Cli;
 use std::path::PathBuf;
-
-#[derive(Parser, Debug)]
-#[command(
-    name = "fusion",
-    version = "0.3.0",
-    about = "Fast, lightweight AI coding assistant with subagents and advisors"
-)]
-pub struct Cli {
-    /// Optional one-off prompt to run non-interactively or slash command
-    #[arg(value_name = "PROMPT")]
-    pub prompt: Option<String>,
-
-    /// Override model (e.g. deepseek-chat, claude-3-5-sonnet-20241022, gpt-4o)
-    #[arg(short, long)]
-    pub model: Option<String>,
-
-    /// Override provider (deepseek, anthropic, openai, xai, openrouter, ollama)
-    #[arg(short, long)]
-    pub provider: Option<String>,
-
-    /// Working directory (defaults to current directory)
-    #[arg(short = 'C', long, value_name = "DIR")]
-    pub cwd: Option<PathBuf>,
-
-    /// Disable parallel advisor critiques
-    #[arg(long)]
-    pub no_advisors: bool,
-
-    /// Start Agent Client Protocol (ACP) JSON-RPC stdio server
-    #[arg(long)]
-    pub acp: bool,
-}
-
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
+    let cli = Cli::parse();
+
+    if let Some(shell) = cli.generate_completion {
+        fusion::cli::completion::print_completion(shell, &mut Cli::command());
+        return Ok(());
+    }
+
     // Initialize tracing
     tracing_subscriber::fmt()
         .with_env_filter(tracing_subscriber::EnvFilter::from_default_env())
         .with_writer(std::io::stderr)
         .init();
-
-    let cli = Cli::parse();
-
     // Load config and apply CLI overrides
     let mut config = fusion::config::Config::load();
+    if let Some(preset_name) = &cli.preset {
+        if let Some(preset) = fusion::config::ConfigPreset::from_str_loose(preset_name) {
+            config.apply_preset(preset);
+        } else {
+            eprintln!(
+                "Warning: Unknown preset '{}'. Available presets: {}",
+                preset_name,
+                fusion::config::presets::available_presets_list()
+            );
+        }
+    }
     if let Some(m) = cli.model {
-        config.default_model = m;
+        let (prov, resolved) = fusion::config::Config::resolve_model(
+            &m,
+            cli.provider.as_deref().or(Some(&config.default_provider)),
+        );
+        config.default_model = resolved;
+        if cli.provider.is_none() {
+            config.default_provider = prov;
+        }
     }
     if let Some(p) = cli.provider {
         config.default_provider = p;
@@ -90,6 +80,25 @@ async fn main() -> anyhow::Result<()> {
             // Non-interactive single turn
             tokio::select! {
                 res = runner.run_turn(&mut session, trimmed) => {
+                    match &res {
+                        Ok(_) => {
+                            fusion::ui::sound::play_turn_complete(runner.config());
+                            fusion::ui::notify::notify_turn_complete(
+                                runner.config(),
+                                "Turn Complete",
+                                &runner.config().default_model,
+                                None,
+                            );
+                        }
+                        Err(err) => {
+                            fusion::ui::sound::play_error(runner.config());
+                            fusion::ui::notify::notify_error(
+                                runner.config(),
+                                "Turn Error",
+                                &err.to_string(),
+                            );
+                        }
+                    }
                     res?;
                 }
                 _ = tokio::signal::ctrl_c() => {
@@ -147,5 +156,32 @@ mod tests {
     fn test_cli_single_prompt() {
         let cli = Cli::try_parse_from(["fusion", "explain main.rs"]).unwrap();
         assert_eq!(cli.prompt.as_deref(), Some("explain main.rs"));
+    }
+
+    #[test]
+    fn test_cli_generate_completion_flag() {
+        let cli = Cli::try_parse_from(["fusion", "--generate-completion", "bash"]).unwrap();
+        assert_eq!(cli.generate_completion, Some(clap_complete::Shell::Bash));
+
+        let cli_zsh = Cli::try_parse_from(["fusion", "--generate-completion", "zsh"]).unwrap();
+        assert_eq!(cli_zsh.generate_completion, Some(clap_complete::Shell::Zsh));
+
+        let cli_fish = Cli::try_parse_from(["fusion", "--generate-completion", "fish"]).unwrap();
+        assert_eq!(cli_fish.generate_completion, Some(clap_complete::Shell::Fish));
+
+        let cli_pwsh = Cli::try_parse_from(["fusion", "--generate-completion", "powershell"]).unwrap();
+        assert_eq!(cli_pwsh.generate_completion, Some(clap_complete::Shell::PowerShell));
+    }
+
+    #[test]
+    fn test_cli_preset_parsing() {
+        let cli = Cli::try_parse_from(["fusion", "--preset", "deep-reasoning"]).unwrap();
+        assert_eq!(cli.preset.as_deref(), Some("deep-reasoning"));
+
+        let mut config = fusion::config::Config::default();
+        let preset = fusion::config::ConfigPreset::from_str_loose(cli.preset.as_deref().unwrap()).unwrap();
+        config.apply_preset(preset);
+        assert_eq!(config.default_provider, "deepseek");
+        assert_eq!(config.default_model, "deepseek-reasoner");
     }
 }

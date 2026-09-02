@@ -18,8 +18,37 @@ pub const ARC_FRAMES: &[&str] = &["◜", "◠", "◝", "◞", "◟", "◡"];
 /// Pulse block frames.
 pub const PULSE_FRAMES: &[&str] = &["█", "▓", "▒", "░", "▒", "▓"];
 
-/// Plain ASCII fallback animation frames.
-pub const ASCII_FRAMES: &[&str] = &["-", "\\", "|", "/"];
+/// Growing/shrinking line bar frames (macOS-style progress bar shimmer).
+pub const LINE_FRAMES: &[&str] = &[
+    "▏", "▎", "▍", "▌", "▋", "▊", "▉", "█", "▉", "▊", "▋", "▌", "▍", "▎",
+];
+
+/// Rotating arrow frames.
+pub const ARROWS_FRAMES: &[&str] = &["←", "↖", "↑", "↗", "→", "↘", "↓", "↙"];
+
+/// Bouncing ball frames (ball travels right then back left).
+pub const BOUNCE_FRAMES: &[&str] = &[
+    "●──────",
+    "─●─────",
+    "──●────",
+    "───●───",
+    "────●──",
+    "─────●─",
+    "──────●",
+    "─────●─",
+    "────●──",
+    "───●───",
+    "──●────",
+    "─●─────",
+];
+
+/// Lunar phase frames (requires emoji-capable terminal).
+pub const MOON_FRAMES: &[&str] = &[
+    "🌑", "🌒", "🌓", "🌔", "🌕", "🌖", "🌗", "🌘",
+];
+
+/// 7-bit ASCII spinner frames for terminals without UTF-8 support.
+pub const ASCII_FRAMES: &[&str] = &["|", "/", "-", "\\"];
 
 /// Spinner animation style presets.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
@@ -33,6 +62,14 @@ pub enum SpinnerStyle {
     Arc,
     /// Pulsing block
     Pulse,
+    /// Growing and shrinking line bar
+    Line,
+    /// Rotating directional arrows
+    Arrows,
+    /// Bouncing ball
+    Bounce,
+    /// Lunar phases (emoji)
+    Moon,
     /// 7-bit ASCII spinner for terminals without UTF-8 support
     Ascii,
 }
@@ -45,6 +82,10 @@ impl SpinnerStyle {
             Self::Dots => DOTS_FRAMES,
             Self::Arc => ARC_FRAMES,
             Self::Pulse => PULSE_FRAMES,
+            Self::Line => LINE_FRAMES,
+            Self::Arrows => ARROWS_FRAMES,
+            Self::Bounce => BOUNCE_FRAMES,
+            Self::Moon => MOON_FRAMES,
             Self::Ascii => ASCII_FRAMES,
         }
     }
@@ -55,6 +96,44 @@ impl SpinnerStyle {
             Self::Braille | Self::Dots => Duration::from_millis(80),
             Self::Arc => Duration::from_millis(100),
             Self::Pulse | Self::Ascii => Duration::from_millis(120),
+            Self::Line => Duration::from_millis(90),
+            Self::Arrows => Duration::from_millis(100),
+            Self::Bounce => Duration::from_millis(80),
+            Self::Moon => Duration::from_millis(180),
+        }
+    }
+
+    /// Resolves a spinner style from a human-friendly name (case-insensitive).
+    ///
+    /// Accepted names: `braille`, `dots`, `arc`, `pulse`, `line`, `arrows`,
+    /// `bounce`, `moon`, `ascii`.
+    pub fn from_name(name: &str) -> Option<Self> {
+        match name.trim().to_lowercase().as_str() {
+            "braille" | "default" => Some(Self::Braille),
+            "dots" => Some(Self::Dots),
+            "arc" => Some(Self::Arc),
+            "pulse" | "block" => Some(Self::Pulse),
+            "line" | "bar" => Some(Self::Line),
+            "arrow" | "arrows" => Some(Self::Arrows),
+            "bounce" | "ball" => Some(Self::Bounce),
+            "moon" | "lunar" => Some(Self::Moon),
+            "ascii" | "plain" => Some(Self::Ascii),
+            _ => None,
+        }
+    }
+
+    /// Returns the canonical lowercase name of this style.
+    pub fn name(&self) -> &'static str {
+        match self {
+            Self::Braille => "braille",
+            Self::Dots => "dots",
+            Self::Arc => "arc",
+            Self::Pulse => "pulse",
+            Self::Line => "line",
+            Self::Arrows => "arrows",
+            Self::Bounce => "bounce",
+            Self::Moon => "moon",
+            Self::Ascii => "ascii",
         }
     }
 }
@@ -591,5 +670,143 @@ mod tests {
         assert_eq!(SpinnerStyle::Arc.frames().len(), 6);
         assert_eq!(SpinnerStyle::Pulse.frames().len(), 6);
         assert_eq!(SpinnerStyle::Ascii.frames().len(), 4);
+    }
+}
+
+#[cfg(test)]
+mod style_tests {
+    use super::*;
+
+    #[test]
+    fn test_new_style_frames() {
+        assert_eq!(SpinnerStyle::Line.frames().len(), LINE_FRAMES.len());
+        assert_eq!(SpinnerStyle::Arrows.frames().len(), ARROWS_FRAMES.len());
+        assert_eq!(SpinnerStyle::Bounce.frames().len(), BOUNCE_FRAMES.len());
+        assert_eq!(SpinnerStyle::Moon.frames().len(), MOON_FRAMES.len());
+    }
+
+    #[test]
+    fn test_all_styles_have_nonempty_frames() {
+        for style in [
+            SpinnerStyle::Braille,
+            SpinnerStyle::Dots,
+            SpinnerStyle::Arc,
+            SpinnerStyle::Pulse,
+            SpinnerStyle::Line,
+            SpinnerStyle::Arrows,
+            SpinnerStyle::Bounce,
+            SpinnerStyle::Moon,
+            SpinnerStyle::Ascii,
+        ] {
+            let frames = style.frames();
+            assert!(!frames.is_empty(), "{:?} has no frames", style);
+            for frame in frames {
+                assert!(!frame.is_empty(), "{:?} has an empty frame", style);
+            }
+        }
+    }
+
+    #[test]
+    fn test_bounce_frames_are_palindromic() {
+        let frames = BOUNCE_FRAMES;
+        assert_eq!(frames[0], frames[frames.len() - 1].replace("─●", "●─"));
+        // Ball travels right then returns: first half ascends, second half mirrors
+        assert_eq!(frames[0], "●──────");
+        assert_eq!(frames[6], "──────●");
+        assert_eq!(frames[7], frames[5]);
+        assert_eq!(frames[8], frames[4]);
+    }
+
+    #[test]
+    fn test_from_name_roundtrip() {
+        for style in [
+            SpinnerStyle::Braille,
+            SpinnerStyle::Dots,
+            SpinnerStyle::Arc,
+            SpinnerStyle::Pulse,
+            SpinnerStyle::Line,
+            SpinnerStyle::Arrows,
+            SpinnerStyle::Bounce,
+            SpinnerStyle::Moon,
+            SpinnerStyle::Ascii,
+        ] {
+            assert_eq!(
+                SpinnerStyle::from_name(style.name()),
+                Some(style),
+                "roundtrip failed for {}",
+                style.name()
+            );
+        }
+    }
+
+    #[test]
+    fn test_from_name_case_insensitive_and_aliases() {
+        assert_eq!(SpinnerStyle::from_name("BRAILLE"), Some(SpinnerStyle::Braille));
+        assert_eq!(SpinnerStyle::from_name("  Dots "), Some(SpinnerStyle::Dots));
+        assert_eq!(SpinnerStyle::from_name("default"), Some(SpinnerStyle::Braille));
+        assert_eq!(SpinnerStyle::from_name("block"), Some(SpinnerStyle::Pulse));
+        assert_eq!(SpinnerStyle::from_name("bar"), Some(SpinnerStyle::Line));
+        assert_eq!(SpinnerStyle::from_name("arrow"), Some(SpinnerStyle::Arrows));
+        assert_eq!(SpinnerStyle::from_name("ball"), Some(SpinnerStyle::Bounce));
+        assert_eq!(SpinnerStyle::from_name("lunar"), Some(SpinnerStyle::Moon));
+        assert_eq!(SpinnerStyle::from_name("plain"), Some(SpinnerStyle::Ascii));
+        assert_eq!(SpinnerStyle::from_name("nonexistent"), None);
+        assert_eq!(SpinnerStyle::from_name(""), None);
+    }
+
+    #[test]
+    fn test_default_is_braille() {
+        assert_eq!(SpinnerStyle::default(), SpinnerStyle::Braille);
+    }
+
+    #[test]
+    fn test_frame_intervals_reasonable() {
+        for style in [
+            SpinnerStyle::Braille,
+            SpinnerStyle::Dots,
+            SpinnerStyle::Arc,
+            SpinnerStyle::Pulse,
+            SpinnerStyle::Line,
+            SpinnerStyle::Arrows,
+            SpinnerStyle::Bounce,
+            SpinnerStyle::Moon,
+            SpinnerStyle::Ascii,
+        ] {
+            let interval = style.frame_interval();
+            assert!(
+                interval >= Duration::from_millis(16) && interval <= Duration::from_millis(500),
+                "{:?} interval out of range: {:?}",
+                style,
+                interval
+            );
+        }
+        // Fast styles should animate quicker than the moon phases
+        assert!(SpinnerStyle::Bounce.frame_interval() < SpinnerStyle::Moon.frame_interval());
+    }
+
+    #[test]
+    fn test_ascii_frames_are_ascii_only() {
+        for frame in ASCII_FRAMES {
+            assert!(
+                frame.is_ascii(),
+                "ASCII frames must be pure ASCII: {:?}",
+                frame
+            );
+        }
+    }
+
+    #[test]
+    fn test_moon_frames_are_emoji() {
+        assert_eq!(MOON_FRAMES[0], "🌑");
+        assert_eq!(MOON_FRAMES[4], "🌕");
+        assert_eq!(MOON_FRAMES[7], "🌘");
+    }
+
+    #[test]
+    fn test_line_frames_sweep_up_and_down() {
+        // Bars grow then shrink: first is narrowest, middle is full block
+        assert_eq!(LINE_FRAMES[0], "▏");
+        assert_eq!(LINE_FRAMES[7], "█");
+        assert_eq!(LINE_FRAMES[13], "▎");
     }
 }

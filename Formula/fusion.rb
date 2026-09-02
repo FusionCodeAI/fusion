@@ -1,22 +1,20 @@
 class Fusion < Formula
-  desc "Terminal-first AI coding agent made by Fusion AI"
+  desc "Fast, lightweight, cross-platform AI coding assistant"
   homepage "https://fusioncode.app"
-  version "0.1.0"
-  license "Apache-2.0"
+  url "https://github.com/theaungmyatmoe/fusion/archive/refs/tags/v0.3.0.tar.gz"
+  sha256 "0000000000000000000000000000000000000000000000000000000000000000"
+  license any_of: ["MIT", "Apache-2.0"]
+  head "https://github.com/theaungmyatmoe/fusion.git", branch: "main"
 
-  if OS.mac? && Hardware::CPU.arm?
-    url "https://github.com/theaungmyatmoe/fusion/releases/download/v#{version}/fusion-v#{version}-aarch64-apple-darwin.tar.gz"
-  elsif OS.mac? && Hardware::CPU.intel?
-    url "https://github.com/theaungmyatmoe/fusion/releases/download/v#{version}/fusion-v#{version}-x86_64-apple-darwin.tar.gz"
-  elsif OS.linux?
-    url "https://github.com/theaungmyatmoe/fusion/releases/download/v#{version}/fusion-v#{version}-x86_64-unknown-linux-gnu.tar.gz"
-  end
+  depends_on "rust" => :build
 
   def install
-    bin.install "fusion"
+    system "cargo", "install", *std_cargo_args
+
+    generate_completions_from_executable(bin/"fusion", "--generate-completion")
   end
 
   test do
-    assert_match "fusion", shell_output("#{bin}/fusion --version")
+    assert_match "fusion #{version}", shell_output("#{bin}/fusion --version")
   end
 end

@@ -14,6 +14,7 @@ use crate::provider::types::{Message, Role, StreamChunk, ToolCall, ToolDefinitio
 #[derive(Clone)]
 pub struct LlmClient {
     client: reqwest::Client,
+    retry_policy: Option<crate::provider::retry::RetryPolicy>,
 }
 
 impl Default for LlmClient {
@@ -29,13 +30,40 @@ impl LlmClient {
             .connect_timeout(Duration::from_secs(30))
             .build()
             .unwrap_or_else(|_| reqwest::Client::new());
-        Self { client }
+        Self {
+            client,
+            retry_policy: Some(crate::provider::retry::RetryPolicy::default()),
+        }
     }
 
     pub fn with_client(client: reqwest::Client) -> Self {
-        Self { client }
+        Self {
+            client,
+            retry_policy: Some(crate::provider::retry::RetryPolicy::default()),
+        }
     }
 
+    /// Configures the client with a custom retry policy.
+    pub fn with_retry_policy(mut self, policy: crate::provider::retry::RetryPolicy) -> Self {
+        self.retry_policy = Some(policy);
+        self
+    }
+
+    /// Disables automatic retries on this client.
+    pub fn without_retry(mut self) -> Self {
+        self.retry_policy = None;
+        self
+    }
+
+    /// Returns the currently active retry policy, if any.
+    pub fn retry_policy(&self) -> Option<&crate::provider::retry::RetryPolicy> {
+        self.retry_policy.as_ref()
+    }
+
+    /// Sets or clears the active retry policy.
+    pub fn set_retry_policy(&mut self, policy: Option<crate::provider::retry::RetryPolicy>) {
+        self.retry_policy = policy;
+    }
     /// Stream a chat completion using the provided Config settings.
     pub async fn stream_chat(
         &self,
@@ -58,7 +86,69 @@ impl LlmClient {
     }
 
     /// Stream a chat completion with explicit provider and connection parameters.
+    /// When a `RetryPolicy` is configured (default), transient 429 and 503 errors are
+    /// automatically retried with exponential backoff and jitter.
     pub async fn stream_chat_with(
+        &self,
+        provider: &str,
+        model: &str,
+        temperature: Option<f32>,
+        max_tokens: Option<u32>,
+        api_key: Option<&str>,
+        base_url: &str,
+        messages: &[Message],
+        tools: &[ToolDefinition],
+    ) -> anyhow::Result<mpsc::Receiver<StreamChunk>> {
+        if let Some(ref policy) = self.retry_policy {
+            let client = self.clone().without_retry();
+            let provider = provider.to_string();
+            let model = model.to_string();
+            let api_key = api_key.map(|s| s.to_string());
+            let base_url = base_url.to_string();
+            let messages = messages.to_vec();
+            let tools = tools.to_vec();
+
+            crate::provider::retry::retry_stream(policy, move || {
+                let client = client.clone();
+                let provider = provider.clone();
+                let model = model.clone();
+                let api_key = api_key.clone();
+                let base_url = base_url.clone();
+                let messages = messages.clone();
+                let tools = tools.clone();
+
+                async move {
+                    client
+                        .stream_chat_with_inner(
+                            &provider,
+                            &model,
+                            temperature,
+                            max_tokens,
+                            api_key.as_deref(),
+                            &base_url,
+                            &messages,
+                            &tools,
+                        )
+                        .await
+                }
+            })
+            .await
+        } else {
+            self.stream_chat_with_inner(
+                provider,
+                model,
+                temperature,
+                max_tokens,
+                api_key,
+                base_url,
+                messages,
+                tools,
+            )
+            .await
+        }
+    }
+
+    async fn stream_chat_with_inner(
         &self,
         provider: &str,
         model: &str,
@@ -237,6 +327,14 @@ impl LlmClient {
             }
         }
 
+        // Cloudflare edge (Fusion API) blocks non-browser clients with 404/1010
+        // unless a browser User-Agent is sent. Apply it for the fusion provider.
+        if provider == "fusion" || base_url.contains("fusioncode.app") {
+            if let Ok(hv) = HeaderValue::from_str("Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36") {
+                headers.insert(reqwest::header::USER_AGENT, hv);
+            }
+        }
+
         if provider == "openrouter" || base_url.contains("openrouter.ai") {
             if let Ok(hv) = HeaderValue::from_str("https://github.com/theaungmyatmoe/fusion") {
                 headers.insert("HTTP-Referer", hv);
@@ -259,8 +357,14 @@ impl LlmClient {
 
         if !response.status().is_success() {
             let status = response.status();
+            let retry_after = crate::provider::retry::parse_retry_after_header(response.headers());
             let body = response.text().await.unwrap_or_default();
-            anyhow::bail!("API request to {} failed ({}): {}", url, status, body);
+            let err = crate::provider::retry::HttpError {
+                status: status.as_u16(),
+                message: format!("{} — {}", status, short_body(&body)),
+                retry_after,
+            };
+            return Err(err.into());
         }
 
         let (tx, rx) = mpsc::channel(256);
@@ -462,8 +566,14 @@ impl LlmClient {
 
         if !response.status().is_success() {
             let status = response.status();
+            let retry_after = crate::provider::retry::parse_retry_after_header(response.headers());
             let body = response.text().await.unwrap_or_default();
-            anyhow::bail!("API request to {} failed ({}): {}", url, status, body);
+            let err = crate::provider::retry::HttpError {
+                status: status.as_u16(),
+                message: format!("{} — {}", status, short_body(&body)),
+                retry_after,
+            };
+            return Err(err.into());
         }
 
         let (tx, rx) = mpsc::channel(256);
@@ -652,6 +762,32 @@ impl LlmClient {
     }
 }
 
+/// Truncate an error response body to a readable one-liner.
+fn short_body(body: &str) -> String {
+    let clean = body.trim();
+    // Try to pull the meaningful `message` field out of JSON envelopes.
+    if let Ok(v) = serde_json::from_str::<serde_json::Value>(clean) {
+        if let Some(msg) = v.pointer("/error/message").and_then(|m| m.as_str()) {
+            return truncate_line(msg);
+        }
+        if let Some(msg) = v.get("message").and_then(|m| m.as_str()) {
+            return truncate_line(msg);
+        }
+    }
+    truncate_line(clean)
+}
+
+/// Cut a line to 100 chars and add an ellipsis when truncated.
+fn truncate_line(s: &str) -> String {
+    let line = s.lines().next().unwrap_or("").trim();
+    if line.chars().count() <= 100 {
+        line.to_string()
+    } else {
+        let cut: String = line.chars().take(97).collect();
+        format!("{}...", cut)
+    }
+}
+
 pub fn construct_openai_url(base_url: &str) -> String {
     let base = base_url.trim_end_matches('/');
     if base.ends_with("/chat/completions") {
@@ -698,6 +834,29 @@ pub fn build_openai_payload(
 
     let mut messages_json = Vec::new();
     for msg in messages {
+        let content = if msg.content.trim().is_empty() {
+            if msg.role == Role::Assistant
+                && msg
+                    .tool_calls
+                    .as_ref()
+                    .map_or(false, |tc| !tc.is_empty())
+            {
+                "Executing tools...".to_string()
+            } else if msg.role == Role::Assistant {
+                "(continuing)".to_string()
+            } else if msg.role == Role::User {
+                "(empty message)".to_string()
+            } else if msg.role == Role::Tool {
+                "(empty output)".to_string()
+            } else if msg.role == Role::System {
+                "You are a helpful assistant.".to_string()
+            } else {
+                "(empty)".to_string()
+            }
+        } else {
+            msg.content.clone()
+        };
+
         let mut item = json!({
             "role": match msg.role {
                 Role::System => "system",
@@ -705,9 +864,8 @@ pub fn build_openai_payload(
                 Role::Assistant => "assistant",
                 Role::Tool => "tool",
             },
-            "content": msg.content,
+            "content": content,
         });
-
         if let Some(name) = &msg.name {
             item["name"] = json!(name);
         }
@@ -785,7 +943,7 @@ pub fn build_anthropic_payload(
         .iter()
         .filter(|m| m.role == Role::System)
         .map(|m| m.content.as_str())
-        .filter(|c| !c.is_empty())
+        .filter(|c| !c.trim().is_empty())
         .collect();
 
     if !system_prompts.is_empty() {
@@ -801,16 +959,21 @@ pub fn build_anthropic_payload(
                 continue;
             }
             Role::User => {
+                let content = if msg.content.trim().is_empty() {
+                    "(empty message)".to_string()
+                } else {
+                    msg.content.clone()
+                };
                 anthropic_messages.push(json!({
                     "role": "user",
-                    "content": msg.content,
+                    "content": content,
                 }));
             }
             Role::Assistant => {
                 if let Some(tool_calls) = &msg.tool_calls {
                     if !tool_calls.is_empty() {
                         let mut content_arr = Vec::new();
-                        if !msg.content.is_empty() {
+                        if !msg.content.trim().is_empty() {
                             content_arr.push(json!({
                                 "type": "text",
                                 "text": msg.content,
@@ -831,27 +994,42 @@ pub fn build_anthropic_payload(
                             "content": content_arr,
                         }));
                     } else {
+                        let content = if msg.content.trim().is_empty() {
+                            "(continuing)".to_string()
+                        } else {
+                            msg.content.clone()
+                        };
                         anthropic_messages.push(json!({
                             "role": "assistant",
-                            "content": msg.content,
+                            "content": content,
                         }));
                     }
                 } else {
+                    let content = if msg.content.trim().is_empty() {
+                        "(continuing)".to_string()
+                    } else {
+                        msg.content.clone()
+                    };
                     anthropic_messages.push(json!({
                         "role": "assistant",
-                        "content": msg.content,
+                        "content": content,
                     }));
                 }
             }
             Role::Tool => {
                 let tool_use_id = msg.tool_call_id.clone().unwrap_or_default();
+                let content = if msg.content.trim().is_empty() {
+                    "(empty output)".to_string()
+                } else {
+                    msg.content.clone()
+                };
                 anthropic_messages.push(json!({
                     "role": "user",
                     "content": [
                         {
                             "type": "tool_result",
                             "tool_use_id": tool_use_id,
-                            "content": msg.content,
+                            "content": content,
                         }
                     ]
                 }));
@@ -976,6 +1154,38 @@ mod tests {
     }
 
     #[test]
+    fn test_build_openai_payload_empty_content_sanitization() {
+        let messages = vec![
+            Message::system(""),
+            Message::user("   "),
+            Message::assistant_with_tools(
+                "",
+                vec![ToolCall {
+                    id: "call_empty".to_string(),
+                    name: "read".to_string(),
+                    arguments: r#"{"path":"foo.rs"}"#.to_string(),
+                }],
+            ),
+            Message::assistant(""),
+            Message::tool_result("call_empty", "  "),
+        ];
+
+        let payload = build_openai_payload("minimax/minimax-01", None, None, &messages, &[]);
+        let msgs = payload["messages"].as_array().unwrap();
+        assert_eq!(msgs.len(), 5);
+        assert_eq!(msgs[0]["role"], "system");
+        assert_eq!(msgs[0]["content"], "You are a helpful assistant.");
+        assert_eq!(msgs[1]["role"], "user");
+        assert_eq!(msgs[1]["content"], "(empty message)");
+        assert_eq!(msgs[2]["role"], "assistant");
+        assert_eq!(msgs[2]["content"], "Executing tools...");
+        assert_eq!(msgs[3]["role"], "assistant");
+        assert_eq!(msgs[3]["content"], "(continuing)");
+        assert_eq!(msgs[4]["role"], "tool");
+        assert_eq!(msgs[4]["content"], "(empty output)");
+    }
+
+    #[test]
     fn test_build_anthropic_payload() {
         let messages = vec![
             Message::system("System instruction"),
@@ -1082,5 +1292,19 @@ mod tests {
         assert_eq!(tool_calls[0].id, "tc_1");
         assert_eq!(tool_calls[0].name, "read");
         assert_eq!(tool_calls[0].arguments, r#"{"path":"file.txt"}"#);
+    }
+
+    #[test]
+    fn test_llm_client_retry_policy_configuration() {
+        let client = LlmClient::new();
+        assert!(client.retry_policy().is_some());
+        assert_eq!(client.retry_policy().unwrap().max_retries, 3);
+
+        let custom_policy = crate::provider::retry::RetryPolicy::aggressive();
+        let client = client.with_retry_policy(custom_policy.clone());
+        assert_eq!(client.retry_policy().unwrap().max_retries, 5);
+
+        let client = client.without_retry();
+        assert!(client.retry_policy().is_none());
     }
 }

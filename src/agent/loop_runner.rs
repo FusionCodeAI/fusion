@@ -5,6 +5,8 @@ use std::time::{Duration, Instant};
 use tokio::sync::mpsc::{unbounded_channel, UnboundedSender};
 
 use crate::agent::advisor::{consult_advisors, format_critiques_for_system_prompt, AdvisorRegistry};
+use crate::agent::prompts::{self, PromptPreset, SystemPromptBuilder};
+use crate::agent::skills::SkillRegistry;
 use crate::agent::session::Session;
 use crate::config::Config;
 use crate::provider::types::{Message, StreamChunk, ToolCall};
@@ -72,10 +74,13 @@ pub struct AgentRunner {
     tools: ToolRegistry,
     tool_ctx: ToolContext,
     advisors: AdvisorRegistry,
+    skills: SkillRegistry,
+    corrections: crate::agent::correction::CorrectionEngine,
+    recovery: crate::agent::recovery::RecoveryManager,
     system_prompt: Option<String>,
+    checkpoints: std::sync::Arc<std::sync::Mutex<crate::agent::undo::CheckpointManager>>,
     max_turns: usize,
 }
-
 impl AgentRunner {
     /// Creates a new AgentRunner with default advisors.
     pub fn new(client: LlmClient, config: Config, tools: ToolRegistry, tool_ctx: ToolContext) -> Self {
@@ -83,8 +88,14 @@ impl AgentRunner {
             client,
             config,
             tools,
-            tool_ctx,
+            tool_ctx: tool_ctx.clone(),
             advisors: AdvisorRegistry::default_advisors(),
+            skills: SkillRegistry::scan_default(Some(&tool_ctx.cwd)),
+            corrections: crate::agent::correction::CorrectionEngine::default(),
+            recovery: crate::agent::recovery::RecoveryManager::new(tool_ctx.cwd.clone()),
+            checkpoints: std::sync::Arc::new(std::sync::Mutex::new(
+                crate::agent::undo::CheckpointManager::new(tool_ctx.cwd.clone()),
+            )),
             system_prompt: None,
             max_turns: 30,
         }
@@ -96,9 +107,81 @@ impl AgentRunner {
         self
     }
 
+    /// Sets a custom SkillRegistry.
+    pub fn with_skills(mut self, skills: SkillRegistry) -> Self {
+        self.skills = skills;
+        self
+    }
+    /// Returns a shared reference to the CheckpointManager.
+    pub fn checkpoints(&self) -> std::sync::Arc<std::sync::Mutex<crate::agent::undo::CheckpointManager>> {
+        self.checkpoints.clone()
+    }
+
+    /// Sets a custom CheckpointManager.
+    pub fn with_checkpoints(
+        mut self,
+        checkpoints: std::sync::Arc<std::sync::Mutex<crate::agent::undo::CheckpointManager>>,
+    ) -> Self {
+        self.checkpoints = checkpoints;
+        self
+    }
+
+    /// Sets a custom CorrectionConfig for the self-correcting retry loop.
+    pub fn with_correction_config(mut self, config: crate::agent::correction::CorrectionConfig) -> Self {
+        self.corrections = crate::agent::correction::CorrectionEngine::new(config);
+        self
+    }
+
+    /// Enables or disables automatic silent tool error recovery.
+    pub fn with_auto_correction(mut self, enabled: bool) -> Self {
+        self.corrections.config.enable_auto_retry = enabled;
+        self
+    }
+
+    /// Returns a reference to the CorrectionEngine.
+    pub fn corrections(&self) -> &crate::agent::correction::CorrectionEngine {
+        &self.corrections
+    }
+
+    /// Returns a reference to the RecoveryManager.
+    pub fn recovery(&self) -> &crate::agent::recovery::RecoveryManager {
+        &self.recovery
+    }
+
+    /// Sets a custom RecoveryManager.
+    pub fn with_recovery(mut self, recovery: crate::agent::recovery::RecoveryManager) -> Self {
+        self.recovery = recovery;
+        self
+    }
+
+    /// Enables or disables automatic turn recovery snapshots.
+    pub fn with_recovery_enabled(mut self, enabled: bool) -> Self {
+        self.recovery.set_enabled(enabled);
+        self
+    }
+
+
     /// Overrides the default system prompt.
     pub fn with_system_prompt(mut self, prompt: impl Into<String>) -> Self {
         self.system_prompt = Some(prompt.into());
+        self
+    }
+
+    /// Sets a language-specific system prompt preset.
+    pub fn with_preset(mut self, preset: PromptPreset) -> Self {
+        let prompt = SystemPromptBuilder::new()
+            .with_preset(preset)
+            .build();
+        self.system_prompt = Some(prompt);
+        self
+    }
+
+    /// Automatically detects the appropriate preset based on the workspace directory.
+    pub fn with_detected_preset(mut self, workspace_path: &std::path::Path) -> Self {
+        let prompt = SystemPromptBuilder::new()
+            .with_workspace_detection(workspace_path)
+            .build();
+        self.system_prompt = Some(prompt);
         self
     }
 
@@ -138,17 +221,19 @@ impl AgentRunner {
         &self.advisors
     }
 
+    /// Returns a reference to the SkillRegistry.
+    pub fn skills(&self) -> &SkillRegistry {
+        &self.skills
+    }
+
+    /// Returns a mutable reference to the SkillRegistry.
+    pub fn skills_mut(&mut self) -> &mut SkillRegistry {
+        &mut self.skills
+    }
+
     /// Default system prompt for Fusion coding assistant.
     pub fn default_system_prompt() -> &'static str {
-        r#"You are Fusion, a fast, lightweight, pure-Rust AI coding assistant.
-You operate cleanly across macOS, Linux, Windows, and Android (Termux).
-
-Principles:
-- Be concise, direct, and technically rigorous. Deliver working solutions without unnecessary filler.
-- Use provided tools (read, write, edit, grep, glob, bash) to inspect the workspace and perform actions.
-- Prefer targeted reads/greps rather than dumping entire files unnecessarily.
-- When modifying existing code, use precise edits. Ensure cross-platform compatibility.
-- Zero-cost engineering: avoid redundant allocations, unhandled errors, or unverified assumptions."#
+        prompts::general_system_prompt()
     }
 
     /// Runs a single turn synchronously/CLI-style, printing tokens directly to stdout.
@@ -157,19 +242,17 @@ Principles:
 
         // Spawn a background task to handle event printing
         let print_task = tokio::spawn(async move {
-            let mut stdout = std::io::stdout();
+            let mut md = crate::ui::markdown::MarkdownRenderer::new();
             while let Some(event) = rx.recv().await {
                 match event {
                     AgentEvent::TextDelta(delta) => {
-                        print!("{}", delta);
-                        let _ = stdout.flush();
+                        md.push(&delta);
                     }
-                    AgentEvent::ThinkingDelta(delta) => {
-                        // Print thinking in subdued text if desired
-                        eprint!("{}", delta);
-                        let _ = std::io::stderr().flush();
+                    AgentEvent::ThinkingDelta(_delta) => {
+                        // Suppress raw internal chain-of-thought
                     }
                     AgentEvent::ToolStarted { name, args, .. } => {
+                        md.finish();
                         println!("\n⚙️  Tool [{}] with args: {}", name, args);
                     }
                     AgentEvent::ToolFinished { name, success, output, duration, .. } => {
@@ -190,9 +273,13 @@ Principles:
                     AgentEvent::Error(err) => {
                         eprintln!("\n❌ Error: {}", err);
                     }
+                    AgentEvent::Finished { .. } => {
+                        md.finish();
+                    }
                     _ => {}
                 }
             }
+            md.finish();
             println!();
         });
 
@@ -208,6 +295,9 @@ Principles:
         user_input: &str,
         event_tx: UnboundedSender<AgentEvent>,
     ) -> anyhow::Result<String> {
+        // Auto-save recovery state immediately before starting conversation turn
+        let _ = self.recovery.on_turn_start(session, user_input, 1);
+
         // Record user input
         session.add_user_message(user_input);
 
@@ -215,6 +305,7 @@ Principles:
         let mut advisor_notes = String::new();
         if self.config.advisors_enabled && !self.advisors.is_empty() {
             let _ = event_tx.send(AgentEvent::Status("Consulting advisors in parallel...".to_string()));
+            let _ = self.recovery.on_advisor_phase();
             for adv in self.advisors.all() {
                 let _ = event_tx.send(AgentEvent::AdvisorStarted {
                     advisor: adv.name.clone(),
@@ -248,17 +339,49 @@ Principles:
             .as_deref()
             .unwrap_or(default_prompt);
 
-        let system_message_content = if advisor_notes.is_empty() {
-            base_system_prompt.to_string()
-        } else {
-            format!("{}\n{}", base_system_prompt, advisor_notes)
-        };
+        let mut system_message_content = base_system_prompt.to_string();
+
+        // Domain skills dynamic injection
+        let relevant_matches = self.skills.find_relevant(user_input, Some(&self.tool_ctx.cwd));
+        if !relevant_matches.is_empty() {
+            let skill_names: Vec<&str> = relevant_matches.iter().map(|m| m.skill.name()).collect();
+            let _ = event_tx.send(AgentEvent::Status(format!(
+                "Active domain skills injected: {}",
+                skill_names.join(", ")
+            )));
+
+            if let Some(skills_block) = self.skills.inject_relevant_skills(
+                user_input,
+                Some(&self.tool_ctx.cwd),
+                Some(4),
+            ) {
+                system_message_content.push_str("\n\n");
+                system_message_content.push_str(&skills_block);
+            }
+        }
+
+        if !advisor_notes.is_empty() {
+            system_message_content.push_str("\n\n");
+            system_message_content.push_str(&advisor_notes);
+        }
 
         let mut turn = 0;
         let tool_defs = self.tools.definitions();
 
         while turn < self.max_turns {
             turn += 1;
+
+            // Auto-compact conversation history if it exceeds the context budget (>= 80%)
+            let compactor = crate::agent::compaction::Compactor::default();
+            if compactor.needs_compaction(session.messages(), session.active_model()) {
+                let _ = event_tx.send(AgentEvent::Status(
+                    "Context window limit approaching. Compacting history...".to_string(),
+                ));
+                let compaction_result = compactor.compact_session(session);
+                if compaction_result.compacted {
+                    let _ = event_tx.send(AgentEvent::Status(compaction_result.format_summary()));
+                }
+            }
 
             // Assemble full message history
             let mut messages = Vec::with_capacity(session.messages().len() + 1);
@@ -271,7 +394,8 @@ Principles:
             let mut chunk_stream = match self.client.stream_chat(&self.config, &messages, &tool_defs).await {
                 Ok(rx) => rx,
                 Err(e) => {
-                    let err_msg = format!("Failed to connect to provider: {}", e);
+                    let err_msg = format!("{}", e);
+                    let _ = self.recovery.on_turn_error(&err_msg);
                     let _ = event_tx.send(AgentEvent::Error(err_msg.clone()));
                     anyhow::bail!(err_msg);
                 }
@@ -310,6 +434,7 @@ Principles:
                         break;
                     }
                     StreamChunk::Error(err) => {
+                        let _ = self.recovery.on_turn_error(&err);
                         let _ = event_tx.send(AgentEvent::Error(err.clone()));
                         anyhow::bail!("LLM stream error: {}", err);
                     }
@@ -334,16 +459,45 @@ Principles:
             }
 
             if tool_calls.is_empty() {
-                // No tools requested - final response reached
-                session.add_assistant_message(&full_content);
+                let final_content = if full_content.trim().is_empty() {
+                    if !full_thinking.trim().is_empty() {
+                        let clean_answer = if let Some((_, ans)) = full_thinking.split_once("</think>") {
+                            ans.trim().to_string()
+                        } else if let Some((_, ans)) = full_thinking.rsplit_once("\n\n") {
+                            if !ans.trim().is_empty() {
+                                ans.trim().to_string()
+                            } else {
+                                full_thinking.trim().to_string()
+                            }
+                        } else {
+                            full_thinking.trim().to_string()
+                        };
+                        let _ = event_tx.send(AgentEvent::TextDelta(clean_answer.clone()));
+                        clean_answer
+                    } else {
+                        "(empty response)".to_string()
+                    }
+                } else {
+                    full_content
+                };
+                session.add_assistant_message(&final_content);
                 let _ = event_tx.send(AgentEvent::Finished { usage: None });
                 let _ = session.save();
-                return Ok(full_content);
+                let _ = self.recovery.on_turn_completed(session);
+                return Ok(final_content);
             }
 
             // Record assistant message with tool calls
-            session.add_assistant_with_tools(&full_content, tool_calls.clone());
-
+            let assistant_content = if full_content.trim().is_empty() {
+                if !full_thinking.trim().is_empty() {
+                    format!("<think>{}</think>", full_thinking.trim())
+                } else {
+                    "Executing tools...".to_string()
+                }
+            } else {
+                full_content
+            };
+            session.add_assistant_with_tools(&assistant_content, tool_calls.clone());
             // Execute each tool call in sequence
             for tc in tool_calls {
                 let parsed_args = match serde_json::from_str::<serde_json::Value>(&tc.arguments) {
@@ -372,13 +526,43 @@ Principles:
                     name: tc.name.clone(),
                     args: parsed_args.clone(),
                 });
+                let _ = self.recovery.on_tool_start(&tc.name, &tc.id, &parsed_args);
+                // Capture pre-tool file snapshots for reliable checkpoint undo
+                let checkpoint_id = match self.checkpoints.lock() {
+                    Ok(mut mgr) => mgr
+                        .capture_before_tool(&tc.name, &parsed_args, &self.tool_ctx.cwd)
+                        .ok()
+                        .flatten(),
+                    Err(_) => None,
+                };
 
                 let start = Instant::now();
-                let result = self.tools.execute(&tc.name, parsed_args, &self.tool_ctx).await;
+                let outcome = self
+                    .corrections
+                    .execute_with_registry(&tc.name, parsed_args, &self.tool_ctx, &self.tools)
+                    .await;
                 let duration = start.elapsed();
 
-                match result {
-                    Ok(output) => {
+                // Capture post-execution file state for diff inspection and redo
+                if let Some(chk_id) = &checkpoint_id {
+                    if let Ok(mut mgr) = self.checkpoints.lock() {
+                        let _ = mgr.capture_after_tool(chk_id, &self.tool_ctx.cwd);
+                    }
+                }
+
+                match outcome {
+                    crate::agent::correction::CorrectionOutcome::Success {
+                        output,
+                        was_corrected,
+                        total_corrections,
+                        ..
+                    } => {
+                        if was_corrected {
+                            let _ = event_tx.send(AgentEvent::Status(format!(
+                                "Tool '{}' self-corrected after {} recovery attempt(s)",
+                                tc.name, total_corrections
+                            )));
+                        }
                         let _ = event_tx.send(AgentEvent::ToolFinished {
                             id: tc.id.clone(),
                             name: tc.name.clone(),
@@ -386,27 +570,47 @@ Principles:
                             output: output.clone(),
                             duration,
                         });
-                        session.add_tool_result(&tc.id, output);
+                        session.add_tool_result(&tc.id, &output);
+                        let _ = self.recovery.on_tool_finish(
+                            &tc.name,
+                            &tc.id,
+                            &tc.arguments,
+                            true,
+                            &output,
+                            duration,
+                        );
                     }
-                    Err(err) => {
-                        let err_msg = format!("Tool '{}' error: {}", tc.name, err);
+                    crate::agent::correction::CorrectionOutcome::Failed {
+                        enriched_diagnostic,
+                        ..
+                    } => {
                         let _ = event_tx.send(AgentEvent::ToolFinished {
                             id: tc.id.clone(),
                             name: tc.name.clone(),
                             success: false,
-                            output: err_msg.clone(),
+                            output: enriched_diagnostic.clone(),
                             duration,
                         });
-                        session.add_tool_result(&tc.id, err_msg);
+                        session.add_tool_result(&tc.id, &enriched_diagnostic);
+                        let _ = self.recovery.on_tool_finish(
+                            &tc.name,
+                            &tc.id,
+                            &tc.arguments,
+                            false,
+                            &enriched_diagnostic,
+                            duration,
+                        );
                     }
                 }
             }
         }
 
-        anyhow::bail!(
+        let err_msg = format!(
             "Agent reached maximum execution turns ({}) without completing",
             self.max_turns
-        )
+        );
+        let _ = self.recovery.on_turn_error(&err_msg);
+        anyhow::bail!(err_msg);
     }
 }
 
@@ -431,6 +635,20 @@ mod tests {
     }
 
     #[test]
+    fn test_agent_runner_with_preset() {
+        let client = LlmClient::new();
+        let config = Config::default();
+        let tools = ToolRegistry::new();
+        let ctx = ToolContext::default();
+
+        let runner = AgentRunner::new(client, config, tools, ctx)
+            .with_preset(PromptPreset::Rust);
+
+        let prompt = runner.system_prompt.as_deref().unwrap();
+        assert!(prompt.contains("expert Rust systems"));
+    }
+
+    #[test]
     fn test_agent_event_serialization() {
         let event = AgentEvent::ToolStarted {
             id: "call_1".into(),
@@ -448,5 +666,33 @@ mod tests {
             }
             _ => panic!("Unexpected event variant"),
         }
+    }
+
+    #[test]
+    fn test_empty_content_fallback_resolution() {
+        let full_content = "";
+        let full_thinking = "I should plan carefully.";
+        let resolved = if full_content.trim().is_empty() {
+            if !full_thinking.trim().is_empty() {
+                format!("<think>{}</think>", full_thinking.trim())
+            } else {
+                "(empty response)".to_string()
+            }
+        } else {
+            full_content.to_string()
+        };
+        assert_eq!(resolved, "<think>I should plan carefully.</think>");
+
+        let empty_thinking = "   ";
+        let resolved_empty = if full_content.trim().is_empty() {
+            if !empty_thinking.trim().is_empty() {
+                format!("<think>{}</think>", empty_thinking.trim())
+            } else {
+                "(empty response)".to_string()
+            }
+        } else {
+            full_content.to_string()
+        };
+        assert_eq!(resolved_empty, "(empty response)");
     }
 }

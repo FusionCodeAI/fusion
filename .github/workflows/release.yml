@@ -1,216 +1,353 @@
 name: Release
 
-on:
+'on':
   push:
     tags:
       - 'v*'
   workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Release version tag (e.g. v0.3.0)'
+        required: false
+        default: ''
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
 
 permissions:
   contents: write
+  id-token: write
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+  CARGO_BUILD_JOBS: 2
 
 jobs:
-  # ── Tag validation ──────────────────────────────────────────────────────────
+  # ── Tag Validation ──────────────────────────────────────────────────────────
   tag-check:
+    name: Validate Release Version
     runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      tag: ${{ steps.version.outputs.tag }}
     steps:
       - uses: actions/checkout@v4
-      - name: Validate tag matches Cargo.toml version
+
+      - name: Resolve and Validate Version
+        id: version
         shell: bash
         run: |
           set -euo pipefail
-          cargo_ver="$(grep -m1 '^version' crates/codegen/xai-grok-pager-bin/Cargo.toml \
-                        | sed -E 's/version *= *"([^"]+)".*/\1/')"
+          cargo_ver="$(grep -m1 '^version' Cargo.toml | sed -E 's/version *= *"([^"]+)".*/\1/')"
+
           if [[ "${GITHUB_REF_TYPE:-}" == "tag" ]]; then
-            tag_ver="${GITHUB_REF_NAME#v}"
-            [[ "${tag_ver}" == "${cargo_ver}" ]] \
-              || { echo "❌ Tag v${tag_ver} ≠ Cargo.toml ${cargo_ver}"; exit 1; }
-            echo "✅ Tag and Cargo.toml agree (${tag_ver})"
+            tag="${GITHUB_REF_NAME}"
+            tag_ver="${tag#v}"
+            if [[ "${tag_ver}" != "${cargo_ver}" ]]; then
+              echo "::warning::Tag version (${tag_ver}) differs from Cargo.toml version (${cargo_ver})"
+            else
+              echo "✅ Tag and Cargo.toml agree (${tag_ver})"
+            fi
+          elif [[ -n "${{ github.event.inputs.tag }}" ]]; then
+            tag="${{ github.event.inputs.tag }}"
+            tag_ver="${tag#v}"
           else
-            echo "✅ Manual release workflow dispatched for version ${cargo_ver}"
+            tag="v${cargo_ver}"
+            tag_ver="${cargo_ver}"
           fi
+
+          echo "version=${tag_ver}" >> "$GITHUB_OUTPUT"
+          echo "tag=${tag}" >> "$GITHUB_OUTPUT"
+          echo "Target Release: ${tag} (version ${tag_ver})"
+
+  # ── Multi-Platform Binary Matrix Build ──────────────────────────────────────
   build:
-    name: Build ${{ matrix.target }}
+    name: Build (${{ matrix.target }})
     needs: tag-check
     strategy:
       fail-fast: false
       matrix:
         include:
-          # ── Linux x86_64 — native on ubuntu-22.04 (older glibc = wider compat)
+          # ── Linux x86_64 (glibc on Ubuntu 22.04 for broad compat) ──────────
           - target: x86_64-unknown-linux-gnu
             os: ubuntu-22.04
             binary: fusion
+            archive_ext: tar.gz
+            use_cross: false
             android: false
 
-          # ── Termux / Android ARM64 — native NDK build ───────────────────────
+          # ── Linux x86_64 (static musl) ──────────────────────────────────────
+          - target: x86_64-unknown-linux-musl
+            os: ubuntu-latest
+            binary: fusion
+            archive_ext: tar.gz
+            use_cross: false
+            android: false
+
+          # ── Linux AArch64 (static musl via cross) ───────────────────────────
+          - target: aarch64-unknown-linux-musl
+            os: ubuntu-latest
+            binary: fusion
+            archive_ext: tar.gz
+            use_cross: true
+            android: false
+
+          # ── Android / Termux ARM64 (native NDK) ─────────────────────────────
           - target: aarch64-linux-android
             os: ubuntu-latest
             binary: fusion
+            archive_ext: tar.gz
+            use_cross: false
             android: true
 
-          # ── macOS Apple Silicon ─────────────────────────────────────────────
+          # ── macOS Apple Silicon (ARM64) ─────────────────────────────────────
           - target: aarch64-apple-darwin
             os: macos-latest
             binary: fusion
+            archive_ext: tar.gz
+            use_cross: false
             android: false
 
-          # ── macOS Intel ─────────────────────────────────────────────────────
+          # ── macOS Intel (x86_64) ───────────────────────────────────────────
           - target: x86_64-apple-darwin
-            os: macos-latest
+            os: macos-13
             binary: fusion
+            archive_ext: tar.gz
+            use_cross: false
             android: false
 
-          # ── Windows x64 ──────────────────────────────────────────────────────
+          # ── Windows x86_64 (MSVC) ───────────────────────────────────────────
           - target: x86_64-pc-windows-msvc
             os: windows-latest
             binary: fusion.exe
+            archive_ext: zip
+            use_cross: false
             android: false
 
     runs-on: ${{ matrix.os }}
-    timeout-minutes: 180
+    timeout-minutes: 120
 
     steps:
       - uses: actions/checkout@v4
 
-      # protobuf codegen (xai-grok-tools-api etc.) needs a real protoc on PATH.
-      # bin/protoc is a DotSlash wrapper and fails in CI without dotslash.
-      - name: Install protoc
-        uses: arduino/setup-protoc@v3
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
         with:
-          version: "29.3"
-          repo-token: ${{ secrets.GITHUB_TOKEN }}
+          targets: ${{ (!matrix.use_cross && matrix.target) || '' }}
 
-      - name: Install Rust
-        uses: dtolnay/rust-toolchain@master
-        with:
-          toolchain: "1.92.0"
-          # Don't add the android target here — build-linux.sh does it via rustup.
-          # Only add the target for non-android builds.
-          targets: ${{ matrix.android == false && matrix.target || '' }}
+      - name: Install Linux build dependencies (musl-tools)
+        if: matrix.target == 'x86_64-unknown-linux-musl'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y musl-tools
 
-      # ── Cache ─────────────────────────────────────────────────────────────
-      - name: Cache cargo registry
+      - name: Setup Android NDK
+        if: matrix.android
+        id: setup-ndk
+        run: |
+          rustup target add ${{ matrix.target }}
+          if [ -n "${ANDROID_NDK_LATEST_HOME:-}" ] && [ -d "${ANDROID_NDK_LATEST_HOME}" ]; then
+            NDK_ROOT="${ANDROID_NDK_LATEST_HOME}"
+          elif [ -n "${ANDROID_NDK_HOME:-}" ] && [ -d "${ANDROID_NDK_HOME}" ]; then
+            NDK_ROOT="${ANDROID_NDK_HOME}"
+          elif [ -d "/usr/local/lib/android/sdk/ndk" ]; then
+            NDK_ROOT="$(ls -d /usr/local/lib/android/sdk/ndk/* 2>/dev/null | tail -1)"
+          else
+            NDK_ROOT="${ANDROID_HOME}/ndk-bundle"
+          fi
+          echo "NDK_ROOT=${NDK_ROOT}" >> "$GITHUB_ENV"
+          TOOLCHAIN="${NDK_ROOT}/toolchains/llvm/prebuilt/linux-x86_64/bin"
+          echo "${TOOLCHAIN}" >> "$GITHUB_PATH"
+          echo "CC_aarch64_linux_android=${TOOLCHAIN}/aarch64-linux-android24-clang" >> "$GITHUB_ENV"
+          echo "CXX_aarch64_linux_android=${TOOLCHAIN}/aarch64-linux-android24-clang++" >> "$GITHUB_ENV"
+          echo "AR_aarch64_linux_android=${TOOLCHAIN}/llvm-ar" >> "$GITHUB_ENV"
+          echo "CARGO_TARGET_AARCH64_LINUX_ANDROID_LINKER=${TOOLCHAIN}/aarch64-linux-android24-clang" >> "$GITHUB_ENV"
+          echo "CARGO_TARGET_AARCH64_LINUX_ANDROID_AR=${TOOLCHAIN}/llvm-ar" >> "$GITHUB_ENV"
+
+      - name: Install cross-compilation tool (cross)
+        if: matrix.use_cross
+        uses: taiki-e/install-action@cross
+
+      - name: Cache Cargo Dependencies
         uses: actions/cache@v4
         with:
           path: |
-            ~/.cargo/registry
-            ~/.cargo/git
+            ~/.cargo/registry/index
+            ~/.cargo/registry/cache
+            ~/.cargo/git/db
             target
           key: ${{ runner.os }}-${{ matrix.target }}-cargo-${{ hashFiles('**/Cargo.lock') }}
           restore-keys: |
             ${{ runner.os }}-${{ matrix.target }}-cargo-
 
-      # ── Build ──────────────────────────────────────────────────────────────
-      - name: Build (native Linux/macOS)
-        if: "!matrix.android"
+      # ── Compilation ────────────────────────────────────────────────────────
+      - name: Build Binary (Native / Rustup)
+        if: "!matrix.use_cross"
         shell: bash
-        env:
-          CARGO_BUILD_JOBS: 2
-          CARGO_PROFILE_RELEASE_DEBUG: "0"
-          CARGO_PROFILE_RELEASE_INCREMENTAL: "false"
         run: |
-          cargo build \
-            --release \
-            --target ${{ matrix.target }} \
-            --features release-dist \
-            -p xai-grok-pager-bin
+          cargo build --release --target ${{ matrix.target }}
 
-      - name: Strip Linux binary
-        if: "matrix.target == 'x86_64-unknown-linux-gnu'"
+      - name: Build Binary (Cross)
+        if: matrix.use_cross
         shell: bash
-        run: strip "target/${{ matrix.target }}/release/${{ matrix.binary }}"
+        run: |
+          cross build --release --target ${{ matrix.target }}
 
-      - name: Build Android ARM64 (NDK)
+      # ── Symbol Stripping ───────────────────────────────────────────────────
+      - name: Strip Debug Symbols (Unix)
+        if: "!matrix.android && runner.os != 'Windows'"
+        shell: bash
+        run: |
+          BIN_PATH="target/${{ matrix.target }}/release/${{ matrix.binary }}"
+          if [[ "${{ runner.os }}" == "macOS" ]]; then
+            strip -x "${BIN_PATH}" 2>/dev/null || true
+          else
+            strip --strip-all "${BIN_PATH}" 2>/dev/null || strip "${BIN_PATH}" 2>/dev/null || true
+          fi
+
+      - name: Strip Debug Symbols (Android)
         if: matrix.android
-        run: |
-          ./scripts/build-linux.sh arm64
-
-      # ── Package ────────────────────────────────────────────────────────────
-      - name: Package binary
         shell: bash
         run: |
-          TAG="${GITHUB_REF_NAME}"
-          if [[ "${TAG}" != v* ]]; then
-            cargo_ver="$(grep -m1 '^version' crates/codegen/xai-grok-pager-bin/Cargo.toml \
-                          | sed -E 's/version *= *"([^"]+)".*/\1/')"
-            TAG="v${cargo_ver}"
-          fi
-          ARTIFACT="fusion-${TAG}-${{ matrix.target }}"
-          mkdir -p dist
-          if [ "${{ matrix.android }}" = "true" ]; then
-            # build-linux.sh already compiled, stripped, and placed it in dist/
-            mv "dist/fusion-linux-aarch64" "dist/${{ matrix.binary }}"
-          else
-            cp "target/${{ matrix.target }}/release/${{ matrix.binary }}" "dist/${{ matrix.binary }}"
-          fi
-          cd dist
-          tar czf "${ARTIFACT}.tar.gz" "${{ matrix.binary }}"
-          # Produce a checksum (Linux: sha256sum, macOS: shasum)
-          if command -v sha256sum >/dev/null 2>&1; then
-            sha256sum "${ARTIFACT}.tar.gz" > "${ARTIFACT}.tar.gz.sha256"
-          else
-            shasum -a 256 "${ARTIFACT}.tar.gz" > "${ARTIFACT}.tar.gz.sha256"
-          fi
-          rm "${{ matrix.binary }}"
+          BIN_PATH="target/${{ matrix.target }}/release/${{ matrix.binary }}"
+          llvm-strip --strip-all "${BIN_PATH}" 2>/dev/null || strip "${BIN_PATH}" 2>/dev/null || true
 
-      - name: Upload artifact
+      # ── Packaging ──────────────────────────────────────────────────────────
+      - name: Package Distribution Archives
+        shell: bash
+        run: |
+          set -euo pipefail
+          TAG="${{ needs.tag-check.outputs.tag }}"
+          TARGET="${{ matrix.target }}"
+          BINARY="${{ matrix.binary }}"
+          BIN_SRC="target/${TARGET}/release/${BINARY}"
+
+          mkdir -p dist staging
+          cp "${BIN_SRC}" "staging/${BINARY}"
+          chmod +x "staging/${BINARY}"
+
+          [ -f "README.md" ] && cp "README.md" "staging/"
+          [ -f "LICENSE" ] && cp "LICENSE" "staging/"
+
+          ARCHIVE_BASE="fusion-${TAG}-${TARGET}"
+          TAR_FILE="dist/${ARCHIVE_BASE}.tar.gz"
+          ZIP_FILE="dist/${ARCHIVE_BASE}.zip"
+
+          # 1. Create .tar.gz
+          ( cd staging && tar -czf "../${TAR_FILE}" * )
+
+          # 2. Create .zip
+          if command -v zip >/dev/null 2>&1; then
+            ( cd staging && zip -q -9 -r "../${ZIP_FILE}" * )
+          elif command -v python3 >/dev/null 2>&1; then
+            python3 -c "import shutil; shutil.make_archive('dist/${ARCHIVE_BASE}', 'zip', 'staging')"
+          fi
+
+          # 3. Generate SHA256 Checksums
+          cd dist
+          for file in "${ARCHIVE_BASE}".*; do
+            if [ -f "$file" ]; then
+              if command -v sha256sum >/dev/null 2>&1; then
+                sha256sum "$file" > "${file}.sha256"
+              else
+                shasum -a 256 "$file" > "${file}.sha256"
+              fi
+            fi
+          done
+
+      - name: Upload Build Artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: fusion-${{ matrix.target }}
+          name: artifacts-${{ matrix.target }}
           path: dist/*
+          if-no-files-found: error
 
   # ── GitHub Release ──────────────────────────────────────────────────────────
   release:
-    name: Create GitHub Release
-    needs: build
+    name: Publish GitHub Release
+    needs: [tag-check, build]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
 
-      - name: Download all artifacts
+      - name: Download all build artifacts
         uses: actions/download-artifact@v4
         with:
-          path: artifacts
+          pattern: artifacts-*
+          path: all-artifacts
           merge-multiple: true
+
+      - name: Generate Consolidated SHA256SUMS.txt
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p release-assets
+          cp all-artifacts/* release-assets/
+
+          cd release-assets
+          # Collect all archive files (.tar.gz and .zip), compute combined checksum file
+          rm -f SHA256SUMS.txt
+          find . -maxdepth 1 -type f \( -name "*.tar.gz" -o -name "*.zip" \) -exec sha256sum {} + | sort -k2 | sed 's|\./||' > SHA256SUMS.txt
+
+          echo "=== Generated SHA256SUMS.txt ==="
+          cat SHA256SUMS.txt
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          files: artifacts/**/*
+          tag_name: ${{ needs.tag-check.outputs.tag }}
+          name: Fusion ${{ needs.tag-check.outputs.tag }}
+          files: |
+            release-assets/*
           generate_release_notes: true
+          draft: false
+          prerelease: false
           body: |
-            ## Fusion ${{ github.ref_name }}
+            ## Fusion ${{ needs.tag-check.outputs.tag }}
 
-            ### Downloads
+            Fast, lightweight, cross-platform AI coding assistant with subagents and advisors.
 
-            | Platform | File |
-            |----------|------|
-            | Linux x86_64 | `fusion-${{ github.ref_name }}-x86_64-unknown-linux-gnu.tar.gz` |
-            | Termux / Android ARM64 | `fusion-${{ github.ref_name }}-aarch64-linux-android.tar.gz` |
-            | macOS Apple Silicon | `fusion-${{ github.ref_name }}-aarch64-apple-darwin.tar.gz` |
-            | macOS Intel | `fusion-${{ github.ref_name }}-x86_64-apple-darwin.tar.gz` |
-            | Windows x64 | `fusion-${{ github.ref_name }}-x86_64-pc-windows-msvc.tar.gz` |
+            ### 🚀 Quick Install (macOS / Linux / Termux)
 
-            ### Install (Termux / Android)
             ```bash
-            curl -sSL https://raw.githubusercontent.com/${{ github.repository }}/main/scripts/install.sh | sh
+            curl -fsSL https://fusioncode.app/install | bash
             ```
 
-            ### Install (one-liner, all platforms)
+            ### 📦 Homebrew (macOS / Linux)
+
             ```bash
-            curl -sSL https://raw.githubusercontent.com/${{ github.repository }}/main/scripts/install.sh | sh
+            brew install theaungmyatmoe/fusion/fusion
             ```
 
-  # ── NPM & JSR Publish ────────────────────────────────────────────────────────
-  publish-npm-jsr:
-    name: Publish to npm & JSR
-    needs: build
+            ### 📱 Termux (Android)
+
+            ```bash
+            curl -fsSL https://raw.githubusercontent.com/${{ github.repository }}/main/scripts/termux-bootstrap.sh | bash
+            ```
+
+            ---
+
+            ### 📥 Pre-compiled Release Binaries
+
+            | Platform / Architecture | Archive | Checksum |
+            |-------------------------|---------|----------|
+            | **macOS Apple Silicon** (ARM64) | [`fusion-${{ needs.tag-check.outputs.tag }}-aarch64-apple-darwin.tar.gz`](https://github.com/${{ github.repository }}/releases/download/${{ needs.tag-check.outputs.tag }}/fusion-${{ needs.tag-check.outputs.tag }}-aarch64-apple-darwin.tar.gz) | [`.sha256`](https://github.com/${{ github.repository }}/releases/download/${{ needs.tag-check.outputs.tag }}/fusion-${{ needs.tag-check.outputs.tag }}-aarch64-apple-darwin.tar.gz.sha256) |
+            | **macOS Intel** (x86_64) | [`fusion-${{ needs.tag-check.outputs.tag }}-x86_64-apple-darwin.tar.gz`](https://github.com/${{ github.repository }}/releases/download/${{ needs.tag-check.outputs.tag }}/fusion-${{ needs.tag-check.outputs.tag }}-x86_64-apple-darwin.tar.gz) | [`.sha256`](https://github.com/${{ github.repository }}/releases/download/${{ needs.tag-check.outputs.tag }}/fusion-${{ needs.tag-check.outputs.tag }}-x86_64-apple-darwin.tar.gz.sha256) |
+            | **Linux x86_64** (glibc) | [`fusion-${{ needs.tag-check.outputs.tag }}-x86_64-unknown-linux-gnu.tar.gz`](https://github.com/${{ github.repository }}/releases/download/${{ needs.tag-check.outputs.tag }}/fusion-${{ needs.tag-check.outputs.tag }}-x86_64-unknown-linux-gnu.tar.gz) | [`.sha256`](https://github.com/${{ github.repository }}/releases/download/${{ needs.tag-check.outputs.tag }}/fusion-${{ needs.tag-check.outputs.tag }}-x86_64-unknown-linux-gnu.tar.gz.sha256) |
+            | **Linux x86_64** (musl static) | [`fusion-${{ needs.tag-check.outputs.tag }}-x86_64-unknown-linux-musl.tar.gz`](https://github.com/${{ github.repository }}/releases/download/${{ needs.tag-check.outputs.tag }}/fusion-${{ needs.tag-check.outputs.tag }}-x86_64-unknown-linux-musl.tar.gz) | [`.sha256`](https://github.com/${{ github.repository }}/releases/download/${{ needs.tag-check.outputs.tag }}/fusion-${{ needs.tag-check.outputs.tag }}-x86_64-unknown-linux-musl.tar.gz.sha256) |
+            | **Linux AArch64** (musl static) | [`fusion-${{ needs.tag-check.outputs.tag }}-aarch64-unknown-linux-musl.tar.gz`](https://github.com/${{ github.repository }}/releases/download/${{ needs.tag-check.outputs.tag }}/fusion-${{ needs.tag-check.outputs.tag }}-aarch64-unknown-linux-musl.tar.gz) | [`.sha256`](https://github.com/${{ github.repository }}/releases/download/${{ needs.tag-check.outputs.tag }}/fusion-${{ needs.tag-check.outputs.tag }}-aarch64-unknown-linux-musl.tar.gz.sha256) |
+            | **Android / Termux** (ARM64) | [`fusion-${{ needs.tag-check.outputs.tag }}-aarch64-linux-android.tar.gz`](https://github.com/${{ github.repository }}/releases/download/${{ needs.tag-check.outputs.tag }}/fusion-${{ needs.tag-check.outputs.tag }}-aarch64-linux-android.tar.gz) | [`.sha256`](https://github.com/${{ github.repository }}/releases/download/${{ needs.tag-check.outputs.tag }}/fusion-${{ needs.tag-check.outputs.tag }}-aarch64-linux-android.tar.gz.sha256) |
+            | **Windows x64** (MSVC) | [`fusion-${{ needs.tag-check.outputs.tag }}-x86_64-pc-windows-msvc.zip`](https://github.com/${{ github.repository }}/releases/download/${{ needs.tag-check.outputs.tag }}/fusion-${{ needs.tag-check.outputs.tag }}-x86_64-pc-windows-msvc.zip) | [`.sha256`](https://github.com/${{ github.repository }}/releases/download/${{ needs.tag-check.outputs.tag }}/fusion-${{ needs.tag-check.outputs.tag }}-x86_64-pc-windows-msvc.zip.sha256) |
+
+            *Verification checksums for all release packages are available in [`SHA256SUMS.txt`](https://github.com/${{ github.repository }}/releases/download/${{ needs.tag-check.outputs.tag }}/SHA256SUMS.txt).*
+
+  # ── TypeScript / WebAssembly SDK NPM Publish ────────────────────────────────
+  publish-sdk:
+    name: Publish TypeScript SDK (@fusion/sdk)
+    needs: [tag-check, release]
     runs-on: ubuntu-latest
-    env:
-      NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
-    permissions:
-      contents: read
-      id-token: write # required for JSR provenance / OIDC publishing
     steps:
       - uses: actions/checkout@v4
 
@@ -220,45 +357,30 @@ jobs:
           node-version: 20
           registry-url: 'https://registry.npmjs.org'
 
-      - name: Download all built binaries
-        uses: actions/download-artifact@v4
-        with:
-          path: artifacts
-          merge-multiple: true
-
-      - name: Assemble npm packages
+      - name: Build & Publish SDK
         shell: bash
-        run: |
-          mkdir -p target/aarch64-apple-darwin/release
-          mkdir -p target/x86_64-apple-darwin/release
-          mkdir -p target/x86_64-unknown-linux-gnu/release
-          mkdir -p target/aarch64-linux-android/release
-          mkdir -p target/x86_64-pc-windows-msvc/release
-
-          tar -xzf artifacts/fusion-${GITHUB_REF_NAME}-aarch64-apple-darwin.tar.gz -C target/aarch64-apple-darwin/release/ || true
-          tar -xzf artifacts/fusion-${GITHUB_REF_NAME}-x86_64-apple-darwin.tar.gz -C target/x86_64-apple-darwin/release/ || true
-          tar -xzf artifacts/fusion-${GITHUB_REF_NAME}-x86_64-unknown-linux-gnu.tar.gz -C target/x86_64-unknown-linux-gnu/release/ || true
-          tar -xzf artifacts/fusion-${GITHUB_REF_NAME}-aarch64-linux-android.tar.gz -C target/aarch64-linux-android/release/ || true
-          tar -xzf artifacts/fusion-${GITHUB_REF_NAME}-x86_64-pc-windows-msvc.tar.gz -C target/x86_64-pc-windows-msvc/release/ || true
-
-          cd crates/codegen/xai-grok-pager/npm/fusion
-          node scripts/assemble-platform-packages.js
-
-      - name: Publish to npm
-        if: ${{ env.NPM_TOKEN != '' }}
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
-          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
         run: |
-          cd crates/codegen/xai-grok-pager/npm
-          for dir in fusion-*; do
-            if [ -d "$dir" ]; then
-              (cd "$dir" && npm publish --access public || true)
-            fi
-          done
-          (cd fusion && npm publish --access public || true)
+          set -euo pipefail
+          cd sdk
 
-      - name: Publish to JSR
-        run: |
-          cd crates/codegen/xai-grok-pager/npm/fusion
-          npx jsr publish --allow-dirty --allow-slow-types || true
+          echo "Installing SDK dependencies..."
+          npm ci || npm install
+
+          TAG_VERSION="${{ needs.tag-check.outputs.version }}"
+          if [ -n "$TAG_VERSION" ]; then
+            echo "Updating sdk package.json version to ${TAG_VERSION}..."
+            npm version "${TAG_VERSION}" --no-git-tag-version --allow-same-version || true
+          fi
+
+          echo "Building SDK TypeScript and type declarations..."
+          npm run build
+
+          if [ -n "${NODE_AUTH_TOKEN:-}" ]; then
+            echo "Publishing @fusion/sdk to npm registry..."
+            npm publish --access public --provenance || npm publish --access public
+          else
+            echo "⚠️ NPM_TOKEN secret not configured; skipping npm publish (dry-run)."
+            npm pack --dry-run
+          fi

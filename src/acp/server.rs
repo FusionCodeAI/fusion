@@ -5,6 +5,7 @@ use tokio::io::{AsyncBufRead, AsyncBufReadExt, AsyncWrite, AsyncWriteExt};
 use tokio::sync::mpsc::{unbounded_channel, UnboundedReceiver, UnboundedSender};
 use tokio::sync::{watch, Mutex, RwLock};
 
+use crate::acp::events::AcpEventBridge;
 use crate::acp::types::*;
 use crate::agent::advisor::AdvisorRegistry;
 use crate::agent::loop_runner::{AgentEvent, AgentRunner};
@@ -144,14 +145,65 @@ impl AcpServer {
     }
 
     /// Parses and processes a single raw JSON-RPC string message.
+    ///
+    /// Accepts either a single request/notification object or a JSON-RPC 2.0 batch array.
+    /// Malformed JSON yields a single `parse_error` response with a null id.
     pub async fn process_raw_message(&self, raw: &str, out_tx: UnboundedSender<String>) {
-        let parsed: Result<JsonRpcRequest, _> = serde_json::from_str(raw);
-        let request = match parsed {
-            Ok(req) => req,
+        let value: serde_json::Value = match serde_json::from_str(raw) {
+            Ok(v) => v,
             Err(e) => {
                 let error_resp = JsonRpcResponse::error(
                     RequestId::Null,
                     JsonRpcError::parse_error(e.to_string()),
+                );
+                if let Ok(json_str) = serde_json::to_string(&error_resp) {
+                    let _ = out_tx.send(json_str);
+                }
+                return;
+            }
+        };
+
+        match value {
+            serde_json::Value::Array(items) => {
+                if items.is_empty() {
+                    let error_resp = JsonRpcResponse::error(
+                        RequestId::Null,
+                        JsonRpcError::invalid_request("Empty JSON-RPC batch"),
+                    );
+                    if let Ok(json_str) = serde_json::to_string(&error_resp) {
+                        let _ = out_tx.send(json_str);
+                    }
+                } else {
+                    for item in items {
+                        self.process_json_message(item, &out_tx).await;
+                    }
+                }
+            }
+            other => self.process_json_message(other, &out_tx).await,
+        }
+    }
+
+    /// Processes a single parsed JSON-RPC message value (request or notification).
+    ///
+    /// Valid JSON that fails structural validation responds with `invalid_request`,
+    /// echoing the original request id whenever it can be recovered.
+    async fn process_json_message(
+        &self,
+        value: serde_json::Value,
+        out_tx: &UnboundedSender<String>,
+    ) {
+        // Recover the request id so clients can correlate error responses.
+        let echoed_id = value
+            .get("id")
+            .filter(|v| !v.is_null())
+            .and_then(|v| serde_json::from_value::<RequestId>(v.clone()).ok());
+
+        let request: JsonRpcRequest = match serde_json::from_value(value) {
+            Ok(req) => req,
+            Err(e) => {
+                let error_resp = JsonRpcResponse::error(
+                    echoed_id.unwrap_or(RequestId::Null),
+                    JsonRpcError::invalid_request(e.to_string()),
                 );
                 if let Ok(json_str) = serde_json::to_string(&error_resp) {
                     let _ = out_tx.send(json_str);
@@ -221,10 +273,6 @@ impl AcpServer {
 
             // Session Lifecycle
             "session/new" => self.handle_session_new(params).await,
-            "session/load" | "session/resume" => self.handle_session_load(params).await,
-            "session/list" => self.handle_session_list(params).await,
-            "session/close" => self.handle_session_close(params).await,
-            "session/cancel" => self.handle_session_cancel(params).await,
 
             // Prompt Dispatching
             "session/prompt" => self.handle_session_prompt(params, out_tx).await,
@@ -495,15 +543,11 @@ impl AcpServer {
 
         // Get or create session
         let session_arc = {
+            let default_model = self.config.read().await.default_model.clone();
             let mut sessions = self.sessions.write().await;
             sessions
                 .entry(req.session_id.clone())
-                .or_insert_with(|| {
-                    let cfg = futures::executor::block_on(async {
-                        self.config.read().await.default_model.clone()
-                    });
-                    Arc::new(Mutex::new(Session::new(&cfg)))
-                })
+                .or_insert_with(|| Arc::new(Mutex::new(Session::new(&default_model))))
                 .clone()
         };
 
@@ -530,78 +574,9 @@ impl AcpServer {
             .with_advisors(self.advisors.clone())
         };
 
-        let session_id_clone = req.session_id.clone();
-        let out_tx_clone = out_tx.clone();
-
-        // Stream bridge task: converts AgentEvent to ACP session/update notifications
-        let mut full_assistant_text = String::new();
-        let stream_bridge = tokio::spawn(async move {
-            while let Some(event) = event_rx.recv().await {
-                let update = match event {
-                    AgentEvent::TextDelta(delta) => {
-                        full_assistant_text.push_str(&delta);
-                        SessionUpdate::AgentMessageChunk {
-                            content: AgentMessageContent::assistant_text(delta),
-                        }
-                    }
-                    AgentEvent::ThinkingDelta(thought) => SessionUpdate::AgentThoughtChunk { thought },
-                    AgentEvent::ToolStarted { name, args, .. } => {
-                        SessionUpdate::ToolCall {
-                            call_id: uuid::Uuid::new_v4().to_string(),
-                            name,
-                            args,
-                        }
-                    }
-                    AgentEvent::ToolFinished {
-                        name,
-                        success,
-                        output,
-                        ..
-                    } => SessionUpdate::ToolCallResult {
-                        call_id: uuid::Uuid::new_v4().to_string(),
-                        name,
-                        output,
-                        success,
-                    },
-                    AgentEvent::AdvisorCritique {
-                        advisor,
-                        approved,
-                        critique,
-                    } => SessionUpdate::AdvisorCritique {
-                        advisor,
-                        approved,
-                        critique,
-                    },
-                    AgentEvent::Status(message) => SessionUpdate::Status { message },
-                    AgentEvent::SubagentStarted { name, task } => SessionUpdate::Status {
-                        message: format!("Subagent [{}] started task: {}", name, task),
-                    },
-                    AgentEvent::SubagentFinished { name, output, .. } => SessionUpdate::Status {
-                        message: format!("Subagent [{}] finished: {}", name, output),
-                    },
-                    AgentEvent::Error(err) => SessionUpdate::Status {
-                        message: format!("Error: {}", err),
-                    },
-                    AgentEvent::Finished { .. } => {
-                        continue;
-                    }
-                    _ => continue,
-                };
-
-                let params = serde_json::to_value(SessionUpdateParams {
-                    session_id: session_id_clone.clone(),
-                    update,
-                });
-
-                if let Ok(p) = params {
-                    let notif = JsonRpcNotification::new("session/update", p);
-                    if let Ok(json_str) = serde_json::to_string(&notif) {
-                        let _ = out_tx_clone.send(json_str);
-                    }
-                }
-            }
-            full_assistant_text
-        });
+        // Stream bridge task: converts AgentEvent to rich ACP session/update notifications
+        let bridge = AcpEventBridge::new(&req.session_id).with_out_sender(out_tx.clone());
+        let stream_bridge = tokio::spawn(bridge.run(event_rx));
 
         // Execute runner with cancellation watch
         let mut session_guard = session_arc.lock().await;
@@ -631,14 +606,192 @@ impl AcpServer {
             self.cancellations.write().await.remove(&req.session_id);
         }
 
-        let accumulated_text = stream_bridge.await.unwrap_or_default();
+        let summary = stream_bridge.await.unwrap_or_default();
 
         let response = PromptResponse {
             stop_reason,
-            content: Some(vec![ContentBlock::text(accumulated_text)]),
-            stats: Some(TokenStatsInfo::default()),
+            content: Some(vec![ContentBlock::text(summary.full_assistant_text)]),
+            stats: Some(TokenStatsInfo {
+                prompt_tokens: Some(summary.prompt_tokens as u32),
+                completion_tokens: Some(summary.completion_tokens as u32),
+                total_tokens: Some(summary.total_tokens as u32),
+            }),
         };
 
         serde_json::to_value(response).map_err(|e| JsonRpcError::internal_error(e.to_string()))
+    }
+}
+
+// ============================================================================
+// Unit Tests
+// ============================================================================
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use serde_json::json;
+    use tokio::sync::mpsc::unbounded_channel;
+
+    fn test_server() -> AcpServer {
+        AcpServer::new(
+            Config::default(),
+            LlmClient::new(),
+            ToolRegistry::new(),
+            ToolContext::default(),
+        )
+    }
+
+    async fn next_response(out_rx: &mut UnboundedReceiver<String>) -> JsonRpcResponse {
+        let line = out_rx.recv().await.expect("Expected a JSON-RPC line");
+        serde_json::from_str(&line).expect("Valid JSON-RPC response")
+    }
+
+    #[tokio::test]
+    async fn test_ping_roundtrip() {
+        let server = test_server();
+        let (out_tx, mut out_rx) = unbounded_channel();
+
+        server
+            .process_raw_message(&json!({ "jsonrpc": "2.0", "id": 7, "method": "ping" }).to_string(), out_tx)
+            .await;
+
+        let resp = next_response(&mut out_rx).await;
+        assert_eq!(resp.jsonrpc, "2.0");
+        assert_eq!(resp.id, RequestId::Number(7));
+        assert_eq!(resp.result.unwrap(), json!({ "pong": true }));
+    }
+
+    #[tokio::test]
+    async fn test_malformed_json_yields_parse_error() {
+        let server = test_server();
+        let (out_tx, mut out_rx) = unbounded_channel();
+
+        server.process_raw_message("not valid json", out_tx).await;
+
+        let resp = next_response(&mut out_rx).await;
+        assert_eq!(resp.id, RequestId::Null);
+        let err = resp.error.expect("Expected parse error");
+        assert_eq!(err.code, error_codes::PARSE_ERROR);
+    }
+
+    #[tokio::test]
+    async fn test_missing_method_is_invalid_request() {
+        let server = test_server();
+        let (out_tx, mut out_rx) = unbounded_channel();
+
+        server
+            .process_raw_message(&json!({ "jsonrpc": "2.0", "id": 5 }).to_string(), out_tx)
+            .await;
+
+        let resp = next_response(&mut out_rx).await;
+        assert_eq!(resp.id, RequestId::Number(5));
+        assert_eq!(resp.error.unwrap().code, error_codes::INVALID_REQUEST);
+    }
+
+    #[tokio::test]
+    async fn test_wrong_jsonrpc_version_responds_invalid_request() {
+        let server = test_server();
+        let (out_tx, mut out_rx) = unbounded_channel();
+
+        server
+            .process_raw_message(
+                &json!({ "jsonrpc": "1.0", "id": 3, "method": "ping" }).to_string(),
+                out_tx,
+            )
+            .await;
+
+        let resp = next_response(&mut out_rx).await;
+        assert_eq!(resp.id, RequestId::Number(3));
+        assert_eq!(resp.error.unwrap().code, error_codes::INVALID_REQUEST);
+    }
+
+    #[tokio::test]
+    async fn test_unknown_method_responds_method_not_found() {
+        let server = test_server();
+        let (out_tx, mut out_rx) = unbounded_channel();
+
+        server
+            .process_raw_message(
+                &json!({ "jsonrpc": "2.0", "id": 99, "method": "no/such" }).to_string(),
+                out_tx,
+            )
+            .await;
+
+        let resp = next_response(&mut out_rx).await;
+        assert_eq!(resp.error.unwrap().code, error_codes::METHOD_NOT_FOUND);
+    }
+
+    #[tokio::test]
+    async fn test_notification_ping_produces_no_response() {
+        let server = test_server();
+        let (out_tx, mut out_rx) = unbounded_channel();
+
+        server
+            .process_raw_message(&json!({ "jsonrpc": "2.0", "method": "ping" }).to_string(), out_tx)
+            .await;
+
+        assert!(
+            out_rx.try_recv().is_err(),
+            "Notifications must not yield a JSON-RPC response"
+        );
+    }
+
+    #[tokio::test]
+    async fn test_batch_dispatch_processes_every_request() {
+        let server = test_server();
+        let (out_tx, mut out_rx) = unbounded_channel();
+
+        let batch = json!([
+            { "jsonrpc": "2.0", "id": 1, "method": "ping" },
+            { "jsonrpc": "2.0", "id": 2, "method": "no/such" }
+        ]);
+        server.process_raw_message(&batch.to_string(), out_tx).await;
+
+        let first = next_response(&mut out_rx).await;
+        assert_eq!(first.id, RequestId::Number(1));
+        assert!(first.error.is_none());
+
+        let second = next_response(&mut out_rx).await;
+        assert_eq!(second.id, RequestId::Number(2));
+        assert_eq!(second.error.unwrap().code, error_codes::METHOD_NOT_FOUND);
+    }
+
+    #[tokio::test]
+    async fn test_empty_batch_yields_invalid_request() {
+        let server = test_server();
+        let (out_tx, mut out_rx) = unbounded_channel();
+
+        server.process_raw_message(&json!([]).to_string(), out_tx).await;
+
+        let resp = next_response(&mut out_rx).await;
+        assert_eq!(resp.id, RequestId::Null);
+        assert_eq!(resp.error.unwrap().code, error_codes::INVALID_REQUEST);
+    }
+
+    #[tokio::test]
+    async fn test_invalid_id_type_echoed_in_error_response() {
+        let server = test_server();
+        let (out_tx, mut out_rx) = unbounded_channel();
+
+        // `method` missing so structural validation fails, but `id` is recoverable.
+        let raw = json!({ "jsonrpc": "2.0", "id": "echo-1", "extra": true }).to_string();
+        server.process_raw_message(&raw, out_tx).await;
+
+        let resp = next_response(&mut out_rx).await;
+        assert_eq!(resp.id, RequestId::String("echo-1".to_string()));
+        assert_eq!(resp.error.unwrap().code, error_codes::INVALID_REQUEST);
+    }
+
+    #[tokio::test]
+    async fn test_initialize_params_missing_rejected() {
+        let server = test_server();
+        let (out_tx, mut out_rx) = unbounded_channel();
+
+        server
+            .process_raw_message(&json!({ "jsonrpc": "2.0", "id": 1, "method": "initialize" }).to_string(), out_tx)
+            .await;
+
+        let resp = next_response(&mut out_rx).await;
+        assert_eq!(resp.error.unwrap().code, error_codes::INVALID_PARAMS);
     }
 }

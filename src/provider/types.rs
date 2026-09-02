@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum Role {
     System,
@@ -9,12 +9,32 @@ pub enum Role {
     Tool,
 }
 
+impl Role {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Role::System => "system",
+            Role::User => "user",
+            Role::Assistant => "assistant",
+            Role::Tool => "tool",
+        }
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ToolCall {
     pub id: String,
     pub name: String,
     pub arguments: String,
 }
+
+impl PartialEq for ToolCall {
+    fn eq(&self, other: &Self) -> bool {
+        self.id == other.id
+            && self.name == other.name
+            && self.arguments == other.arguments
+    }
+}
+impl Eq for ToolCall {}
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Message {
@@ -27,6 +47,17 @@ pub struct Message {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub tool_call_id: Option<String>,
 }
+
+impl PartialEq for Message {
+    fn eq(&self, other: &Self) -> bool {
+        self.role == other.role
+            && self.content == other.content
+            && self.name == other.name
+            && self.tool_calls == other.tool_calls
+            && self.tool_call_id == other.tool_call_id
+    }
+}
+impl Eq for Message {}
 
 impl Message {
     pub fn system(content: impl Into<String>) -> Self {

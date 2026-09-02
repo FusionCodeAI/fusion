@@ -1,0 +1,2126 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>Fusion v2 — Web Terminal &amp; In-Browser WASM Playground</title>
+  <meta name="description" content="Pure Rust AI coding assistant running directly in browser via WASM and WebSocket ACP protocol. Multi-agent mesh, advisor guardrails, and instant playground." />
+
+  <!-- Preconnect & Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:ital,wght@0,400;0,500;0,600;0,700;1,400&family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
+
+  <!-- xterm.js CDN -->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@xterm/xterm@5.5.0/css/xterm.min.css" />
+  <script src="https://cdn.jsdelivr.net/npm/@xterm/xterm@5.5.0/lib/xterm.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@xterm/addon-fit@0.10.0/lib/addon-fit.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@xterm/addon-web-links@0.11.0/lib/addon-web-links.min.js"></script>
+
+  <style>
+    :root {
+      --bg-base: #080b11;
+      --bg-surface: #0e131f;
+      --bg-surface-elevated: #141a29;
+      --bg-card: #182032;
+      --bg-card-hover: #1f2a42;
+      --bg-glass: rgba(14, 19, 31, 0.82);
+      --bg-glass-card: rgba(24, 32, 50, 0.65);
+      
+      --border-color: rgba(255, 255, 255, 0.09);
+      --border-subtle: rgba(255, 255, 255, 0.04);
+      --border-highlight: rgba(139, 92, 246, 0.35);
+      --border-focus: #6366f1;
+
+      --text-main: #f1f5f9;
+      --text-muted: #94a3b8;
+      --text-dim: #64748b;
+
+      --accent-primary: #8b5cf6;
+      --accent-primary-hover: #7c3aed;
+      --accent-primary-glow: rgba(139, 92, 246, 0.25);
+
+      --accent-cyan: #06b6d4;
+      --accent-cyan-glow: rgba(6, 182, 212, 0.25);
+
+      --accent-emerald: #10b981;
+      --accent-emerald-glow: rgba(16, 185, 129, 0.25);
+
+      --accent-amber: #f59e0b;
+      --accent-amber-glow: rgba(245, 158, 11, 0.25);
+
+      --accent-rose: #f43f5e;
+      --accent-rose-glow: rgba(244, 63, 94, 0.25);
+
+      --font-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+      --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+
+      --sidebar-width: 270px;
+      --drawer-width: 320px;
+      --header-height: 52px;
+      --quickbar-height: 38px;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    html, body {
+      height: 100%;
+      width: 100%;
+      background: var(--bg-base);
+      color: var(--text-main);
+      font-family: var(--font-sans);
+      overflow: hidden;
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+    }
+
+    /* Scrollbar styles */
+    ::-webkit-scrollbar {
+      width: 5px;
+      height: 5px;
+    }
+    ::-webkit-scrollbar-track {
+      background: transparent;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: rgba(255, 255, 255, 0.12);
+      border-radius: 4px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: rgba(255, 255, 255, 0.22);
+    }
+
+    /* Top App Layout */
+    .app-wrapper {
+      display: flex;
+      flex-direction: column;
+      height: 100vh;
+      width: 100vw;
+      background: radial-gradient(circle at 50% 0%, rgba(139, 92, 246, 0.08) 0%, transparent 60%),
+                  radial-gradient(circle at 90% 100%, rgba(6, 182, 212, 0.05) 0%, transparent 50%),
+                  var(--bg-base);
+    }
+
+    /* Glassmorphism Header */
+    header.app-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      height: var(--header-height);
+      padding: 0 16px;
+      background: var(--bg-glass);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      border-bottom: 1px solid var(--border-color);
+      gap: 12px;
+      flex-shrink: 0;
+      z-index: 40;
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.35);
+    }
+
+    .brand-section {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-shrink: 0;
+    }
+
+    .logo-badge {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 32px;
+      height: 32px;
+      background: linear-gradient(135deg, #8b5cf6 0%, #06b6d4 100%);
+      border-radius: 9px;
+      font-size: 17px;
+      font-weight: 800;
+      color: white;
+      box-shadow: 0 0 16px var(--accent-primary-glow), inset 0 1px 1px rgba(255, 255, 255, 0.4);
+      cursor: pointer;
+      transition: transform 0.2s ease, box-shadow 0.2s ease;
+    }
+
+    .logo-badge:hover {
+      transform: scale(1.05) rotate(-3deg);
+      box-shadow: 0 0 22px var(--accent-primary-glow);
+    }
+
+    .brand-title-wrap {
+      display: flex;
+      flex-direction: column;
+    }
+
+    .brand-title {
+      font-size: 15px;
+      font-weight: 700;
+      letter-spacing: -0.02em;
+      color: #ffffff;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      line-height: 1.2;
+    }
+
+    .version-tag {
+      font-size: 10px;
+      padding: 2px 6px;
+      background: rgba(139, 92, 246, 0.18);
+      color: #c4b5fd;
+      border: 1px solid rgba(139, 92, 246, 0.4);
+      border-radius: 4px;
+      font-family: var(--font-mono);
+      font-weight: 600;
+      letter-spacing: 0.02em;
+    }
+
+    .brand-subtitle {
+      font-size: 11px;
+      color: var(--text-muted);
+      letter-spacing: -0.01em;
+    }
+
+    /* Header Center: Model Selector & Quick Switches */
+    .header-center {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex: 1;
+      max-width: 620px;
+      justify-content: center;
+    }
+
+    .model-selector-btn {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 6px 12px;
+      background: var(--bg-glass-card);
+      border: 1px solid var(--border-color);
+      border-radius: 8px;
+      color: var(--text-main);
+      font-size: 12px;
+      font-family: var(--font-mono);
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.18s ease;
+      white-space: nowrap;
+      backdrop-filter: blur(8px);
+    }
+
+    .model-selector-btn:hover {
+      background: var(--bg-card-hover);
+      border-color: var(--accent-primary);
+      box-shadow: 0 0 14px var(--accent-primary-glow);
+      color: #fff;
+    }
+
+    .model-provider-badge {
+      display: inline-block;
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--accent-cyan);
+      box-shadow: 0 0 8px var(--accent-cyan);
+    }
+
+    .header-quick-models {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+
+    .quick-model-pill {
+      padding: 3px 8px;
+      border-radius: 6px;
+      background: rgba(255, 255, 255, 0.04);
+      border: 1px solid var(--border-subtle);
+      color: var(--text-muted);
+      font-size: 11px;
+      font-family: var(--font-mono);
+      cursor: pointer;
+      transition: all 0.15s ease;
+      white-space: nowrap;
+    }
+
+    .quick-model-pill:hover {
+      background: rgba(139, 92, 246, 0.16);
+      border-color: rgba(139, 92, 246, 0.4);
+      color: #ddd6fe;
+    }
+
+    .quick-model-pill.active {
+      background: rgba(139, 92, 246, 0.25);
+      border-color: var(--accent-primary);
+      color: #ffffff;
+      font-weight: 600;
+    }
+
+    /* Header Right: Status Pills & Action Buttons */
+    .header-right {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-shrink: 0;
+    }
+
+    /* Advisor Status Pill */
+    .advisor-status-pill {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 4px 10px;
+      border-radius: 100px;
+      background: rgba(6, 182, 212, 0.1);
+      border: 1px solid rgba(6, 182, 212, 0.35);
+      font-size: 11px;
+      font-family: var(--font-mono);
+      color: var(--accent-cyan);
+      cursor: pointer;
+      transition: all 0.15s ease;
+      user-select: none;
+    }
+
+    .advisor-status-pill:hover {
+      background: rgba(6, 182, 212, 0.18);
+      border-color: var(--accent-cyan);
+      box-shadow: 0 0 10px var(--accent-cyan-glow);
+    }
+
+    .advisor-shield-icon {
+      font-size: 11px;
+      line-height: 1;
+    }
+
+    /* Connection Status Pill */
+    .status-pill {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 4px 10px;
+      border-radius: 100px;
+      background: rgba(16, 185, 129, 0.1);
+      border: 1px solid rgba(16, 185, 129, 0.35);
+      font-size: 11px;
+      font-family: var(--font-mono);
+      color: var(--accent-emerald);
+      transition: all 0.15s ease;
+    }
+
+    .status-pill.status-connecting {
+      background: rgba(245, 158, 11, 0.1);
+      border-color: rgba(245, 158, 11, 0.4);
+      color: var(--accent-amber);
+    }
+
+    .status-pill.status-disconnected {
+      background: rgba(244, 63, 94, 0.1);
+      border-color: rgba(244, 63, 94, 0.4);
+      color: var(--accent-rose);
+    }
+
+    .status-dot {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: currentColor;
+      box-shadow: 0 0 8px currentColor;
+      animation: pulse-dot 2s infinite ease-in-out;
+    }
+
+    @keyframes pulse-dot {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.45; transform: scale(0.85); }
+    }
+
+    /* Header Action Buttons */
+    .header-btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      padding: 6px 11px;
+      border-radius: 7px;
+      background: var(--bg-glass-card);
+      border: 1px solid var(--border-color);
+      color: var(--text-main);
+      font-size: 12px;
+      font-family: var(--font-sans);
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.15s ease;
+      backdrop-filter: blur(8px);
+      white-space: nowrap;
+    }
+
+    .header-btn:hover {
+      background: var(--bg-card-hover);
+      border-color: rgba(255, 255, 255, 0.2);
+      color: #fff;
+    }
+
+    .header-btn.primary {
+      background: var(--accent-primary);
+      border-color: var(--accent-primary-hover);
+      color: #fff;
+      box-shadow: 0 0 10px var(--accent-primary-glow);
+    }
+
+    .header-btn.primary:hover {
+      background: var(--accent-primary-hover);
+      box-shadow: 0 0 16px var(--accent-primary-glow);
+    }
+
+    .header-btn.active {
+      background: rgba(139, 92, 246, 0.22);
+      border-color: var(--accent-primary);
+      color: #c4b5fd;
+    }
+
+    .header-btn-icon-only {
+      padding: 6px 9px;
+    }
+
+    /* Quick Action Chips Bar */
+    .quick-bar {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 0 16px;
+      height: var(--quickbar-height);
+      background: rgba(11, 15, 24, 0.95);
+      border-bottom: 1px solid var(--border-color);
+      overflow-x: auto;
+      white-space: nowrap;
+      flex-shrink: 0;
+      z-index: 20;
+    }
+
+    .quick-label {
+      font-size: 11px;
+      font-weight: 700;
+      color: var(--text-dim);
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      margin-right: 4px;
+      font-family: var(--font-mono);
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+
+    .chip-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      padding: 3px 9px;
+      background: rgba(24, 32, 50, 0.6);
+      border: 1px solid var(--border-color);
+      border-radius: 5px;
+      color: var(--text-muted);
+      font-size: 11px;
+      font-family: var(--font-mono);
+      cursor: pointer;
+      transition: all 0.14s ease;
+    }
+
+    .chip-btn:hover {
+      background: rgba(139, 92, 246, 0.18);
+      border-color: var(--accent-primary);
+      color: #ddd6fe;
+      transform: translateY(-1px);
+    }
+
+    .chip-btn .chip-desc {
+      color: var(--text-dim);
+      font-size: 10px;
+    }
+
+    /* ======================================================================= */
+    /* MAIN 3-COLUMN SPLIT VIEW LAYOUT                                        */
+    /* ======================================================================= */
+    .app-main-layout {
+      display: flex;
+      flex: 1;
+      height: calc(100vh - var(--header-height) - var(--quickbar-height));
+      position: relative;
+      overflow: hidden;
+      background: var(--bg-base);
+    }
+
+    /* Common Sidebar / Drawer Panel Base */
+    .layout-panel {
+      display: flex;
+      flex-direction: column;
+      background: var(--bg-surface);
+      border-color: var(--border-color);
+      z-index: 15;
+      transition: width 0.24s cubic-bezier(0.4, 0, 0.2, 1),
+                  transform 0.24s cubic-bezier(0.4, 0, 0.2, 1),
+                  opacity 0.2s ease;
+      flex-shrink: 0;
+      overflow: hidden;
+    }
+
+    .panel-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 8px 12px;
+      background: var(--bg-surface-elevated);
+      border-bottom: 1px solid var(--border-color);
+      flex-shrink: 0;
+      height: 38px;
+    }
+
+    .panel-tabs {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+
+    .panel-tab-btn {
+      padding: 4px 8px;
+      background: transparent;
+      border: none;
+      border-radius: 5px;
+      color: var(--text-muted);
+      font-size: 11px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.15s ease;
+      display: flex;
+      align-items: center;
+      gap: 5px;
+    }
+
+    .panel-tab-btn:hover {
+      color: #fff;
+      background: rgba(255, 255, 255, 0.05);
+    }
+
+    .panel-tab-btn.active {
+      color: #fff;
+      background: var(--bg-card);
+      border: 1px solid var(--border-color);
+      box-shadow: 0 1px 4px rgba(0, 0, 0, 0.2);
+    }
+
+    .panel-action-btn {
+      background: transparent;
+      border: none;
+      color: var(--text-dim);
+      font-size: 13px;
+      cursor: pointer;
+      padding: 4px;
+      border-radius: 4px;
+      line-height: 1;
+      transition: color 0.15s ease, background 0.15s ease;
+    }
+
+    .panel-action-btn:hover {
+      color: #fff;
+      background: rgba(255, 255, 255, 0.08);
+    }
+
+    .panel-content {
+      flex: 1;
+      overflow-y: auto;
+      padding: 10px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    /* Left Sidebar: Virtual File Tree & Session History */
+    .sidebar-left {
+      width: var(--sidebar-width);
+      border-right: 1px solid var(--border-color);
+    }
+
+    .sidebar-left.collapsed {
+      width: 0;
+      border-right: none;
+      opacity: 0;
+      pointer-events: none;
+    }
+
+    /* Virtual File Tree Component */
+    .file-tree-container {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+      font-family: var(--font-mono);
+      font-size: 12px;
+    }
+
+    .tree-item {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 4px 8px;
+      border-radius: 5px;
+      color: var(--text-muted);
+      cursor: pointer;
+      transition: all 0.12s ease;
+      user-select: none;
+    }
+
+    .tree-item:hover {
+      background: var(--bg-card);
+      color: #ffffff;
+    }
+
+    .tree-item.active {
+      background: rgba(139, 92, 246, 0.18);
+      color: #c4b5fd;
+      border-left: 2px solid var(--accent-primary);
+    }
+
+    .tree-label-wrap {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .tree-icon {
+      font-size: 13px;
+      opacity: 0.85;
+    }
+
+    .tree-tag {
+      font-size: 9px;
+      padding: 1px 4px;
+      border-radius: 3px;
+      background: rgba(255, 255, 255, 0.06);
+      color: var(--text-dim);
+    }
+
+    .tree-folder-group {
+      margin-left: 10px;
+      border-left: 1px solid rgba(255, 255, 255, 0.06);
+      padding-left: 6px;
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+
+    /* Session History & Memory Metrics */
+    .metric-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border-color);
+      border-radius: 8px;
+      padding: 10px;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .metric-title {
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+
+    .metric-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+    }
+
+    .metric-stat-box {
+      background: var(--bg-base);
+      border: 1px solid var(--border-subtle);
+      border-radius: 6px;
+      padding: 6px 8px;
+    }
+
+    .metric-stat-label {
+      font-size: 10px;
+      color: var(--text-dim);
+      font-family: var(--font-mono);
+    }
+
+    .metric-stat-val {
+      font-size: 13px;
+      font-weight: 700;
+      color: #fff;
+      font-family: var(--font-mono);
+      margin-top: 2px;
+    }
+
+    .history-timeline {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .timeline-event {
+      display: flex;
+      gap: 8px;
+      font-size: 11px;
+      padding: 6px 8px;
+      background: var(--bg-card);
+      border: 1px solid var(--border-color);
+      border-radius: 6px;
+    }
+
+    .timeline-time {
+      color: var(--accent-cyan);
+      font-family: var(--font-mono);
+      font-size: 10px;
+      white-space: nowrap;
+    }
+
+    .timeline-body {
+      color: var(--text-muted);
+      line-height: 1.3;
+    }
+
+    /* Center Main Terminal Area */
+    .main-center-pane {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      min-width: 0;
+      background: #090d16;
+      position: relative;
+    }
+
+    .terminal-wrapper {
+      flex: 1;
+      position: relative;
+      background: #090d16;
+      overflow: hidden;
+      padding: 8px 10px;
+    }
+
+    #terminal-container {
+      width: 100%;
+      height: 100%;
+    }
+
+    /* Right Drawer: Subagent Mesh & Advisor Committee Log */
+    .drawer-right {
+      width: var(--drawer-width);
+      border-left: 1px solid var(--border-color);
+    }
+
+    .drawer-right.collapsed {
+      width: 0;
+      border-left: none;
+      opacity: 0;
+      pointer-events: none;
+    }
+
+    /* Subagent Mesh UI Cards */
+    .mesh-header-banner {
+      background: linear-gradient(135deg, rgba(139, 92, 246, 0.15) 0%, rgba(6, 182, 212, 0.15) 100%);
+      border: 1px solid rgba(139, 92, 246, 0.3);
+      border-radius: 8px;
+      padding: 10px;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .mesh-banner-title {
+      font-size: 12px;
+      font-weight: 700;
+      color: #fff;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .mesh-banner-desc {
+      font-size: 10px;
+      color: var(--text-muted);
+      line-height: 1.3;
+    }
+
+    .agent-cards-list {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .agent-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border-color);
+      border-radius: 8px;
+      padding: 10px;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      transition: all 0.15s ease;
+    }
+
+    .agent-card:hover {
+      background: var(--bg-card-hover);
+      border-color: var(--accent-primary);
+      transform: translateY(-1px);
+    }
+
+    .agent-card-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .agent-name-wrap {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .agent-avatar {
+      font-size: 14px;
+    }
+
+    .agent-name {
+      font-size: 12px;
+      font-weight: 600;
+      color: #ffffff;
+    }
+
+    .agent-role-pill {
+      font-size: 9px;
+      padding: 2px 5px;
+      border-radius: 4px;
+      background: rgba(139, 92, 246, 0.15);
+      color: #c4b5fd;
+      font-family: var(--font-mono);
+    }
+
+    .agent-status-badge {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      font-size: 10px;
+      font-family: var(--font-mono);
+      color: var(--accent-emerald);
+    }
+
+    .agent-status-indicator {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: var(--accent-emerald);
+      box-shadow: 0 0 6px var(--accent-emerald);
+    }
+
+    .agent-details {
+      font-size: 11px;
+      color: var(--text-muted);
+      line-height: 1.3;
+    }
+
+    .agent-card-footer {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      border-top: 1px solid rgba(255, 255, 255, 0.05);
+      padding-top: 6px;
+      font-size: 10px;
+      font-family: var(--font-mono);
+      color: var(--text-dim);
+    }
+
+    /* Advisor Guardrail Committee UI */
+    .advisor-score-card {
+      background: linear-gradient(135deg, rgba(6, 182, 212, 0.15) 0%, rgba(16, 185, 129, 0.15) 100%);
+      border: 1px solid rgba(6, 182, 212, 0.35);
+      border-radius: 8px;
+      padding: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .advisor-score-left {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+
+    .advisor-score-title {
+      font-size: 12px;
+      font-weight: 700;
+      color: #fff;
+      display: flex;
+      align-items: center;
+      gap: 5px;
+    }
+
+    .advisor-score-sub {
+      font-size: 10px;
+      color: var(--text-muted);
+    }
+
+    .advisor-score-badge {
+      padding: 4px 10px;
+      background: rgba(16, 185, 129, 0.2);
+      border: 1px solid var(--accent-emerald);
+      border-radius: 6px;
+      color: var(--accent-emerald);
+      font-weight: 700;
+      font-size: 12px;
+      font-family: var(--font-mono);
+    }
+
+    .advisor-rules-list {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .advisor-rule-item {
+      background: var(--bg-card);
+      border: 1px solid var(--border-color);
+      border-radius: 6px;
+      padding: 8px 10px;
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+    }
+
+    .rule-icon {
+      font-size: 13px;
+      line-height: 1.2;
+    }
+
+    .rule-content {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+
+    .rule-title-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .rule-title {
+      font-size: 11px;
+      font-weight: 600;
+      color: #fff;
+    }
+
+    .rule-status {
+      font-size: 9px;
+      font-family: var(--font-mono);
+      padding: 1px 5px;
+      border-radius: 3px;
+      background: rgba(16, 185, 129, 0.15);
+      color: var(--accent-emerald);
+    }
+
+    .rule-desc {
+      font-size: 10px;
+      color: var(--text-dim);
+      line-height: 1.3;
+    }
+
+    /* Mobile / Touch toolbar */
+    .touch-toolbar {
+      display: none;
+      align-items: center;
+      gap: 6px;
+      padding: 6px 12px;
+      background: var(--bg-surface);
+      border-top: 1px solid var(--border-color);
+      overflow-x: auto;
+      flex-shrink: 0;
+      z-index: 30;
+    }
+
+    .touch-key {
+      padding: 7px 12px;
+      background: var(--bg-card);
+      border: 1px solid var(--border-color);
+      border-radius: 6px;
+      color: var(--text-main);
+      font-family: var(--font-mono);
+      font-size: 12px;
+      cursor: pointer;
+      flex-shrink: 0;
+      min-height: 36px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .touch-key:active {
+      background: var(--accent-primary);
+      color: #fff;
+    }
+
+    /* Modal Styles */
+    .modal-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(4, 7, 13, 0.78);
+      backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 100;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.2s ease;
+      padding: 20px;
+    }
+
+    .modal-overlay.active {
+      opacity: 1;
+      pointer-events: auto;
+    }
+
+    .modal-card {
+      background: var(--bg-surface);
+      border: 1px solid var(--border-color);
+      border-radius: 12px;
+      width: 100%;
+      max-width: 700px;
+      max-height: 85vh;
+      display: flex;
+      flex-direction: column;
+      box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.7), 0 0 0 1px rgba(255, 255, 255, 0.06);
+      overflow: hidden;
+      transform: translateY(12px) scale(0.98);
+      transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+
+    .modal-overlay.active .modal-card {
+      transform: translateY(0) scale(1);
+    }
+
+    .modal-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 14px 18px;
+      border-bottom: 1px solid var(--border-color);
+      background: var(--bg-surface-elevated);
+    }
+
+    .modal-title {
+      font-size: 15px;
+      font-weight: 700;
+      color: #fff;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .modal-close {
+      background: transparent;
+      border: none;
+      color: var(--text-muted);
+      font-size: 20px;
+      cursor: pointer;
+      line-height: 1;
+      padding: 4px;
+      border-radius: 4px;
+    }
+
+    .modal-close:hover {
+      color: #fff;
+      background: rgba(255, 255, 255, 0.1);
+    }
+
+    .modal-body {
+      padding: 18px;
+      overflow-y: auto;
+      flex: 1;
+    }
+
+    .modal-footer {
+      display: flex;
+      align-items: center;
+      justify-content: flex-end;
+      gap: 10px;
+      padding: 12px 18px;
+      border-top: 1px solid var(--border-color);
+      background: var(--bg-surface-elevated);
+    }
+
+    /* Model Picker Tabs & Cards */
+    .tabs-nav {
+      display: flex;
+      gap: 5px;
+      border-bottom: 1px solid var(--border-color);
+      margin-bottom: 16px;
+      padding-bottom: 6px;
+      overflow-x: auto;
+    }
+
+    .tab-btn {
+      padding: 6px 12px;
+      background: transparent;
+      border: none;
+      border-radius: 6px;
+      color: var(--text-muted);
+      font-size: 12px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.15s ease;
+      white-space: nowrap;
+    }
+
+    .tab-btn:hover {
+      color: #fff;
+      background: var(--bg-card);
+    }
+
+    .tab-btn.active {
+      color: #fff;
+      background: var(--accent-primary);
+      box-shadow: 0 0 10px var(--accent-primary-glow);
+    }
+
+    .model-search-box {
+      width: 100%;
+      padding: 9px 14px;
+      background: var(--bg-base);
+      border: 1px solid var(--border-color);
+      border-radius: 8px;
+      color: var(--text-main);
+      font-size: 13px;
+      margin-bottom: 14px;
+      outline: none;
+      transition: border-color 0.15s ease;
+    }
+
+    .model-search-box:focus {
+      border-color: var(--accent-primary);
+      box-shadow: 0 0 0 2px var(--accent-primary-glow);
+    }
+
+    .model-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+      gap: 10px;
+    }
+
+    .model-card {
+      padding: 12px;
+      background: var(--bg-card);
+      border: 1px solid var(--border-color);
+      border-radius: 8px;
+      cursor: pointer;
+      transition: all 0.15s ease;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .model-card:hover {
+      background: var(--bg-card-hover);
+      border-color: var(--accent-primary);
+      transform: translateY(-1px);
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+    }
+
+    .model-card.selected {
+      border-color: var(--accent-primary);
+      background: rgba(139, 92, 246, 0.12);
+    }
+
+    .model-card-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .model-name {
+      font-weight: 600;
+      font-size: 13px;
+      color: #fff;
+    }
+
+    .model-tag {
+      font-size: 10px;
+      padding: 2px 6px;
+      border-radius: 4px;
+      background: rgba(6, 182, 212, 0.15);
+      color: var(--accent-cyan);
+      font-family: var(--font-mono);
+    }
+
+    .model-desc {
+      font-size: 11px;
+      color: var(--text-muted);
+      line-height: 1.4;
+    }
+
+    .model-meta {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-top: 4px;
+      padding-top: 6px;
+      border-top: 1px solid rgba(255, 255, 255, 0.05);
+      font-size: 10px;
+      color: var(--text-dim);
+      font-family: var(--font-mono);
+    }
+
+    /* Settings Form Fields */
+    .form-group {
+      margin-bottom: 16px;
+    }
+
+    .form-label {
+      display: block;
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--text-main);
+      margin-bottom: 6px;
+    }
+
+    .form-help {
+      font-size: 11px;
+      color: var(--text-muted);
+      margin-top: 4px;
+    }
+
+    .form-input, .form-select, .form-textarea {
+      width: 100%;
+      padding: 8px 12px;
+      background: var(--bg-base);
+      border: 1px solid var(--border-color);
+      border-radius: 6px;
+      color: var(--text-main);
+      font-size: 12px;
+      font-family: var(--font-mono);
+      outline: none;
+      transition: border-color 0.15s ease;
+    }
+
+    .form-input:focus, .form-select:focus, .form-textarea:focus {
+      border-color: var(--accent-primary);
+      box-shadow: 0 0 0 2px var(--accent-primary-glow);
+    }
+
+    .form-row {
+      display: flex;
+      gap: 12px;
+    }
+
+    .form-row > * {
+      flex: 1;
+    }
+
+    .radio-group {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .radio-option {
+      display: flex;
+      align-items: flex-start;
+      gap: 10px;
+      padding: 10px;
+      background: var(--bg-card);
+      border: 1px solid var(--border-color);
+      border-radius: 6px;
+      cursor: pointer;
+      transition: background 0.15s ease, border-color 0.15s ease;
+    }
+
+    .radio-option:hover {
+      background: var(--bg-card-hover);
+      border-color: var(--accent-primary);
+    }
+
+    .radio-option input[type="radio"] {
+      margin-top: 2px;
+    }
+
+    .radio-title {
+      font-size: 12px;
+      font-weight: 600;
+      color: #fff;
+    }
+
+    .radio-sub {
+      font-size: 11px;
+      color: var(--text-muted);
+    }
+
+    .checkpoint-box {
+      display: flex;
+      gap: 8px;
+      margin-top: 8px;
+    }
+
+    /* ======================================================================= */
+    /* RESPONSIVE BREAKPOINTS (Tablet, Mobile)                                  */
+    /* ======================================================================= */
+    @media (max-width: 1180px) {
+      .drawer-right {
+        position: absolute;
+        top: 0;
+        right: 0;
+        bottom: 0;
+        z-index: 50;
+        box-shadow: -10px 0 30px rgba(0, 0, 0, 0.6);
+        background: var(--bg-surface);
+      }
+      .drawer-right.collapsed {
+        transform: translateX(100%);
+        width: var(--drawer-width);
+      }
+      .header-quick-models {
+        display: none;
+      }
+    }
+
+    @media (max-width: 860px) {
+      .sidebar-left {
+        position: absolute;
+        top: 0;
+        left: 0;
+        bottom: 0;
+        z-index: 50;
+        box-shadow: 10px 0 30px rgba(0, 0, 0, 0.6);
+        background: var(--bg-surface);
+      }
+      .sidebar-left.collapsed {
+        transform: translateX(-100%);
+        width: var(--sidebar-width);
+      }
+      .touch-toolbar {
+        display: flex;
+      }
+      .brand-subtitle {
+        display: none;
+      }
+      .header-center {
+        max-width: none;
+      }
+    }
+
+    @media (max-width: 600px) {
+      header.app-header {
+        padding: 0 10px;
+        gap: 8px;
+      }
+      .brand-title {
+        font-size: 13px;
+      }
+      .version-tag {
+        display: none;
+      }
+      .header-right .header-btn:not(.header-btn-icon-only) span.btn-label {
+        display: none;
+      }
+      .advisor-status-pill .advisor-status-text {
+        display: none;
+      }
+      .model-selector-btn {
+        padding: 4px 8px;
+        font-size: 11px;
+      }
+      .sidebar-left, .drawer-right {
+        width: 85vw;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="app-wrapper">
+    <!-- Top Header Navigation (Glassmorphism) -->
+    <header class="app-header">
+      <div class="brand-section">
+        <!-- Sidebar Toggle -->
+        <button id="btn-toggle-left-sidebar" class="header-btn header-btn-icon-only" title="Toggle Virtual File Tree &amp; History" aria-label="Toggle Files and History">
+          📁
+        </button>
+
+        <div class="logo-badge" title="Fusion — Pure Rust AI Assistant">⚡</div>
+        <div class="brand-title-wrap">
+          <div class="brand-title">
+            Fusion <span class="version-tag">v0.3.0</span>
+          </div>
+          <div class="brand-subtitle">In-Browser WASM &amp; Subagent Mesh</div>
+        </div>
+      </div>
+
+      <div class="header-center">
+        <!-- Interactive Model Selector Trigger (matches fx.sh/try UX) -->
+        <button id="btn-open-model-picker" class="model-selector-btn" title="Choose AI Model">
+          <span class="model-provider-badge"></span>
+          <span id="header-model-name">anthropic/claude-3-5-sonnet</span>
+          <span style="font-size: 10px; opacity: 0.6;">▼</span>
+        </button>
+
+        <!-- Quick Switcher Tabs for Trending Models -->
+        <div class="header-quick-models">
+          <button class="quick-model-pill" data-model="deepseek/deepseek-r1" title="DeepSeek R1 Reasoning">DeepSeek R1</button>
+          <button class="quick-model-pill" data-model="deepseek/deepseek-chat" title="DeepSeek V3 Efficient">DeepSeek V3</button>
+          <button class="quick-model-pill" data-model="anthropic/claude-3-7-sonnet" title="Claude 3.7 Hybrid Reasoning">Claude 3.7</button>
+          <button class="quick-model-pill" data-model="openai/gpt-4o" title="OpenAI GPT-4o">GPT-4o</button>
+          <button class="quick-model-pill" data-model="ollama/qwen2.5-coder" title="Ollama Local Assistant">Ollama</button>
+        </div>
+      </div>
+
+      <div class="header-right">
+        <!-- Advisor Committee Status Pill -->
+        <div id="advisor-status-pill" class="advisor-status-pill" title="Advisor Committee: 4/4 Guardrails Active (0.0 Risk)">
+          <span class="advisor-shield-icon">🛡️</span>
+          <span class="advisor-status-text">Advisor: <strong>Active</strong></span>
+        </div>
+
+        <!-- Connection Status Pill -->
+        <div id="connection-status-pill" class="status-pill" title="Connection mode and status">
+          <span class="status-dot"></span>
+          <span id="connection-mode-label">WASM Agent</span>
+        </div>
+
+        <!-- Right Drawer Toggle -->
+        <button id="btn-toggle-right-drawer" class="header-btn header-btn-icon-only" title="Toggle Subagent Mesh &amp; Advisor Log" aria-label="Toggle Subagent Mesh and Advisor">
+          ⚡
+        </button>
+
+        <!-- Configuration & Actions -->
+        <button id="btn-open-settings" class="header-btn" title="Configuration &amp; API Keys">
+          ⚙️ <span class="btn-label">Settings</span>
+        </button>
+        <button id="btn-open-shortcuts" class="header-btn header-btn-icon-only" title="Shortcuts &amp; Help">
+          ❓
+        </button>
+        <button id="btn-export-session" class="header-btn" title="Export conversation">
+          📋 <span class="btn-label">Export</span>
+        </button>
+        <button id="btn-clear-terminal" class="header-btn" title="Clear terminal screen">
+          🧹 <span class="btn-label">Clear</span>
+        </button>
+      </div>
+    </header>
+
+    <!-- Quick Action Chips Bar -->
+    <div class="quick-bar">
+      <span class="quick-label">⚡ Commands:</span>
+      <button class="chip-btn" data-command="/help">
+        /help <span class="chip-desc">commands</span>
+      </button>
+      <button class="chip-btn" data-command="/model">
+        /model <span class="chip-desc">switcher</span>
+      </button>
+      <button class="chip-btn" data-command="/subagent refactor mesh router with zero unwrap">
+        /subagent <span class="chip-desc">parallel mesh</span>
+      </button>
+      <button class="chip-btn" data-command="/tools">
+        /tools <span class="chip-desc">grep/edit/bash</span>
+      </button>
+      <button class="chip-btn" data-command="/cost">
+        /cost <span class="chip-desc">tokens &amp; pricing</span>
+      </button>
+      <button class="chip-btn" data-command="/compact">
+        /compact <span class="chip-desc">context shrink</span>
+      </button>
+      <button class="chip-btn" data-command="/advisor">
+        /advisor <span class="chip-desc">security check</span>
+      </button>
+      <button class="chip-btn" data-command="/checkpoint">
+        /checkpoint <span class="chip-desc">serialize state</span>
+      </button>
+    </div>
+
+    <!-- Split View / Responsive Layout -->
+    <div class="app-main-layout">
+      <!-- ================================================================= -->
+      <!-- LEFT SIDEBAR: Virtual File Tree & Session History                 -->
+      <!-- ================================================================= -->
+      <aside id="left-sidebar" class="layout-panel sidebar-left">
+        <div class="panel-header">
+          <div class="panel-tabs">
+            <button id="tab-btn-files" class="panel-tab-btn active">
+              📁 Virtual Files
+            </button>
+            <button id="tab-btn-history" class="panel-tab-btn">
+              📜 History
+            </button>
+          </div>
+          <button id="btn-close-left-sidebar" class="panel-action-btn" title="Collapse Sidebar">&times;</button>
+        </div>
+
+        <!-- Tab 1: Virtual Files -->
+        <div id="pane-files" class="panel-content">
+          <div class="file-tree-container">
+            <div class="tree-item active" data-path="workspace">
+              <div class="tree-label-wrap">
+                <span class="tree-icon">📂</span>
+                <span style="font-weight: 600; color: #fff;">workspace/</span>
+              </div>
+              <span class="tree-tag">root</span>
+            </div>
+
+            <div class="tree-folder-group">
+              <div class="tree-item" data-path="src">
+                <div class="tree-label-wrap">
+                  <span class="tree-icon">📁</span>
+                  <span>src/</span>
+                </div>
+              </div>
+              <div class="tree-folder-group">
+                <div class="tree-item" data-path="src/main.rs" data-action="inspect">
+                  <div class="tree-label-wrap">
+                    <span class="tree-icon">🦀</span>
+                    <span>main.rs</span>
+                  </div>
+                  <span class="tree-tag">rs</span>
+                </div>
+                <div class="tree-item" data-path="src/agent.rs" data-action="inspect">
+                  <div class="tree-label-wrap">
+                    <span class="tree-icon">🤖</span>
+                    <span>agent.rs</span>
+                  </div>
+                  <span class="tree-tag">rs</span>
+                </div>
+                <div class="tree-item" data-path="src/mesh.rs" data-action="inspect">
+                  <div class="tree-label-wrap">
+                    <span class="tree-icon">⚡</span>
+                    <span>mesh.rs</span>
+                  </div>
+                  <span class="tree-tag">rs</span>
+                </div>
+                <div class="tree-item" data-path="src/tools.rs" data-action="inspect">
+                  <div class="tree-label-wrap">
+                    <span class="tree-icon">🔧</span>
+                    <span>tools.rs</span>
+                  </div>
+                  <span class="tree-tag">rs</span>
+                </div>
+                <div class="tree-item" data-path="src/advisor.rs" data-action="inspect">
+                  <div class="tree-label-wrap">
+                    <span class="tree-icon">🛡️</span>
+                    <span>advisor.rs</span>
+                  </div>
+                  <span class="tree-tag">rs</span>
+                </div>
+              </div>
+
+              <div class="tree-item" data-path="tests">
+                <div class="tree-label-wrap">
+                  <span class="tree-icon">📁</span>
+                  <span>tests/</span>
+                </div>
+              </div>
+              <div class="tree-folder-group">
+                <div class="tree-item" data-path="tests/mesh_test.rs">
+                  <div class="tree-label-wrap">
+                    <span class="tree-icon">🧪</span>
+                    <span>mesh_test.rs</span>
+                  </div>
+                </div>
+                <div class="tree-item" data-path="tests/agent_test.rs">
+                  <div class="tree-label-wrap">
+                    <span class="tree-icon">🧪</span>
+                    <span>agent_test.rs</span>
+                  </div>
+                </div>
+              </div>
+
+              <div class="tree-item" data-path="web">
+                <div class="tree-label-wrap">
+                  <span class="tree-icon">📁</span>
+                  <span>web/</span>
+                </div>
+              </div>
+              <div class="tree-folder-group">
+                <div class="tree-item" data-path="web/index.html">
+                  <div class="tree-label-wrap">
+                    <span class="tree-icon">🌐</span>
+                    <span>index.html</span>
+                  </div>
+                  <span class="tree-tag">html</span>
+                </div>
+                <div class="tree-item" data-path="web/term.js">
+                  <div class="tree-label-wrap">
+                    <span class="tree-icon">📜</span>
+                    <span>term.js</span>
+                  </div>
+                  <span class="tree-tag">js</span>
+                </div>
+              </div>
+
+              <div class="tree-item" data-path="Cargo.toml">
+                <div class="tree-label-wrap">
+                  <span class="tree-icon">📦</span>
+                  <span>Cargo.toml</span>
+                </div>
+                <span class="tree-tag">toml</span>
+              </div>
+              <div class="tree-item" data-path="fusion.toml">
+                <div class="tree-label-wrap">
+                  <span class="tree-icon">⚙️</span>
+                  <span>fusion.toml</span>
+                </div>
+                <span class="tree-tag">toml</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Tab 2: Session History & Metrics -->
+        <div id="pane-history" class="panel-content" style="display: none;">
+          <div class="metric-card">
+            <div class="metric-title">Live Session Telemetry</div>
+            <div class="metric-grid">
+              <div class="metric-stat-box">
+                <div class="metric-stat-label">Prompt Tokens</div>
+                <div id="stat-prompt-tokens" class="metric-stat-val">1,240</div>
+              </div>
+              <div class="metric-stat-box">
+                <div class="metric-stat-label">Comp Tokens</div>
+                <div id="stat-comp-tokens" class="metric-stat-val">680</div>
+              </div>
+              <div class="metric-stat-box">
+                <div class="metric-stat-label">Turns</div>
+                <div id="stat-total-turns" class="metric-stat-val">4</div>
+              </div>
+              <div class="metric-stat-box">
+                <div class="metric-stat-label">Cost</div>
+                <div id="stat-est-cost" class="metric-stat-val">$0.002</div>
+              </div>
+            </div>
+          </div>
+
+          <div class="metric-card">
+            <div class="metric-title">Event Timeline</div>
+            <div class="history-timeline">
+              <div class="timeline-event">
+                <span class="timeline-time">00:01</span>
+                <span class="timeline-body">WASM Agent runtime ready &amp; memory initialized.</span>
+              </div>
+              <div class="timeline-event">
+                <span class="timeline-time">00:03</span>
+                <span class="timeline-body">Model selected: Anthropic Claude 3.5 Sonnet.</span>
+              </div>
+              <div class="timeline-event">
+                <span class="timeline-time">00:07</span>
+                <span class="timeline-body">Advisor committee activated: 4 guardrails validated.</span>
+              </div>
+              <div class="timeline-event">
+                <span class="timeline-time">00:12</span>
+                <span class="timeline-body">Virtual filesystem root mounted (in-memory sandbox).</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </aside>
+
+      <!-- ================================================================= -->
+      <!-- MAIN CENTER PANE: Xterm.js Terminal Canvas                        -->
+      <!-- ================================================================= -->
+      <main class="main-center-pane">
+        <div class="terminal-wrapper">
+          <div id="terminal-container"></div>
+        </div>
+
+        <!-- Mobile Touch Key Helper Bar (Termux / Phone / Tablet Friendly) -->
+        <div class="touch-toolbar">
+          <button class="touch-key" data-key="Tab">Tab</button>
+          <button class="touch-key" data-key="Escape">Esc</button>
+          <button class="touch-key" data-key="CtrlC">Ctrl+C</button>
+          <button class="touch-key" data-key="ArrowUp">▲</button>
+          <button class="touch-key" data-key="ArrowDown">▼</button>
+          <button class="touch-key" data-key="Enter">⏎ Enter</button>
+        </div>
+      </main>
+
+      <!-- ================================================================= -->
+      <!-- RIGHT DRAWER: Subagent Mesh & Advisor Committee Log               -->
+      <!-- ================================================================= -->
+      <aside id="right-drawer" class="layout-panel drawer-right">
+        <div class="panel-header">
+          <div class="panel-tabs">
+            <button id="tab-btn-mesh" class="panel-tab-btn active">
+              ⚡ Subagent Mesh
+            </button>
+            <button id="tab-btn-advisor" class="panel-tab-btn">
+              🛡️ Advisor Log
+            </button>
+          </div>
+          <button id="btn-close-right-drawer" class="panel-action-btn" title="Collapse Drawer">&times;</button>
+        </div>
+
+        <!-- Tab 1: Subagent Mesh Visualization -->
+        <div id="pane-mesh" class="panel-content">
+          <div class="mesh-header-banner">
+            <div class="mesh-banner-title">
+              <span>⚡ Parallel Subagent Topology</span>
+            </div>
+            <div class="mesh-banner-desc">
+              Coordinator fans out isolated tasks via Zero-Lock Star-Mesh with verified async aggregation.
+            </div>
+          </div>
+
+          <div class="agent-cards-list">
+            <!-- Scout Agent -->
+            <div class="agent-card">
+              <div class="agent-card-header">
+                <div class="agent-name-wrap">
+                  <span class="agent-avatar">🔍</span>
+                  <span class="agent-name">Scout Agent</span>
+                </div>
+                <span class="agent-role-pill">ast_grep / read</span>
+              </div>
+              <div class="agent-details">
+                Rapid codebase discovery, AST pattern search, dependency tree scanning.
+              </div>
+              <div class="agent-card-footer">
+                <span class="agent-status-badge">
+                  <span class="agent-status-indicator"></span> Standby / Ready
+                </span>
+                <span>120ms avg</span>
+              </div>
+            </div>
+
+            <!-- Reviewer Agent -->
+            <div class="agent-card">
+              <div class="agent-card-header">
+                <div class="agent-name-wrap">
+                  <span class="agent-avatar">🛡️</span>
+                  <span class="agent-name">Reviewer Agent</span>
+                </div>
+                <span class="agent-role-pill">invariants / audit</span>
+              </div>
+              <div class="agent-details">
+                Verifies invariant safety, zero-unwrap contract, and static memory bounds.
+              </div>
+              <div class="agent-card-footer">
+                <span class="agent-status-badge">
+                  <span class="agent-status-indicator"></span> Standby / Ready
+                </span>
+                <span>340ms avg</span>
+              </div>
+            </div>
+
+            <!-- Simplifier Agent -->
+            <div class="agent-card">
+              <div class="agent-card-header">
+                <div class="agent-name-wrap">
+                  <span class="agent-avatar">⚡</span>
+                  <span class="agent-name">Simplifier Agent</span>
+                </div>
+                <span class="agent-role-pill">refactor / dedupe</span>
+              </div>
+              <div class="agent-details">
+                Code deduplication, AST compression, and dead-branch elimination.
+              </div>
+              <div class="agent-card-footer">
+                <span class="agent-status-badge">
+                  <span class="agent-status-indicator"></span> Standby / Ready
+                </span>
+                <span>210ms avg</span>
+              </div>
+            </div>
+
+            <!-- Coder Agent -->
+            <div class="agent-card">
+              <div class="agent-card-header">
+                <div class="agent-name-wrap">
+                  <span class="agent-avatar">💻</span>
+                  <span class="agent-name">Coder Agent</span>
+                </div>
+                <span class="agent-role-pill">rust / ts / wasm</span>
+              </div>
+              <div class="agent-details">
+                Pure Rust and TypeScript implementation with zero external C dependencies.
+              </div>
+              <div class="agent-card-footer">
+                <span class="agent-status-badge">
+                  <span class="agent-status-indicator"></span> Standby / Ready
+                </span>
+                <span>280ms avg</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Tab 2: Advisor Committee Log -->
+        <div id="pane-advisor" class="panel-content" style="display: none;">
+          <div class="advisor-score-card">
+            <div class="advisor-score-left">
+              <div class="advisor-score-title">
+                <span>🛡️ Guardrail Status</span>
+              </div>
+              <div class="advisor-score-sub">All 4 Policies Enforced</div>
+            </div>
+            <div class="advisor-score-badge">0.0 Risk</div>
+          </div>
+
+          <div class="advisor-rules-list">
+            <div class="advisor-rule-item">
+              <span class="rule-icon">🔒</span>
+              <div class="rule-content">
+                <div class="rule-title-row">
+                  <span class="rule-title">Security Guardrail</span>
+                  <span class="rule-status">PASS</span>
+                </div>
+                <div class="rule-desc">Zero raw shell injection; sanitized tool arguments only.</div>
+              </div>
+            </div>
+
+            <div class="advisor-rule-item">
+              <span class="rule-icon">⚡</span>
+              <div class="rule-content">
+                <div class="rule-title-row">
+                  <span class="rule-title">Performance Auditor</span>
+                  <span class="rule-status">PASS</span>
+                </div>
+                <div class="rule-desc">Zero unwrap() in hot paths; non-blocking async executor.</div>
+              </div>
+            </div>
+
+            <div class="advisor-rule-item">
+              <span class="rule-icon">💰</span>
+              <div class="rule-content">
+                <div class="rule-title-row">
+                  <span class="rule-title">Budget Watchdog</span>
+                  <span class="rule-status">PASS</span>
+                </div>
+                <div class="rule-desc">Strict turn limits and context window compaction guard.</div>
+              </div>
+            </div>
+
+            <div class="advisor-rule-item">
+              <span class="rule-icon">📜</span>
+              <div class="rule-content">
+                <div class="rule-title-row">
+                  <span class="rule-title">Policy Verifier</span>
+                  <span class="rule-status">PASS</span>
+                </div>
+                <div class="rule-desc">Pure Rust WASM / POSIX shell compliance verified.</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </aside>
+    </div>
+  </div>
+
+  <!-- ======================================================================= -->
+  <!-- MODAL: Tabbed Model Picker (fx.sh/try UX)                              -->
+  <!-- ======================================================================= -->
+  <div id="modal-model-picker" class="modal-overlay">
+    <div class="modal-card">
+      <div class="modal-header">
+        <div class="modal-title">
+          <span>⚡ Select AI Model</span>
+        </div>
+        <button class="modal-close" data-close="modal-model-picker">&times;</button>
+      </div>
+      <div class="modal-body">
+        <input type="text" id="model-search-input" class="model-search-box" placeholder="Search models by name, provider, or capability (e.g. sonnet, r1, coding, gpt-4o)..." />
+
+        <div class="tabs-nav" id="model-tabs-nav">
+          <button class="tab-btn active" data-tab="all">🌟 All Models</button>
+          <button class="tab-btn" data-tab="reasoning">🧠 Reasoning (R1 / 3.7 / o3)</button>
+          <button class="tab-btn" data-tab="coding">💻 Coding Specialists</button>
+          <button class="tab-btn" data-tab="fast">⚡ Fast &amp; Cheap</button>
+          <button class="tab-btn" data-tab="local">🏠 Local / Ollama</button>
+        </div>
+
+        <div class="model-grid" id="model-cards-grid">
+          <!-- Populated dynamically by term.js -->
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="header-btn" data-close="modal-model-picker">Cancel</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ======================================================================= -->
+  <!-- MODAL: Settings & Configuration                                         -->
+  <!-- ======================================================================= -->
+  <div id="modal-settings" class="modal-overlay">
+    <div class="modal-card">
+      <div class="modal-header">
+        <div class="modal-title">
+          <span>⚙️ Agent Configuration</span>
+        </div>
+        <button class="modal-close" data-close="modal-settings">&times;</button>
+      </div>
+      <div class="modal-body">
+        <!-- Connection Mode Radio Selection -->
+        <div class="form-group">
+          <label class="form-label">Connection Backend</label>
+          <div class="radio-group">
+            <label class="radio-option">
+              <input type="radio" name="conn-mode" value="wasm" checked />
+              <div>
+                <div class="radio-title">🚀 WebAssembly Agent (In-Browser)</div>
+                <div class="radio-sub">Runs Rust agent directly inside browser tab via WASM bindings</div>
+              </div>
+            </label>
+            <label class="radio-option">
+              <input type="radio" name="conn-mode" value="websocket" />
+              <div>
+                <div class="radio-title">🔌 WebSocket Agent Server (ACP Protocol)</div>
+                <div class="radio-sub">Connects to local `fusion --acp` or JSON-RPC server daemon</div>
+              </div>
+            </label>
+            <label class="radio-option">
+              <input type="radio" name="conn-mode" value="direct_api" />
+              <div>
+                <div class="radio-title">🌐 Direct LLM Streaming (OpenRouter / Anthropic)</div>
+                <div class="radio-sub">Streams responses directly via browser fetch with client-side tools</div>
+              </div>
+            </label>
+            <label class="radio-option">
+              <input type="radio" name="conn-mode" value="demo" />
+              <div>
+                <div class="radio-title">🎮 Zero-Config Interactive Simulator</div>
+                <div class="radio-sub">Instant sandbox with simulated subagents, tools, and code generation</div>
+              </div>
+            </label>
+          </div>
+        </div>
+
+        <!-- WebSocket Config Section -->
+        <div class="form-group" id="ws-config-group">
+          <label class="form-label">WebSocket ACP Server URL</label>
+          <input type="text" id="setting-ws-url" class="form-input" value="ws://127.0.0.1:9001" placeholder="ws://127.0.0.1:9001" />
+          <div class="form-help">Start server locally with: <code>cargo run -- --acp</code> or WebSocket bridge</div>
+        </div>
+
+        <!-- API Keys Section -->
+        <div class="form-group" id="api-config-group">
+          <label class="form-label">OpenRouter / Anthropic / OpenAI API Key</label>
+          <input type="password" id="setting-api-key" class="form-input" placeholder="sk-or-v1-..." autocomplete="off" />
+          <div class="form-help">Stored only in your browser's <code>localStorage</code>. Never sent to third parties.</div>
+        </div>
+
+        <!-- Ollama Base URL -->
+        <div class="form-group">
+          <label class="form-label">Ollama Local Base URL</label>
+          <input type="text" id="setting-ollama-url" class="form-input" value="http://localhost:11434" />
+        </div>
+
+        <!-- Agent Parameters -->
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">Temperature</label>
+            <input type="number" id="setting-temperature" class="form-input" min="0" max="1" step="0.1" value="0.2" />
+          </div>
+          <div class="form-group">
+            <label class="form-label">Max Tool Turns</label>
+            <input type="number" id="setting-max-turns" class="form-input" min="1" max="100" value="30" />
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">System Prompt Override</label>
+          <textarea id="setting-system-prompt" class="form-textarea" rows="3" placeholder="Default Fusion v2 coding assistant system prompt..."></textarea>
+        </div>
+
+        <!-- Checkpoint & Restore -->
+        <div class="form-group">
+          <label class="form-label">Session Checkpoints</label>
+          <div class="checkpoint-box">
+            <button id="btn-save-checkpoint" class="header-btn">💾 Save Checkpoint</button>
+            <button id="btn-load-checkpoint" class="header-btn">📂 Restore Checkpoint</button>
+          </div>
+          <div class="form-help">Serializes current agent session memory, history, and state via <code>checkpoint()</code>.</div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="header-btn" data-close="modal-settings">Cancel</button>
+        <button id="btn-save-settings" class="header-btn primary">Save &amp; Apply</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ======================================================================= -->
+  <!-- MODAL: Shortcuts & Reference Help                                       -->
+  <!-- ======================================================================= -->
+  <div id="modal-shortcuts" class="modal-overlay">
+    <div class="modal-card">
+      <div class="modal-header">
+        <div class="modal-title">
+          <span>❓ Terminal Shortcuts &amp; Slash Commands</span>
+        </div>
+        <button class="modal-close" data-close="modal-shortcuts">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div style="font-size: 13px; line-height: 1.6; color: var(--text-main);">
+          <h4 style="color: #fff; margin-bottom: 8px;">Keyboard Shortcuts</h4>
+          <table style="width: 100%; border-collapse: collapse; font-family: var(--font-mono); font-size: 12px; margin-bottom: 16px;">
+            <tr style="border-bottom: 1px solid var(--border-color);"><td style="padding: 6px; color: var(--accent-cyan);">Enter</td><td style="padding: 6px;">Submit prompt to agent</td></tr>
+            <tr style="border-bottom: 1px solid var(--border-color);"><td style="padding: 6px; color: var(--accent-cyan);">Ctrl + C</td><td style="padding: 6px;">Interrupt active streaming turn or clear input</td></tr>
+            <tr style="border-bottom: 1px solid var(--border-color);"><td style="padding: 6px; color: var(--accent-cyan);">Ctrl + L</td><td style="padding: 6px;">Clear terminal screen</td></tr>
+            <tr style="border-bottom: 1px solid var(--border-color);"><td style="padding: 6px; color: var(--accent-cyan);">Tab</td><td style="padding: 6px;">Auto-complete slash commands</td></tr>
+            <tr style="border-bottom: 1px solid var(--border-color);"><td style="padding: 6px; color: var(--accent-cyan);">▲ / ▼</td><td style="padding: 6px;">Navigate command history</td></tr>
+            <tr style="border-bottom: 1px solid var(--border-color);"><td style="padding: 6px; color: var(--accent-cyan);">Ctrl + A / E</td><td style="padding: 6px;">Jump to start / end of line</td></tr>
+            <tr style="border-bottom: 1px solid var(--border-color);"><td style="padding: 6px; color: var(--accent-cyan);">Ctrl + U</td><td style="padding: 6px;">Delete entire line</td></tr>
+          </table>
+
+          <h4 style="color: #fff; margin-bottom: 8px;">Supported Slash Commands</h4>
+          <ul style="list-style: none; font-family: var(--font-mono); font-size: 12px; display: flex; flex-direction: column; gap: 6px;">
+            <li><span style="color: var(--accent-primary);">/help</span> — Show command summary and active configuration</li>
+            <li><span style="color: var(--accent-primary);">/model [name]</span> — Open model picker or switch active model</li>
+            <li><span style="color: var(--accent-primary);">/subagent &lt;task&gt;</span> — Fan-out parallel subagents (scout, reviewer, simplifier)</li>
+            <li><span style="color: var(--accent-primary);">/tools</span> — List and test available tools (grep, glob, bash, edit, file)</li>
+            <li><span style="color: var(--accent-primary);">/cost</span> — View token usage metrics and estimated session cost</li>
+            <li><span style="color: var(--accent-primary);">/compact</span> — Compact context window to prevent overflow</li>
+            <li><span style="color: var(--accent-primary);">/advisor</span> — Evaluate security and performance guardrails</li>
+            <li><span style="color: var(--accent-primary);">/checkpoint</span> — Serialize session state to JSON</li>
+            <li><span style="color: var(--accent-primary);">/restore</span> — Restore session state from checkpoint JSON</li>
+            <li><span style="color: var(--accent-primary);">/clear</span> — Clear terminal output</li>
+          </ul>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="header-btn" data-close="modal-shortcuts">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- UI Split-View Controller Script (Left & Right Panel Toggles, Tabs) -->
+  <script>
+    (function () {
+      // Sidebar & Drawer Toggles
+      const leftSidebar = document.getElementById('left-sidebar');
+      const rightDrawer = document.getElementById('right-drawer');
+      const btnToggleLeft = document.getElementById('btn-toggle-left-sidebar');
+      const btnCloseLeft = document.getElementById('btn-close-left-sidebar');
+      const btnToggleRight = document.getElementById('btn-toggle-right-drawer');
+      const btnCloseRight = document.getElementById('btn-close-right-drawer');
+
+      function triggerTerminalFit() {
+        setTimeout(() => {
+          window.dispatchEvent(new Event('resize'));
+        }, 260);
+      }
+
+      if (btnToggleLeft && leftSidebar) {
+        btnToggleLeft.addEventListener('click', () => {
+          leftSidebar.classList.toggle('collapsed');
+          btnToggleLeft.classList.toggle('active', !leftSidebar.classList.contains('collapsed'));
+          triggerTerminalFit();
+        });
+      }
+
+      if (btnCloseLeft && leftSidebar) {
+        btnCloseLeft.addEventListener('click', () => {
+          leftSidebar.classList.add('collapsed');
+          if (btnToggleLeft) btnToggleLeft.classList.remove('active');
+          triggerTerminalFit();
+        });
+      }
+
+      if (btnToggleRight && rightDrawer) {
+        btnToggleRight.addEventListener('click', () => {
+          rightDrawer.classList.toggle('collapsed');
+          btnToggleRight.classList.toggle('active', !rightDrawer.classList.contains('collapsed'));
+          triggerTerminalFit();
+        });
+      }
+
+      if (btnCloseRight && rightDrawer) {
+        btnCloseRight.addEventListener('click', () => {
+          rightDrawer.classList.add('collapsed');
+          if (btnToggleRight) btnToggleRight.classList.remove('active');
+          triggerTerminalFit();
+        });
+      }
+
+      // Left Sidebar Tabs (Files vs History)
+      const tabBtnFiles = document.getElementById('tab-btn-files');
+      const tabBtnHistory = document.getElementById('tab-btn-history');
+      const paneFiles = document.getElementById('pane-files');
+      const paneHistory = document.getElementById('pane-history');
+
+      if (tabBtnFiles && tabBtnHistory && paneFiles && paneHistory) {
+        tabBtnFiles.addEventListener('click', () => {
+          tabBtnFiles.classList.add('active');
+          tabBtnHistory.classList.remove('active');
+          paneFiles.style.display = 'flex';
+          paneHistory.style.display = 'none';
+        });
+
+        tabBtnHistory.addEventListener('click', () => {
+          tabBtnHistory.classList.add('active');
+          tabBtnFiles.classList.remove('active');
+          paneHistory.style.display = 'flex';
+          paneFiles.style.display = 'none';
+        });
+      }
+
+      // Right Drawer Tabs (Subagents vs Advisor)
+      const tabBtnMesh = document.getElementById('tab-btn-mesh');
+      const tabBtnAdvisor = document.getElementById('tab-btn-advisor');
+      const paneMesh = document.getElementById('pane-mesh');
+      const paneAdvisor = document.getElementById('pane-advisor');
+
+      if (tabBtnMesh && tabBtnAdvisor && paneMesh && paneAdvisor) {
+        tabBtnMesh.addEventListener('click', () => {
+          tabBtnMesh.classList.add('active');
+          tabBtnAdvisor.classList.remove('active');
+          paneMesh.style.display = 'flex';
+          paneAdvisor.style.display = 'none';
+        });
+
+        tabBtnAdvisor.addEventListener('click', () => {
+          tabBtnAdvisor.classList.add('active');
+          tabBtnMesh.classList.remove('active');
+          paneAdvisor.style.display = 'flex';
+          paneMesh.style.display = 'none';
+        });
+      }
+
+      // Quick Model Pills in Header
+      const quickModelPills = document.querySelectorAll('.quick-model-pill');
+      quickModelPills.forEach(pill => {
+        pill.addEventListener('click', () => {
+          const modelId = pill.getAttribute('data-model');
+          if (modelId) {
+            localStorage.setItem('fusion_model', modelId);
+            const headerName = document.getElementById('header-model-name');
+            if (headerName) headerName.textContent = modelId;
+            quickModelPills.forEach(p => p.classList.remove('active'));
+            pill.classList.add('active');
+          }
+        });
+      });
+
+      // Advisor Status Pill Click
+      const advisorPill = document.getElementById('advisor-status-pill');
+      if (advisorPill && rightDrawer) {
+        advisorPill.addEventListener('click', () => {
+          rightDrawer.classList.remove('collapsed');
+          if (btnToggleRight) btnToggleRight.classList.add('active');
+          if (tabBtnAdvisor) tabBtnAdvisor.click();
+          triggerTerminalFit();
+        });
+      }
+    })();
+  </script>
+
+  <!-- Terminal Logic & Agent Controller -->
+  <script src="term.js"></script>
+</body>
+</html>

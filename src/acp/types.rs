@@ -552,16 +552,38 @@ pub enum SessionUpdate {
     /// Incremental assistant text chunk.
     AgentMessageChunk {
         content: AgentMessageContent,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        index: Option<u64>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        is_first: Option<bool>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        is_last: Option<bool>,
     },
     /// Incremental thinking/reasoning chunk.
     AgentThoughtChunk {
         thought: String,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        index: Option<u64>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        elapsed_ms: Option<u64>,
     },
     /// Tool execution started.
     ToolCall {
         call_id: String,
         name: String,
         args: serde_json::Value,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        status: Option<String>,
+    },
+    /// Tool execution progress or intermediate status update.
+    ToolStatus {
+        call_id: String,
+        name: String,
+        status: String,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        progress: Option<f32>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        partial_output: Option<String>,
     },
     /// Tool execution completed.
     ToolCallResult {
@@ -569,20 +591,56 @@ pub enum SessionUpdate {
         name: String,
         output: String,
         success: bool,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        duration_ms: Option<u64>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        error: Option<String>,
+    },
+    /// Advisor review started.
+    AdvisorStarted {
+        advisor: String,
+        role: String,
     },
     /// Advisor review feedback.
     AdvisorCritique {
         advisor: String,
         approved: bool,
         critique: String,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        role: Option<String>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        severity: Option<String>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        suggestions: Option<Vec<String>>,
+    },
+    /// Real-time token usage and speed statistics.
+    TokenStats {
+        prompt_tokens: u64,
+        completion_tokens: u64,
+        total_tokens: u64,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        cached_tokens: Option<u64>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        tokens_per_second: Option<f64>,
     },
     /// Status message or progress indicator.
     Status {
         message: String,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        level: Option<String>,
     },
     /// Execution plan update.
     Plan {
         steps: Vec<String>,
+    },
+    /// Subagent execution status update.
+    SubagentUpdate {
+        name: String,
+        status: String,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        task: Option<String>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        output: Option<String>,
     },
 }
 

@@ -8,3 +8,6 @@ Thumbs.db
 .env
 .env.*
 reference/
+.fusion/
+*.rlib
+node_modules/

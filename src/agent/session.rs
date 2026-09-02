@@ -254,6 +254,11 @@ impl Session {
         self.touch();
     }
 
+    /// Estimates the monetary cost (USD) of the tokens consumed in this session so far.
+    pub fn estimate_cost(&self, default_provider: Option<&str>) -> crate::agent::cost::CostBreakdown {
+        crate::agent::cost::estimate_session_cost(self, default_provider)
+    }
+
     /// Returns the optional system prompt.
     pub fn system_prompt(&self) -> Option<&str> {
         self.system_prompt.as_deref()
@@ -358,6 +363,32 @@ impl Session {
             self.messages.truncate(len);
             self.touch();
         }
+    }
+
+    /// Estimates the current token count across all messages in this session.
+    pub fn estimate_tokens(&self) -> usize {
+        crate::agent::compaction::estimate_messages_tokens(&self.messages)
+    }
+
+    /// Returns `true` if the session's messages exceed the context budget
+    /// (by default 80% of the active model's context window limit).
+    pub fn needs_compaction(&self, compactor: Option<&crate::agent::compaction::Compactor>) -> bool {
+        if let Some(c) = compactor {
+            c.needs_compaction(&self.messages, &self.active_model)
+        } else {
+            let default_c = crate::agent::compaction::Compactor::default();
+            default_c.needs_compaction(&self.messages, &self.active_model)
+        }
+    }
+
+    /// Intelligently compacts the conversation history in-place using the specified
+    /// or default Compactor.
+    pub fn compact(&mut self, compactor: &crate::agent::compaction::Compactor) -> crate::agent::compaction::CompactionResult {
+        let res = compactor.compact_session(self);
+        if res.compacted {
+            self.touch();
+        }
+        res
     }
 
     // --- Persistence & Resumption ---
@@ -544,6 +575,19 @@ impl Session {
         Ok(summaries)
     }
 
+    /// Searches all saved sessions in `~/.fusion/sessions/` using full-text BM25 or semantic matching.
+    pub fn search_all(query_str: &str) -> anyhow::Result<crate::agent::search::SearchReport> {
+        crate::agent::search::search_sessions(query_str)
+    }
+
+    /// Searches saved sessions in a specified directory using structured query options.
+    pub fn search_dir(
+        dir: impl AsRef<Path>,
+        query: &crate::agent::search::SearchQuery,
+    ) -> anyhow::Result<crate::agent::search::SearchReport> {
+        crate::agent::search::search_sessions_dir(dir, query)
+    }
+
     /// Exports the full session conversation to formatted Markdown.
     pub fn export_markdown(&self) -> String {
         let mut md = String::new();
@@ -592,6 +636,69 @@ impl Session {
         }
 
         md
+    }
+
+    /// Exports the full session conversation to a self-contained, syntax-highlighted HTML document.
+    pub fn export_html(&self) -> String {
+        crate::agent::export::export_session_html(self)
+    }
+
+    /// Exports the full session conversation to a self-contained HTML file on disk.
+    pub fn export_html_file(&self, path: impl AsRef<std::path::Path>) -> std::io::Result<()> {
+        crate::agent::export::export_session_html_file(self, path)
+    }
+
+    /// Generates a unified diff string representing all file modifications in this session.
+    pub fn export_patch(&self) -> String {
+        crate::agent::session_patch::export_session_patch_string(
+            self,
+            &crate::agent::session_patch::SessionPatchOptions::default(),
+        )
+    }
+
+    /// Generates a unified diff string representing all file modifications with customized options.
+    pub fn export_patch_with_options(
+        &self,
+        options: &crate::agent::session_patch::SessionPatchOptions,
+    ) -> String {
+        crate::agent::session_patch::export_session_patch_string(self, options)
+    }
+
+    /// Saves all session file edits into a single `session.patch` file at the specified path.
+    pub fn export_patch_file(
+        &self,
+        path: impl AsRef<std::path::Path>,
+    ) -> std::io::Result<std::path::PathBuf> {
+        crate::agent::session_patch::export_session_patch_file(
+            self,
+            path,
+            &crate::agent::session_patch::SessionPatchOptions::default(),
+        )
+    }
+
+    /// Saves all session file edits into a patch file with customized options.
+    pub fn export_patch_file_with_options(
+        &self,
+        path: impl AsRef<std::path::Path>,
+        options: &crate::agent::session_patch::SessionPatchOptions,
+    ) -> std::io::Result<std::path::PathBuf> {
+        crate::agent::session_patch::export_session_patch_file(self, path, options)
+    }
+
+    /// Generates a structured `SessionPatch` object containing all file diffs and statistics.
+    pub fn session_patch(&self) -> crate::agent::session_patch::SessionPatch {
+        crate::agent::session_patch::export_session_patch(
+            self,
+            &crate::agent::session_patch::SessionPatchOptions::default(),
+        )
+    }
+
+    /// Generates a structured `SessionPatch` object with customized options.
+    pub fn session_patch_with_options(
+        &self,
+        options: &crate::agent::session_patch::SessionPatchOptions,
+    ) -> crate::agent::session_patch::SessionPatch {
+        crate::agent::session_patch::export_session_patch(self, options)
     }
 }
 
@@ -703,6 +810,13 @@ mod tests {
         assert!(md.contains("### 🤖 Assistant"));
         assert!(md.contains("deepseek-chat"));
 
+
+        // HTML export test
+        let html = loaded.export_html();
+        assert!(html.contains("<!DOCTYPE html>"));
+        assert!(html.contains("Rust Architecture Discussion"));
+        assert!(html.contains("deepseek-chat"));
+        assert!(html.contains("data-theme=\"dark\""));
         // Cleanup
         let _ = fs::remove_dir_all(temp_dir);
     }

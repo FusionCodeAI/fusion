@@ -451,6 +451,7 @@ pub struct SubagentManager {
     active_agents: Arc<RwLock<HashMap<String, SubagentInfo>>>,
     cancels: Arc<RwLock<HashMap<String, watch::Sender<bool>>>>,
     global_event_tx: broadcast::Sender<SubagentProgress>,
+    metrics: Arc<crate::agent::metrics::SubagentMetricsCollector>,
 }
 
 impl SubagentManager {
@@ -458,7 +459,7 @@ impl SubagentManager {
     pub fn new(client: Arc<LlmClient>, config: Config, tools: ToolRegistry) -> Self {
         let (global_event_tx, _) = broadcast::channel(256);
         let max_concurrent = 8;
-        Self {
+        let mgr = Self {
             client,
             config,
             tools,
@@ -466,8 +467,14 @@ impl SubagentManager {
             semaphore: Arc::new(Semaphore::new(max_concurrent)),
             active_agents: Arc::new(RwLock::new(HashMap::new())),
             cancels: Arc::new(RwLock::new(HashMap::new())),
-            global_event_tx,
-        }
+            global_event_tx: global_event_tx.clone(),
+            metrics: Arc::new(crate::agent::metrics::SubagentMetricsCollector::new()),
+        };
+        crate::agent::metrics::SubagentMetricsCollector::spawn_event_listener(
+            mgr.metrics.clone(),
+            global_event_tx.subscribe(),
+        );
+        mgr
     }
 
     /// Configures the maximum number of subagents allowed to run concurrently.
@@ -658,6 +665,21 @@ impl SubagentManager {
         for tx in guard.values() {
             let _ = tx.send(true);
         }
+    }
+
+    /// Returns the metrics collector tracking all managed subagents.
+    pub fn metrics(&self) -> Arc<crate::agent::metrics::SubagentMetricsCollector> {
+        self.metrics.clone()
+    }
+
+    /// Returns detailed metrics for a specific subagent by ID.
+    pub fn get_metrics(&self, id: &str) -> Option<crate::agent::metrics::SubagentMetrics> {
+        self.metrics.get(id)
+    }
+
+    /// Returns fleet-wide telemetry aggregation across all managed subagents.
+    pub fn fleet_metrics(&self) -> crate::agent::metrics::SubagentFleetMetrics {
+        self.metrics.fleet_summary()
     }
 }
 
