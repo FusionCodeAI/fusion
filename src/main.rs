@@ -44,6 +44,9 @@ async fn main() -> anyhow::Result<()> {
     if cli.no_advisors {
         config.advisors_enabled = false;
     }
+    if let Some(turns) = cli.max_turns {
+        config.max_turns = Some(turns.clamp(10, 500));
+    }
 
     let cwd = cli
         .cwd
@@ -201,5 +204,17 @@ mod tests {
         config.apply_preset(preset);
         assert_eq!(config.default_provider, "deepseek");
         assert_eq!(config.default_model, "deepseek-reasoner");
+    }
+
+    #[test]
+    fn test_cli_max_turns_parsing() {
+        let cli = Cli::try_parse_from(["fusion", "--max-turns", "150"]).unwrap();
+        assert_eq!(cli.max_turns, Some(150));
+
+        let mut config = fusion::config::Config::default();
+        if let Some(turns) = cli.max_turns {
+            config.max_turns = Some(turns.clamp(10, 500));
+        }
+        assert_eq!(config.max_turns, Some(150));
     }
 }

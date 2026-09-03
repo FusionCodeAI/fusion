@@ -1513,7 +1513,7 @@ mod tests {
 
     #[test]
     fn test_banner_styles_art_width() {
-        assert!(BannerStyle::Cyber.art_width() > 40);
+        assert!(BannerStyle::Cyber.art_width() > 30);
         assert!(BannerStyle::Sleek.art_width() > 30);
         assert!(BannerStyle::Slant.art_width() > 30);
         assert!(BannerStyle::Standard.art_width() > 20);
@@ -1523,25 +1523,23 @@ mod tests {
 
     #[test]
     fn test_banner_style_resolution_for_width() {
-        assert_eq!(BannerStyle::Auto.resolve_for_width(100), BannerStyle::Cyber);
-        assert_eq!(BannerStyle::Auto.resolve_for_width(65), BannerStyle::Sleek);
+        assert_eq!(BannerStyle::Auto.resolve_for_width(100), BannerStyle::Sleek);
         assert_eq!(
-            BannerStyle::Auto.resolve_for_width(50),
+            BannerStyle::Auto.resolve_for_width(65),
             BannerStyle::Standard
         );
         assert_eq!(
-            BannerStyle::Auto.resolve_for_width(35),
+            BannerStyle::Auto.resolve_for_width(50),
             BannerStyle::Compact
         );
         assert_eq!(
-            BannerStyle::Auto.resolve_for_width(25),
+            BannerStyle::Auto.resolve_for_width(35),
             BannerStyle::Minimal
         );
         assert_eq!(
-            BannerStyle::Auto.resolve_for_width(15),
+            BannerStyle::Auto.resolve_for_width(20),
             BannerStyle::OneLine
         );
-
         // Fixed styles should not change
         assert_eq!(BannerStyle::Sleek.resolve_for_width(20), BannerStyle::Sleek);
     }

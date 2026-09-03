@@ -205,18 +205,41 @@ class FakeAcpServer extends EventEmitter {
  * graph exposes it on its own globalThis for FAKE_CP_SOURCE to reach, and
  * agent.test.ts holds the same reference.
  */
+let currentServer = null;
+
 export const fusionMockState = {
   servers: [],
-  current: null,
+  get current() {
+    if (!currentServer) {
+      currentServer = new FakeAcpServer();
+    }
+    return currentServer;
+  },
+  set current(val) {
+    currentServer = val;
+  },
   createServerCalls: [],
   createServer(command, args, opts) {
-    const server = new FakeAcpServer(command, args, opts);
+    let server = currentServer;
+    if (!server || fusionMockState.servers.includes(server)) {
+      server = new FakeAcpServer(command, args, opts);
+      currentServer = server;
+    } else {
+      server.command = command;
+      server.args = args;
+      server.opts = opts;
+    }
     fusionMockState.servers.push(server);
-    fusionMockState.current = server;
     fusionMockState.createServerCalls.push({ command, args, opts });
     return server;
   }
 };
+if (typeof globalThis !== 'undefined') {
+  const g = /** @type {any} */ (globalThis);
+  g.__fusionHooksState = fusionMockState;
+  g.__fusionMock = fusionMockState;
+}
+
 
 export async function initialize(data) {
   const g = /** @type {any} */ (globalThis);
@@ -227,7 +250,17 @@ export async function resolve(specifier, context, nextResolve) {
   if (specifier === 'child_process') {
     return { url: FAKE_CP_URL, shortCircuit: true };
   }
-  return nextResolve(specifier, context);
+  try {
+    return await nextResolve(specifier, context);
+  } catch (err) {
+    if (typeof specifier === 'string' && specifier.endsWith('.js')) {
+      const tsSpecifier = specifier.slice(0, -3) + '.ts';
+      try {
+        return await nextResolve(tsSpecifier, context);
+      } catch {}
+    }
+    throw err;
+  }
 }
 
 export async function load(url, context, nextLoad) {

@@ -595,7 +595,7 @@ pub fn render_tool_tree_to<W: std::io::Write>(
     } else {
         format!(" · {}", breakdown.join(" · "))
     };
-
+    write!(out, "\r\n")?;
     let call_label = if total == 1 {
         "tool call"
     } else {
@@ -603,7 +603,7 @@ pub fn render_tool_tree_to<W: std::io::Write>(
     };
     write!(
         out,
-        "\r\n\x1b[2;37m● {} {}{}\x1b[0m\r\n",
+        "\x1b[2;37m● {} {}{}\x1b[0m\r\n",
         total, call_label, breakdown_str
     )?;
     for (i, item) in tool_batch.iter().enumerate() {
@@ -637,7 +637,9 @@ pub fn render_tool_tree_to<W: std::io::Write>(
 }
 
 pub fn render_tool_tree(tool_batch: &[ToolCallItem]) {
-    let _ = render_tool_tree_to(&mut stdout(), tool_batch);
+    let mut out = stdout();
+    let _ = write!(out, "\r\x1b[2K");
+    let _ = render_tool_tree_to(&mut out, tool_batch);
 }
 
 fn parse_exit_code(output: &str) -> i32 {
@@ -663,6 +665,18 @@ fn parse_exit_code(output: &str) -> i32 {
         }
     }
     1
+}
+#[inline]
+pub(crate) fn reset_prompt_render_state(prompt: &mut Prompt) {
+    prompt.reset_render_state();
+}
+
+#[inline]
+pub(crate) fn clear_prompt_frame(prompt: &mut Prompt) {
+    if prompt.last_rendered_lines > 0 || prompt.last_cursor_row > 0 {
+        let _ = prompt.clear_frame();
+    }
+    prompt.reset_render_state();
 }
 
 pub async fn run_turn_ui(
@@ -690,22 +704,194 @@ pub async fn run_turn_ui(
 
     let mut is_thinking = true;
     let mut tool_batch: Vec<ToolCallItem> = Vec::new();
-    let mut ticker = tokio::time::interval(std::time::Duration::from_millis(200));
+    let mut ticker = tokio::time::interval(std::time::Duration::from_millis(300));
 
+    clear_prompt_frame(prompt);
     prompt.reset_input();
+    reset_prompt_render_state(prompt);
     prompt.set_running(true);
+
+    let mut handle_agent_event = |event: AgentEvent,
+                                  tool_batch: &mut Vec<ToolCallItem>,
+                                  active_tool_label: &mut Option<String>,
+                                  is_thinking: &mut bool,
+                                  output_tokens: &mut u64,
+                                  input_tokens: &mut u64,
+                                  md: &mut MarkdownRenderer,
+                                  prompt: &mut Prompt| {
+        match event {
+            AgentEvent::TextDelta(d) => {
+                clear_prompt_frame(prompt);
+                if *is_thinking {
+                    prompt.set_running_status(None);
+                    *is_thinking = false;
+                    *active_tool_label = None;
+                    let mut out = stdout();
+                    let _ = write!(out, "\r\x1b[2K");
+                    let _ = out.flush();
+                }
+                if !tool_batch.is_empty() {
+                    prompt.set_running_status(None);
+                    let mut out = stdout();
+                    let _ = write!(out, "\r\x1b[2K");
+                    let _ = out.flush();
+                    render_tool_tree(tool_batch);
+                    tool_batch.clear();
+                    reset_prompt_render_state(prompt);
+                }
+                *output_tokens += crate::agent::tokens::estimate_text_tokens(&d) as u64;
+                md.push(&d);
+                reset_prompt_render_state(prompt);
+            }
+            AgentEvent::ThinkingDelta(th) => {
+                if !tool_batch.is_empty() {
+                    clear_prompt_frame(prompt);
+                    prompt.set_running_status(None);
+                    let mut out = stdout();
+                    let _ = write!(out, "\r\x1b[2K");
+                    let _ = out.flush();
+                    render_tool_tree(tool_batch);
+                    tool_batch.clear();
+                    reset_prompt_render_state(prompt);
+                }
+                *output_tokens += crate::agent::tokens::estimate_text_tokens(&th) as u64;
+            }
+            AgentEvent::ToolStarted { name, args, .. } => {
+                clear_prompt_frame(prompt);
+                let mut out = stdout();
+                let _ = write!(out, "\r\x1b[2K");
+                let _ = out.flush();
+                let active_label = parse_tool_active_label(&name, &args);
+                let (completed_label, category) = parse_tool_info(&name, &args);
+                *active_tool_label = Some(active_label.clone());
+                tool_batch.push(ToolCallItem::new(name, completed_label, category));
+                md.finish();
+                reset_prompt_render_state(prompt);
+                *is_thinking = true;
+                let elapsed = start_time.elapsed();
+                let half_periods = elapsed.as_millis() / 500;
+                let dot = if half_periods % 2 == 0 { "• " } else { "  " };
+                let verb = active_label.strip_prefix("• ").unwrap_or(&active_label);
+                let status = format!(
+                    "\r\x1b[2K{}{} ({}) (↑{} ↓{})",
+                    dot,
+                    verb,
+                    format_duration_compact(elapsed),
+                    format_tokens_compact(*input_tokens),
+                    format_tokens_compact(*output_tokens)
+                );
+                prompt.set_running_status(Some(status));
+                let _ = prompt.render_current();
+            }
+            AgentEvent::ToolFinished {
+                success, output, ..
+            } => {
+                clear_prompt_frame(prompt);
+                let mut out = stdout();
+                let _ = write!(out, "\r\x1b[2K");
+                let _ = out.flush();
+                *active_tool_label = None;
+                if let Some(item) = tool_batch.last_mut() {
+                    if !success {
+                        item.failed = true;
+                        if item.category == "command" {
+                            let cmd = item.label.strip_prefix("Ran ").unwrap_or(&item.label);
+                            let code = parse_exit_code(&output);
+                            item.label = format!("Exited {} {}", code, cmd);
+                        } else if !item.label.starts_with("Failed ") {
+                            item.label = format!("Failed {}", item.label);
+                        }
+                    }
+                }
+                prompt.set_running_status(None);
+                *is_thinking = true;
+                reset_prompt_render_state(prompt);
+            }
+            AgentEvent::Status(msg) => {
+                clear_prompt_frame(prompt);
+                if msg.contains("Waiting for model response") || !tool_batch.is_empty() {
+                    if !tool_batch.is_empty() {
+                        prompt.set_running_status(None);
+                        let mut out = stdout();
+                        let _ = write!(out, "\r\x1b[2K");
+                        let _ = out.flush();
+                        render_tool_tree(tool_batch);
+                        tool_batch.clear();
+                        reset_prompt_render_state(prompt);
+                    }
+                }
+                reset_prompt_render_state(prompt);
+            }
+            AgentEvent::Error(err) => {
+                clear_prompt_frame(prompt);
+                prompt.set_running(false);
+                prompt.set_running_status(None);
+                let mut out = stdout();
+                let _ = write!(out, "\r\x1b[2K\r\n\x1b[31m❌ Error: {}\x1b[0m\r\n\r\n", err);
+                let _ = execute!(out, cursor::MoveToColumn(0));
+                let _ = out.flush();
+                reset_prompt_render_state(prompt);
+            }
+            AgentEvent::Finished { usage } => {
+                if let Some(u) = &usage {
+                    if let Some(pt) = u.get("prompt_tokens").and_then(|v| v.as_u64()) {
+                        *input_tokens = pt;
+                    }
+                    if let Some(ct) = u.get("completion_tokens").and_then(|v| v.as_u64()) {
+                        *output_tokens = ct;
+                    }
+                }
+                clear_prompt_frame(prompt);
+                prompt.set_running_status(None);
+                let mut out = stdout();
+                let _ = write!(out, "\r\x1b[2K");
+                let _ = out.flush();
+                if !tool_batch.is_empty() {
+                    render_tool_tree(tool_batch);
+                    tool_batch.clear();
+                    reset_prompt_render_state(prompt);
+                }
+                md.finish();
+                reset_prompt_render_state(prompt);
+            }
+            _ => {}
+        }
+    };
+
+    let mut last_status_secs: Option<u64> = None;
+    let mut last_status_dot_frame: Option<bool> = None;
 
     loop {
         tokio::select! {
             _ = ticker.tick(), if is_thinking => {
                 let elapsed = start_time.elapsed();
+                let current_secs = elapsed.as_secs();
                 let half_periods = elapsed.as_millis() / 500;
-                let dot = if half_periods % 2 == 0 { "• " } else { "  " };
+                let dot_frame = half_periods % 2 == 0;
+
+                // Debounce: only re-render if elapsed second changed or dot frame changed
+                if prompt.running_status.is_some()
+                    && last_status_secs == Some(current_secs)
+                    && last_status_dot_frame == Some(dot_frame)
+                {
+                    continue;
+                }
+                last_status_secs = Some(current_secs);
+                last_status_dot_frame = Some(dot_frame);
+
+                let dot = if dot_frame { "• " } else { "  " };
                 let verb = match active_tool_label.as_deref() {
                     Some(label) => label.strip_prefix("• ").unwrap_or(label),
                     None => "Running",
                 };
-                let status = format!("{}{} ({}) (↑{} ↓{})", dot, verb, format_duration_compact(elapsed), format_tokens_compact(input_tokens), format_tokens_compact(output_tokens));
+                let status = format!(
+                    "\r\x1b[2K{}{} ({}) (↑{} ↓{})",
+                    dot,
+                    verb,
+                    format_duration_compact(elapsed),
+                    format_tokens_compact(input_tokens),
+                    format_tokens_compact(output_tokens)
+                );
                 prompt.set_running_status(Some(status));
                 let _ = prompt.render_current();
             }
@@ -738,7 +924,7 @@ pub async fn run_turn_ui(
                                 let _ = prompt.render_current();
                             }
                             PromptResult::Cancel => {
-                                let _ = prompt.clear_frame();
+                                clear_prompt_frame(prompt);
                                 prompt.set_running(false);
                                 prompt.set_running_status(None);
                                 prompt.set_queued_count(0);
@@ -750,13 +936,16 @@ pub async fn run_turn_ui(
                                 }
                                 let _ = execute!(out, cursor::MoveToColumn(0));
                                 let _ = out.flush();
+                                reset_prompt_render_state(prompt);
                                 return Ok((String::new(), queued_prompts));
                             }
                             PromptResult::Exit => {
-                                let _ = prompt.clear_frame();
+                                clear_prompt_frame(prompt);
                                 prompt.set_running(false);
                                 prompt.set_running_status(None);
                                 prompt.set_queued_count(0);
+                                let _ = stdout().flush();
+                                reset_prompt_render_state(prompt);
                                 return Ok((String::new(), queued_prompts));
                             }
                         }
@@ -765,95 +954,28 @@ pub async fn run_turn_ui(
             }
             res = &mut runner_task => {
                 while let Ok(event) = rx.try_recv() {
-                    match event {
-                        AgentEvent::TextDelta(d) => {
-                            if is_thinking {
-                                let _ = prompt.clear_frame();
-                                prompt.set_running_status(None);
-                                is_thinking = false;
-                                active_tool_label = None;
-                            }
-                            if !tool_batch.is_empty() {
-                                render_tool_tree(&tool_batch);
-                                tool_batch.clear();
-                            }
-                            output_tokens += crate::agent::tokens::estimate_text_tokens(&d) as u64;
-                            md.push(&d);
-                        }
-                        AgentEvent::ThinkingDelta(th) => {
-                            if !tool_batch.is_empty() {
-                                let _ = prompt.clear_frame();
-                                prompt.set_running_status(None);
-                                render_tool_tree(&tool_batch);
-                                tool_batch.clear();
-                            }
-                            output_tokens += crate::agent::tokens::estimate_text_tokens(&th) as u64;
-                        }
-                        AgentEvent::ToolStarted { name, args, .. } => {
-                            let active_label = parse_tool_active_label(&name, &args);
-                            let (completed_label, category) = parse_tool_info(&name, &args);
-                            active_tool_label = Some(active_label.clone());
-                            tool_batch.push(ToolCallItem::new(name, completed_label, category));
-                            md.finish();
-                            is_thinking = true;
-                            let elapsed = start_time.elapsed();
-                            let half_periods = elapsed.as_millis() / 500;
-                            let dot = if half_periods % 2 == 0 { "• " } else { "  " };
-                            let verb = active_label.strip_prefix("• ").unwrap_or(&active_label);
-                            let status = format!("{}{} ({}) (↑{} ↓{})", dot, verb, format_duration_compact(elapsed), format_tokens_compact(input_tokens), format_tokens_compact(output_tokens));
-                            prompt.set_running_status(Some(status));
-                            let _ = prompt.render_current();
-                        }
-                        AgentEvent::ToolFinished { success, output, .. } => {
-                            active_tool_label = None;
-                            if let Some(item) = tool_batch.last_mut() {
-                                if !success {
-                                    item.failed = true;
-                                    if item.category == "command" {
-                                        let cmd = item.label.strip_prefix("Ran ").unwrap_or(&item.label);
-                                        let code = parse_exit_code(&output);
-                                        item.label = format!("Exited {} {}", code, cmd);
-                                    } else if !item.label.starts_with("Failed ") {
-                                        item.label = format!("Failed {}", item.label);
-                                    }
-                                }
-                            }
-                            let _ = prompt.clear_frame();
-                            prompt.set_running_status(None);
-                            is_thinking = true;
-                        }
-                        AgentEvent::Status(msg) => {
-                            if msg.contains("Waiting for model response") && !tool_batch.is_empty() {
-                                let _ = prompt.clear_frame();
-                                prompt.set_running_status(None);
-                                render_tool_tree(&tool_batch);
-                                tool_batch.clear();
-                            }
-                        }
-                        AgentEvent::Finished { usage } => {
-                            if let Some(u) = &usage {
-                                if let Some(pt) = u.get("prompt_tokens").and_then(|v| v.as_u64()) {
-                                    input_tokens = pt;
-                                }
-                                if let Some(ct) = u.get("completion_tokens").and_then(|v| v.as_u64()) {
-                                    output_tokens = ct;
-                                }
-                            }
-                        }
-                        _ => {}
-                    }
+                    handle_agent_event(
+                        event,
+                        &mut tool_batch,
+                        &mut active_tool_label,
+                        &mut is_thinking,
+                        &mut output_tokens,
+                        &mut input_tokens,
+                        &mut md,
+                        prompt,
+                    );
                 }
-                if is_thinking {
-                    let _ = prompt.clear_frame();
-                }
+                clear_prompt_frame(prompt);
                 prompt.set_running(false);
                 prompt.set_running_status(None);
                 prompt.set_queued_count(0);
                 if !tool_batch.is_empty() {
                     render_tool_tree(&tool_batch);
                     tool_batch.clear();
+                    reset_prompt_render_state(prompt);
                 }
                 md.finish();
+                reset_prompt_render_state(prompt);
 
                 let elapsed = start_time.elapsed();
                 let elapsed_str = format_duration_compact(elapsed);
@@ -863,103 +985,20 @@ pub async fn run_turn_ui(
                 let _ = write!(out, "  \x1b[2;37m{} (↑{} ↓{})\x1b[0m\r\n\r\n", elapsed_str, in_str, out_str);
                 let _ = execute!(out, cursor::MoveToColumn(0));
                 let _ = out.flush();
+                reset_prompt_render_state(prompt);
                 return res.map(|content| (content, queued_prompts));
             }
             Some(event) = rx.recv() => {
-                match event {
-                    AgentEvent::ThinkingDelta(th) => {
-                        if !tool_batch.is_empty() {
-                            let _ = prompt.clear_frame();
-                            prompt.set_running_status(None);
-                            render_tool_tree(&tool_batch);
-                            tool_batch.clear();
-                        }
-                        output_tokens += crate::agent::tokens::estimate_text_tokens(&th) as u64;
-                    }
-                    AgentEvent::TextDelta(d) => {
-                        if is_thinking {
-                            let _ = prompt.clear_frame();
-                            prompt.set_running_status(None);
-                            is_thinking = false;
-                            active_tool_label = None;
-                        }
-                        if !tool_batch.is_empty() {
-                            render_tool_tree(&tool_batch);
-                            tool_batch.clear();
-                        }
-                        output_tokens += crate::agent::tokens::estimate_text_tokens(&d) as u64;
-                        md.push(&d);
-                    }
-                    AgentEvent::ToolStarted { name, args, .. } => {
-                        let active_label = parse_tool_active_label(&name, &args);
-                        let (completed_label, category) = parse_tool_info(&name, &args);
-                        active_tool_label = Some(active_label.clone());
-                        tool_batch.push(ToolCallItem::new(name, completed_label, category));
-                        md.finish();
-                        is_thinking = true;
-                        let elapsed = start_time.elapsed();
-                        let half_periods = elapsed.as_millis() / 500;
-                        let dot = if half_periods % 2 == 0 { "• " } else { "  " };
-                        let verb = active_label.strip_prefix("• ").unwrap_or(&active_label);
-                        let status = format!("{}{} ({}) (↑{} ↓{})", dot, verb, format_duration_compact(elapsed), format_tokens_compact(input_tokens), format_tokens_compact(output_tokens));
-                        prompt.set_running_status(Some(status));
-                        let _ = prompt.render_current();
-                    }
-                    AgentEvent::ToolFinished { success, output, .. } => {
-                        active_tool_label = None;
-                        if let Some(item) = tool_batch.last_mut() {
-                            if !success {
-                                item.failed = true;
-                                if item.category == "command" {
-                                    let cmd = item.label.strip_prefix("Ran ").unwrap_or(&item.label);
-                                    let code = parse_exit_code(&output);
-                                    item.label = format!("Exited {} {}", code, cmd);
-                                } else if !item.label.starts_with("Failed ") {
-                                    item.label = format!("Failed {}", item.label);
-                                }
-                            }
-                        }
-                        let _ = prompt.clear_frame();
-                        prompt.set_running_status(None);
-                        is_thinking = true;
-                    }
-                    AgentEvent::Status(msg) => {
-                        if msg.contains("Waiting for model response") && !tool_batch.is_empty() {
-                            let _ = prompt.clear_frame();
-                            prompt.set_running_status(None);
-                            render_tool_tree(&tool_batch);
-                            tool_batch.clear();
-                        }
-                    }
-                    AgentEvent::Error(err) => {
-                        let _ = prompt.clear_frame();
-                        prompt.set_running(false);
-                        prompt.set_running_status(None);
-                        let mut out = stdout();
-                        let _ = write!(out, "\r\n\x1b[31m❌ Error: {}\x1b[0m\r\n\r\n", err);
-                        let _ = out.flush();
-                    }
-                    AgentEvent::Finished { usage } => {
-                        if let Some(u) = &usage {
-                            if let Some(pt) = u.get("prompt_tokens").and_then(|v| v.as_u64()) {
-                                input_tokens = pt;
-                            }
-                            if let Some(ct) = u.get("completion_tokens").and_then(|v| v.as_u64()) {
-                                output_tokens = ct;
-                            }
-                        }
-                        if is_thinking {
-                            let _ = prompt.clear_frame();
-                            prompt.set_running_status(None);
-                        }
-                        if !tool_batch.is_empty() {
-                            render_tool_tree(&tool_batch);
-                            tool_batch.clear();
-                        }
-                        md.finish();
-                    }
-                    _ => {}
-                }
+                handle_agent_event(
+                    event,
+                    &mut tool_batch,
+                    &mut active_tool_label,
+                    &mut is_thinking,
+                    &mut output_tokens,
+                    &mut input_tokens,
+                    &mut md,
+                    prompt,
+                );
             }
         }
     }
@@ -1001,13 +1040,24 @@ pub async fn run_repl_with_session(
         runner.config_mut().default_model = session.active_model().to_string();
 
         let input = if let Some(next_prompt) = prompt_queue.pop_front() {
+            let trimmed = next_prompt.trim().to_string();
+            if trimmed.is_empty() {
+                continue;
+            }
+            clear_prompt_frame(&mut prompt);
             let mut out = stdout();
-            let _ = write!(out, "\x1b[1m┃ {}\x1b[0m\r\n\r\n", next_prompt);
+            let _ = write!(out, "\x1b[1m┃ {}\x1b[0m\r\n\r\n", trimmed);
             let _ = execute!(out, cursor::MoveToColumn(0));
             let _ = out.flush();
-            next_prompt
+            reset_prompt_render_state(&mut prompt);
+            trimmed
         } else {
             prompt.set_model(session.active_model());
+            clear_prompt_frame(&mut prompt);
+            let mut out = stdout();
+            let _ = execute!(out, cursor::MoveToColumn(0));
+            let _ = out.flush();
+            prompt.reset_render_state();
             match prompt.read_input() {
                 Ok(PromptResult::Submit(input)) => {
                     last_cancel_time = None;
@@ -1060,6 +1110,7 @@ pub async fn run_repl_with_session(
             }
             prompt.set_model(session.active_model());
             runner.config_mut().default_model = session.active_model().to_string();
+            clear_prompt_frame(&mut prompt);
             continue;
         }
 
@@ -1077,9 +1128,14 @@ pub async fn run_repl_with_session(
                 );
             }
             Err(e) => {
-                eprintln!("Error during turn: {}", e);
+                clear_prompt_frame(&mut prompt);
+                eprintln!("Error during turn: {}\r\n", e);
+                let _ = execute!(stdout(), cursor::MoveToColumn(0));
+                let _ = stdout().flush();
+                reset_prompt_render_state(&mut prompt);
             }
         }
+        clear_prompt_frame(&mut prompt);
     }
 
     Ok(())
@@ -1412,5 +1468,25 @@ mod tests {
         // After 3 seconds -> should not trigger exit
         let t2 = t0 + Duration::from_secs(3);
         assert!(t2.duration_since(last_cancel.unwrap()) > Duration::from_secs(2));
+    }
+
+    #[test]
+    fn test_reset_prompt_render_state() {
+        let mut prompt = Prompt::new();
+        prompt.last_rendered_lines = 5;
+        prompt.last_cursor_row = 2;
+        reset_prompt_render_state(&mut prompt);
+        assert_eq!(prompt.last_rendered_lines, 0);
+        assert_eq!(prompt.last_cursor_row, 0);
+    }
+
+    #[test]
+    fn test_clear_prompt_frame_state() {
+        let mut prompt = Prompt::new();
+        prompt.last_rendered_lines = 0;
+        prompt.last_cursor_row = 3;
+        clear_prompt_frame(&mut prompt);
+        assert_eq!(prompt.last_rendered_lines, 0);
+        assert_eq!(prompt.last_cursor_row, 0);
     }
 }

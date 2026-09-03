@@ -278,11 +278,13 @@ impl AcpServer {
 
             // Session Lifecycle
             "session/new" => self.handle_session_new(params).await,
+            "session/load" => self.handle_session_load(params).await,
+            "session/list" => self.handle_session_list(params).await,
+            "session/close" => self.handle_session_close(params).await,
+            "session/cancel" => self.handle_session_cancel(params).await,
 
             // Prompt Dispatching
             "session/prompt" => self.handle_session_prompt(params, out_tx).await,
-
-            // Capability queries & meta
             "models/list" => self.handle_models_list().await,
 
             _ => Err(JsonRpcError::method_not_found(method)),
@@ -490,7 +492,10 @@ impl AcpServer {
             let _ = tx.send(true);
         }
 
-        Ok(serde_json::json!({ "success": true }))
+        Ok(serde_json::json!({
+            "cancelled": true,
+            "sessionId": req.session_id
+        }))
     }
 
     async fn handle_models_list(&self) -> Result<serde_json::Value, JsonRpcError> {
@@ -807,5 +812,62 @@ mod tests {
 
         let resp = next_response(&mut out_rx).await;
         assert_eq!(resp.error.unwrap().code, error_codes::INVALID_PARAMS);
+    }
+
+    #[tokio::test]
+    async fn test_session_cancel_response() {
+        let server = test_server();
+        let (out_tx, mut out_rx) = unbounded_channel();
+
+        server
+            .process_raw_message(
+                &json!({
+                    "jsonrpc": "2.0",
+                    "id": 10,
+                    "method": "session/cancel",
+                    "params": { "sessionId": "sess-123" }
+                })
+                .to_string(),
+                out_tx,
+            )
+            .await;
+
+        let resp = next_response(&mut out_rx).await;
+        assert!(resp.error.is_none());
+        assert_eq!(
+            resp.result.unwrap(),
+            json!({
+                "cancelled": true,
+                "sessionId": "sess-123"
+            })
+        );
+    }
+
+    #[tokio::test]
+    async fn test_session_close_response() {
+        let server = test_server();
+        let (out_tx, mut out_rx) = unbounded_channel();
+
+        server
+            .process_raw_message(
+                &json!({
+                    "jsonrpc": "2.0",
+                    "id": 11,
+                    "method": "session/close",
+                    "params": { "sessionId": "sess-123" }
+                })
+                .to_string(),
+                out_tx,
+            )
+            .await;
+
+        let resp = next_response(&mut out_rx).await;
+        assert!(resp.error.is_none());
+        assert_eq!(
+            resp.result.unwrap(),
+            json!({
+                "success": true
+            })
+        );
     }
 }

@@ -278,8 +278,9 @@ pub struct InitializeResult {
 #[serde(rename_all = "camelCase")]
 pub struct AgentCapabilities {
     pub load_session: bool,
+    #[serde(rename = "prompts", default)]
     pub prompt_capabilities: PromptCapabilities,
-    #[serde(default)]
+    #[serde(rename = "mcp", default)]
     pub mcp_capabilities: Option<McpCapabilities>,
     #[serde(default)]
     pub terminal: Option<bool>,
@@ -302,9 +303,9 @@ impl Default for AgentCapabilities {
 pub struct PromptCapabilities {
     pub image: bool,
     pub audio: bool,
+    #[serde(rename = "embeddedContext", default)]
     pub embedded_resources: bool,
 }
-
 impl Default for PromptCapabilities {
     fn default() -> Self {
         Self {
@@ -574,6 +575,7 @@ pub struct SessionUpdateParams {
 #[serde(tag = "kind", rename_all = "snake_case")]
 pub enum SessionUpdate {
     /// Incremental assistant text chunk.
+    #[serde(rename_all = "camelCase")]
     AgentMessageChunk {
         content: AgentMessageContent,
         #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -584,6 +586,7 @@ pub enum SessionUpdate {
         is_last: Option<bool>,
     },
     /// Incremental thinking/reasoning chunk.
+    #[serde(rename_all = "camelCase")]
     AgentThoughtChunk {
         thought: String,
         #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -592,6 +595,7 @@ pub enum SessionUpdate {
         elapsed_ms: Option<u64>,
     },
     /// Tool execution started.
+    #[serde(rename_all = "camelCase")]
     ToolCall {
         call_id: String,
         name: String,
@@ -600,16 +604,18 @@ pub enum SessionUpdate {
         status: Option<String>,
     },
     /// Tool execution progress or intermediate status update.
+    #[serde(rename_all = "camelCase")]
     ToolStatus {
         call_id: String,
         name: String,
         status: String,
         #[serde(default, skip_serializing_if = "Option::is_none")]
-        progress: Option<f32>,
+        progress: Option<f64>,
         #[serde(default, skip_serializing_if = "Option::is_none")]
         partial_output: Option<String>,
     },
     /// Tool execution completed.
+    #[serde(rename_all = "camelCase")]
     ToolCallResult {
         call_id: String,
         name: String,
@@ -621,8 +627,13 @@ pub enum SessionUpdate {
         error: Option<String>,
     },
     /// Advisor review started.
-    AdvisorStarted { advisor: String, role: String },
+    #[serde(rename_all = "camelCase")]
+    AdvisorStarted {
+        advisor: String,
+        role: String,
+    },
     /// Advisor review feedback.
+    #[serde(rename_all = "camelCase")]
     AdvisorCritique {
         advisor: String,
         approved: bool,
@@ -635,6 +646,7 @@ pub enum SessionUpdate {
         suggestions: Option<Vec<String>>,
     },
     /// Real-time token usage and speed statistics.
+    #[serde(rename_all = "camelCase")]
     TokenStats {
         prompt_tokens: u64,
         completion_tokens: u64,
@@ -645,13 +657,15 @@ pub enum SessionUpdate {
         tokens_per_second: Option<f64>,
     },
     /// Status message or progress indicator.
+    #[serde(rename_all = "camelCase")]
     Status {
         message: String,
         #[serde(default, skip_serializing_if = "Option::is_none")]
         level: Option<String>,
     },
-    /// Execution plan update.
-    Plan { steps: Vec<String> },
+    Plan {
+        steps: Vec<String>,
+    },
     /// Subagent execution status update.
     SubagentUpdate {
         name: String,

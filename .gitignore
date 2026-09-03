@@ -11,3 +11,4 @@ reference/
 .fusion/
 *.rlib
 node_modules/
+sdk/dist/

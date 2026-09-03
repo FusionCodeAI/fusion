@@ -305,8 +305,9 @@ interface Deferred<T> {
 }
 
 function createDeferred<T>(): Deferred<T> {
-  if (typeof Promise.withResolvers === 'function') {
-    return Promise.withResolvers<T>();
+  const promiseWithResolvers = (Promise as unknown as { withResolvers?: <R>() => Deferred<R> }).withResolvers;
+  if (typeof promiseWithResolvers === 'function') {
+    return promiseWithResolvers<T>();
   }
   let resolveFunc!: (value: T | PromiseLike<T>) => void;
   let rejectFunc!: (reason?: unknown) => void;
@@ -2993,25 +2994,27 @@ export class XtermAdapter implements IDisposable {
   handleAgentEvent(event: AgentEvent): void {
     if (!this._terminal) return;
 
-    switch (event.type) {
+    const ev = event as Record<string, unknown>;
+    switch (ev.type) {
       case 'text_delta':
-        if (event.delta) {
-          this.streamToken(event.delta, 'text');
+        if (typeof ev.delta === 'string') {
+          this.streamToken(ev.delta, 'text');
         }
         break;
 
       case 'thinking_delta':
-        if (event.delta) {
-          this.streamToken(event.delta, 'thinking');
+        if (typeof ev.delta === 'string') {
+          this.streamToken(ev.delta, 'thinking');
         }
         break;
 
       case 'status':
-        if (event.message) {
+        if (ev.message) {
+          const msg = typeof ev.message === 'string' ? ev.message : String(ev.message);
           if (this._activeSpinner) {
-            this._activeSpinner.setText(event.message);
+            this._activeSpinner.setText(msg);
           } else {
-            this.writeln(`${ANSI.slate}⚙ ${event.message}${ANSI.reset}`);
+            this.writeln(`${ANSI.slate}⚙ ${msg}${ANSI.reset}`);
           }
         }
         break;
@@ -3019,35 +3022,47 @@ export class XtermAdapter implements IDisposable {
       case 'tool_started':
         this.stopSpinner(true);
         this.writeln('');
-        this.writeln(AnsiFormatter.formatToolStart(event.name, event.args));
-        this.startSpinner(`Executing ${event.name}...`);
+        this.writeln(AnsiFormatter.formatToolStart(
+          typeof ev.name === 'string' ? ev.name : '',
+          typeof ev.args === 'object' && ev.args !== null ? (ev.args as Record<string, unknown>) : undefined
+        ));
+        this.startSpinner(`Executing ${ev.name}...`);
         break;
 
       case 'tool_finished':
         this.stopSpinner(true);
-        this.writeln(AnsiFormatter.formatToolResult(event.output, event.success, event.duration_ms));
+        this.writeln(AnsiFormatter.formatToolResult(
+          typeof ev.output === 'string' ? ev.output : '',
+          Boolean(ev.success),
+          typeof ev.duration_ms === 'number' ? ev.duration_ms : undefined
+        ));
         this.writeln('');
         break;
 
       case 'advisor_critique':
         this.stopSpinner(true);
         this.writeln('');
-        this.writeln(AnsiFormatter.formatAdvisor(event.advisor, event.approved, event.critique));
+        this.writeln(AnsiFormatter.formatAdvisor(
+          typeof ev.advisor === 'string' ? ev.advisor : '',
+          Boolean(ev.approved),
+          typeof ev.critique === 'string' ? ev.critique : ''
+        ));
         this.writeln('');
         break;
 
       case 'finished':
         this.stopSpinner(true);
-        if (event.usage) {
-          if (event.usage.prompt_tokens) this._stats.promptTokens = event.usage.prompt_tokens;
-          if (event.usage.completion_tokens) this._stats.completionTokens = event.usage.completion_tokens;
+        if (ev.usage && typeof ev.usage === 'object') {
+          const usage = ev.usage as Record<string, unknown>;
+          if (typeof usage.prompt_tokens === 'number') this._stats.promptTokens = usage.prompt_tokens;
+          if (typeof usage.completion_tokens === 'number') this._stats.completionTokens = usage.completion_tokens;
           this._stats.totalTokens = this._stats.promptTokens + this._stats.completionTokens;
         }
         break;
 
       case 'error':
         this.stopSpinner(true);
-        this.writeln(`\r\n${ANSI.rose}Error: ${event.message}${ANSI.reset}`);
+        this.writeln(`\r\n${ANSI.rose}Error: ${ev.message}${ANSI.reset}`);
         break;
     }
   }

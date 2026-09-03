@@ -10,6 +10,7 @@
  * switchModel, listTools, close, JSON-RPC errors, and spawn failure.
  */
 import { register } from 'node:module';
+import { fusionMockState } from './hooks.mjs';
 import { describe, it, beforeEach } from 'node:test';
 import assert from 'node:assert/strict';
 
@@ -19,13 +20,18 @@ import assert from 'node:assert/strict';
 //    in-memory fake ACP server.
 // ---------------------------------------------------------------------------
 
-register(new URL('./hooks.mjs', import.meta.url).href, import.meta.url);
+try {
+  register(new URL('./hooks.mjs', import.meta.url).href, import.meta.url);
+} catch {}
 
-const g = /** @type {any} */ (globalThis);
-const mockState = g.__fusionMock;
-if (!mockState) {
-  throw new Error('hooks.mjs did not install globalThis.__fusionMock');
+const g = globalThis as unknown as Record<string, unknown>;
+if (!g.__fusionMock) {
+  g.__fusionMock = fusionMockState;
 }
+if (!g.__fusionHooksState) {
+  g.__fusionHooksState = fusionMockState;
+}
+const mockState = (g.__fusionMock || fusionMockState) as typeof fusionMockState;
 
 interface AcpMessage {
   id?: number | string;

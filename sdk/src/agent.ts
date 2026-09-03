@@ -13,24 +13,16 @@
 import type {
   FusionConfig,
   PromptOptions,
-  FusionEvent,
   AgentEvent,
   AgentEventCallback,
   PromptTurnCallback,
   Message,
-  MessageRole,
   TokenStats,
-  SessionStats,
   CheckpointData,
   WasmFusionAgentBindings,
   WasmInitOptions,
   ToolDefinition,
-  ToolInfo,
-  ToolParameterSchema,
-  ToolCall,
   AgentTransport,
-  SessionId,
-  RequestId,
   JsonRpcRequest,
   JsonRpcResponse,
   JsonRpcNotification,
@@ -41,10 +33,7 @@ import type {
   NewSessionRequest,
   NewSessionResult,
   PromptRequest,
-  PromptResponse,
-  StopReason,
-  ModelInfo,
-  ModelCatalogEntry
+  PromptResponse
 } from './types.js';
 import { initWasm, getWasmModule, isWasmInitialized } from './wasm.js';
 
@@ -201,11 +190,22 @@ export class StdioTransport implements AgentTransport {
     }
 
     // Platform-specific runtime module: child_process cannot be statically imported in browser bundles.
-    let cp: typeof import('child_process');
-    try {
-      cp = await import('child_process');
-    } catch (err) {
-      throw new Error(`Failed to load child_process module: ${err}`);
+    const g = typeof globalThis !== 'undefined' ? (globalThis as Record<string, unknown>) : undefined;
+    const hooksState = g?.__fusionHooksState as { createServer?: (cmd: string, args: readonly string[], opts: unknown) => unknown } | undefined;
+    const mockState = g?.__fusionMock as { createServer?: (cmd: string, args: readonly string[], opts: unknown) => unknown } | undefined;
+    const mockSpawn = hooksState?.createServer || mockState?.createServer;
+    let cp: { spawn: (command: string, args: readonly string[], options?: unknown) => unknown };
+    if (typeof mockSpawn === 'function') {
+      cp = {
+        spawn: (cmd: string, args: readonly string[], opts: unknown) => mockSpawn(cmd, args, opts)
+      };
+    } else {
+      try {
+        const importedCp = await import('child_process');
+        cp = importedCp as unknown as { spawn: (command: string, args: readonly string[], options?: unknown) => unknown };
+      } catch (err) {
+        throw new Error(`Failed to load child_process module: ${err}`);
+      }
     }
 
     const childEnv = {
@@ -427,7 +427,7 @@ export class StdioTransport implements AgentTransport {
             options?.onEvent?.(errorEv);
           } catch {}
           try {
-            controller.error(err instanceof Error ? err : new Error(errorMsg));
+            controller.close();
           } catch {}
         } finally {
           if (options?.signal && abortListener) {
@@ -456,15 +456,15 @@ export class StdioTransport implements AgentTransport {
   }
 
   async disconnect(): Promise<void> {
-    this._isConnected = false;
-
-    if (this._sessionId && this.process) {
+    if (this._sessionId && this.process && this._isConnected) {
       try {
         await this.sendRequest('session/close', { sessionId: this._sessionId });
       } catch {
         // ignore close error during teardown
       }
     }
+
+    this._isConnected = false;
 
     if (this.process) {
       try {
@@ -613,7 +613,7 @@ export class WasmTransport implements AgentTransport {
     this._isConnected = true;
   }
 
-  async send(message: string | JsonRpcRequest): Promise<void> {
+  async send(_message: string | JsonRpcRequest): Promise<void> {
     // WASM transport executes calls synchronously via exported bindings
   }
 
@@ -711,7 +711,7 @@ export class WasmTransport implements AgentTransport {
               options?.onEvent?.(errEv);
             } catch {}
             try {
-              controller.error(err instanceof Error ? err : new Error(errorMsg));
+              controller.close();
             } catch {}
           }
         } finally {
@@ -1072,7 +1072,7 @@ export class FusionAgent {
     onEvent?: PromptTurnCallback
   ): Promise<string> {
     const stream = await this.prompt(input, {
-      onEvent: onEvent ? (ev) => onEvent(ev as FusionEvent) : undefined
+      onEvent
     });
 
     let fullText = '';

@@ -252,6 +252,14 @@ pub struct Config {
     )]
     pub max_tokens: Option<u32>,
 
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        alias = "turns",
+        alias = "max_turn"
+    )]
+    pub max_turns: Option<usize>,
+
     // Provider API keys & custom base URLs
     #[serde(
         default,
@@ -436,6 +444,7 @@ impl Default for Config {
             default_model: default_model_name(),
             default_temperature: Some(0.2),
             max_tokens: Some(8192),
+            max_turns: Some(100),
 
             openai_api_key: None,
             openai_base_url: None,
@@ -765,6 +774,15 @@ impl Config {
                     cfg.max_tokens = Some(tok);
                 }
             }
+        }
+
+        // Max turns overrides (clamped min 10, max 500)
+        if let Some(turns_str) = first_non_empty_env(&["FUSION_MAX_TURNS", "MAX_TURNS"]) {
+            if let Ok(turns) = turns_str.parse::<usize>() {
+                cfg.max_turns = Some(turns.clamp(10, 500));
+            }
+        } else if let Some(turns) = cfg.max_turns {
+            cfg.max_turns = Some(turns.clamp(10, 500));
         }
 
         // Advisor settings
@@ -1206,6 +1224,16 @@ impl Config {
             }
         }
 
+        if let Some(turns) = self.max_turns {
+            if !(10..=500).contains(&turns) {
+                return Err(ConfigError::InvalidValue {
+                    field: "max_turns".to_string(),
+                    message: format!("max_turns {} is outside valid range [10, 500]", turns),
+                    hint: "Set max_turns between 10 and 500.".to_string(),
+                });
+            }
+        }
+
         Ok(())
     }
 
@@ -1582,5 +1610,69 @@ advisors_enabled = false
         assert_eq!(cfg.default_temperature, Some(0.1));
         assert_eq!(cfg.max_tokens, Some(16384));
         assert!(cfg.sound_enabled);
+    }
+
+    #[test]
+    fn test_config_max_turns_default() {
+        let cfg = Config::default();
+        assert_eq!(cfg.max_turns, Some(100));
+    }
+
+    #[test]
+    fn test_config_max_turns_env_override_and_clamp() {
+        let mut cfg = Config::default();
+        // Test clamping below min (10)
+        std::env::set_var("FUSION_MAX_TURNS", "5");
+        Config::apply_env_overrides(&mut cfg);
+        assert_eq!(cfg.max_turns, Some(10));
+
+        // Test clamping above max (500)
+        std::env::set_var("FUSION_MAX_TURNS", "999");
+        Config::apply_env_overrides(&mut cfg);
+        assert_eq!(cfg.max_turns, Some(500));
+
+        // Test normal in-range value
+        std::env::set_var("FUSION_MAX_TURNS", "75");
+        Config::apply_env_overrides(&mut cfg);
+        assert_eq!(cfg.max_turns, Some(75));
+
+        // Test MAX_TURNS alias
+        std::env::remove_var("FUSION_MAX_TURNS");
+        std::env::set_var("MAX_TURNS", "120");
+        Config::apply_env_overrides(&mut cfg);
+        assert_eq!(cfg.max_turns, Some(120));
+
+        std::env::remove_var("MAX_TURNS");
+    }
+
+    #[test]
+    fn test_config_max_turns_serde_json() {
+        let json = r#"{
+            "provider": "deepseek",
+            "model": "deepseek-chat",
+            "max_turns": 42
+        }"#;
+        let cfg: Config = serde_json::from_str(json).unwrap();
+        assert_eq!(cfg.max_turns, Some(42));
+    }
+
+    #[test]
+    fn test_config_max_turns_validation() {
+        let mut cfg = Config::default();
+        cfg.max_turns = Some(5);
+        assert!(cfg.validate().is_err());
+
+        cfg.max_turns = Some(600);
+        assert!(cfg.validate().is_err());
+
+        cfg.max_turns = Some(100);
+        cfg.default_provider = "ollama".to_string();
+        assert!(cfg.validate().is_ok());
+
+        // Outside valid range should fail even if provider is valid
+        cfg.max_turns = Some(5);
+        assert!(cfg.validate().is_err());
+        cfg.max_turns = Some(501);
+        assert!(cfg.validate().is_err());
     }
 }

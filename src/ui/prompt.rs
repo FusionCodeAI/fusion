@@ -71,7 +71,7 @@ impl Prompt {
             history_idx: None,
             prompt_symbol: "\x1b[1m┃\x1b[0m ".to_string(),
             multiline_symbol: "\x1b[1m┃\x1b[0m ".to_string(),
-            placeholder: None,
+            placeholder: Some("Type a message or / for commands...".to_string()),
             key_handler: KeyHandler::new(KeybindingProfile::Default),
             show_mode_indicator: false,
             slash_selection: 0,
@@ -340,15 +340,23 @@ impl Prompt {
         self.effort_picker_active = false;
         self.effort_selection = 0;
         self.pending_model_id.clear();
-        self.last_rendered_lines = 0;
-        self.last_cursor_row = 0;
+        self.reset_render_state();
         self.running_status = None;
         self.queued_count = 0;
         self.is_running = false;
+        self.cancel_pressed = false;
         if self.key_handler.profile() == KeybindingProfile::Vi {
             self.key_handler.set_vi_mode(ViMode::Insert);
         }
         self.key_handler.clear_pending();
+    }
+
+    /// Reset rendered lines and cursor row tracking.
+    /// Call this whenever external output has been printed to stdout (e.g. streaming markdown deltas,
+    /// tool execution tree, turn stats) causing the terminal to scroll and invalidating prior cursor offsets.
+    pub fn reset_render_state(&mut self) {
+        self.last_rendered_lines = 0;
+        self.last_cursor_row = 0;
     }
 
     /// Update active running/thinking status banner displayed above the prompt.
@@ -374,6 +382,9 @@ impl Prompt {
     /// Update active running state of the prompt.
     pub fn set_running(&mut self, running: bool) {
         self.is_running = running;
+        if !running {
+            self.reset_render_state();
+        }
     }
 
     /// Builder method to set active running state.
@@ -407,9 +418,19 @@ impl Prompt {
 
     /// Erase the rendered prompt frame from screen.
     pub fn clear_frame(&mut self) -> std::io::Result<()> {
+        if self.last_rendered_lines == 0
+            || self.last_cursor_row > 50
+            || self.last_rendered_lines > 50
+        {
+            self.reset_render_state();
+            return Ok(());
+        }
+        let term_rows = terminal::size().map(|(_, h)| h as usize).unwrap_or(24);
+        let max_up = term_rows.saturating_sub(1).min(50);
+        let up = self.last_cursor_row.min(max_up);
         let mut out = stdout();
-        if self.last_cursor_row > 0 {
-            execute!(out, cursor::MoveUp(self.last_cursor_row as u16))?;
+        if up > 0 {
+            execute!(out, cursor::MoveUp(up as u16))?;
         }
         execute!(
             out,
@@ -417,8 +438,7 @@ impl Prompt {
             terminal::Clear(ClearType::FromCursorDown)
         )?;
         out.flush()?;
-        self.last_rendered_lines = 0;
-        self.last_cursor_row = 0;
+        self.reset_render_state();
         Ok(())
     }
 
@@ -697,8 +717,7 @@ impl Prompt {
                             terminal::Clear(ClearType::All),
                             cursor::MoveTo(0, 0)
                         );
-                        self.last_rendered_lines = 0;
-                        self.last_cursor_row = 0;
+                        self.reset_render_state();
                         self.render_current()?;
                         Ok(None)
                     }
@@ -720,6 +739,7 @@ impl Prompt {
                 Ok(None)
             }
             Event::Resize(_, _) => {
+                self.reset_render_state();
                 self.render_current()?;
                 Ok(None)
             }
@@ -730,9 +750,11 @@ impl Prompt {
     /// Read an interactive line / multiline input from user.
     pub fn read_input(&mut self) -> std::io::Result<PromptResult> {
         let _raw_guard = RawModeGuard::enter()?;
+        if self.last_rendered_lines > 0 {
+            self.clear_frame()?;
+        }
         self.reset_input();
         self.render_current()?;
-
         loop {
             let ev = event::read()?;
             if let Some(res) = self.handle_event(ev)? {
@@ -802,9 +824,22 @@ impl Prompt {
             Vec::new()
         };
 
+        let (term_cols, term_rows) = terminal::size()
+            .map(|(w, h)| (w as usize, h as usize))
+            .unwrap_or((80, 24));
+        let max_up = term_rows.saturating_sub(1).min(50);
+
         // Clear previous frame using exact relative cursor movement
-        if *last_cursor_row > 0 {
-            execute!(out, cursor::MoveUp(*last_cursor_row as u16))?;
+        // Guard against out-of-bounds relative cursor jumps that erase streamed terminal content
+        if *last_rendered_lines > 0
+            && *last_cursor_row > 0
+            && *last_cursor_row <= 50
+            && *last_rendered_lines <= 50
+        {
+            let up = (*last_cursor_row).min(max_up);
+            if up > 0 {
+                execute!(out, cursor::MoveUp(up as u16))?;
+            }
         }
         execute!(
             out,
@@ -815,7 +850,13 @@ impl Prompt {
         let mut total_lines = 0;
 
         let running_lines = if let Some(status) = &self.running_status {
-            write!(out, "  \x1b[2;37m{}\x1b[0m\r\n\r\n", status)?;
+            let max_w = term_cols.saturating_sub(4);
+            let display_status = if max_w > 0 {
+                truncate_fit(status, max_w)
+            } else {
+                status.clone()
+            };
+            write!(out, "\x1b[2K  \x1b[2;37m{}\x1b[0m\r\n\r\n", display_status)?;
             2
         } else {
             0
@@ -844,7 +885,11 @@ impl Prompt {
 
             write!(out, "{}", prefix)?;
             if idx == 0 && line.is_empty() && lines.len() == 1 {
-                if let Some(ph) = &self.placeholder {
+                let ph = self
+                    .placeholder
+                    .as_deref()
+                    .unwrap_or("Type a message or / for commands...");
+                if !ph.is_empty() {
                     write!(out, "\x1b[2;37m{}\x1b[0m", ph)?;
                 }
             } else {
@@ -854,7 +899,6 @@ impl Prompt {
             total_lines += 1;
         }
 
-        let term_cols = terminal::size().map(|(w, _)| w as usize).unwrap_or(80);
         let divider = "─".repeat(term_cols);
 
         // 2. Dropdown menu below the input line (matching fx)
@@ -903,7 +947,7 @@ impl Prompt {
             write!(out, "\x1b[2;37m{}\x1b[0m", status_text)?;
             total_lines += 1;
 
-            let lines_up = (lines.len() - 1 - target_row) + EFFORT_OPTIONS.len() + 3;
+            let lines_up = ((lines.len() - 1 - target_row) + EFFORT_OPTIONS.len() + 3).min(max_up);
             execute!(out, cursor::MoveUp(lines_up as u16))?;
             let prefix = if target_row == 0 {
                 &self.prompt_symbol
@@ -999,7 +1043,7 @@ impl Prompt {
             )?;
             total_lines += 1;
 
-            let lines_up = (lines.len() - 1 - target_row) + visible_count + 5;
+            let lines_up = ((lines.len() - 1 - target_row) + visible_count + 5).min(max_up);
             execute!(out, cursor::MoveUp(lines_up as u16))?;
             let prefix = if target_row == 0 {
                 &self.prompt_symbol
@@ -1093,7 +1137,7 @@ impl Prompt {
             )?;
             total_lines += 1;
 
-            let lines_up = (lines.len() - 1 - target_row) + visible_count + 5;
+            let lines_up = ((lines.len() - 1 - target_row) + visible_count + 5).min(max_up);
             execute!(out, cursor::MoveUp(lines_up as u16))?;
             let prefix = if target_row == 0 {
                 &self.prompt_symbol
@@ -1111,7 +1155,16 @@ impl Prompt {
             write!(out, "\r\n")?;
             total_lines += 1;
             let model_label = crate::ui::repl::format_model_label(&self.active_model);
-            let mut status_body = format!("auto · {}", model_label);
+            let mode_prefix = if self.show_mode_indicator {
+                if let Some(indicator) = self.key_handler.mode_indicator() {
+                    format!("{} ", indicator)
+                } else {
+                    String::new()
+                }
+            } else {
+                String::new()
+            };
+            let mut status_body = format!("{}auto · {}", mode_prefix, model_label);
             if let Some(effort) = &self.selected_effort {
                 status_body.push_str(&format!(" · {}", effort));
             }
@@ -1125,11 +1178,11 @@ impl Prompt {
             } else {
                 status_body
             };
-            write!(out, "\x1b[2;37m{}\x1b[0m", status_text)?;
+            write!(out, "\x1b[2;37m{}\x1b[0m\r\n", status_text)?;
             total_lines += 1;
 
             // Reposition cursor inside input box on active input row
-            let lines_up = (lines.len() - 1 - target_row) + 2;
+            let lines_up = ((lines.len() - 1 - target_row) + 3).min(max_up);
             execute!(out, cursor::MoveUp(lines_up as u16))?;
 
             let prefix = if target_row == 0 {
@@ -1938,6 +1991,38 @@ mod tests {
     }
 
     #[test]
+    fn test_render_long_running_status_truncated_and_cleared() {
+        let mut prompt = Prompt::new().with_model("xai/grok-4.6");
+        let long_status = "Running cd /Users/aungmyatmoe/Workshop && for d in react-js-project-very-long-path-name-exceeding-columns; do echo $d; done (22s) (↑100 ↓200)";
+        prompt.set_running_status(Some(long_status.to_string()));
+
+        let mut buf = Vec::new();
+        let buffer: Vec<char> = Vec::new();
+        let mut last_lines = 0;
+        let mut last_cursor = 0;
+
+        prompt
+            .render_to(&mut buf, &buffer, 0, &mut last_lines, &mut last_cursor)
+            .expect("render_to long running status failed");
+
+        let raw = String::from_utf8_lossy(&buf);
+        assert!(
+            raw.contains("\x1b[2K  \x1b[2;37m"),
+            "Missing line clear sequence in:\n{}",
+            raw
+        );
+        assert!(
+            raw.contains("…\x1b[0m"),
+            "Long status should be truncated with ellipsis in:\n{}",
+            raw
+        );
+        assert_eq!(
+            last_cursor, 2,
+            "last_cursor_row should still be 2 (single unwrapped line + 1 blank line)"
+        );
+    }
+
+    #[test]
     fn test_render_idle_prompt_status_line() {
         let prompt = Prompt::new().with_model("xai/grok-4.6");
 
@@ -2019,5 +2104,184 @@ mod tests {
         );
         assert!(prompt.buffer.is_empty());
         assert_eq!(prompt.cursor_pos, 0);
+    }
+
+    #[test]
+    fn test_reset_render_state() {
+        let mut prompt = Prompt::new();
+        prompt.last_rendered_lines = 10;
+        prompt.last_cursor_row = 4;
+        prompt.reset_render_state();
+        assert_eq!(prompt.last_rendered_lines, 0);
+        assert_eq!(prompt.last_cursor_row, 0);
+    }
+
+    #[test]
+    fn test_clear_frame_noop_when_not_rendered() {
+        let mut prompt = Prompt::new();
+        prompt.reset_render_state();
+        assert_eq!(prompt.last_rendered_lines, 0);
+        assert_eq!(prompt.last_cursor_row, 0);
+        assert!(prompt.clear_frame().is_ok());
+        assert_eq!(prompt.last_rendered_lines, 0);
+        assert_eq!(prompt.last_cursor_row, 0);
+    }
+
+    #[test]
+    fn test_render_to_empty_buffer_renders_full_box_and_placeholder() {
+        let prompt = Prompt::new().with_model("deepseek-ai/DeepSeek-V4-Flash-0731");
+        let mut buf = Vec::new();
+        let buffer: Vec<char> = Vec::new();
+        let mut last_lines = 0;
+        let mut last_cursor = 0;
+
+        prompt
+            .render_to(&mut buf, &buffer, 0, &mut last_lines, &mut last_cursor)
+            .expect("render_to should succeed");
+
+        let raw = String::from_utf8_lossy(&buf);
+
+        // 1. Input line has rail ┃
+        assert!(raw.contains('┃'), "Must contain rail symbol '┃':\n{}", raw);
+        // 2. Placeholder text is present
+        assert!(
+            raw.contains("Type a message or / for commands..."),
+            "Empty buffer must render placeholder text:\n{}",
+            raw
+        );
+        // 3. Status footer is present
+        assert!(
+            raw.contains("auto · DeepSeek V4 Flash"),
+            "Status footer must be rendered:\n{}",
+            raw
+        );
+        // 4. Cursor tracking: 0 running lines, target_row 0 => last_cursor = 0
+        assert_eq!(last_cursor, 0);
+        // 5. Total lines rendered: 1 input + 1 spacer + 1 status line = 3
+        assert_eq!(last_lines, 3);
+    }
+
+    #[test]
+    fn test_render_to_does_not_move_up_when_last_rendered_lines_is_zero() {
+        let prompt = Prompt::new().with_model("MiniMaxAI/MiniMax-M2.7");
+        let mut buf = Vec::new();
+        let buffer: Vec<char> = "hello".chars().collect();
+        let mut last_lines = 0;
+        let mut last_cursor = 10; // Stale cursor row from before terminal scroll
+
+        prompt
+            .render_to(&mut buf, &buffer, 5, &mut last_lines, &mut last_cursor)
+            .expect("render_to should succeed");
+
+        let raw = String::from_utf8_lossy(&buf);
+        // Must NOT contain MoveUp escape sequence before Clear
+        assert!(
+            !raw.contains("\x1b[10A"),
+            "Must not attempt MoveUp when last_rendered_lines is 0:\n{:?}",
+            raw
+        );
+    }
+
+    #[test]
+    fn test_render_to_multiline_input_rails() {
+        let prompt = Prompt::new().with_model("xai/grok-4.6");
+        let mut buf = Vec::new();
+        let text = "line 1\nline 2\nline 3";
+        let buffer: Vec<char> = text.chars().collect();
+        let mut last_lines = 0;
+        let mut last_cursor = 0;
+
+        prompt
+            .render_to(
+                &mut buf,
+                &buffer,
+                text.len(),
+                &mut last_lines,
+                &mut last_cursor,
+            )
+            .expect("render_to multiline should succeed");
+
+        let raw = String::from_utf8_lossy(&buf);
+        assert!(raw.contains("line 1"));
+        assert!(raw.contains("line 2"));
+        assert!(raw.contains("line 3"));
+        assert!(raw.contains('┃'));
+        assert!(raw.contains("auto · grok-4.6"));
+    }
+
+    #[test]
+    fn test_clear_frame_guards_against_out_of_bounds_cursor_row() {
+        let mut prompt = Prompt::new();
+        prompt.last_rendered_lines = 100;
+        prompt.last_cursor_row = 75;
+        assert!(prompt.clear_frame().is_ok());
+        assert_eq!(prompt.last_rendered_lines, 0);
+        assert_eq!(prompt.last_cursor_row, 0);
+    }
+
+    #[test]
+    fn test_render_to_does_not_move_up_when_last_cursor_exceeds_threshold() {
+        let prompt = Prompt::new().with_model("MiniMaxAI/MiniMax-M2.7");
+        let mut buf = Vec::new();
+        let buffer: Vec<char> = "hello".chars().collect();
+        let mut last_lines = 60;
+        let mut last_cursor = 55; // Corrupted / stale cursor row beyond 50
+
+        prompt
+            .render_to(&mut buf, &buffer, 5, &mut last_lines, &mut last_cursor)
+            .expect("render_to should succeed");
+
+        let raw = String::from_utf8_lossy(&buf);
+        assert!(
+            !raw.contains("\x1b[50A") && !raw.contains("\x1b[55A"),
+            "Must not attempt MoveUp when last_cursor_row > 50:\n{:?}",
+            raw
+        );
+    }
+
+    #[test]
+    fn test_set_running_false_resets_render_state() {
+        let mut prompt = Prompt::new();
+        prompt.set_running(true);
+        prompt.last_rendered_lines = 10;
+        prompt.last_cursor_row = 5;
+        prompt.set_running(false);
+        assert_eq!(prompt.last_rendered_lines, 0);
+        assert_eq!(prompt.last_cursor_row, 0);
+    }
+
+    #[test]
+    fn test_clear_frame_when_last_rendered_lines_zero_even_with_cursor_row() {
+        let mut prompt = Prompt::new();
+        prompt.last_rendered_lines = 0;
+        prompt.last_cursor_row = 15;
+        assert!(prompt.clear_frame().is_ok());
+        assert_eq!(prompt.last_rendered_lines, 0);
+        assert_eq!(prompt.last_cursor_row, 0);
+    }
+
+    #[test]
+    fn test_render_to_status_line_ends_with_newline() {
+        let prompt = Prompt::new().with_model("xai/grok-4.6");
+        let mut buf = Vec::new();
+        let buffer: Vec<char> = Vec::new();
+        let mut last_lines = 0;
+        let mut last_cursor = 0;
+
+        prompt
+            .render_to(&mut buf, &buffer, 0, &mut last_lines, &mut last_cursor)
+            .expect("render_to failed");
+
+        let raw = String::from_utf8_lossy(&buf);
+        assert!(
+            raw.contains("\x1b[2;37mauto · grok-4.6\x1b[0m\r\n"),
+            "Status line must end with \\r\\n in:\n{}",
+            raw
+        );
+        assert!(
+            raw.contains("\x1b[3A"),
+            "Cursor must be moved up 3 lines to active input line in:\n{}",
+            raw
+        );
     }
 }

@@ -46,6 +46,10 @@ pub struct Cli {
     /// Resume a previously saved session by id or prefix
     #[arg(short = 'r', long, value_name = "SESSION_ID")]
     pub resume: Option<String>,
+
+    /// Maximum execution turns per agent turn (defaults to 100, clamped 10..=500)
+    #[arg(long, value_name = "N")]
+    pub max_turns: Option<usize>,
 }
 
 #[cfg(test)]
@@ -59,5 +63,11 @@ mod tests {
 
         let cli_short = Cli::try_parse_from(["fusion", "-P", "offline-ollama"]).unwrap();
         assert_eq!(cli_short.preset.as_deref(), Some("offline-ollama"));
+    }
+
+    #[test]
+    fn test_cli_max_turns_flag() {
+        let cli = Cli::try_parse_from(["fusion", "--max-turns", "75"]).unwrap();
+        assert_eq!(cli.max_turns, Some(75));
     }
 }

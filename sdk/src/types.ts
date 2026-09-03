@@ -1319,14 +1319,14 @@ export type FusionEvent =
   | ErrorEvent;
 
 /**
- * Callback function type receiving streaming events.
- */
-export type PromptTurnCallback = (event: FusionEvent) => void;
-
-/**
  * Real-time event emitted during agent turn execution for terminal adapters.
  */
 export type AgentEvent = FusionEvent | { type: string; [key: string]: unknown };
+
+/**
+ * Callback function type receiving streaming events.
+ */
+export type PromptTurnCallback = (event: AgentEvent) => void;
 
 /**
  * Callback function for receiving real-time agent streaming events.

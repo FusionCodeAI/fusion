@@ -692,9 +692,17 @@ mod virtual_filesystem_tests {
 
     impl InMemoryVfs {
         pub fn new() -> Self {
-            let mut fs = Self {
+            Self::with_seeded_files()
+        }
+
+        pub fn empty() -> Self {
+            Self {
                 files: HashMap::new(),
-            };
+            }
+        }
+
+        pub fn with_seeded_files() -> Self {
+            let mut fs = Self::empty();
             fs.write(
                 "README.md",
                 "# Fusion Web Agent\n\nFast, lightweight pure-Rust AI coding assistant running directly in WebAssembly.\n",
@@ -886,7 +894,7 @@ mod virtual_filesystem_tests {
 
     #[test]
     fn test_vfs_seeded_files_and_initialization() {
-        let vfs = InMemoryVfs::new();
+        let vfs = InMemoryVfs::with_seeded_files();
         let files = vfs.list_files();
 
         assert_eq!(files.len(), 3);
@@ -980,7 +988,7 @@ mod virtual_filesystem_tests {
         let mut vfs = InMemoryVfs::new();
         vfs.write(
             "src/agent.rs",
-            "// Agent Module\npub struct Agent;\nimpl Agent {\n    pub fn run() {}\n}\n",
+            "// Agent Module\npub struct Agent;\nimpl Runner {\n    pub fn run() {}\n}\n",
         );
         vfs.write(
             "tests/agent_test.rs",
@@ -989,7 +997,7 @@ mod virtual_filesystem_tests {
 
         // Substring grep across all files
         let all_hits = vfs.grep("Agent", None);
-        assert_eq!(all_hits.len(), 4); // 2 in src/agent.rs, 2 in tests/agent_test.rs
+        assert_eq!(all_hits.len(), 5); // 1 in README.md, 2 in src/agent.rs, 2 in tests/agent_test.rs
 
         // Path filtered grep
         let src_hits = vfs.grep("Agent", Some("src"));
@@ -1084,7 +1092,7 @@ mod virtual_filesystem_tests {
         // wc
         let (ok_wc, wc_out) = vfs.execute_bash("wc notes.txt");
         assert!(ok_wc);
-        assert_eq!(wc_out, "2 5 25 notes.txt");
+        assert_eq!(wc_out, "2 6 25 notes.txt");
 
         // rm
         let (ok_rm, rm_out) = vfs.execute_bash("rm notes.txt");
@@ -1231,12 +1239,13 @@ mod event_stream_serialization_tests {
             call_id: "call_bash_02".to_string(),
             name: "bash".to_string(),
             status: "compiling".to_string(),
-            progress: Some(0.65),
+            progress: Some(0.65f64),
             partial_output: Some("Building 42/65 targets...".to_string()),
         };
         let status_val = serde_json::to_value(&tool_status).expect("serialize ToolStatus");
         assert_eq!(status_val["kind"], "tool_status");
-        assert_eq!(status_val["progress"], 0.65);
+        assert_eq!(status_val["progress"].as_f64(), Some(0.65f64));
+        assert!((status_val["progress"].as_f64().unwrap() - 0.65f64).abs() < f64::EPSILON);
         assert_eq!(status_val["partialOutput"], "Building 42/65 targets...");
 
         // 3. ToolCallResult (Completed Success)

@@ -692,7 +692,7 @@
     // Model & Agent config
     activeModel: localStorage.getItem('fusion_model') || 'anthropic/claude-3-5-sonnet',
     temperature: parseFloat(localStorage.getItem('fusion_temp') || '0.2'),
-    maxTurns: parseInt(localStorage.getItem('fusion_max_turns') || '30', 10),
+    maxTurns: parseInt(localStorage.getItem('fusion_max_turns') || '100', 10),
     systemPrompt: localStorage.getItem('fusion_system_prompt') || '',
     
     // Active session
@@ -2537,7 +2537,7 @@ fn partition<T: Ord>(arr: &mut [T]) -> usize {
         }
 
         if (maxTurnsInput) {
-          state.maxTurns = parseInt(maxTurnsInput.value, 10) || 30;
+          state.maxTurns = parseInt(maxTurnsInput.value, 10) || 100;
           localStorage.setItem('fusion_max_turns', state.maxTurns);
         }
 

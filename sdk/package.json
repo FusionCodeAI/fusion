@@ -39,7 +39,7 @@
     "build:clean": "rm -rf dist && tsc",
     "lint": "tsc --noEmit",
     "typecheck": "tsc --noEmit",
-    "test": "node --test tests/*.test.js 2>/dev/null || true",
+    "test": "bun test || node --experimental-strip-types --test tests/agent.test.ts",
     "prepublishOnly": "npm run build"
   },
   "repository": {

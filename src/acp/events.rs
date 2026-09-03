@@ -132,7 +132,7 @@ pub struct ToolStatusUpdate {
     pub args: Option<serde_json::Value>,
     /// Progress fraction between 0.0 and 1.0 if measurable.
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub progress: Option<f32>,
+    pub progress: Option<f64>,
     /// Streaming partial output chunk if active.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub partial_output: Option<String>,
@@ -395,7 +395,7 @@ impl AcpSessionEvent {
         call_id: impl Into<String>,
         name: impl Into<String>,
         status: impl Into<String>,
-        progress: Option<f32>,
+        progress: Option<f64>,
         partial_output: Option<String>,
     ) -> Self {
         Self::ToolProgress(ToolStatusUpdate {
@@ -1002,11 +1002,16 @@ impl AcpEventBridge {
                     id
                 };
 
+                let explicit_dur = duration.as_millis() as u64;
                 let computed_duration_ms =
                     if let Some((_, start)) = self.active_tools.remove(&call_id) {
-                        start.elapsed().as_millis() as u64
+                        if explicit_dur > 0 {
+                            explicit_dur
+                        } else {
+                            start.elapsed().as_millis() as u64
+                        }
                     } else {
-                        duration.as_millis() as u64
+                        explicit_dur
                     };
 
                 let status = if success {

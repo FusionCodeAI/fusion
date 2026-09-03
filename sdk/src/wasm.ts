@@ -12,18 +12,8 @@ import type {
   WasmInitOptions,
   FusionConfig,
   FusionEvent,
-  StatusEvent,
-  TextDeltaEvent,
-  ThinkingDeltaEvent,
-  ToolStartedEvent,
-  ToolFinishedEvent,
-  AdvisorStartedEvent,
-  AdvisorCritiqueEvent,
   FinishedEvent,
-  ErrorEvent,
-  PromptTurnCallback,
-  CheckpointData,
-  Message
+  PromptTurnCallback
 } from './types.js';
 
 // ============================================================================
@@ -181,7 +171,8 @@ export async function loadFusionWasm(wasmSource?: WasmSourceInput): Promise<Fusi
       if (isNode) {
         try {
           // Dynamic import: wasm-bindgen JS bundle is only present in Node/bundled environments, not in browser
-          const wasmBindgen = await import('../wasm/fusion.js').catch(() => null);
+          const wasmModulePath = '../wasm/fusion.js';
+          const wasmBindgen = await import(/* @vite-ignore */ wasmModulePath).catch(() => null);
           if (wasmBindgen && wasmBindgen.default) {
             let bindgenInput: unknown = source;
             if (!bindgenInput) {
@@ -325,9 +316,10 @@ export async function loadFusionWasm(wasmSource?: WasmSourceInput): Promise<Fusi
           } else {
             const bytes = binaryBuffer ?? (responseSource ? await responseSource.arrayBuffer() : null);
             if (bytes) {
-              const result = await WebAssembly.instantiate(bytes, wasmImports);
-              instance = (result as WebAssembly.WebAssemblyInstantiatedSource).instance || (result as unknown as WebAssembly.Instance);
-              module = (result as WebAssembly.WebAssemblyInstantiatedSource).module || (await WebAssembly.compile(bytes));
+              const bufferSource = bytes as BufferSource;
+              const result = await WebAssembly.instantiate(bufferSource, wasmImports);
+              instance = result.instance;
+              module = result.module;
             } else {
               throw new Error('No valid WASM bytes available');
             }

@@ -990,7 +990,7 @@ impl JsonLogEvent {
                 &update.call_id,
                 &update.name,
                 update.partial_output.clone(),
-                update.progress,
+                update.progress.map(|p| p as f32),
                 Some(update.status.clone()),
             ),
             AcpSessionEvent::ToolCompleted(update) => {

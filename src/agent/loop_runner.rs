@@ -83,6 +83,7 @@ impl AgentRunner {
         tools: ToolRegistry,
         tool_ctx: ToolContext,
     ) -> Self {
+        let max_turns = config.max_turns.unwrap_or(100).clamp(10, 500);
         Self {
             client,
             config,
@@ -96,7 +97,7 @@ impl AgentRunner {
                 crate::agent::undo::CheckpointManager::new(tool_ctx.cwd.clone()),
             )),
             system_prompt: None,
-            max_turns: 30,
+            max_turns,
         }
     }
 
@@ -190,6 +191,11 @@ impl AgentRunner {
     pub fn with_max_turns(mut self, max: usize) -> Self {
         self.max_turns = max;
         self
+    }
+
+    /// Returns the maximum tool loop turns per user turn.
+    pub fn max_turns(&self) -> usize {
+        self.max_turns
     }
 
     /// Returns a reference to the LLM client.
@@ -665,12 +671,98 @@ impl AgentRunner {
             }
         }
 
-        let err_msg = format!(
-            "Agent reached maximum execution turns ({}) without completing",
-            self.max_turns
+        // Agent reached maximum execution turns. Check for active file edits and ongoing
+        // tasks, save session state, and provide a helpful resumption message rather than a crash error.
+        let mut modified_files = std::collections::BTreeSet::new();
+        let mut edit_count = 0;
+
+        if let Ok(mgr) = self.checkpoints.lock() {
+            let active = mgr.list_checkpoints();
+            edit_count = active.len();
+            for chk in &active {
+                for path in &chk.files {
+                    modified_files.insert(path.to_string_lossy().to_string());
+                }
+            }
+        }
+
+        if modified_files.is_empty() {
+            let patch = session.session_patch();
+            for path in patch.file_paths() {
+                modified_files.insert(path.to_string_lossy().to_string());
+            }
+            if edit_count == 0 {
+                edit_count = patch.file_count();
+            }
+        }
+
+        let last_tool_calls: Vec<String> = session
+            .messages()
+            .iter()
+            .rev()
+            .find_map(|m| {
+                m.tool_calls.as_ref().and_then(|calls| {
+                    if !calls.is_empty() {
+                        Some(calls.iter().map(|tc| tc.name.clone()).collect())
+                    } else {
+                        None
+                    }
+                })
+            })
+            .unwrap_or_default();
+
+        let has_skill_state = !session.execution_state.is_empty();
+
+        let mut resume_msg = format!("Agent completed {} turns.\n\n", self.max_turns);
+
+        if !modified_files.is_empty() {
+            resume_msg.push_str(&format!(
+                "Active file edits ({} file{} modified):\n",
+                modified_files.len(),
+                if modified_files.len() == 1 { "" } else { "s" }
+            ));
+            for file in modified_files.iter().take(10) {
+                resume_msg.push_str(&format!("  • {}\n", file));
+            }
+            if modified_files.len() > 10 {
+                resume_msg.push_str(&format!(
+                    "  • ... and {} more files\n",
+                    modified_files.len() - 10
+                ));
+            }
+            resume_msg.push('\n');
+        } else if edit_count > 0 {
+            resume_msg.push_str(&format!(
+                "Active file edits: {} checkpoint(s) saved.\n\n",
+                edit_count
+            ));
+        }
+
+        if !last_tool_calls.is_empty() {
+            resume_msg.push_str(&format!(
+                "Ongoing tasks / last tools executed: {}\n\n",
+                last_tool_calls.join(", ")
+            ));
+        }
+
+        if has_skill_state {
+            resume_msg.push_str(&format!(
+                "Task execution state: Step {}\n\n",
+                session.execution_state.step
+            ));
+        }
+
+        resume_msg.push_str(
+            "Session state has been saved. You can continue execution at any time by asking the agent to continue or providing the next prompt."
         );
-        let _ = self.recovery.on_turn_error(&err_msg);
-        anyhow::bail!(err_msg);
+
+        let _ = event_tx.send(AgentEvent::TextDelta(resume_msg.clone()));
+        let _ = event_tx.send(AgentEvent::Finished { usage: None });
+        session.add_assistant_message(&resume_msg);
+        let _ = session.save();
+        let _ = self.recovery.on_turn_completed(session);
+
+        Ok(resume_msg)
     }
 }
 
@@ -753,5 +845,68 @@ mod tests {
             full_content.to_string()
         };
         assert_eq!(resolved_empty, "(empty response)");
+    }
+
+    #[test]
+    fn test_max_turns_resume_message_structure() {
+        let max_turns = 100;
+        let mut modified_files = std::collections::BTreeSet::new();
+        modified_files.insert("src/main.rs".to_string());
+        modified_files.insert("package.json".to_string());
+        let _edit_count = 2;
+        let last_tool_calls = vec!["edit".to_string(), "bash".to_string()];
+
+        let mut resume_msg = format!("Agent completed {} turns.\n\n", max_turns);
+        if !modified_files.is_empty() {
+            resume_msg.push_str(&format!(
+                "Active file edits ({} file{} modified):\n",
+                modified_files.len(),
+                if modified_files.len() == 1 { "" } else { "s" }
+            ));
+            for file in modified_files.iter().take(10) {
+                resume_msg.push_str(&format!("  • {}\n", file));
+            }
+            resume_msg.push('\n');
+        }
+        if !last_tool_calls.is_empty() {
+            resume_msg.push_str(&format!(
+                "Ongoing tasks / last tools executed: {}\n\n",
+                last_tool_calls.join(", ")
+            ));
+        }
+        resume_msg.push_str(
+            "Session state has been saved. You can continue execution at any time by asking the agent to continue or providing the next prompt."
+        );
+
+        assert!(resume_msg.contains("Agent completed 100 turns."));
+        assert!(resume_msg.contains("Active file edits (2 files modified):"));
+        assert!(resume_msg.contains("package.json"));
+        assert!(resume_msg.contains("src/main.rs"));
+        assert!(resume_msg.contains("Ongoing tasks / last tools executed: edit, bash"));
+        assert!(resume_msg.contains("Session state has been saved."));
+        assert!(resume_msg.contains("continue"));
+    }
+
+    #[test]
+    fn test_agent_runner_default_max_turns() {
+        let client = LlmClient::new();
+        let config = Config::default();
+        let tools = ToolRegistry::new();
+        let ctx = ToolContext::default();
+
+        let runner = AgentRunner::new(client, config, tools, ctx);
+        assert_eq!(runner.max_turns(), 100);
+    }
+
+    #[test]
+    fn test_agent_runner_custom_config_max_turns() {
+        let client = LlmClient::new();
+        let mut config = Config::default();
+        config.max_turns = Some(150);
+        let tools = ToolRegistry::new();
+        let ctx = ToolContext::default();
+
+        let runner = AgentRunner::new(client, config, tools, ctx);
+        assert_eq!(runner.max_turns(), 150);
     }
 }
