@@ -14,7 +14,6 @@
 
 [**Quick Install**](#quick-install) • [**Quickstart**](#quickstart) • [**Vision**](#vision) • [**Core Features**](#features) • [**Multi-Agent Mesh & Advisors**](#multi-agent-mesh--advisors) • [**Architecture**](#architecture-overview) • [**Configuration**](#configuration) • [**Contributing**](#contributing)
 
----
 
 </div>
 
@@ -81,11 +80,8 @@ cargo build --release
 
 ### 6. Browser WebAssembly (Zero Install)
 
-Experience Fusion immediately in your browser with zero installation:
-- **Live Demo**: [https://fx.sh/try](https://fx.sh/try)
-- Features the interactive tabbed model selector, client-side virtual filesystem, and direct browser LLM streaming.
+Experience Fusion immediately in your browser with zero installation via WebAssembly — featuring the interactive tabbed model selector, client-side virtual filesystem, and direct browser LLM streaming.
 
----
 
 ## <a id="quickstart"></a>Quickstart
 
@@ -184,7 +180,6 @@ fusion --acp
 
 Point Zed, Neovim, or JetBrains at Fusion over the Agent Client Protocol — see [ACP Support](#agent-client-protocol-acp).
 
----
 
 ## <a id="vision"></a>Vision
 
@@ -205,12 +200,11 @@ Modern AI coding tools have grown bloated, sluggish, and fragile. Running on hea
 | **Idle Memory (RSS)** | **< 25 MB** | 250 MB – 900 MB |
 | **Dependencies** | **Pure Rust** (No C, No OpenSSL, No protoc) | Node.js / Python, OpenSSL, native C++ node-gyp |
 | **Android / Termux** | **Native 1st-class support** out of the box | Broken bindings, heavy crashes, root required |
-| **Browser WASM** | **Runs in browser (`fx.sh/try`)** | Not possible |
+| **Browser WASM** | **Runs in browser via WebAssembly** | Not possible |
 | **Advisory Committee** | **Built-in parallel Architecture/Security advisors** | None or single sequential prompt |
 | **Subagent Mesh** | **Concurrent async worker roles** (Scout, Coder, Tester, Reviewer) | None or monolithic blocking agent |
 | **IDE Protocol** | **Native ACP (Agent Client Protocol) stdio server** | Proprietary or custom webhooks |
 
----
 
 ## <a id="features"></a>Core Features
 
@@ -272,7 +266,6 @@ Smart shorthands: `/model v3` (DeepSeek V3), `/model r1` (DeepSeek R1), `/model 
 - **Interactive Benchmarks**: `/benchmark [provider]` (aliases `/bench`, `/latency`, `/speed`) measures provider latency and throughput with high-precision timing and token-budget protection.
 - **Comparison Harness**: Head-to-head provider/model comparison benchmarks under `benches/` with criterion-based Rust micro-benchmarks.
 
----
 
 ## <a id="multi-agent-mesh--advisors"></a>Multi-Agent Mesh & Advisors
 
@@ -313,7 +306,6 @@ Before executing high-impact code modifications or risky shell commands, Fusion 
 
 Advisors assess proposed plans with structured risk levels: **`LOW`**, **`MEDIUM`**, **`HIGH`**, or **`CRITICAL`**. If critical risks are detected, execution halts with actionable critique and remediation suggestions. A weighted **Consensus Engine** aggregates advisor votes, supports vetoes, and resolves conflicting critiques before approval.
 
----
 
 ## <a id="agent-client-protocol-acp"></a>Agent Client Protocol (ACP) Support
 
@@ -352,14 +344,12 @@ require("fusion-acp").setup({
 })
 ```
 
----
 
 ## <a id="wasm--typescript-sdk"></a>WebAssembly & TypeScript SDK
 
 ### Browser Playground
 
 Compile and run the entire Fusion agent engine inside any WebAssembly-compatible browser:
-- **Live Interactive Playground**: [https://fx.sh/try](https://fx.sh/try)
 - **Tabbed Model Picker**: Instant visual switching across providers and models.
 - **Virtual Memory FS**: Sandboxed in-browser code exploration and editing with `read`, `write`, `edit`, `grep`, `glob`, and simulated `bash` tools.
 - **xterm.js Terminal**: WebSocket ACP bridge to a full in-browser terminal experience.
@@ -374,7 +364,6 @@ The [official SDK](sdk/README.md) wraps the pure-Rust WASM core for Browser and 
 - **Xterm.js Terminal Adapter** with ANSI coloring, auto-wrapping, history navigation, and slash commands.
 - **Universal Model Support**: OpenRouter, Anthropic, OpenAI, DeepSeek, and local Ollama.
 
----
 
 ## <a id="built-in-tools"></a>Built-in Tools
 
@@ -404,7 +393,6 @@ Extended registry:
 | **`mcp` / `mcp_bridge`** | Model Context Protocol JSON-RPC client and bridge for external tool servers. |
 | **`compat`** | Legacy tool-name compatibility mapping. |
 
----
 
 ## <a id="architecture-overview"></a>Architecture Overview
 
@@ -507,7 +495,6 @@ scripts/        install.sh, termux-bootstrap.sh, package.sh, verify.sh
 tests/          CLI, multi-agent, smoke, and WASM integration tests
 ```
 
----
 
 ## <a id="slash-commands"></a>Slash Commands
 
@@ -542,7 +529,6 @@ Interactive command reference (browsable in-app via `/help` and `/palette`):
 | `/preset` | `/preset [coding-fast\|deep-reasoning\|cheap\|offline-ollama\|termux-mobile]` | Apply a curated configuration preset. |
 | `/skills` | `/skills <list\|info\|reload\|enable\|disable\|test>` | Manage the skills registry. |
 
----
 
 ## <a id="configuration"></a>Configuration
 
@@ -637,7 +623,6 @@ Curated presets via `/preset`:
 | `Ctrl+D` | Exit Fusion when prompt is empty |
 | `Ctrl+L` | Clear screen buffer |
 
----
 
 ## <a id="ci-cd--release"></a>CI/CD & Release
 
@@ -646,7 +631,6 @@ Curated presets via `/preset`:
 - **Homebrew**: Live formula in `Formula/fusion.rb` with shell-completion generation and version smoke test.
 - **Packaging**: `scripts/package.sh` and `scripts/verify.sh` for release artifact packaging and post-build verification.
 
----
 
 ## <a id="termux--mobile-support"></a>Termux & Mobile Support
 
@@ -657,7 +641,6 @@ Fusion treats Android/Termux as a first-class tier:
 - **Mobile Preset**: `/preset termux-mobile` applies a curated low-memory configuration.
 - **Precompiled Bootstrap**: `scripts/termux-bootstrap.sh` installs a standalone ARM64 binary without a Rust toolchain.
 
----
 
 ## <a id="development"></a>Development
 
@@ -691,7 +674,6 @@ npx tsc --noEmit    # type-check
 npm run build       # compile TypeScript
 ```
 
----
 
 ## <a id="contributing"></a>Contributing
 
@@ -731,7 +713,6 @@ Open a GitHub issue with:
 - Provider and model in use.
 - Minimal reproduction steps and, for crashes, `RUST_BACKTRACE=1` output.
 
----
 
 ## <a id="roadmap"></a>Roadmap
 
@@ -740,7 +721,6 @@ Open a GitHub issue with:
 - [ ] Additional provider adapters (community-contributed).
 - [ ] WASM playground VFS persistence via Origin Private File System.
 
----
 
 ## License
 
@@ -751,7 +731,6 @@ Dual-licensed under either of:
 
 at your option.
 
----
 
 <div align="center">
 
