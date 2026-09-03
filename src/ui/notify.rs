@@ -273,6 +273,22 @@ pub enum TerminalOscProtocol {
     All,
 }
 
+/// Auto-detect the best terminal notification escape protocol for the current environment.
+pub fn detect_terminal_osc_protocol() -> TerminalOscProtocol {
+    let term_prog = std::env::var("TERM_PROGRAM").unwrap_or_default();
+    let term = std::env::var("TERM").unwrap_or_default();
+
+    if term_prog.contains("Warp") || term_prog.contains("iTerm") || term_prog.contains("WezTerm") {
+        TerminalOscProtocol::Osc9
+    } else if term.contains("kitty") || std::env::var("KITTY_PID").is_ok() {
+        TerminalOscProtocol::Osc99
+    } else if term_prog.contains("ghostty") || term.contains("ghostty") || term.contains("foot") {
+        TerminalOscProtocol::Osc777
+    } else {
+        TerminalOscProtocol::Osc9
+    }
+}
+
 // ---------------------------------------------------------------------------
 // Configuration
 // ---------------------------------------------------------------------------
@@ -974,6 +990,11 @@ end run"#;
         self.render_terminal_osc_protocol(TerminalOscProtocol::All)
     }
 
+    /// Auto-detects the active terminal's supported OSC protocol.
+    pub fn detect_protocol() -> TerminalOscProtocol {
+        detect_terminal_osc_protocol()
+    }
+
     /// Renders inline terminal notification escape sequences for a specific protocol.
     pub fn render_terminal_osc_protocol(&self, protocol: TerminalOscProtocol) -> String {
         let clean_title = sanitize_terminal_text(&self.title);
@@ -1088,7 +1109,8 @@ end run"#;
 
     /// Sends terminal OSC escape sequences to the provided writer.
     pub fn send_terminal_osc<W: Write>(&self, writer: &mut W) -> std::io::Result<bool> {
-        let osc_seq = self.render_terminal_osc();
+        let protocol = detect_terminal_osc_protocol();
+        let osc_seq = self.render_terminal_osc_protocol(protocol);
         writer.write_all(osc_seq.as_bytes())?;
         writer.flush()?;
         Ok(true)
@@ -1096,13 +1118,37 @@ end run"#;
 
     /// Executes the desktop notification backend command with a bounded execution deadline.
     pub fn send_desktop(&self, backend: NotificationBackend) -> Result<(), NotificationError> {
+        #[cfg(target_os = "macos")]
+        {
+            if let Some(tn_path) = find_terminal_notifier() {
+                let mut args = vec![
+                    "-title".to_string(),
+                    self.title.clone(),
+                    "-message".to_string(),
+                    self.body.clone(),
+                ];
+                if let Some(sub) = &self.subtitle {
+                    if !sub.is_empty() {
+                        args.push("-subtitle".to_string());
+                        args.push(sub.clone());
+                    }
+                }
+                if self.sound {
+                    args.push("-sound".to_string());
+                    args.push("default".to_string());
+                }
+                if let Ok(()) = execute_process_with_timeout(&tn_path, &args, self.timeout_ms) {
+                    return Ok(());
+                }
+            }
+        }
+
         let cmd_spec = match self.build_command(backend) {
             Some(spec) => spec,
             None => return Err(NotificationError::Disabled),
         };
 
         let (bin, args) = cmd_spec;
-
         // Check if executable exists
         if !is_executable_in_path(&bin) {
             // Check for Linux kdialog fallback if notify-send is missing
@@ -1301,6 +1347,19 @@ pub fn is_executable_in_path(cmd: &str) -> bool {
         }
     }
     false
+}
+
+/// Locates `terminal-notifier` executable on macOS if installed.
+pub fn find_terminal_notifier() -> Option<String> {
+    if is_executable_in_path("terminal-notifier") {
+        return Some("terminal-notifier".to_string());
+    }
+    for candidate in &["/opt/homebrew/bin/terminal-notifier", "/usr/local/bin/terminal-notifier"] {
+        if std::path::Path::new(candidate).exists() {
+            return Some((*candidate).to_string());
+        }
+    }
+    None
 }
 
 // ---------------------------------------------------------------------------

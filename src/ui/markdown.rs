@@ -223,7 +223,6 @@ impl MarkdownRenderer {
         }
 
         let mut output = String::new();
-
         if self.stream_stdout {
             while let Some(newline_pos) = self.buffer.find('\n') {
                 let line_content: String = self.buffer.drain(..=newline_pos).collect();
@@ -238,17 +237,15 @@ impl MarkdownRenderer {
                     if is_special {
                         self.render_buffered_line(line, &mut output);
                         self.line_has_prefix = false;
-                    } else {
-                        if !self.line_has_prefix {
-                            if self.indent > 0 {
-                                print!("{}{}\r\n", " ".repeat(self.indent), line);
-                            } else {
-                                print!("{}\r\n", line);
-                            }
-                        } else {
-                            print!("{}\r\n", line);
-                        }
+                    } else if self.line_has_prefix {
+                        let rendered = render_inline(line);
+                        print!("{}\r\n", rendered);
                         let _ = stdout().flush();
+                        output.push_str(&rendered);
+                        output.push('\n');
+                        self.line_has_prefix = false;
+                    } else {
+                        self.render_buffered_line(line, &mut output);
                         self.line_has_prefix = false;
                     }
                 }
@@ -260,23 +257,25 @@ impl MarkdownRenderer {
                 if !is_special {
                     if let Some(last_space_idx) = self.buffer.rfind(' ') {
                         let to_print: String = self.buffer.drain(..=last_space_idx).collect();
+                        let formatted_words = render_inline(&to_print);
                         if !self.line_has_prefix {
                             if self.indent > 0 {
-                                print!("{}{}", " ".repeat(self.indent), to_print);
+                                print!("{}{}", " ".repeat(self.indent), formatted_words);
+                                output.push_str(&" ".repeat(self.indent));
                             } else {
-                                print!("{}", to_print);
+                                print!("{}", formatted_words);
                             }
                             self.line_has_prefix = true;
                         } else {
-                            print!("{}", to_print);
+                            print!("{}", formatted_words);
                         }
+                        output.push_str(&formatted_words);
                         let _ = stdout().flush();
                     }
                 }
             }
         } else {
             while let Some(newline_pos) = self.buffer.find('\n') {
-                // Take the complete line including the newline in one memmove.
                 let line: String = self.buffer.drain(..=newline_pos).collect();
                 let line = line.trim_end_matches('\n');
                 self.render_buffered_line(line, &mut output);
@@ -291,32 +290,21 @@ impl MarkdownRenderer {
         let mut output = String::new();
 
         if !self.buffer.is_empty() {
+            let line = std::mem::take(&mut self.buffer);
             if self.stream_stdout {
                 if self.in_code_block {
-                    let line = std::mem::take(&mut self.buffer);
                     self.render_buffered_line(&line, &mut output);
+                } else if self.line_has_prefix {
+                    let rendered = render_inline(&line);
+                    print!("{}\r\n", rendered);
+                    let _ = stdout().flush();
+                    output.push_str(&rendered);
+                    output.push('\n');
                 } else {
-                    let is_special = is_special_block_prefix(&self.buffer) || self.table_streamer.is_buffering();
-                    if is_special {
-                        let line = std::mem::take(&mut self.buffer);
-                        self.render_buffered_line(&line, &mut output);
-                    } else {
-                        let line = std::mem::take(&mut self.buffer);
-                        if !self.line_has_prefix {
-                            if self.indent > 0 {
-                                print!("{}{}\r\n", " ".repeat(self.indent), line);
-                            } else {
-                                print!("{}\r\n", line);
-                            }
-                        } else {
-                            print!("{}\r\n", line);
-                        }
-                        let _ = stdout().flush();
-                    }
+                    self.render_buffered_line(&line, &mut output);
                 }
                 self.line_has_prefix = false;
             } else {
-                let line = std::mem::take(&mut self.buffer);
                 self.render_buffered_line(&line, &mut output);
             }
         }
