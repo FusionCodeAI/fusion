@@ -2694,6 +2694,7 @@ mod tests {
             system_prompt: Some("You are a helpful coding assistant.".to_string()),
             working_dir: None,
             metadata: std::collections::HashMap::new(),
+            execution_state: crate::agent::skill_state::SkillState::new(),
         };
 
         session.token_stats.add(150, 220);

@@ -8,6 +8,7 @@ pub mod openrouter;
 pub mod partial_json;
 pub mod retry;
 pub mod types;
+pub mod usage;
 
 pub use anthropic::AnthropicClient;
 pub use catalog::{
@@ -39,3 +40,7 @@ pub use retry::{
     DEFAULT_INITIAL_DELAY, DEFAULT_MAX_DELAY, DEFAULT_MAX_RETRIES,
 };
 pub use types::*;
+pub use usage::{
+    fetch_backend_usage, fetch_backend_usage_sync, fetch_backend_usage_with_client,
+    normalize_usage_url, BackendUsageReport, ModelCacheSavings,
+};

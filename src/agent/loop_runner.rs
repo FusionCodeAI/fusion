@@ -401,9 +401,17 @@ impl AgentRunner {
                 }
             }
 
-            // Assemble full message history
-            let mut messages = Vec::with_capacity(session.messages().len() + 1);
+            // Assemble message payload:
+            // When SKILL.state Σ is initialized, assemble bounded (P, Σ_t, O_t) prompt
+            // keeping per-step prompt size bounded to O(1) tokens (arXiv:2608.26263).
+            let mut messages = Vec::new();
             let mut sys_content = system_message_content.clone();
+            if !session.execution_state.is_empty() {
+                sys_content.push_str("\n\nSkill Execution State (Σ):\n```json\n");
+                sys_content.push_str(&session.execution_state.to_compact_json());
+                sys_content.push_str("\n```");
+            }
+
             if turn > 1 {
                 sys_content.push_str("\n\nCRITICAL DIRECTIVE: Tool results have been returned above. Synthesize your findings, code analysis, and answers directly to fulfill the user's prompt. Do NOT ask rhetorical follow-up questions (such as 'Would you like me to dive deeper or help refactor?') or offer menus of choices instead of answering. Present your full response, technical evaluation, and findings immediately.");
             }
@@ -487,6 +495,26 @@ impl AgentRunner {
                         });
                     }
                 }
+            }
+
+            // SKILL.state: Check if the model emitted a structured state patch ΔΣ (arXiv:2608.26263)
+            let raw_for_patch = if !full_content.trim().is_empty() {
+                &full_content
+            } else {
+                &full_thinking
+            };
+            let extracted_patch = crate::agent::skill_state::extract_state_patch(raw_for_patch);
+            if extracted_patch.is_valid && !extracted_patch.state_patch.is_empty() {
+                let update_report = session
+                    .execution_state
+                    .apply_patch(&extracted_patch.state_patch);
+                let _ = event_tx.send(AgentEvent::Status(format!(
+                    "SKILL.state Σ update: step {} (+{} ~{} -{})",
+                    update_report.new_step,
+                    update_report.keys_added.len(),
+                    update_report.keys_updated.len(),
+                    update_report.keys_deleted.len()
+                )));
             }
 
             if tool_calls.is_empty() {

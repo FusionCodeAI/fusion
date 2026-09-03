@@ -35,6 +35,7 @@ pub mod table;
 pub mod termux;
 pub mod theme;
 pub mod title;
+pub mod usage_card;
 pub mod voice;
 // Re-exports for convenient top-level access
 pub use agent_tree::{
@@ -232,6 +233,12 @@ pub use title::{
     set_session_model_title, set_terminal_title, set_terminal_title_to, shorten_model_name,
     OscTerminator, OscType, TerminalTitle, TitleConfig, TitleFormatStyle, TitleGuard, TitleUpdater,
     DEFAULT_APP_NAME, DEFAULT_FALLBACK_TITLE, DEFAULT_MAX_TITLE_LENGTH,
+};
+pub use usage_card::{
+    format_currency, format_number_commas, format_savings,
+    format_tokens_compact as format_usage_tokens_compact, render_backend_usage_error,
+    render_backend_usage_fx, DEFAULT_CARD_WIDTH as DEFAULT_USAGE_CARD_WIDTH,
+    MIN_CARD_WIDTH as MIN_USAGE_CARD_WIDTH,
 };
 pub use voice::{
     create_stt_adapter, render_recording_banner, render_voice_badge, AudioBuffer, AudioFormat,

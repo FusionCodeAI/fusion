@@ -117,6 +117,12 @@ pub struct Session {
     /// Arbitrary session-level metadata key-value pairs.
     #[serde(default, skip_serializing_if = "HashMap::is_empty")]
     pub metadata: HashMap<String, String>,
+    /// Explicit structured execution state Σ for SKILL.state bounded prompt runtime (arXiv:2608.26263).
+    #[serde(
+        default,
+        skip_serializing_if = "crate::agent::skill_state::SkillState::is_empty"
+    )]
+    pub execution_state: crate::agent::skill_state::SkillState,
 }
 
 /// Lightweight summary of a session for listing / UI selection.
@@ -146,6 +152,7 @@ impl Session {
             system_prompt: None,
             working_dir: None,
             metadata: HashMap::new(),
+            execution_state: crate::agent::skill_state::SkillState::new(),
         }
     }
 
@@ -163,6 +170,7 @@ impl Session {
             system_prompt: None,
             working_dir: None,
             metadata: HashMap::new(),
+            execution_state: crate::agent::skill_state::SkillState::new(),
         }
     }
 

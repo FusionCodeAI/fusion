@@ -80,6 +80,8 @@ pub enum SlashCommand {
     Rewind { turns: Option<usize> },
     /// Force context window compaction to reduce token overhead: `/compact`
     Compact,
+    /// Fetch and display cloud account quota, current month spend, token usage, and prefix cache savings: `/usage`
+    Usage,
     /// Display comprehensive token consumption, session duration, and cost breakdown: `/stats`
     Stats,
     /// Export conversation transcript to Markdown or HTML: `/export [md|html] [path]`
@@ -463,12 +465,20 @@ pub static COMMAND_PALETTE: &[CommandDescriptor] = &[
         examples: &["/advisors toggle", "/advisors on", "/advisors status"],
     },
     CommandDescriptor {
+        name: "/usage",
+        aliases: &[],
+        syntax: "/usage",
+        category: CommandCategory::Model,
+        description: "Fetch and display cloud account quota, current month spend, token usage, and prefix cache savings",
+        examples: &["/usage"],
+    },
+    CommandDescriptor {
         name: "/stats",
-        aliases: &["/usage", "/cost"],
+        aliases: &["/cost"],
         syntax: "/stats",
         category: CommandCategory::Model,
         description: "Display detailed token consumption, duration, and itemized USD cost analytics",
-        examples: &["/stats"],
+        examples: &["/stats", "/cost"],
     },
     CommandDescriptor {
         name: "/benchmark",
@@ -592,7 +602,8 @@ impl SlashCommand {
                 SlashCommand::Rewind { turns }
             }
             "/compact" | "/compress" => SlashCommand::Compact,
-            "/stats" | "/usage" | "/cost" => SlashCommand::Stats,
+            "/usage" => SlashCommand::Usage,
+            "/stats" | "/cost" => SlashCommand::Stats,
             "/benchmark" | "/bench" | "/latency" | "/speed" => SlashCommand::Benchmark {
                 args: args.to_vec(),
             },
@@ -977,6 +988,10 @@ pub fn execute_slash_command(
             handle_compact(session);
             CommandResult::Continue
         }
+        SlashCommand::Usage => {
+            handle_usage(runner);
+            CommandResult::Continue
+        }
         SlashCommand::Stats => {
             handle_stats(runner, session);
             CommandResult::Continue
@@ -1137,7 +1152,24 @@ reduces token usage and latency without losing essential conversational continui
 "#;
                 print_markdown(text);
             }
-            "stats" | "usage" | "cost" => {
+            "usage" => {
+                let text = r#"
+# Slash Command: `/usage`
+
+Fetch and display cloud account quota, current month spend, token usage, and prefix cache savings from the Fusion Backend API.
+
+### Metrics Included
+- **Plan & Account**: Account tier, user email, pay-as-you-go status.
+- **Quota & Spend**: Used USD, monthly limit, remaining budget with progress bar.
+- **Token Usage**: Used tokens this month, prompt tokens, cached tokens.
+- **Cache Analytics**: Prompt cache hit rate, cache hit count, USD savings, and per-model savings breakdown.
+
+### Usage
+- `/usage` - View backend account usage and cache savings.
+"#;
+                print_markdown(text);
+            }
+            "stats" | "cost" => {
                 let text = r#"
 # Slash Command: `/stats`
 
@@ -1151,7 +1183,7 @@ Display detailed token analytics, session duration, and itemized USD cost estima
 
 ### Usage
 - `/stats` - View session usage and cost breakdown.
-- Aliases: `/usage`, `/cost`.
+- Aliases: `/cost`.
 "#;
                 print_markdown(text);
             }
@@ -1734,6 +1766,67 @@ fn handle_compact(session: &mut Session) {
             result.original_tokens.max(before_tokens),
             before_msgs
         );
+    }
+}
+
+fn handle_usage(runner: &AgentRunner) {
+    let config = runner.config();
+    let api_key = config
+        .fusion_api_key
+        .clone()
+        .or_else(|| std::env::var("FUSION_API_KEY").ok())
+        .filter(|k| !k.trim().is_empty());
+
+    let api_key = match api_key {
+        Some(k) => k,
+        None => {
+            println!(
+                "\x1b[1;33m⚠ No Fusion API key found. Set FUSION_API_KEY in your environment or configure ~/.fusion/config.json with your key to view cloud usage.\x1b[0m"
+            );
+            return;
+        }
+    };
+
+    let base_url = config
+        .fusion_base_url
+        .clone()
+        .or_else(|| std::env::var("FUSION_BASE_URL").ok())
+        .unwrap_or_else(|| "https://api.fusioncode.app/v1".to_string());
+
+    let mut spinner = crate::ui::spinner::Spinner::start("Fetching account usage and quota...");
+
+    let handle = tokio::runtime::Handle::try_current();
+    let report_result = match handle {
+        Ok(h) => tokio::task::block_in_place(|| {
+            h.block_on(async {
+                crate::provider::usage::fetch_backend_usage(&base_url, &api_key).await
+            })
+        }),
+        Err(_) => match tokio::runtime::Runtime::new() {
+            Ok(rt) => rt.block_on(async {
+                crate::provider::usage::fetch_backend_usage(&base_url, &api_key).await
+            }),
+            Err(e) => {
+                spinner.stop();
+                eprintln!(
+                    "\x1b[1;31mUsage error:\x1b[0m Failed to create async runtime: {}",
+                    e
+                );
+                return;
+            }
+        },
+    };
+
+    spinner.stop();
+    match report_result {
+        Ok(report) => {
+            let rendered = crate::ui::usage_card::render_backend_usage_fx(&report);
+            println!("{}", rendered);
+        }
+        Err(err) => {
+            let rendered = crate::ui::usage_card::render_backend_usage_error(&err.to_string());
+            println!("{}", rendered);
+        }
     }
 }
 
@@ -3389,9 +3482,13 @@ mod tests {
     }
 
     #[test]
+    fn test_parse_usage() {
+        assert_eq!(SlashCommand::parse("/usage"), Some(SlashCommand::Usage));
+    }
+
+    #[test]
     fn test_parse_stats() {
         assert_eq!(SlashCommand::parse("/stats"), Some(SlashCommand::Stats));
-        assert_eq!(SlashCommand::parse("/usage"), Some(SlashCommand::Stats));
         assert_eq!(SlashCommand::parse("/cost"), Some(SlashCommand::Stats));
     }
     #[test]
@@ -3864,6 +3961,7 @@ mod tests {
         assert!(all.contains("/rewind"));
         assert!(all.contains("/compact"));
         assert!(all.contains("/stats"));
+        assert!(all.contains("/usage"));
         assert!(all.contains("/export"));
 
         let filtered = render_command_palette(Some("branch"));

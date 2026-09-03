@@ -24,6 +24,7 @@ pub mod recovery;
 pub mod search;
 pub mod session;
 pub mod session_patch;
+pub mod skill_state;
 pub mod skills;
 pub mod snippets;
 pub mod subagent;
@@ -32,6 +33,7 @@ pub mod throttle;
 pub mod tokens;
 pub mod trace;
 pub mod undo;
+pub use skill_state::{extract_state_patch, ExtractedPatch, SkillState, StateUpdateReport};
 
 pub use advisor::{
     consult_advisors, format_critiques_for_system_prompt, format_critiques_summary, Advisor,
