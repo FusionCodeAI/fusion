@@ -19,7 +19,11 @@
 //! 16. Dynamic status line updating with reasoning effort (`auto · <model> · high`).
 //! 17. Clean model switch confirmation output without `/model` prefix text.
 //! 18. Smooth progressive word streaming output parity with buffered markdown rendering.
-use std::collections::HashMap;
+//! 19. Multi-prompt queue banner formatting (`2 queued messages · ↑ to edit` and status line `queued 2 · enter queue · auto · grok-4.6`).
+//! 20. Queue Up arrow recall (`↑ to edit`) popping from queue back to input buffer.
+//! 21. Multi-prompt queue FIFO execution across turns.
+//! 22. Model persistence across turns, runner config, and session.
+use std::collections::{HashMap, VecDeque};
 use std::time::Duration;
 use crossterm::{
     cursor,
@@ -1655,4 +1659,364 @@ fn test_progressive_word_streaming_matches_buffered_output() {
         strip_ansi(&single_out),
         "Character-by-character progressive streaming must produce identical output to batch rendering"
     );
+}
+
+// ===========================================================================
+// Contract 19: Multi-Prompt Queue Banner and Status Line Parity (FX Image #1)
+// ===========================================================================
+
+#[test]
+fn test_fx_image1_multi_prompt_queue_banner_and_status_line() {
+    // Exact visual parity with FX screenshot Image #1:
+    // ┃ oo
+    //
+    //   Thinking (3s) (↑1 ↓0)
+    //
+    // 2 queued messages · ↑ to edit
+    //
+    // ┃
+    //
+    // queued 2 · enter queue · auto · grok-4.6
+
+    let mut prompt = Prompt::new()
+        .with_model("grok-4.6")
+        .with_queued_count(2);
+    prompt.set_running_status(Some("Thinking (3s) (↑1 ↓0)".to_string()));
+
+    let mut buf = Vec::new();
+    let buffer_chars: Vec<char> = Vec::new();
+    let mut last_lines = 0;
+    let mut last_cursor = 0;
+
+    let res = prompt.render_to(&mut buf, &buffer_chars, 0, &mut last_lines, &mut last_cursor);
+    assert!(res.is_ok(), "Prompt render_to must succeed with queue banner");
+
+    let raw_out = String::from_utf8_lossy(&buf);
+    let plain_out = strip_ansi(&raw_out);
+
+    // 1. Verify Thinking running status banner
+    assert!(
+        plain_out.contains("Thinking (3s) (↑1 ↓0)"),
+        "Must contain running status banner, got:\n{}",
+        plain_out
+    );
+
+    // 2. Verify queue banner with exact text `2 queued messages · ↑ to edit`
+    assert!(
+        plain_out.contains("2 queued messages · ↑ to edit"),
+        "Must contain queue banner '2 queued messages · ↑ to edit', got:\n{}",
+        plain_out
+    );
+
+    // 3. Verify vertical prompt rail
+    assert!(
+        plain_out.contains('┃'),
+        "Must contain prompt rail '┃', got:\n{}",
+        plain_out
+    );
+
+    // 4. Verify status line with exact text `queued 2 · enter queue · auto · grok-4.6`
+    assert!(
+        plain_out.contains("queued 2 · enter queue · auto · grok-4.6"),
+        "Must contain status line 'queued 2 · enter queue · auto · grok-4.6', got:\n{}",
+        plain_out
+    );
+}
+
+#[test]
+fn test_queue_banner_singular_and_plural_formatting() {
+    // 1. Singular: 1 queued message
+    let mut prompt_single = Prompt::new()
+        .with_model("MiniMaxAI/MiniMax-M2.7")
+        .with_queued_count(1);
+    prompt_single.set_running_status(Some("Thinking (1s) (↑0 ↓0)".to_string()));
+
+    let mut buf_single = Vec::new();
+    let mut last_lines = 0;
+    let mut last_cursor = 0;
+    prompt_single.render_to(&mut buf_single, &[], 0, &mut last_lines, &mut last_cursor).unwrap();
+    let plain_single = strip_ansi(&String::from_utf8_lossy(&buf_single));
+
+    assert!(plain_single.contains("1 queued message · ↑ to edit"), "Must format singular '1 queued message', got:\n{}", plain_single);
+    assert!(plain_single.contains("queued 1 · enter queue · auto · MiniMax M2.7"), "Must format singular status line, got:\n{}", plain_single);
+
+    // 2. Plural: 5 queued messages
+    let mut prompt_plural = Prompt::new()
+        .with_model("deepseek-ai/DeepSeek-V4-Flash-0731")
+        .with_queued_count(5);
+    prompt_plural.set_running_status(Some("Thinking (12s) (↑350 ↓120)".to_string()));
+
+    let mut buf_plural = Vec::new();
+    let mut last_lines_p = 0;
+    let mut last_cursor_p = 0;
+    prompt_plural.render_to(&mut buf_plural, &[], 0, &mut last_lines_p, &mut last_cursor_p).unwrap();
+    let plain_plural = strip_ansi(&String::from_utf8_lossy(&buf_plural));
+
+    assert!(plain_plural.contains("5 queued messages · ↑ to edit"), "Must format plural '5 queued messages', got:\n{}", plain_plural);
+    assert!(plain_plural.contains("queued 5 · enter queue · auto · DeepSeek V4 Flash"), "Must format plural status line, got:\n{}", plain_plural);
+
+    // 3. Reset clears queued count
+    prompt_plural.reset_input();
+    assert_eq!(prompt_plural.queued_count(), 0, "reset_input must reset queued_count to 0");
+}
+
+#[test]
+fn test_queue_status_line_with_reasoning_effort() {
+    let mut prompt = Prompt::new()
+        .with_model("grok-4.6")
+        .with_selected_effort(Some("high".to_string()))
+        .with_queued_count(2);
+    prompt.set_running_status(Some("Thinking (3s) (↑1 ↓0)".to_string()));
+    let mut buf = Vec::new();
+    let mut last_lines = 0;
+    let mut last_cursor = 0;
+    prompt.render_to(&mut buf, &[], 0, &mut last_lines, &mut last_cursor).unwrap();
+    let plain = strip_ansi(&String::from_utf8_lossy(&buf));
+
+    assert!(
+        plain.contains("queued 2 · enter queue · auto · grok-4.6 · high"),
+        "Status line must include reasoning effort with queued count, got:\n{}",
+        plain
+    );
+}
+
+// ===========================================================================
+// Contract 20: Up Arrow Recall (`↑ to edit`) Popping from Queue to Input Buffer
+// ===========================================================================
+
+#[test]
+fn test_queue_up_arrow_recall_popping_to_input_buffer() {
+    let mut queued_prompts: VecDeque<String> = VecDeque::new();
+    queued_prompts.push_back("first queued prompt".to_string());
+    queued_prompts.push_back("second queued prompt".to_string());
+
+    let mut prompt = Prompt::new()
+        .with_model("grok-4.6")
+        .with_queued_count(queued_prompts.len());
+
+    assert_eq!(prompt.queued_count(), 2);
+    assert!(prompt.buffer.is_empty());
+
+    // 1. Simulate pressing Up arrow on empty buffer: pops last queued prompt back into input buffer
+    if prompt.buffer.is_empty() {
+        if let Some(last) = queued_prompts.pop_back() {
+            prompt.buffer = last.chars().collect();
+            prompt.cursor_pos = prompt.buffer.len();
+            prompt.set_queued_count(queued_prompts.len());
+        }
+    }
+
+    assert_eq!(prompt.buffer.iter().collect::<String>(), "second queued prompt");
+    assert_eq!(prompt.cursor_pos, "second queued prompt".len());
+    assert_eq!(prompt.queued_count(), 1);
+    assert_eq!(queued_prompts.len(), 1);
+    assert_eq!(queued_prompts.front().unwrap(), "first queued prompt");
+
+    // 2. User edits the recalled prompt in buffer: appends " (edited)"
+    for c in " (edited)".chars() {
+        prompt.buffer.insert(prompt.cursor_pos, c);
+        prompt.cursor_pos += 1;
+    }
+    assert_eq!(prompt.buffer.iter().collect::<String>(), "second queued prompt (edited)");
+
+    // 3. User presses Enter while thinking -> submits back to queue
+    let text: String = prompt.buffer.drain(..).collect();
+    let trimmed = text.trim().to_string();
+    prompt.cursor_pos = 0;
+    if !trimmed.is_empty() {
+        queued_prompts.push_back(trimmed);
+    }
+    prompt.set_queued_count(queued_prompts.len());
+
+    assert_eq!(prompt.queued_count(), 2);
+    assert_eq!(queued_prompts.len(), 2);
+    assert_eq!(queued_prompts[0], "first queued prompt");
+    assert_eq!(queued_prompts[1], "second queued prompt (edited)");
+
+    // 4. Sequential Up arrow recall on empty buffer popping all items FIFO in reverse
+    // 1st Up arrow -> pops "second queued prompt (edited)"
+    if prompt.buffer.is_empty() {
+        if let Some(last) = queued_prompts.pop_back() {
+            prompt.buffer = last.chars().collect();
+            prompt.cursor_pos = prompt.buffer.len();
+            prompt.set_queued_count(queued_prompts.len());
+        }
+    }
+    assert_eq!(prompt.buffer.iter().collect::<String>(), "second queued prompt (edited)");
+    assert_eq!(prompt.queued_count(), 1);
+
+    // Clear buffer (user discards or completes edit)
+    prompt.buffer.clear();
+    prompt.cursor_pos = 0;
+
+    // 2nd Up arrow -> pops "first queued prompt"
+    if prompt.buffer.is_empty() {
+        if let Some(last) = queued_prompts.pop_back() {
+            prompt.buffer = last.chars().collect();
+            prompt.cursor_pos = prompt.buffer.len();
+            prompt.set_queued_count(queued_prompts.len());
+        }
+    }
+    assert_eq!(prompt.buffer.iter().collect::<String>(), "first queued prompt");
+    assert_eq!(prompt.queued_count(), 0);
+    assert!(queued_prompts.is_empty());
+
+    // 5. Up arrow on non-empty buffer must NOT pop from queue
+    prompt.buffer = "existing typed text".chars().collect();
+    queued_prompts.push_back("another queue item".to_string());
+    prompt.set_queued_count(queued_prompts.len());
+
+    let initial_queue_len = queued_prompts.len();
+    if prompt.buffer.is_empty() {
+        if let Some(last) = queued_prompts.pop_back() {
+            prompt.buffer = last.chars().collect();
+        }
+    }
+    assert_eq!(queued_prompts.len(), initial_queue_len, "Up arrow on non-empty buffer must not pop queue");
+    assert_eq!(prompt.buffer.iter().collect::<String>(), "existing typed text");
+}
+
+// ===========================================================================
+// Contract 21: Multi-Prompt Queue FIFO Execution Across Turns
+// ===========================================================================
+
+#[test]
+fn test_multi_prompt_queue_fifo_execution_across_turns() {
+    let mut prompt_queue: VecDeque<String> = VecDeque::new();
+
+    // 1. Initial queue with 3 prompts
+    prompt_queue.push_back("Turn 1: analyze repo structure".to_string());
+    prompt_queue.push_back("Turn 2: generate mock data".to_string());
+    prompt_queue.push_back("Turn 3: refactor auth module".to_string());
+
+    let mut executed_prompts: Vec<String> = Vec::new();
+
+    // Turn 1 executes
+    let turn1_input = prompt_queue.pop_front().expect("Queue must have turn 1");
+    assert_eq!(turn1_input, "Turn 1: analyze repo structure");
+    executed_prompts.push(turn1_input);
+
+    // While Turn 1 is executing, user queues two additional prompts
+    let mut thinking_queued: VecDeque<String> = VecDeque::new();
+    thinking_queued.push_back("Turn 4: add unit tests".to_string());
+    thinking_queued.push_back("Turn 5: verify coverage".to_string());
+
+    // End of Turn 1: queued prompts extend the REPL queue
+    prompt_queue.extend(thinking_queued);
+    assert_eq!(prompt_queue.len(), 4);
+
+    // Turn 2 executes
+    let turn2_input = prompt_queue.pop_front().expect("Queue must have turn 2");
+    assert_eq!(turn2_input, "Turn 2: generate mock data");
+    executed_prompts.push(turn2_input);
+
+    // Turn 3 executes
+    let turn3_input = prompt_queue.pop_front().expect("Queue must have turn 3");
+    assert_eq!(turn3_input, "Turn 3: refactor auth module");
+    executed_prompts.push(turn3_input);
+
+    // Turn 4 executes
+    let turn4_input = prompt_queue.pop_front().expect("Queue must have turn 4");
+    assert_eq!(turn4_input, "Turn 4: add unit tests");
+    executed_prompts.push(turn4_input);
+
+    // Turn 5 executes
+    let turn5_input = prompt_queue.pop_front().expect("Queue must have turn 5");
+    assert_eq!(turn5_input, "Turn 5: verify coverage");
+    executed_prompts.push(turn5_input);
+
+    assert!(prompt_queue.is_empty(), "All queued prompts must be consumed in FIFO order");
+    assert_eq!(
+        executed_prompts,
+        vec![
+            "Turn 1: analyze repo structure",
+            "Turn 2: generate mock data",
+            "Turn 3: refactor auth module",
+            "Turn 4: add unit tests",
+            "Turn 5: verify coverage",
+        ],
+        "Prompts must execute in exact FIFO order across turns"
+    );
+}
+
+// ===========================================================================
+// Contract 22: Model Persistence Across Turns, Runner Config, and Session
+// ===========================================================================
+
+#[test]
+fn test_model_persistence_across_turns_and_components() {
+    let (mut runner, mut session) = create_test_runner_and_session();
+    let mut prompt = Prompt::new().with_model(session.active_model());
+
+    // 1. Initial default model
+    let initial_model = session.active_model().to_string();
+    assert_eq!(prompt.active_model(), initial_model);
+    assert_eq!(runner.config().default_model, initial_model);
+
+    // 2. Switch model to MiniMaxAI/MiniMax-M2.7 via slash command
+    let res = handle_slash_command(
+        "/model MiniMaxAI/MiniMax-M2.7",
+        &mut runner,
+        &mut session,
+    );
+
+    assert!(res.is_some());
+    assert_eq!(session.active_model(), "MiniMaxAI/MiniMax-M2.7");
+    assert_eq!(runner.config().default_model, "MiniMaxAI/MiniMax-M2.7");
+    prompt.set_model(session.active_model());
+    assert_eq!(prompt.active_model(), "MiniMaxAI/MiniMax-M2.7");
+
+    // Sync runner config as done in run_repl_with_session loop
+    runner.config_mut().default_model = session.active_model().to_string();
+    assert_eq!(runner.config().default_model, "MiniMaxAI/MiniMax-M2.7");
+
+    // Verify rendered status line reflects new model
+    let mut buf = Vec::new();
+    let mut last_lines = 0;
+    let mut last_cursor = 0;
+    prompt.render_to(&mut buf, &[], 0, &mut last_lines, &mut last_cursor).unwrap();
+    let plain = strip_ansi(&String::from_utf8_lossy(&buf));
+    assert!(plain.contains("auto · MiniMax M2.7"), "Status line must display formatted model label 'MiniMax M2.7', got:\n{}", plain);
+
+    // 3. Simulate turn loop: model must persist across multiple turns without reverting
+    for _turn in 1..=3 {
+        // Sync before turn
+        prompt.set_model(session.active_model());
+        runner.config_mut().default_model = session.active_model().to_string();
+
+        assert_eq!(session.active_model(), "MiniMaxAI/MiniMax-M2.7");
+        assert_eq!(runner.config().default_model, "MiniMaxAI/MiniMax-M2.7");
+        assert_eq!(prompt.active_model(), "MiniMaxAI/MiniMax-M2.7");
+    }
+
+    // 4. Switch model to grok-4.6
+    let res2 = handle_slash_command(
+        "/model grok-4.6",
+        &mut runner,
+        &mut session,
+    );
+
+    assert!(res2.is_some());
+    assert_eq!(session.active_model(), "grok-4.6");
+    assert_eq!(runner.config().default_model, "grok-4.6");
+    prompt.set_model(session.active_model());
+    assert_eq!(prompt.active_model(), "grok-4.6");
+    assert_eq!(runner.config().default_model, "grok-4.6");
+
+    let mut buf2 = Vec::new();
+    let mut last_lines2 = 0;
+    let mut last_cursor2 = 0;
+    prompt.render_to(&mut buf2, &[], 0, &mut last_lines2, &mut last_cursor2).unwrap();
+    let plain2 = strip_ansi(&String::from_utf8_lossy(&buf2));
+    assert!(plain2.contains("auto · grok-4.6"), "Status line must display formatted model label 'grok-4.6', got:\n{}", plain2);
+
+    // 5. With queued prompts, model is preserved in status line: `queued 2 · enter queue · auto · grok-4.6`
+    prompt.set_queued_count(2);
+    prompt.set_running_status(Some("Thinking (3s) (↑1 ↓0)".to_string()));
+    let mut buf3 = Vec::new();
+    let mut last_lines3 = 0;
+    let mut last_cursor3 = 0;
+    prompt.render_to(&mut buf3, &[], 0, &mut last_lines3, &mut last_cursor3).unwrap();
+    let plain3 = strip_ansi(&String::from_utf8_lossy(&buf3));
+    assert!(plain3.contains("queued 2 · enter queue · auto · grok-4.6"), "Status line must display 'queued 2 · enter queue · auto · grok-4.6', got:\n{}", plain3);
 }

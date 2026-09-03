@@ -45,6 +45,7 @@ pub struct Prompt {
     models: Vec<(String, String)>,
     active_model: String,
     pub running_status: Option<String>,
+    pub queued_count: usize,
     pub buffer: Vec<char>,
     pub cursor_pos: usize,
     saved_current: String,
@@ -79,6 +80,7 @@ impl Prompt {
             models: Vec::new(),
             active_model: String::new(),
             running_status: None,
+            queued_count: 0,
             buffer: Vec::new(),
             cursor_pos: 0,
             saved_current: String::new(),
@@ -340,6 +342,7 @@ impl Prompt {
         self.last_rendered_lines = 0;
         self.last_cursor_row = 0;
         self.running_status = None;
+        self.queued_count = 0;
         if self.key_handler.profile() == KeybindingProfile::Vi {
             self.key_handler.set_vi_mode(ViMode::Insert);
         }
@@ -351,6 +354,21 @@ impl Prompt {
         self.running_status = status;
     }
 
+    /// Set number of queued messages displayed in banner and status line.
+    pub fn with_queued_count(mut self, count: usize) -> Self {
+        self.queued_count = count;
+        self
+    }
+
+    /// Set number of queued messages displayed in banner and status line.
+    pub fn set_queued_count(&mut self, count: usize) {
+        self.queued_count = count;
+    }
+
+    /// Get number of queued messages.
+    pub fn queued_count(&self) -> usize {
+        self.queued_count
+    }
     /// Render current prompt state to stdout.
     pub fn render_current(&mut self) -> std::io::Result<()> {
         let mut out = stdout();
@@ -764,8 +782,20 @@ impl Prompt {
         } else {
             0
         };
-        total_lines += running_lines;
 
+        let queue_banner_lines = if self.queued_count > 0 {
+            let banner = if self.queued_count == 1 {
+                "1 queued message · ↑ to edit".to_string()
+            } else {
+                format!("{} queued messages · ↑ to edit", self.queued_count)
+            };
+            write!(out, "\x1b[2;37m{}\x1b[0m\r\n\r\n", banner)?;
+            2
+        } else {
+            0
+        };
+        let header_lines = running_lines + queue_banner_lines;
+        total_lines += header_lines;
         // 1. Input lines with clean vertical rail symbol (┃ )
         for (idx, line) in lines.iter().enumerate() {
             let prefix = if idx == 0 {
@@ -821,7 +851,9 @@ impl Prompt {
             if current_effort != "default" {
                 status_body.push_str(&format!(" · {}", current_effort));
             }
-            let status_text = if self.running_status.is_some() {
+            let status_text = if self.queued_count > 0 {
+                format!("queued {} · enter queue · {}", self.queued_count, status_body)
+            } else if self.running_status.is_some() {
                 format!("enter queue · {}", status_body)
             } else {
                 status_body
@@ -841,7 +873,7 @@ impl Prompt {
             execute!(out, cursor::MoveToColumn(target_x))?;
 
             *last_rendered_lines = total_lines;
-            *last_cursor_row = running_lines + target_row;
+            *last_cursor_row = header_lines + target_row;
         } else if self.model_picker_active {
             let sel = if filtered_models.is_empty() {
                 0
@@ -922,7 +954,7 @@ impl Prompt {
             execute!(out, cursor::MoveToColumn(target_x))?;
 
             *last_rendered_lines = total_lines;
-            *last_cursor_row = running_lines + target_row;
+            *last_cursor_row = header_lines + target_row;
         } else if !slash_suggestions.is_empty() {
             let sel = self.slash_selection.min(slash_suggestions.len().saturating_sub(1));
             let window_start = if sel >= 6 { sel - 5 } else { 0 };
@@ -996,7 +1028,7 @@ impl Prompt {
             execute!(out, cursor::MoveToColumn(target_x))?;
 
             *last_rendered_lines = total_lines;
-            *last_cursor_row = running_lines + target_row;
+            *last_cursor_row = header_lines + target_row;
         } else {
             // 3. Blank line between input and status
             write!(out, "\r\n")?;
@@ -1006,7 +1038,9 @@ impl Prompt {
             if let Some(effort) = &self.selected_effort {
                 status_body.push_str(&format!(" · {}", effort));
             }
-            let status_text = if self.running_status.is_some() {
+            let status_text = if self.queued_count > 0 {
+                format!("queued {} · enter queue · {}", self.queued_count, status_body)
+            } else if self.running_status.is_some() {
                 format!("enter queue · {}", status_body)
             } else {
                 status_body
@@ -1028,7 +1062,7 @@ impl Prompt {
             execute!(out, cursor::MoveToColumn(target_x))?;
 
             *last_rendered_lines = total_lines;
-            *last_cursor_row = running_lines + target_row;
+            *last_cursor_row = header_lines + target_row;
         }
 
         out.flush()?;
@@ -1566,5 +1600,106 @@ mod tests {
         assert_eq!(prompt.effort_selection(), 0);
         assert!(prompt.pending_model_id().is_empty());
         assert!(prompt.buffer.is_empty());
+    }
+
+    #[test]
+    fn test_queued_count_lifecycle() {
+        let mut prompt = Prompt::new();
+        assert_eq!(prompt.queued_count(), 0);
+        assert_eq!(prompt.queued_count, 0);
+
+        prompt.set_queued_count(3);
+        assert_eq!(prompt.queued_count(), 3);
+        assert_eq!(prompt.queued_count, 3);
+
+        let prompt2 = Prompt::new().with_queued_count(5);
+        assert_eq!(prompt2.queued_count(), 5);
+
+        prompt.reset_input();
+        assert_eq!(prompt.queued_count(), 0);
+    }
+
+    #[test]
+    fn test_render_single_queued_message_banner() {
+        let prompt = Prompt::new()
+            .with_model("grok-4.6")
+            .with_queued_count(1);
+
+        let mut buf = Vec::new();
+        let buffer: Vec<char> = Vec::new();
+        let mut last_lines = 0;
+        let mut last_cursor = 0;
+
+        prompt
+            .render_to(&mut buf, &buffer, 0, &mut last_lines, &mut last_cursor)
+            .expect("render_to single queue banner failed");
+
+        let raw = String::from_utf8_lossy(&buf);
+        assert!(raw.contains("1 queued message · ↑ to edit"), "Missing single queue banner in:\n{}", raw);
+        assert!(raw.contains("queued 1 · enter queue · auto · grok-4.6"), "Missing queued status line in:\n{}", raw);
+        assert_eq!(last_cursor, 2, "last_cursor_row should be 2 (0 running + 2 queue banner + 0 target_row)");
+    }
+
+    #[test]
+    fn test_render_multiple_queued_messages_banner_and_running_status() {
+        let mut prompt = Prompt::new()
+            .with_model("xai/grok-4.6")
+            .with_queued_count(2);
+        prompt.set_running_status(Some("Thinking (3s) (↑1 ↓0)".to_string()));
+
+        let mut buf = Vec::new();
+        let buffer: Vec<char> = Vec::new();
+        let mut last_lines = 0;
+        let mut last_cursor = 0;
+
+        prompt
+            .render_to(&mut buf, &buffer, 0, &mut last_lines, &mut last_cursor)
+            .expect("render_to multi queue banner + running status failed");
+
+        let raw = String::from_utf8_lossy(&buf);
+        assert!(raw.contains("Thinking (3s) (↑1 ↓0)"), "Missing thinking status in:\n{}", raw);
+        assert!(raw.contains("2 queued messages · ↑ to edit"), "Missing plural queue banner in:\n{}", raw);
+        assert!(raw.contains("queued 2 · enter queue · auto · grok-4.6"), "Missing queued 2 status line in:\n{}", raw);
+        assert_eq!(last_cursor, 4, "last_cursor_row should be 4 (2 running + 2 queue banner + 0 target_row)");
+    }
+
+    #[test]
+    fn test_render_running_status_without_queue() {
+        let mut prompt = Prompt::new().with_model("xai/grok-4.6");
+        prompt.set_running_status(Some("Thinking (1s)".to_string()));
+
+        let mut buf = Vec::new();
+        let buffer: Vec<char> = Vec::new();
+        let mut last_lines = 0;
+        let mut last_cursor = 0;
+
+        prompt
+            .render_to(&mut buf, &buffer, 0, &mut last_lines, &mut last_cursor)
+            .expect("render_to running status failed");
+
+        let raw = String::from_utf8_lossy(&buf);
+        assert!(raw.contains("Thinking (1s)"), "Missing thinking status in:\n{}", raw);
+        assert!(!raw.contains("queued message"), "Should not have queue banner");
+        assert!(raw.contains("enter queue · auto · grok-4.6"), "Missing enter queue status in:\n{}", raw);
+        assert_eq!(last_cursor, 2, "last_cursor_row should be 2 (2 running + 0 queue banner + 0 target_row)");
+    }
+
+    #[test]
+    fn test_render_idle_prompt_status_line() {
+        let prompt = Prompt::new().with_model("xai/grok-4.6");
+
+        let mut buf = Vec::new();
+        let buffer: Vec<char> = Vec::new();
+        let mut last_lines = 0;
+        let mut last_cursor = 0;
+
+        prompt
+            .render_to(&mut buf, &buffer, 0, &mut last_lines, &mut last_cursor)
+            .expect("render_to idle failed");
+
+        let raw = String::from_utf8_lossy(&buf);
+        assert!(!raw.contains("enter queue"), "Idle status should not contain enter queue");
+        assert!(raw.contains("auto · grok-4.6"), "Missing auto status in:\n{}", raw);
+        assert_eq!(last_cursor, 0, "last_cursor_row should be 0 (0 running + 0 queue banner + 0 target_row)");
     }
 }

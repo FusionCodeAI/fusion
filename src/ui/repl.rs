@@ -1,8 +1,9 @@
 use crossterm::{
     cursor, execute,
-    event::{Event, EventStream, KeyCode, KeyModifiers},
+    event::{Event, EventStream, KeyCode, KeyEventKind},
     terminal::{self, ClearType},
 };
+use std::collections::VecDeque;
 use futures::StreamExt;
 use std::io::{stdout, Write};
 use std::time::Instant;
@@ -544,7 +545,7 @@ pub async fn run_turn_ui(
     session: &mut Session,
     user_input: &str,
     prompt: &mut Prompt,
-) -> anyhow::Result<(String, Option<String>)> {
+) -> anyhow::Result<(String, VecDeque<String>)> {
     let start_time = Instant::now();
     let mut input_tokens = (crate::agent::tokens::estimate_text_tokens(user_input)
         + session.estimate_tokens())
@@ -559,7 +560,7 @@ pub async fn run_turn_ui(
     // Enter raw mode to allow interactive typing, slash suggestions, and Esc cancel
     let _raw_guard = crate::ui::prompt::RawModeGuard::enter().ok();
     let mut event_stream = EventStream::new();
-    let mut queued_prompt: Option<String> = None;
+    let mut queued_prompts: VecDeque<String> = VecDeque::new();
     let mut active_tool_label: Option<String> = None;
 
     let mut is_thinking = true;
@@ -584,17 +585,36 @@ pub async fn run_turn_ui(
             }
             Some(event_res) = event_stream.next() => {
                 if let Ok(ev) = event_res {
+                    if let Event::Key(key) = ev {
+                        if key.kind != KeyEventKind::Release
+                            && key.code == KeyCode::Up
+                            && prompt.buffer.is_empty()
+                        {
+                            if let Some(last) = queued_prompts.pop_back() {
+                                prompt.buffer = last.chars().collect();
+                                prompt.cursor_pos = prompt.buffer.len();
+                                prompt.set_queued_count(queued_prompts.len());
+                                let _ = prompt.render_current();
+                                continue;
+                            }
+                        }
+                    }
                     if let Some(res) = prompt.handle_event(ev)? {
                         match res {
                             PromptResult::Submit(text) => {
                                 let trimmed = text.trim().to_string();
                                 if !trimmed.is_empty() {
-                                    queued_prompt = Some(trimmed);
+                                    queued_prompts.push_back(trimmed);
                                 }
-                                prompt.reset_input();
+                                prompt.set_queued_count(queued_prompts.len());
+                                prompt.buffer.clear();
+                                prompt.cursor_pos = 0;
+                                let _ = prompt.render_current();
                             }
                             PromptResult::Cancel => {
                                 let _ = prompt.clear_frame();
+                                prompt.set_running_status(None);
+                                prompt.set_queued_count(0);
                                 let mut out = stdout();
                                 if let Some(tool) = &active_tool_label {
                                     let _ = write!(out, "■ Cancelled {} · What can fusion do differently?\r\n\r\n", tool);
@@ -603,11 +623,13 @@ pub async fn run_turn_ui(
                                 }
                                 let _ = execute!(out, cursor::MoveToColumn(0));
                                 let _ = out.flush();
-                                return Ok((String::new(), None));
+                                return Ok((String::new(), queued_prompts));
                             }
                             PromptResult::Exit => {
                                 let _ = prompt.clear_frame();
-                                return Ok((String::new(), None));
+                                prompt.set_running_status(None);
+                                prompt.set_queued_count(0);
+                                return Ok((String::new(), queued_prompts));
                             }
                         }
                     }
@@ -683,6 +705,7 @@ pub async fn run_turn_ui(
                 }
                 let _ = prompt.clear_frame();
                 prompt.set_running_status(None);
+                prompt.set_queued_count(0);
                 if !tool_batch.is_empty() {
                     render_tool_tree(&tool_batch);
                     tool_batch.clear();
@@ -697,7 +720,7 @@ pub async fn run_turn_ui(
                 let _ = write!(out, "  \x1b[2;37m{} (↑{} ↓{})\x1b[0m\r\n\r\n", elapsed_str, in_str, out_str);
                 let _ = execute!(out, cursor::MoveToColumn(0));
                 let _ = out.flush();
-                return res.map(|content| (content, queued_prompt));
+                return res.map(|content| (content, queued_prompts));
             }
             Some(event) = rx.recv() => {
                 match event {
@@ -790,7 +813,7 @@ pub async fn run_repl_with_session(
     let mut session =
         initial_session.unwrap_or_else(|| Session::new(&runner.config().default_model));
     let mut prompt = Prompt::new()
-        .with_model(&runner.config().default_model)
+        .with_model(session.active_model())
         .with_models(model_picker_list(&crate::provider::catalog::get_catalog()));
 
     // Clear terminal screen and place cursor at top left (clean startup like fx)
@@ -809,17 +832,37 @@ pub async fn run_repl_with_session(
     // Clear any leftover recovery crash state so we start cleanly with a blank prompt
     let _ = runner.recovery().clear();
 
-    let mut pending_prompt: Option<String> = None;
+    let mut prompt_queue: VecDeque<String> = VecDeque::new();
+    let mut last_cancel_time: Option<Instant> = None;
 
     loop {
-        let input = if let Some(queued) = pending_prompt.take() {
-            queued
+        // Model name sync: ensure switching to MiniMax or any model persists in prompt, runner.config, and session
+        prompt.set_model(session.active_model());
+        runner.config_mut().default_model = session.active_model().to_string();
+
+        let input = if let Some(next_prompt) = prompt_queue.pop_front() {
+            let mut out = stdout();
+            let _ = write!(out, "\x1b[1m┃ {}\x1b[0m\r\n\r\n", next_prompt);
+            let _ = execute!(out, cursor::MoveToColumn(0));
+            let _ = out.flush();
+            next_prompt
         } else {
-            prompt.set_model(&runner.config().default_model);
+            prompt.set_model(session.active_model());
             match prompt.read_input() {
-                Ok(PromptResult::Submit(input)) => input,
+                Ok(PromptResult::Submit(input)) => {
+                    last_cancel_time = None;
+                    input
+                }
                 Ok(PromptResult::Cancel) => {
-                    println!("\x1b[2;37m(Turn canceled)\x1b[0m\r\n");
+                    let now = Instant::now();
+                    if let Some(prev) = last_cancel_time {
+                        if now.duration_since(prev) <= std::time::Duration::from_secs(2) {
+                            println!("\x1b[2;37mGoodbye!\x1b[0m\r\n");
+                            break;
+                        }
+                    }
+                    last_cancel_time = Some(now);
+                    println!("\x1b[2;37m(Turn canceled - press Ctrl+C again to exit)\x1b[0m\r\n");
                     continue;
                 }
                 Ok(PromptResult::Exit) => {
@@ -855,14 +898,27 @@ pub async fn run_repl_with_session(
             if handle_command(trimmed, &mut runner, &mut session) {
                 break;
             }
-            prompt.set_model(&runner.config().default_model);
+            prompt.set_model(session.active_model());
+            runner.config_mut().default_model = session.active_model().to_string();
             continue;
         }
 
+        let turn_start = Instant::now();
         // Execute turn with live streaming and capture any queued prompt
         match run_turn_ui(&runner, &mut session, trimmed, &mut prompt).await {
             Ok((_content, queued)) => {
-                pending_prompt = queued;
+                prompt_queue.extend(queued);
+                let turn_elapsed = turn_start.elapsed();
+                crate::ui::notify::notify_turn_complete(
+                    runner.config(),
+                    trimmed,
+                    session.active_model(),
+                    Some(turn_elapsed.as_secs_f64()),
+                );
+                crate::ui::notify::emit_terminal_notification(
+                    "Fusion",
+                    &format!("Turn complete ({})", session.active_model()),
+                );
             }
             Err(e) => {
                 eprintln!("Error during turn: {}", e);
@@ -1076,5 +1132,69 @@ mod tests {
         );
         assert!(status_off_2.contains("  Running"));
         assert!(!status_off_2.contains("• •"));
+    }
+
+    #[test]
+    fn test_prompt_queue_fifo_and_recall() {
+        let mut queued_prompts: VecDeque<String> = VecDeque::new();
+        let mut prompt = Prompt::new();
+
+        // Enqueue two prompts
+        queued_prompts.push_back("first message".to_string());
+        queued_prompts.push_back("second message".to_string());
+        prompt.set_queued_count(queued_prompts.len());
+        assert_eq!(prompt.queued_count(), 2);
+
+        // Recall last queued prompt on empty buffer via Up arrow logic
+        assert!(prompt.buffer.is_empty());
+        if let Some(last) = queued_prompts.pop_back() {
+            prompt.buffer = last.chars().collect();
+            prompt.cursor_pos = prompt.buffer.len();
+            prompt.set_queued_count(queued_prompts.len());
+        }
+        assert_eq!(prompt.buffer.iter().collect::<String>(), "second message");
+        assert_eq!(prompt.cursor_pos, 14);
+        assert_eq!(prompt.queued_count(), 1);
+        assert_eq!(queued_prompts.len(), 1);
+
+        // FIFO pop of remaining queue
+        assert_eq!(queued_prompts.pop_front(), Some("first message".to_string()));
+        assert!(queued_prompts.is_empty());
+    }
+
+    #[test]
+    fn test_model_sync_persistence() {
+        let mut session = Session::new("minimax-text-01");
+        let mut prompt = Prompt::new().with_model(session.active_model());
+        let mut config = Config::default();
+        config.default_model = session.active_model().to_string();
+
+        assert_eq!(session.active_model(), "minimax-text-01");
+        assert_eq!(prompt.active_model(), "minimax-text-01");
+        assert_eq!(config.default_model, "minimax-text-01");
+
+        // Switch model in session
+        session.set_active_model("grok-4.6");
+        prompt.set_model(session.active_model());
+        config.default_model = session.active_model().to_string();
+
+        assert_eq!(session.active_model(), "grok-4.6");
+        assert_eq!(prompt.active_model(), "grok-4.6");
+        assert_eq!(config.default_model, "grok-4.6");
+    }
+
+    #[test]
+    fn test_double_ctrl_c_timing() {
+        let mut last_cancel: Option<Instant> = None;
+        let t0 = Instant::now();
+        last_cancel = Some(t0);
+
+        // Within 2 seconds -> should trigger exit
+        let t1 = t0 + Duration::from_millis(500);
+        assert!(t1.duration_since(last_cancel.unwrap()) <= Duration::from_secs(2));
+
+        // After 3 seconds -> should not trigger exit
+        let t2 = t0 + Duration::from_secs(3);
+        assert!(t2.duration_since(last_cancel.unwrap()) > Duration::from_secs(2));
     }
 }
