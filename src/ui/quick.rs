@@ -760,7 +760,10 @@ pub enum QuickActionResult {
 impl QuickActionResult {
     /// True if an action was selected.
     pub fn is_selected(&self) -> bool {
-        matches!(self, QuickActionResult::Selected(_) | QuickActionResult::Command(_))
+        matches!(
+            self,
+            QuickActionResult::Selected(_) | QuickActionResult::Command(_)
+        )
     }
 
     /// True if user canceled the menu.
@@ -1077,9 +1080,15 @@ impl QuickActionsMenu {
     // -----------------------------------------------------------------------
 
     /// Process a single keyboard event. Returns `Some(QuickActionResult)` when interactive session finishes.
-    pub fn handle_key(&mut self, code: KeyCode, modifiers: KeyModifiers) -> Option<QuickActionResult> {
+    pub fn handle_key(
+        &mut self,
+        code: KeyCode,
+        modifiers: KeyModifiers,
+    ) -> Option<QuickActionResult> {
         // 1. Global Interruption / Cancellation: Esc / Ctrl+C
-        if code == KeyCode::Esc || (code == KeyCode::Char('c') && modifiers.contains(KeyModifiers::CONTROL)) {
+        if code == KeyCode::Esc
+            || (code == KeyCode::Char('c') && modifiers.contains(KeyModifiers::CONTROL))
+        {
             return Some(QuickActionResult::Cancelled);
         }
 
@@ -1115,11 +1124,15 @@ impl QuickActionsMenu {
         }
 
         // 4. Line Navigation: Up / Down / Ctrl+P / Ctrl+N
-        if code == KeyCode::Up || (code == KeyCode::Char('p') && modifiers.contains(KeyModifiers::CONTROL)) {
+        if code == KeyCode::Up
+            || (code == KeyCode::Char('p') && modifiers.contains(KeyModifiers::CONTROL))
+        {
             self.select_prev();
             return None;
         }
-        if code == KeyCode::Down || (code == KeyCode::Char('n') && modifiers.contains(KeyModifiers::CONTROL)) {
+        if code == KeyCode::Down
+            || (code == KeyCode::Char('n') && modifiers.contains(KeyModifiers::CONTROL))
+        {
             self.select_next();
             return None;
         }
@@ -1188,7 +1201,8 @@ impl QuickActionsMenu {
 
         // 10. Character input
         if let KeyCode::Char(c) = code {
-            if !modifiers.contains(KeyModifiers::CONTROL) && !modifiers.contains(KeyModifiers::ALT) {
+            if !modifiers.contains(KeyModifiers::CONTROL) && !modifiers.contains(KeyModifiers::ALT)
+            {
                 self.insert_char(c);
                 return None;
             }
@@ -1285,8 +1299,18 @@ impl QuickActionsMenu {
         let inner_area = if self.show_border {
             let block = Block::default()
                 .title(Line::from(vec![
-                    Span::styled("⚡ ", Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD)),
-                    Span::styled(&self.title, Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD)),
+                    Span::styled(
+                        "⚡ ",
+                        Style::default()
+                            .fg(Color::Yellow)
+                            .add_modifier(Modifier::BOLD),
+                    ),
+                    Span::styled(
+                        &self.title,
+                        Style::default()
+                            .fg(Color::Cyan)
+                            .add_modifier(Modifier::BOLD),
+                    ),
                     Span::styled(
                         format!(" ({}/{})", self.filtered_indices.len(), self.actions.len()),
                         Style::default().fg(Color::DarkGray),
@@ -1509,7 +1533,9 @@ impl QuickActionsMenu {
             ));
             spans.push(Span::styled(
                 &action.syntax,
-                Style::default().fg(Color::White).add_modifier(Modifier::BOLD),
+                Style::default()
+                    .fg(Color::White)
+                    .add_modifier(Modifier::BOLD),
             ));
 
             if !action.aliases.is_empty() {
@@ -1530,10 +1556,7 @@ impl QuickActionsMenu {
                     "Example: ",
                     Style::default().fg(Color::DarkGray),
                 ));
-                spans.push(Span::styled(
-                    ex.as_str(),
-                    Style::default().fg(Color::Green),
-                ));
+                spans.push(Span::styled(ex.as_str(), Style::default().fg(Color::Green)));
             }
 
             let paragraph = Paragraph::new(Line::from(spans));
@@ -1548,28 +1571,68 @@ impl QuickActionsMenu {
         let footer_line = if is_compact {
             Line::from(vec![
                 Span::raw(" "),
-                Span::styled("↑↓ ", Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD)),
+                Span::styled(
+                    "↑↓ ",
+                    Style::default()
+                        .fg(Color::Cyan)
+                        .add_modifier(Modifier::BOLD),
+                ),
                 Span::styled("Nav ", Style::default().fg(Color::DarkGray)),
-                Span::styled("Tab ", Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD)),
+                Span::styled(
+                    "Tab ",
+                    Style::default()
+                        .fg(Color::Cyan)
+                        .add_modifier(Modifier::BOLD),
+                ),
                 Span::styled("Cat ", Style::default().fg(Color::DarkGray)),
-                Span::styled("↵ ", Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD)),
+                Span::styled(
+                    "↵ ",
+                    Style::default()
+                        .fg(Color::Cyan)
+                        .add_modifier(Modifier::BOLD),
+                ),
                 Span::styled("Run ", Style::default().fg(Color::DarkGray)),
-                Span::styled("Esc ", Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD)),
+                Span::styled(
+                    "Esc ",
+                    Style::default()
+                        .fg(Color::Cyan)
+                        .add_modifier(Modifier::BOLD),
+                ),
                 Span::styled("Close", Style::default().fg(Color::DarkGray)),
             ])
         } else {
             Line::from(vec![
                 Span::raw(" "),
-                Span::styled("↑↓/Ctrl+P/N ", Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD)),
+                Span::styled(
+                    "↑↓/Ctrl+P/N ",
+                    Style::default()
+                        .fg(Color::Cyan)
+                        .add_modifier(Modifier::BOLD),
+                ),
                 Span::styled("Navigate", Style::default().fg(Color::DarkGray)),
                 Span::raw("   "),
-                Span::styled("Tab ", Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD)),
+                Span::styled(
+                    "Tab ",
+                    Style::default()
+                        .fg(Color::Cyan)
+                        .add_modifier(Modifier::BOLD),
+                ),
                 Span::styled("Category", Style::default().fg(Color::DarkGray)),
                 Span::raw("   "),
-                Span::styled("Enter ", Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD)),
+                Span::styled(
+                    "Enter ",
+                    Style::default()
+                        .fg(Color::Cyan)
+                        .add_modifier(Modifier::BOLD),
+                ),
                 Span::styled("Execute", Style::default().fg(Color::DarkGray)),
                 Span::raw("   "),
-                Span::styled("Esc ", Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD)),
+                Span::styled(
+                    "Esc ",
+                    Style::default()
+                        .fg(Color::Cyan)
+                        .add_modifier(Modifier::BOLD),
+                ),
                 Span::styled("Close", Style::default().fg(Color::DarkGray)),
             ])
         };
@@ -1658,10 +1721,7 @@ pub fn format_action_row<'a>(
 
     // 4. Separator
     spans.push(Span::raw(" "));
-    spans.push(Span::styled(
-        "•",
-        Style::default().fg(Color::DarkGray),
-    ));
+    spans.push(Span::styled("•", Style::default().fg(Color::DarkGray)));
     spans.push(Span::raw(" "));
 
     // 5. Title / Description
@@ -1682,7 +1742,10 @@ pub fn format_action_row<'a>(
 
     if available_desc > 3 {
         let truncated_desc: String = if desc_text.chars().count() > available_desc {
-            let mut s: String = desc_text.chars().take(available_desc.saturating_sub(3)).collect();
+            let mut s: String = desc_text
+                .chars()
+                .take(available_desc.saturating_sub(3))
+                .collect();
             s.push_str("...");
             s
         } else {
@@ -1775,10 +1838,16 @@ mod tests {
         assert_eq!(tab.next().next(), QuickActionCategory::Session);
         assert_eq!(tab.next().next().next(), QuickActionCategory::Model);
         assert_eq!(tab.next().next().next().next(), QuickActionCategory::Config);
-        assert_eq!(tab.next().next().next().next().next(), QuickActionCategory::All);
+        assert_eq!(
+            tab.next().next().next().next().next(),
+            QuickActionCategory::All
+        );
 
         assert_eq!(QuickActionCategory::All.prev(), QuickActionCategory::Config);
-        assert_eq!(QuickActionCategory::Config.prev(), QuickActionCategory::Model);
+        assert_eq!(
+            QuickActionCategory::Config.prev(),
+            QuickActionCategory::Model
+        );
     }
 
     #[test]

@@ -16,7 +16,6 @@
 //!   without turn-by-turn spam.
 //! - Adaptive color and theme support (`TokyoNight`, `Monokai`, `Dracula`, `HighContrast`, `Adaptive`).
 
-use std::fmt;
 use ratatui::{
     buffer::Buffer,
     layout::Rect,
@@ -26,11 +25,10 @@ use ratatui::{
     Frame,
 };
 use serde::{Deserialize, Serialize};
+use std::fmt;
 
 use crate::agent::session::Session;
-use crate::agent::tokens::{
-    format_token_count, model_context_limit, ContextBreakdown,
-};
+use crate::agent::tokens::{format_token_count, model_context_limit, ContextBreakdown};
 use crate::provider::types::{Message, ToolDefinition};
 use crate::ui::theme::Theme;
 
@@ -188,9 +186,18 @@ impl ContextAlertLevel {
     pub fn ansi_badge(&self) -> String {
         match self {
             Self::Safe => format!("{}[ OK ]{}", ANSI_GREEN, ANSI_RESET),
-            Self::Warning => format!("{}{} WARN 80% {}{}", ANSI_BG_YELLOW, ANSI_BOLD, ANSI_RESET, ANSI_RESET),
-            Self::Critical => format!("{}{} CRITICAL 95% {}{}", ANSI_BG_RED, ANSI_BOLD, ANSI_RESET, ANSI_RESET),
-            Self::Overflow => format!("{}{} OVERFLOW 100%+ {}{}", ANSI_BG_RED, ANSI_BOLD, ANSI_RESET, ANSI_RESET),
+            Self::Warning => format!(
+                "{}{} WARN 80% {}{}",
+                ANSI_BG_YELLOW, ANSI_BOLD, ANSI_RESET, ANSI_RESET
+            ),
+            Self::Critical => format!(
+                "{}{} CRITICAL 95% {}{}",
+                ANSI_BG_RED, ANSI_BOLD, ANSI_RESET, ANSI_RESET
+            ),
+            Self::Overflow => format!(
+                "{}{} OVERFLOW 100%+ {}{}",
+                ANSI_BG_RED, ANSI_BOLD, ANSI_RESET, ANSI_RESET
+            ),
         }
     }
 
@@ -332,9 +339,15 @@ impl ContextAlert {
     /// Formatted remaining token count (e.g. `"35K"` or `"-5K"`).
     pub fn formatted_remaining(&self) -> String {
         if self.remaining_tokens >= 0 {
-            format!("{} tokens remaining", format_token_count(self.remaining_tokens as usize))
+            format!(
+                "{} tokens remaining",
+                format_token_count(self.remaining_tokens as usize)
+            )
         } else {
-            format!("{} tokens over limit", format_token_count((-self.remaining_tokens) as usize))
+            format!(
+                "{} tokens over limit",
+                format_token_count((-self.remaining_tokens) as usize)
+            )
         }
     }
 
@@ -367,8 +380,12 @@ impl ContextAlert {
         match self.level {
             ContextAlertLevel::Safe => "Normal operation.",
             ContextAlertLevel::Warning => "Run /compact to summarize conversation history.",
-            ContextAlertLevel::Critical => "Urgent: Run /compact now or prune messages to prevent truncation.",
-            ContextAlertLevel::Overflow => "Critical overflow: Conversation exceeds window. Compact immediately.",
+            ContextAlertLevel::Critical => {
+                "Urgent: Run /compact now or prune messages to prevent truncation."
+            }
+            ContextAlertLevel::Overflow => {
+                "Critical overflow: Conversation exceeds window. Compact immediately."
+            }
         }
     }
 
@@ -484,7 +501,12 @@ impl ProgressBarConfig {
 }
 
 /// Formats a visual token usage progress meter string.
-pub fn format_token_progress_bar(current: usize, max: usize, width: usize, colored: bool) -> String {
+pub fn format_token_progress_bar(
+    current: usize,
+    max: usize,
+    width: usize,
+    colored: bool,
+) -> String {
     let config = ProgressBarConfig {
         width,
         colored,
@@ -574,8 +596,12 @@ pub fn format_progress_bar(current: usize, max: usize, config: &ProgressBarConfi
         let pct_str = if config.colored {
             match level {
                 ContextAlertLevel::Safe => format!(" {}{:.1}%{}", ANSI_GREEN, pct, ANSI_RESET),
-                ContextAlertLevel::Warning => format!(" {}{:.1}%{}", ANSI_BOLD_YELLOW, pct, ANSI_RESET),
-                ContextAlertLevel::Critical => format!(" {}{:.1}%{}", ANSI_BOLD_RED, pct, ANSI_RESET),
+                ContextAlertLevel::Warning => {
+                    format!(" {}{:.1}%{}", ANSI_BOLD_YELLOW, pct, ANSI_RESET)
+                }
+                ContextAlertLevel::Critical => {
+                    format!(" {}{:.1}%{}", ANSI_BOLD_RED, pct, ANSI_RESET)
+                }
                 ContextAlertLevel::Overflow => format!(" {}{:.1}%{}", ANSI_BG_RED, pct, ANSI_RESET),
             }
         } else {
@@ -594,7 +620,11 @@ pub fn format_progress_bar(current: usize, max: usize, config: &ProgressBarConfi
                 ANSI_RESET
             )
         } else {
-            format!(" ({} / {})", format_token_count(current), format_token_count(max))
+            format!(
+                " ({} / {})",
+                format_token_count(current),
+                format_token_count(max)
+            )
         };
         result.push_str(&counts_str);
     }
@@ -683,7 +713,11 @@ impl BannerBoxStyle {
 
 /// Renders a full, styled visual context warning banner with borders, progress meter,
 /// metrics breakdown, and actionable suggestions.
-pub fn render_budget_banner_ansi(alert: &ContextAlert, box_style: BannerBoxStyle, banner_width: usize) -> String {
+pub fn render_budget_banner_ansi(
+    alert: &ContextAlert,
+    box_style: BannerBoxStyle,
+    banner_width: usize,
+) -> String {
     let width = banner_width.max(MIN_BANNER_WIDTH);
     let border_color = alert.level.ansi_border_color();
     let horiz = box_style.horizontal();
@@ -709,10 +743,18 @@ pub fn render_budget_banner_ansi(alert: &ContextAlert, box_style: BannerBoxStyle
 
     // Title styling based on severity
     let styled_title = match alert.level {
-        ContextAlertLevel::Safe => format!("{}{}{}{}", ANSI_BOLD, ANSI_GREEN, title_badge, ANSI_RESET),
-        ContextAlertLevel::Warning => format!("{}{}{}{}", ANSI_BOLD, ANSI_YELLOW, title_badge, ANSI_RESET),
-        ContextAlertLevel::Critical => format!("{}{}{}{}", ANSI_BOLD, ANSI_RED, title_badge, ANSI_RESET),
-        ContextAlertLevel::Overflow => format!("{}{}{}{}", ANSI_BOLD, ANSI_BG_RED, title_badge, ANSI_RESET),
+        ContextAlertLevel::Safe => {
+            format!("{}{}{}{}", ANSI_BOLD, ANSI_GREEN, title_badge, ANSI_RESET)
+        }
+        ContextAlertLevel::Warning => {
+            format!("{}{}{}{}", ANSI_BOLD, ANSI_YELLOW, title_badge, ANSI_RESET)
+        }
+        ContextAlertLevel::Critical => {
+            format!("{}{}{}{}", ANSI_BOLD, ANSI_RED, title_badge, ANSI_RESET)
+        }
+        ContextAlertLevel::Overflow => {
+            format!("{}{}{}{}", ANSI_BOLD, ANSI_BG_RED, title_badge, ANSI_RESET)
+        }
     };
     out.push_str(&styled_title);
 
@@ -791,7 +833,11 @@ pub fn render_budget_banner_ansi(alert: &ContextAlert, box_style: BannerBoxStyle
     out.push_str(&render_row(&remaining_styled));
 
     // Granular breakdown if available
-    if let (Some(sys), Some(msg), Some(tools)) = (alert.system_tokens, alert.messages_tokens, alert.tools_tokens) {
+    if let (Some(sys), Some(msg), Some(tools)) = (
+        alert.system_tokens,
+        alert.messages_tokens,
+        alert.tools_tokens,
+    ) {
         let breakdown_line = format!(
             "Breakdown: {}Sys: {}  │  Msgs: {}  │  Tools: {}{}",
             ANSI_GRAY,
@@ -845,10 +891,7 @@ pub fn render_budget_banner_compact_ansi(alert: &ContextAlert) -> String {
     );
 
     let action = alert.primary_action();
-    let line2 = format!(
-        "   {}→ Tip: {}{}",
-        ANSI_GRAY, action, ANSI_RESET
-    );
+    let line2 = format!("   {}→ Tip: {}{}", ANSI_GRAY, action, ANSI_RESET);
 
     format!("{}\n{}", line1, line2)
 }
@@ -908,7 +951,11 @@ impl<'a> Widget for BudgetBannerWidget<'a> {
         }
 
         let alert_color = self.alert.level.ratatui_color(&self.theme);
-        let title = format!(" {} {} ", self.alert.level.icon(), self.alert.level.banner_title());
+        let title = format!(
+            " {} {} ",
+            self.alert.level.icon(),
+            self.alert.level.banner_title()
+        );
 
         let block = Block::default()
             .title(Span::styled(
@@ -934,12 +981,18 @@ impl<'a> Widget for BudgetBannerWidget<'a> {
             ),
             Span::raw("  |  Usage: "),
             Span::styled(
-                format!("{} / {} tokens", self.alert.formatted_current(), self.alert.formatted_max()),
+                format!(
+                    "{} / {} tokens",
+                    self.alert.formatted_current(),
+                    self.alert.formatted_max()
+                ),
                 Style::default().fg(self.theme.foreground),
             ),
             Span::styled(
                 format!(" ({})", self.alert.percentage_str()),
-                Style::default().fg(alert_color).add_modifier(Modifier::BOLD),
+                Style::default()
+                    .fg(alert_color)
+                    .add_modifier(Modifier::BOLD),
             ),
         ]));
 
@@ -964,11 +1017,20 @@ impl<'a> Widget for BudgetBannerWidget<'a> {
         ]));
 
         // Line 3: Granular Breakdown or Recommendation
-        if let (Some(sys), Some(msg), Some(tools)) = (self.alert.system_tokens, self.alert.messages_tokens, self.alert.tools_tokens) {
+        if let (Some(sys), Some(msg), Some(tools)) = (
+            self.alert.system_tokens,
+            self.alert.messages_tokens,
+            self.alert.tools_tokens,
+        ) {
             lines.push(Line::from(vec![
                 Span::styled("Tokens: ", Style::default().fg(self.theme.muted)),
                 Span::styled(
-                    format!("Sys: {}  Msgs: {}  Tools: {}", format_token_count(sys), format_token_count(msg), format_token_count(tools)),
+                    format!(
+                        "Sys: {}  Msgs: {}  Tools: {}",
+                        format_token_count(sys),
+                        format_token_count(msg),
+                        format_token_count(tools)
+                    ),
                     Style::default().fg(self.theme.muted),
                 ),
             ]));
@@ -977,8 +1039,16 @@ impl<'a> Widget for BudgetBannerWidget<'a> {
         // Line 4+: Action advice
         if area.height >= 5 {
             lines.push(Line::from(vec![
-                Span::styled("Action: ", Style::default().fg(alert_color).add_modifier(Modifier::BOLD)),
-                Span::styled(self.alert.primary_action(), Style::default().fg(self.theme.foreground)),
+                Span::styled(
+                    "Action: ",
+                    Style::default()
+                        .fg(alert_color)
+                        .add_modifier(Modifier::BOLD),
+                ),
+                Span::styled(
+                    self.alert.primary_action(),
+                    Style::default().fg(self.theme.foreground),
+                ),
             ]));
         }
 
@@ -1009,11 +1079,17 @@ pub fn render_budget_banner_compact_widget(
     let t = theme.cloned().unwrap_or_else(Theme::auto);
     let alert_color = alert.level.ratatui_color(&t);
 
-    let title = format!(" {} Context {} ", alert.level.icon(), alert.percentage_str());
+    let title = format!(
+        " {} Context {} ",
+        alert.level.icon(),
+        alert.percentage_str()
+    );
     let block = Block::default()
         .title(Span::styled(
             title,
-            Style::default().fg(alert_color).add_modifier(Modifier::BOLD),
+            Style::default()
+                .fg(alert_color)
+                .add_modifier(Modifier::BOLD),
         ))
         .borders(Borders::ALL)
         .border_type(BorderType::Rounded)
@@ -1212,30 +1288,63 @@ mod tests {
     #[test]
     fn test_alert_level_classification() {
         // Safe: < 80%
-        assert_eq!(ContextAlertLevel::from_utilization(0.0), ContextAlertLevel::Safe);
-        assert_eq!(ContextAlertLevel::from_utilization(0.50), ContextAlertLevel::Safe);
-        assert_eq!(ContextAlertLevel::from_utilization(0.799), ContextAlertLevel::Safe);
+        assert_eq!(
+            ContextAlertLevel::from_utilization(0.0),
+            ContextAlertLevel::Safe
+        );
+        assert_eq!(
+            ContextAlertLevel::from_utilization(0.50),
+            ContextAlertLevel::Safe
+        );
+        assert_eq!(
+            ContextAlertLevel::from_utilization(0.799),
+            ContextAlertLevel::Safe
+        );
         assert!(!ContextAlertLevel::Safe.is_alert());
 
         // Warning: >= 80% and < 95%
-        assert_eq!(ContextAlertLevel::from_utilization(0.80), ContextAlertLevel::Warning);
-        assert_eq!(ContextAlertLevel::from_utilization(0.85), ContextAlertLevel::Warning);
-        assert_eq!(ContextAlertLevel::from_utilization(0.949), ContextAlertLevel::Warning);
+        assert_eq!(
+            ContextAlertLevel::from_utilization(0.80),
+            ContextAlertLevel::Warning
+        );
+        assert_eq!(
+            ContextAlertLevel::from_utilization(0.85),
+            ContextAlertLevel::Warning
+        );
+        assert_eq!(
+            ContextAlertLevel::from_utilization(0.949),
+            ContextAlertLevel::Warning
+        );
         assert!(ContextAlertLevel::Warning.is_alert());
         assert!(ContextAlertLevel::Warning.is_warning());
         assert!(!ContextAlertLevel::Warning.is_critical());
 
         // Critical: >= 95% and < 100%
-        assert_eq!(ContextAlertLevel::from_utilization(0.95), ContextAlertLevel::Critical);
-        assert_eq!(ContextAlertLevel::from_utilization(0.98), ContextAlertLevel::Critical);
-        assert_eq!(ContextAlertLevel::from_utilization(0.999), ContextAlertLevel::Critical);
+        assert_eq!(
+            ContextAlertLevel::from_utilization(0.95),
+            ContextAlertLevel::Critical
+        );
+        assert_eq!(
+            ContextAlertLevel::from_utilization(0.98),
+            ContextAlertLevel::Critical
+        );
+        assert_eq!(
+            ContextAlertLevel::from_utilization(0.999),
+            ContextAlertLevel::Critical
+        );
         assert!(ContextAlertLevel::Critical.is_alert());
         assert!(ContextAlertLevel::Critical.is_critical());
         assert!(!ContextAlertLevel::Critical.is_warning());
 
         // Overflow: >= 100%
-        assert_eq!(ContextAlertLevel::from_utilization(1.0), ContextAlertLevel::Overflow);
-        assert_eq!(ContextAlertLevel::from_utilization(1.2), ContextAlertLevel::Overflow);
+        assert_eq!(
+            ContextAlertLevel::from_utilization(1.0),
+            ContextAlertLevel::Overflow
+        );
+        assert_eq!(
+            ContextAlertLevel::from_utilization(1.2),
+            ContextAlertLevel::Overflow
+        );
         assert!(ContextAlertLevel::Overflow.is_alert());
         assert!(ContextAlertLevel::Overflow.is_overflow());
     }

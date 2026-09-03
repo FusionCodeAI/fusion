@@ -27,10 +27,7 @@ pub enum PromptLibError {
     /// Requested prompt template was not found in the library.
     TemplateNotFound(String),
     /// A required template variable was not provided and has no default value.
-    MissingVariable {
-        template: String,
-        variable: String,
-    },
+    MissingVariable { template: String, variable: String },
     /// File system or I/O error occurred.
     Io(String),
     /// Failed to parse or serialize JSON / Markdown frontmatter.
@@ -229,8 +226,11 @@ impl PromptTemplate {
     /// while preserving any previously defined descriptions or defaults.
     pub fn auto_populate_variables(&mut self) {
         let extracted = extract_placeholders(&self.template);
-        let existing_map: HashMap<String, PromptVariable> =
-            self.variables.drain(..).map(|v| (v.name.clone(), v)).collect();
+        let existing_map: HashMap<String, PromptVariable> = self
+            .variables
+            .drain(..)
+            .map(|v| (v.name.clone(), v))
+            .collect();
 
         let mut merged = Vec::new();
         for mut var in extracted {
@@ -277,15 +277,33 @@ impl PromptTemplate {
         let mut out = String::new();
         let cat = self.category.as_deref().unwrap_or("General");
         let builtin_tag = if self.is_builtin { " `(builtin)`" } else { "" };
-        out.push_str(&format!("### `/prompt load {}`{}\n", self.name, builtin_tag));
-        out.push_str(&format!("**Category:** {} | **Description:** {}\n\n", cat, self.description));
+        out.push_str(&format!(
+            "### `/prompt load {}`{}\n",
+            self.name, builtin_tag
+        ));
+        out.push_str(&format!(
+            "**Category:** {} | **Description:** {}\n\n",
+            cat, self.description
+        ));
 
         if !self.variables.is_empty() {
             out.push_str("**Variables:**\n");
             for v in &self.variables {
-                let req = if v.required { "*(required)*" } else { "*(optional)*" };
-                let def = v.default_value.as_deref().map(|d| format!(", default: `{}`", d)).unwrap_or_default();
-                let desc = v.description.as_deref().map(|d| format!(" - {}", d)).unwrap_or_default();
+                let req = if v.required {
+                    "*(required)*"
+                } else {
+                    "*(optional)*"
+                };
+                let def = v
+                    .default_value
+                    .as_deref()
+                    .map(|d| format!(", default: `{}`", d))
+                    .unwrap_or_default();
+                let desc = v
+                    .description
+                    .as_deref()
+                    .map(|d| format!(" - {}", d))
+                    .unwrap_or_default();
                 out.push_str(&format!("- `{{{{{}}}}}` {} {}{}\n", v.name, req, def, desc));
             }
             out.push('\n');
@@ -306,7 +324,10 @@ impl PromptTemplate {
         let mut out = String::new();
         out.push_str("---\n");
         out.push_str(&format!("name: \"{}\"\n", self.name.replace('"', "\\\"")));
-        out.push_str(&format!("description: \"{}\"\n", self.description.replace('"', "\\\"")));
+        out.push_str(&format!(
+            "description: \"{}\"\n",
+            self.description.replace('"', "\\\"")
+        ));
         if let Some(cat) = &self.category {
             out.push_str(&format!("category: \"{}\"\n", cat.replace('"', "\\\"")));
         }
@@ -318,7 +339,10 @@ impl PromptTemplate {
             out.push_str(&format!("model: \"{}\"\n", model));
         }
         if let Some(sys) = &self.system_prompt_override {
-            out.push_str(&format!("system_prompt: \"{}\"\n", sys.replace('"', "\\\"").replace('\n', "\\n")));
+            out.push_str(&format!(
+                "system_prompt: \"{}\"\n",
+                sys.replace('"', "\\\"").replace('\n', "\\n")
+            ));
         }
         if let Some(temp) = self.temperature {
             out.push_str(&format!("temperature: {}\n", temp));
@@ -346,7 +370,9 @@ impl PromptTemplate {
         };
 
         let frontmatter_str = &after_first[..end_idx];
-        let body_str = after_first[end_idx + 4..].trim_start_matches('\n').trim_start_matches('\r');
+        let body_str = after_first[end_idx + 4..]
+            .trim_start_matches('\n')
+            .trim_start_matches('\r');
 
         let mut name = String::new();
         let mut description = String::new();
@@ -376,12 +402,17 @@ impl PromptTemplate {
                                 tags = parsed_tags;
                             }
                         } else {
-                            tags = val.split(',').map(|s| s.trim().to_string()).filter(|s| !s.is_empty()).collect();
+                            tags = val
+                                .split(',')
+                                .map(|s| s.trim().to_string())
+                                .filter(|s| !s.is_empty())
+                                .collect();
                         }
                     }
                     "model" => model_override = Some(val),
                     "system_prompt" | "system" => {
-                        system_prompt_override = Some(val.replace("\\n", "\n").replace("\\\"", "\""))
+                        system_prompt_override =
+                            Some(val.replace("\\n", "\n").replace("\\\"", "\""))
                     }
                     "temperature" | "temp" => {
                         if let Ok(t) = val.parse::<f32>() {
@@ -475,7 +506,6 @@ impl PromptTemplate {
         self.temperature
     }
 }
-
 
 /// Builder helper for fluent `PromptTemplate` construction.
 #[derive(Debug, Clone)]
@@ -619,7 +649,8 @@ impl PromptLibrary {
         if template.variables.is_empty() {
             template.auto_populate_variables();
         }
-        self.templates.insert(template.name.to_lowercase(), template);
+        self.templates
+            .insert(template.name.to_lowercase(), template);
     }
 
     /// Retrieve a template by name (case-insensitive).
@@ -671,13 +702,7 @@ impl PromptLibrary {
         let target = category.to_lowercase();
         self.templates
             .values()
-            .filter(|t| {
-                t.category
-                    .as_deref()
-                    .unwrap_or("general")
-                    .to_lowercase()
-                    == target
-            })
+            .filter(|t| t.category.as_deref().unwrap_or("general").to_lowercase() == target)
             .collect()
     }
 
@@ -734,7 +759,11 @@ impl PromptLibrary {
     }
 
     /// Render template by name with variable map.
-    pub fn render(&self, name: &str, vars: &HashMap<String, String>) -> Result<String, PromptLibError> {
+    pub fn render(
+        &self,
+        name: &str,
+        vars: &HashMap<String, String>,
+    ) -> Result<String, PromptLibError> {
         let tmpl = self
             .get(name)
             .ok_or_else(|| PromptLibError::TemplateNotFound(name.to_string()))?;
@@ -750,7 +779,11 @@ impl PromptLibrary {
     }
 
     /// Render template by name with raw CLI argument tokens.
-    pub fn render_cli_args(&self, name: &str, raw_args: &[String]) -> Result<String, PromptLibError> {
+    pub fn render_cli_args(
+        &self,
+        name: &str,
+        raw_args: &[String],
+    ) -> Result<String, PromptLibError> {
         let tmpl = self
             .get(name)
             .ok_or_else(|| PromptLibError::TemplateNotFound(name.to_string()))?;
@@ -816,9 +849,8 @@ impl PromptLibrary {
 
     /// Load a single template from a file path (`.md`, `.json`, `.toml`).
     pub fn load_from_file(&mut self, path: &Path) -> Result<PromptTemplate, PromptLibError> {
-        let content = fs::read_to_string(path).map_err(|e| {
-            PromptLibError::Io(format!("Failed to read {}: {}", path.display(), e))
-        })?;
+        let content = fs::read_to_string(path)
+            .map_err(|e| PromptLibError::Io(format!("Failed to read {}: {}", path.display(), e)))?;
 
         let ext = path
             .extension()
@@ -1115,7 +1147,9 @@ pub fn parse_cli_tokens(tokens: &[String], template: &PromptTemplate) -> HashMap
 
         // Check if template has one of the primary candidates as a variable
         for candidate in primary_candidates {
-            if template.variables.iter().any(|v| v.name == candidate) && !vars.contains_key(candidate) {
+            if template.variables.iter().any(|v| v.name == candidate)
+                && !vars.contains_key(candidate)
+            {
                 vars.insert(candidate.to_string(), single_arg);
                 return vars;
             }
@@ -1642,10 +1676,7 @@ mod tests {
         assert!(rendered.contains("Focus on: general"));
 
         // Multiple CLI tokens with key-value pairs
-        let tokens = vec![
-            "focus=security".to_string(),
-            "code=let x = 42;".to_string(),
-        ];
+        let tokens = vec!["focus=security".to_string(), "code=let x = 42;".to_string()];
         let rendered2 = tmpl.render_cli_args(&tokens).unwrap();
         assert!(rendered2.contains("let x = 42;"));
         assert!(rendered2.contains("Focus on: security"));
@@ -1673,7 +1704,10 @@ mod tests {
         assert_eq!(parsed.category.as_deref(), Some("Custom"));
         assert_eq!(parsed.tags, vec!["review", "team-standards"]);
         assert_eq!(parsed.model_override.as_deref(), Some("claude-3-5-sonnet"));
-        assert_eq!(parsed.template, "Please check {{code}} against team guidelines.");
+        assert_eq!(
+            parsed.template,
+            "Please check {{code}} against team guidelines."
+        );
     }
 
     #[test]
@@ -1732,7 +1766,10 @@ mod tests {
         assert_eq!(tmpl.category(), Some("Testing"));
         assert_eq!(tmpl.tags(), &["alpha".to_string(), "beta".to_string()]);
         assert_eq!(tmpl.model_override(), Some("gpt-4o"));
-        assert_eq!(tmpl.system_prompt_override(), Some("You are a strict reviewer."));
+        assert_eq!(
+            tmpl.system_prompt_override(),
+            Some("You are a strict reviewer.")
+        );
         assert_eq!(tmpl.temperature(), Some(0.5));
         assert!(!tmpl.is_empty());
         assert_eq!(tmpl.len(), "Review {{code}}.".len());
@@ -1794,7 +1831,10 @@ mod tests {
 
         let mut vars = HashMap::new();
         vars.insert("x".to_string(), "value-x".to_string());
-        assert_eq!(restored.render("export-a", &vars).unwrap(), "Body A value-x");
+        assert_eq!(
+            restored.render("export-a", &vars).unwrap(),
+            "Body A value-x"
+        );
     }
 
     #[test]
@@ -1813,9 +1853,7 @@ mod tests {
         let tmpl = PromptTemplate::builder("card-check")
             .description("Card rendering")
             .category("Testing")
-            .variable(
-                PromptVariable::new("code", true).with_description("The code to inspect"),
-            )
+            .variable(PromptVariable::new("code", true).with_description("The code to inspect"))
             .variable(PromptVariable::with_default("style", "concise"))
             .body("Inspect {{code}} with {{style}} output.")
             .build();
@@ -1851,7 +1889,11 @@ mod tests {
     fn test_search_scores_name_exact_above_body() {
         let mut lib = PromptLibrary::empty();
         lib.insert(PromptTemplate::new("scan", "Scanning tool", "Generic body"));
-        lib.insert(PromptTemplate::new("other", "Other", "Body mentioning scan generically"));
+        lib.insert(PromptTemplate::new(
+            "other",
+            "Other",
+            "Body mentioning scan generically",
+        ));
 
         let results = lib.search("scan");
         assert_eq!(results[0].name, "scan");
@@ -1897,9 +1939,8 @@ mod tests {
     #[test]
     fn test_variable_metadata_preserved_on_repopulate() {
         let mut tmpl = PromptTemplate::new("preserve-var", "Preserving metadata", "Check {{code}}");
-        tmpl.variables = vec![
-            PromptVariable::new("code", true).with_description("Custom code description"),
-        ];
+        tmpl.variables =
+            vec![PromptVariable::new("code", true).with_description("Custom code description")];
         tmpl.auto_populate_variables();
 
         assert_eq!(tmpl.variables.len(), 1);
@@ -1946,7 +1987,11 @@ mod tests {
     fn test_builtins_all_have_variables_inferred() {
         for t in get_curated_builtin_templates() {
             assert!(!t.name.is_empty(), "builtin template must have a name");
-            assert!(!t.template.is_empty(), "builtin {} must have a body", t.name);
+            assert!(
+                !t.template.is_empty(),
+                "builtin {} must have a body",
+                t.name
+            );
             assert!(t.is_builtin, "builtin {} must be flagged builtin", t.name);
             // Every {{var}} in the body must have matching metadata entry.
             for var in &t.variables {

@@ -89,10 +89,7 @@ pub enum OfflineReason {
     /// The user explicitly requested or configured offline mode.
     ManualOfflineEnforced,
     /// The active remote provider endpoint failed to connect.
-    ProviderUnreachable {
-        provider: String,
-        details: String,
-    },
+    ProviderUnreachable { provider: String, details: String },
 }
 
 impl std::fmt::Display for OfflineReason {
@@ -113,10 +110,7 @@ impl std::fmt::Display for OfflineReason {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum OfflineTransitionResult {
     /// Network is online; kept current provider and model configuration unchanged.
-    StayedOnline {
-        provider: String,
-        model: String,
-    },
+    StayedOnline { provider: String, model: String },
     /// Offline detected; successfully switched default provider to Ollama with the best local model.
     SwitchedToOllama {
         previous_provider: String,
@@ -203,11 +197,8 @@ impl OfflineTransitionResult {
                 steps: vec![
                     "Install Ollama if needed: https://ollama.com/download".to_string(),
                     "Start the local daemon: 'ollama serve'".to_string(),
-                    format!(
-                        "Pull a coding model: 'ollama pull {DEFAULT_OFFLINE_MODEL_FALLBACK}'"
-                    ),
-                    "Re-run Fusion; it will detect Ollama and switch automatically."
-                        .to_string(),
+                    format!("Pull a coding model: 'ollama pull {DEFAULT_OFFLINE_MODEL_FALLBACK}'"),
+                    "Re-run Fusion; it will detect Ollama and switch automatically.".to_string(),
                 ],
             },
         }
@@ -604,10 +595,8 @@ pub fn select_best_local_model(models: &[OllamaModelInfo]) -> Option<String> {
         return None;
     }
 
-    let mut scored: Vec<(&OllamaModelInfo, f64)> = models
-        .iter()
-        .map(|m| (m, score_ollama_model(m)))
-        .collect();
+    let mut scored: Vec<(&OllamaModelInfo, f64)> =
+        models.iter().map(|m| (m, score_ollama_model(m))).collect();
 
     // Sort descending by score
     scored.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(Ordering::Equal));
@@ -712,7 +701,10 @@ pub fn extract_host_port_from_url(url: &str) -> String {
         .trim_start_matches("https://")
         .trim_end_matches('/');
 
-    let host_part = trimmed.split('/').next().unwrap_or(DEFAULT_OLLAMA_SOCKET_ADDR);
+    let host_part = trimmed
+        .split('/')
+        .next()
+        .unwrap_or(DEFAULT_OLLAMA_SOCKET_ADDR);
 
     if !host_part.contains(':') {
         format!("{}:{}", host_part, DEFAULT_OLLAMA_PORT)
@@ -920,12 +912,16 @@ impl OfflineDetector {
         let available_models = match self.list_local_models().await {
             Ok(models) => models,
             Err(e) => {
-                warn!("Failed to query Ollama model list: {}. Using fallback model.", e);
+                warn!(
+                    "Failed to query Ollama model list: {}. Using fallback model.",
+                    e
+                );
                 Vec::new()
             }
         };
 
-        let available_names: Vec<String> = available_models.iter().map(|m| m.name.clone()).collect();
+        let available_names: Vec<String> =
+            available_models.iter().map(|m| m.name.clone()).collect();
 
         // 5. Select best available local model
         let selected_model = if let Some(best) = select_best_local_model(&available_models) {
@@ -944,7 +940,9 @@ impl OfflineDetector {
         // 6. Handle case where provider was already Ollama
         if was_already_ollama {
             // Update model if current model was not found and we have a better selected model
-            if !available_names.is_empty() && !available_names.iter().any(|n| n == &config.default_model) {
+            if !available_names.is_empty()
+                && !available_names.iter().any(|n| n == &config.default_model)
+            {
                 config.default_model = selected_model.clone();
             }
             return OfflineTransitionResult::AlreadyOllama {

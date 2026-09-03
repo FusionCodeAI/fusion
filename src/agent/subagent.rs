@@ -424,9 +424,7 @@ impl SubagentHandle {
     }
 
     /// Takes the progress receiver channel out of this handle.
-    pub fn take_progress_receiver(
-        &mut self,
-    ) -> Option<mpsc::UnboundedReceiver<SubagentProgress>> {
+    pub fn take_progress_receiver(&mut self) -> Option<mpsc::UnboundedReceiver<SubagentProgress>> {
         self.progress_rx.take()
     }
 
@@ -701,8 +699,7 @@ async fn execute_subagent_loop(
     cancel_rx: watch::Receiver<bool>,
     active_agents: Arc<RwLock<HashMap<String, SubagentInfo>>>,
 ) -> anyhow::Result<SubagentResult> {
-    let mut session =
-        crate::agent::session::Session::new(model.unwrap_or(&config.default_model));
+    let mut session = crate::agent::session::Session::new(model.unwrap_or(&config.default_model));
     session.add_system_message(system_prompt);
     session.add_user_message(task);
 
@@ -714,9 +711,7 @@ async fn execute_subagent_loop(
 
     while turns < max_turns {
         if *cancel_rx.borrow() {
-            let cancel_event = SubagentProgress::Cancelled {
-                id: id.to_string(),
-            };
+            let cancel_event = SubagentProgress::Cancelled { id: id.to_string() };
             let _ = progress_tx.send(cancel_event.clone());
             let _ = global_tx.send(cancel_event);
 
@@ -1001,11 +996,8 @@ impl Subagent {
         client: &LlmClient,
         config: &Config,
     ) -> anyhow::Result<String> {
-        let manager = SubagentManager::new(
-            Arc::new(client.clone()),
-            config.clone(),
-            self.tools.clone(),
-        );
+        let manager =
+            SubagentManager::new(Arc::new(client.clone()), config.clone(), self.tools.clone());
         let subagent_task = SubagentTask::new(self.role.clone(), task)
             .with_name(&self.name)
             .with_system_prompt(&self.system_prompt)
@@ -1335,11 +1327,26 @@ mod tests {
 
     #[test]
     fn test_role_from_str_and_display() {
-        assert_eq!(SubagentRole::from_str("scout").unwrap(), SubagentRole::Scout);
-        assert_eq!(SubagentRole::from_str("CODER").unwrap(), SubagentRole::Coder);
-        assert_eq!(SubagentRole::from_str("Tester").unwrap(), SubagentRole::Tester);
-        assert_eq!(SubagentRole::from_str("Reviewer").unwrap(), SubagentRole::Reviewer);
-        assert_eq!(SubagentRole::from_str("other").unwrap(), SubagentRole::General);
+        assert_eq!(
+            SubagentRole::from_str("scout").unwrap(),
+            SubagentRole::Scout
+        );
+        assert_eq!(
+            SubagentRole::from_str("CODER").unwrap(),
+            SubagentRole::Coder
+        );
+        assert_eq!(
+            SubagentRole::from_str("Tester").unwrap(),
+            SubagentRole::Tester
+        );
+        assert_eq!(
+            SubagentRole::from_str("Reviewer").unwrap(),
+            SubagentRole::Reviewer
+        );
+        assert_eq!(
+            SubagentRole::from_str("other").unwrap(),
+            SubagentRole::General
+        );
 
         assert_eq!(format!("{}", SubagentRole::Scout), "Scout");
         assert_eq!(format!("{}", SubagentRole::Coder), "Coder");

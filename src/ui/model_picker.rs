@@ -41,10 +41,7 @@ pub enum ProviderTab {
 
 impl ProviderTab {
     /// Ordered list of all tabs.
-    pub const ALL: [ProviderTab; 2] = [
-        ProviderTab::All,
-        ProviderTab::Fusion,
-    ];
+    pub const ALL: [ProviderTab; 2] = [ProviderTab::All, ProviderTab::Fusion];
 
     /// Human-readable tab label.
     pub fn name(&self) -> &'static str {
@@ -145,8 +142,10 @@ impl PartialEq for ModelEntry {
             && self.max_output_tokens == other.max_output_tokens
             && self.context_display == other.context_display
             && self.output_display == other.output_display
-            && self.input_cost_per_m.map(|f| f.to_bits()) == other.input_cost_per_m.map(|f| f.to_bits())
-            && self.output_cost_per_m.map(|f| f.to_bits()) == other.output_cost_per_m.map(|f| f.to_bits())
+            && self.input_cost_per_m.map(|f| f.to_bits())
+                == other.input_cost_per_m.map(|f| f.to_bits())
+            && self.output_cost_per_m.map(|f| f.to_bits())
+                == other.output_cost_per_m.map(|f| f.to_bits())
             && self.pricing_display == other.pricing_display
             && self.speed == other.speed
             && self.badges == other.badges
@@ -271,7 +270,11 @@ impl ModelEntry {
             "Fast".to_string()
         } else if self.badges.iter().any(|b| b.eq_ignore_ascii_case("local")) {
             "Local".to_string()
-        } else if self.badges.iter().any(|b| b.eq_ignore_ascii_case("reasoning") || b.eq_ignore_ascii_case("r1")) {
+        } else if self
+            .badges
+            .iter()
+            .any(|b| b.eq_ignore_ascii_case("reasoning") || b.eq_ignore_ascii_case("r1"))
+        {
             "Reasoning".to_string()
         } else {
             "Standard".to_string()
@@ -289,8 +292,16 @@ impl From<crate::provider::catalog::CatalogModel> for ModelEntry {
             provider: cm.provider,
             context_window: cm.context_window,
             max_output_tokens: cm.max_output_tokens,
-            context_display: if ctx_display == "-" { String::new() } else { ctx_display },
-            output_display: if out_display == "-" { String::new() } else { out_display },
+            context_display: if ctx_display == "-" {
+                String::new()
+            } else {
+                ctx_display
+            },
+            output_display: if out_display == "-" {
+                String::new()
+            } else {
+                out_display
+            },
             input_cost_per_m: None,
             output_cost_per_m: None,
             pricing_display: None,
@@ -567,9 +578,21 @@ impl ModelPicker {
                     let name_match = m.name.to_lowercase().contains(&query);
                     let provider_match = m.provider.to_lowercase().contains(&query);
                     let badge_match = m.badges.iter().any(|b| b.to_lowercase().contains(&query));
-                    let speed_match = m.speed.as_deref().map(|s| s.to_lowercase().contains(&query)).unwrap_or(false);
-                    let desc_match = m.description.as_deref().map(|d| d.to_lowercase().contains(&query)).unwrap_or(false);
-                    let price_match = m.pricing_display.as_deref().map(|p| p.to_lowercase().contains(&query)).unwrap_or(false);
+                    let speed_match = m
+                        .speed
+                        .as_deref()
+                        .map(|s| s.to_lowercase().contains(&query))
+                        .unwrap_or(false);
+                    let desc_match = m
+                        .description
+                        .as_deref()
+                        .map(|d| d.to_lowercase().contains(&query))
+                        .unwrap_or(false);
+                    let price_match = m
+                        .pricing_display
+                        .as_deref()
+                        .map(|p| p.to_lowercase().contains(&query))
+                        .unwrap_or(false);
 
                     if !id_match
                         && !name_match
@@ -629,7 +652,9 @@ impl ModelPicker {
     /// Returns currently selected model if available.
     pub fn selected_model(&self) -> Option<&ModelEntry> {
         let indices = self.filtered_indices();
-        indices.get(self.selected_index).map(|&idx| &self.models[idx])
+        indices
+            .get(self.selected_index)
+            .map(|&idx| &self.models[idx])
     }
 
     /// Current selection index within filtered list.
@@ -707,7 +732,11 @@ impl ModelPicker {
 
     /// Process a keyboard event. Returns `Some(result)` on terminal actions (Enter/Esc),
     /// or `None` if the event modified picker state.
-    pub fn handle_key(&mut self, code: KeyCode, modifiers: KeyModifiers) -> Option<ModelPickerResult> {
+    pub fn handle_key(
+        &mut self,
+        code: KeyCode,
+        modifiers: KeyModifiers,
+    ) -> Option<ModelPickerResult> {
         match (code, modifiers) {
             // Enter: Select and Use
             (KeyCode::Enter, _) => {
@@ -871,7 +900,8 @@ impl ModelPicker {
         }
 
         // Determine layout based on available height and show_border option
-        let (inner_area, _use_border) = if self.show_border && area.height >= 7 && area.width >= 30 {
+        let (inner_area, _use_border) = if self.show_border && area.height >= 7 && area.width >= 30
+        {
             let block = Block::default()
                 .title(format!(" ✦ {} ", self.title))
                 .borders(Borders::ALL)
@@ -1065,7 +1095,9 @@ impl ModelPicker {
             spans.push(Span::raw(" "));
             spans.push(Span::styled(
                 "ℹ ",
-                Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD),
+                Style::default()
+                    .fg(Color::Cyan)
+                    .add_modifier(Modifier::BOLD),
             ));
 
             if let Some(desc) = &model.description {
@@ -1102,31 +1134,76 @@ impl ModelPicker {
 
         let footer_line = if is_compact {
             Line::from(vec![
-                Span::styled("↑↓ ", Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD)),
+                Span::styled(
+                    "↑↓ ",
+                    Style::default()
+                        .fg(Color::Cyan)
+                        .add_modifier(Modifier::BOLD),
+                ),
                 Span::styled("Nav ", Style::default().fg(Color::DarkGray)),
-                Span::styled("Tab ", Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD)),
+                Span::styled(
+                    "Tab ",
+                    Style::default()
+                        .fg(Color::Cyan)
+                        .add_modifier(Modifier::BOLD),
+                ),
                 Span::styled("Prov ", Style::default().fg(Color::DarkGray)),
-                Span::styled("↵ ", Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD)),
+                Span::styled(
+                    "↵ ",
+                    Style::default()
+                        .fg(Color::Cyan)
+                        .add_modifier(Modifier::BOLD),
+                ),
                 Span::styled("Use ", Style::default().fg(Color::DarkGray)),
-                Span::styled("Esc ", Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD)),
+                Span::styled(
+                    "Esc ",
+                    Style::default()
+                        .fg(Color::Cyan)
+                        .add_modifier(Modifier::BOLD),
+                ),
                 Span::styled("Quit", Style::default().fg(Color::DarkGray)),
             ])
         } else {
             Line::from(vec![
                 Span::raw(" "),
-                Span::styled("↑↓ ", Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD)),
+                Span::styled(
+                    "↑↓ ",
+                    Style::default()
+                        .fg(Color::Cyan)
+                        .add_modifier(Modifier::BOLD),
+                ),
                 Span::styled("Navigate", Style::default().fg(Color::DarkGray)),
                 Span::raw("  "),
-                Span::styled("Tab ", Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD)),
+                Span::styled(
+                    "Tab ",
+                    Style::default()
+                        .fg(Color::Cyan)
+                        .add_modifier(Modifier::BOLD),
+                ),
                 Span::styled("Provider", Style::default().fg(Color::DarkGray)),
                 Span::raw("  "),
-                Span::styled("1-8 ", Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD)),
+                Span::styled(
+                    "1-8 ",
+                    Style::default()
+                        .fg(Color::Cyan)
+                        .add_modifier(Modifier::BOLD),
+                ),
                 Span::styled("Jump", Style::default().fg(Color::DarkGray)),
                 Span::raw("  "),
-                Span::styled("Enter ", Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD)),
+                Span::styled(
+                    "Enter ",
+                    Style::default()
+                        .fg(Color::Cyan)
+                        .add_modifier(Modifier::BOLD),
+                ),
                 Span::styled("Use", Style::default().fg(Color::DarkGray)),
                 Span::raw("  "),
-                Span::styled("Esc ", Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD)),
+                Span::styled(
+                    "Esc ",
+                    Style::default()
+                        .fg(Color::Cyan)
+                        .add_modifier(Modifier::BOLD),
+                ),
                 Span::styled("Close", Style::default().fg(Color::DarkGray)),
             ])
         };
@@ -1139,7 +1216,10 @@ impl ModelPicker {
     ///
     /// Clamps height safely for Termux and narrow mobile viewports.
     /// Restores terminal mode and cursor on exit or cancel.
-    pub fn run_interactive(&mut self, requested_height: Option<u16>) -> std::io::Result<Option<ModelEntry>> {
+    pub fn run_interactive(
+        &mut self,
+        requested_height: Option<u16>,
+    ) -> std::io::Result<Option<ModelEntry>> {
         let _raw_guard = RawModeGuard::enter()?;
         let _ = execute!(stdout(), cursor::Hide);
 
@@ -1244,7 +1324,9 @@ pub fn format_model_row<'a>(model: &'a ModelEntry, is_selected: bool, width: u16
         // Model ID
         let truncated_id = truncate_pad(&model.id, id_width);
         let id_style = if is_selected {
-            Style::default().fg(Color::White).add_modifier(Modifier::BOLD)
+            Style::default()
+                .fg(Color::White)
+                .add_modifier(Modifier::BOLD)
         } else {
             Style::default().fg(Color::White)
         };
@@ -1254,7 +1336,9 @@ pub fn format_model_row<'a>(model: &'a ModelEntry, is_selected: bool, width: u16
         // Context Window
         let truncated_ctx = truncate_pad(&model.context_display, ctx_width);
         let ctx_style = if is_selected {
-            Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD)
+            Style::default()
+                .fg(Color::Cyan)
+                .add_modifier(Modifier::BOLD)
         } else {
             Style::default().fg(Color::Cyan)
         };
@@ -1264,7 +1348,9 @@ pub fn format_model_row<'a>(model: &'a ModelEntry, is_selected: bool, width: u16
         // Output tokens
         let truncated_out = truncate_pad(&model.output_display, out_width);
         let out_style = if is_selected {
-            Style::default().fg(Color::Magenta).add_modifier(Modifier::BOLD)
+            Style::default()
+                .fg(Color::Magenta)
+                .add_modifier(Modifier::BOLD)
         } else {
             Style::default().fg(Color::DarkGray)
         };
@@ -1277,7 +1363,9 @@ pub fn format_model_row<'a>(model: &'a ModelEntry, is_selected: bool, width: u16
         let price_style = if pricing == "Free" {
             Style::default().fg(Color::Green)
         } else if is_selected {
-            Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD)
+            Style::default()
+                .fg(Color::Yellow)
+                .add_modifier(Modifier::BOLD)
         } else {
             Style::default().fg(Color::Yellow)
         };
@@ -1288,7 +1376,9 @@ pub fn format_model_row<'a>(model: &'a ModelEntry, is_selected: bool, width: u16
         let speed = format!("⚡ {}", model.formatted_speed());
         let truncated_speed = truncate_pad(&speed, speed_width);
         let speed_style = if is_selected {
-            Style::default().fg(Color::Green).add_modifier(Modifier::BOLD)
+            Style::default()
+                .fg(Color::Green)
+                .add_modifier(Modifier::BOLD)
         } else {
             Style::default().fg(Color::Green)
         };
@@ -1312,7 +1402,9 @@ pub fn format_model_row<'a>(model: &'a ModelEntry, is_selected: bool, width: u16
 
         let truncated_id = truncate_pad(&model.id, id_width);
         let id_style = if is_selected {
-            Style::default().fg(Color::White).add_modifier(Modifier::BOLD)
+            Style::default()
+                .fg(Color::White)
+                .add_modifier(Modifier::BOLD)
         } else {
             Style::default().fg(Color::White)
         };
@@ -1322,7 +1414,9 @@ pub fn format_model_row<'a>(model: &'a ModelEntry, is_selected: bool, width: u16
         let ctx_display = model.context_display.replace(" context", " ctx");
         let truncated_ctx = truncate_pad(&ctx_display, ctx_width);
         let ctx_style = if is_selected {
-            Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD)
+            Style::default()
+                .fg(Color::Cyan)
+                .add_modifier(Modifier::BOLD)
         } else {
             Style::default().fg(Color::Cyan)
         };
@@ -1334,7 +1428,9 @@ pub fn format_model_row<'a>(model: &'a ModelEntry, is_selected: bool, width: u16
         let price_style = if pricing == "Free" {
             Style::default().fg(Color::Green)
         } else if is_selected {
-            Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD)
+            Style::default()
+                .fg(Color::Yellow)
+                .add_modifier(Modifier::BOLD)
         } else {
             Style::default().fg(Color::Yellow)
         };
@@ -1356,7 +1452,9 @@ pub fn format_model_row<'a>(model: &'a ModelEntry, is_selected: bool, width: u16
 
         let truncated_id = truncate_pad(&model.id, id_width);
         let id_style = if is_selected {
-            Style::default().fg(Color::White).add_modifier(Modifier::BOLD)
+            Style::default()
+                .fg(Color::White)
+                .add_modifier(Modifier::BOLD)
         } else {
             Style::default().fg(Color::White)
         };
@@ -1366,7 +1464,9 @@ pub fn format_model_row<'a>(model: &'a ModelEntry, is_selected: bool, width: u16
         let ctx_display = model.context_display.replace(" context", " ctx");
         let truncated_ctx = truncate_pad(&ctx_display, ctx_width);
         let ctx_style = if is_selected {
-            Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD)
+            Style::default()
+                .fg(Color::Cyan)
+                .add_modifier(Modifier::BOLD)
         } else {
             Style::default().fg(Color::Cyan)
         };
@@ -1458,7 +1558,6 @@ pub fn default_models() -> Vec<ModelEntry> {
         )
         .with_speed("Ultra-Fast")
         .with_description("Fusion gateway high-speed 1M context flash model"),
-
         ModelEntry::with_tokens(
             "MiniMaxAI/MiniMax-M2.7",
             "fusion",
@@ -1468,7 +1567,6 @@ pub fn default_models() -> Vec<ModelEntry> {
         )
         .with_speed("Fast")
         .with_description("MiniMax M2.7 frontier coding and reasoning model"),
-
         ModelEntry::with_tokens(
             "moonshotai/Kimi-K2.6",
             "fusion",
@@ -1552,11 +1650,17 @@ mod tests {
 
     #[test]
     fn test_model_entry_builders_and_getters() {
-        let entry = ModelEntry::with_tokens("test-model", "anthropic", 200_000, 8_192, vec!["Fast", "Vision"])
-            .with_name("Test Friendly")
-            .with_description("A testing model")
-            .with_pricing(3.0, 15.0)
-            .with_speed("Very Fast");
+        let entry = ModelEntry::with_tokens(
+            "test-model",
+            "anthropic",
+            200_000,
+            8_192,
+            vec!["Fast", "Vision"],
+        )
+        .with_name("Test Friendly")
+        .with_description("A testing model")
+        .with_pricing(3.0, 15.0)
+        .with_speed("Very Fast");
 
         assert_eq!(entry.name, "Test Friendly");
         assert_eq!(entry.formatted_pricing(), "$3/$15");
@@ -1565,8 +1669,14 @@ mod tests {
         assert_eq!(entry.output_display, "8K output");
         assert_eq!(entry.description.as_deref(), Some("A testing model"));
 
-        let free_entry = ModelEntry::new("local-mod", "ollama", "32K context", "8K output", vec!["Local"])
-            .with_free_pricing();
+        let free_entry = ModelEntry::new(
+            "local-mod",
+            "ollama",
+            "32K context",
+            "8K output",
+            vec!["Local"],
+        )
+        .with_free_pricing();
         assert_eq!(free_entry.formatted_pricing(), "Free");
         assert_eq!(free_entry.formatted_speed(), "Local");
     }
@@ -1576,7 +1686,9 @@ mod tests {
         let models = default_models();
         assert!(!models.is_empty());
         assert!(models.iter().any(|m| m.id == "MiniMaxAI/MiniMax-M2.7"));
-        assert!(models.iter().any(|m| m.id == "deepseek-ai/DeepSeek-V4-Flash-0731"));
+        assert!(models
+            .iter()
+            .any(|m| m.id == "deepseek-ai/DeepSeek-V4-Flash-0731"));
         assert!(models.iter().any(|m| m.id == "moonshotai/Kimi-K2.6"));
         for m in &models {
             assert_eq!(m.provider, "fusion");
@@ -1610,15 +1722,29 @@ mod tests {
         let mut picker = ModelPicker::new();
         picker.set_filter_query("minimax");
         for m in picker.filtered_models() {
-            assert!(m.id.to_lowercase().contains("minimax") || m.name.to_lowercase().contains("minimax"));
+            assert!(
+                m.id.to_lowercase().contains("minimax")
+                    || m.name.to_lowercase().contains("minimax")
+            );
         }
 
         picker.set_filter_query("reasoning");
         for m in picker.filtered_models() {
-            let has_badge = m.badges.iter().any(|b| b.to_lowercase().contains("reasoning"));
+            let has_badge = m
+                .badges
+                .iter()
+                .any(|b| b.to_lowercase().contains("reasoning"));
             let has_id = m.id.to_lowercase().contains("reasoning");
-            let has_desc = m.description.as_deref().map(|d| d.to_lowercase().contains("reasoning")).unwrap_or(false);
-            let has_speed = m.speed.as_deref().map(|s| s.to_lowercase().contains("reasoning")).unwrap_or(false);
+            let has_desc = m
+                .description
+                .as_deref()
+                .map(|d| d.to_lowercase().contains("reasoning"))
+                .unwrap_or(false);
+            let has_speed = m
+                .speed
+                .as_deref()
+                .map(|s| s.to_lowercase().contains("reasoning"))
+                .unwrap_or(false);
             assert!(has_badge || has_id || has_desc || has_speed);
         }
 
@@ -1671,9 +1797,15 @@ mod tests {
         assert_eq!(picker.selected_index(), 1);
 
         // Ctrl+P / Ctrl+N
-        assert_eq!(picker.handle_key(KeyCode::Char('p'), KeyModifiers::CONTROL), None);
+        assert_eq!(
+            picker.handle_key(KeyCode::Char('p'), KeyModifiers::CONTROL),
+            None
+        );
         assert_eq!(picker.selected_index(), 0);
-        assert_eq!(picker.handle_key(KeyCode::Char('n'), KeyModifiers::CONTROL), None);
+        assert_eq!(
+            picker.handle_key(KeyCode::Char('n'), KeyModifiers::CONTROL),
+            None
+        );
         assert_eq!(picker.selected_index(), 1);
 
         // Tab switches provider
@@ -1725,10 +1857,12 @@ mod tests {
 
         let picker = ModelPicker::new();
 
-        terminal.draw(|f| {
-            let area = f.area();
-            f.render_widget(&picker, area);
-        }).unwrap();
+        terminal
+            .draw(|f| {
+                let area = f.area();
+                f.render_widget(&picker, area);
+            })
+            .unwrap();
 
         let buffer = terminal.backend().buffer();
         let text = buffer_to_string(buffer);
@@ -1750,10 +1884,12 @@ mod tests {
 
         let picker = ModelPicker::new();
 
-        terminal.draw(|f| {
-            let area = f.area();
-            f.render_widget(&picker, area);
-        }).unwrap();
+        terminal
+            .draw(|f| {
+                let area = f.area();
+                f.render_widget(&picker, area);
+            })
+            .unwrap();
 
         let buffer = terminal.backend().buffer();
         let text = buffer_to_string(buffer);
@@ -1769,10 +1905,12 @@ mod tests {
 
         let picker = ModelPicker::new();
 
-        terminal.draw(|f| {
-            let area = f.area();
-            f.render_widget(&picker, area);
-        }).unwrap();
+        terminal
+            .draw(|f| {
+                let area = f.area();
+                f.render_widget(&picker, area);
+            })
+            .unwrap();
 
         let buffer = terminal.backend().buffer();
         let text = buffer_to_string(buffer);
@@ -1802,10 +1940,11 @@ mod tests {
 
     #[test]
     fn test_model_entry_serde_roundtrip() {
-        let entry = ModelEntry::with_tokens("gpt-4o", "openai", 128_000, 16_384, vec!["Fast", "Vision"])
-            .with_pricing(2.50, 10.0)
-            .with_speed("Fast")
-            .with_description("Omni multimodal flagship");
+        let entry =
+            ModelEntry::with_tokens("gpt-4o", "openai", 128_000, 16_384, vec!["Fast", "Vision"])
+                .with_pricing(2.50, 10.0)
+                .with_speed("Fast")
+                .with_description("Omni multimodal flagship");
 
         let json = serde_json::to_string(&entry).unwrap();
         let deserialized: ModelEntry = serde_json::from_str(&json).unwrap();

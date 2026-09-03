@@ -86,17 +86,29 @@ impl PromptCategory {
                 "/doc" | "/docs" => Self::Doc,
                 _ => Self::Command,
             }
-        } else if trimmed.starts_with("```") || trimmed.contains("fn ") || trimmed.contains("def ") || trimmed.contains("pub struct ") {
+        } else if trimmed.starts_with("```")
+            || trimmed.contains("fn ")
+            || trimmed.contains("def ")
+            || trimmed.contains("pub struct ")
+        {
             Self::Code
-        } else if trimmed.to_lowercase().starts_with("review ") || trimmed.to_lowercase().contains("code review") {
+        } else if trimmed.to_lowercase().starts_with("review ")
+            || trimmed.to_lowercase().contains("code review")
+        {
             Self::Review
-        } else if trimmed.to_lowercase().starts_with("write test") || trimmed.to_lowercase().starts_with("test ") {
+        } else if trimmed.to_lowercase().starts_with("write test")
+            || trimmed.to_lowercase().starts_with("test ")
+        {
             Self::Test
         } else if trimmed.to_lowercase().starts_with("refactor ") {
             Self::Refactor
-        } else if trimmed.to_lowercase().starts_with("fix ") || trimmed.to_lowercase().starts_with("debug ") {
+        } else if trimmed.to_lowercase().starts_with("fix ")
+            || trimmed.to_lowercase().starts_with("debug ")
+        {
             Self::Debug
-        } else if trimmed.to_lowercase().starts_with("document ") || trimmed.to_lowercase().starts_with("explain ") {
+        } else if trimmed.to_lowercase().starts_with("document ")
+            || trimmed.to_lowercase().starts_with("explain ")
+        {
             Self::Doc
         } else {
             Self::General
@@ -644,7 +656,38 @@ pub fn fuzzy_match_with_config(
 pub fn is_word_boundary_char(c: char) -> bool {
     matches!(
         c,
-        ' ' | '\t' | '\n' | '/' | '\\' | '_' | '-' | '.' | ':' | ';' | ',' | '(' | ')' | '[' | ']' | '{' | '}' | '<' | '>' | '|' | '!' | '?' | '=' | '+' | '*' | '&' | '%' | '$' | '#' | '@' | '"' | '\'' | '`'
+        ' ' | '\t'
+            | '\n'
+            | '/'
+            | '\\'
+            | '_'
+            | '-'
+            | '.'
+            | ':'
+            | ';'
+            | ','
+            | '('
+            | ')'
+            | '['
+            | ']'
+            | '{'
+            | '}'
+            | '<'
+            | '>'
+            | '|'
+            | '!'
+            | '?'
+            | '='
+            | '+'
+            | '*'
+            | '&'
+            | '%'
+            | '$'
+            | '#'
+            | '@'
+            | '"'
+            | '\''
+            | '`'
     )
 }
 
@@ -704,7 +747,12 @@ pub fn match_token_overlap(pattern: &str, candidate: &str) -> Option<PromptMatch
 /// Computes a frecency score combining usage count and exponential recency decay.
 ///
 /// Formula: `score = (use_count ^ 0.75) * (0.5 ^ (age_seconds / half_life_seconds)) * 100.0`
-pub fn frecency_score(use_count: u32, last_used_epoch_secs: i64, now_epoch_secs: i64, half_life_secs: f64) -> f64 {
+pub fn frecency_score(
+    use_count: u32,
+    last_used_epoch_secs: i64,
+    now_epoch_secs: i64,
+    half_life_secs: f64,
+) -> f64 {
     if use_count == 0 {
         return 0.0;
     }
@@ -916,7 +964,11 @@ impl PromptAutocompleter {
     /// Find the highest-ranked inline ghost autocompletion suggestion for the given buffer.
     ///
     /// Returns `Some(GhostCompletion)` if a candidate starts with the current buffer prefix.
-    pub fn get_ghost_suggestion(&self, buffer: &str, _cursor_pos: usize) -> Option<GhostCompletion> {
+    pub fn get_ghost_suggestion(
+        &self,
+        buffer: &str,
+        _cursor_pos: usize,
+    ) -> Option<GhostCompletion> {
         let trimmed = buffer.trim_start();
         if trimmed.chars().count() < self.config.min_prefix_len {
             return None;
@@ -946,12 +998,9 @@ impl PromptAutocompleter {
                     }
 
                     if score > best_score {
-                        if let Some(ghost) = GhostCompletion::new(
-                            buffer,
-                            &item.text,
-                            score,
-                            fuzzy_res.match_kind,
-                        ) {
+                        if let Some(ghost) =
+                            GhostCompletion::new(buffer, &item.text, score, fuzzy_res.match_kind)
+                        {
                             best_score = score;
                             best_ghost = Some(ghost);
                         }
@@ -1056,7 +1105,8 @@ impl PromptAutocompleter {
                     None
                 };
 
-                let highlighted = highlight_matched_chars(&item.text, &fuzzy_res.matched_indices, "\x1b[1;33m");
+                let highlighted =
+                    highlight_matched_chars(&item.text, &fuzzy_res.matched_indices, "\x1b[1;33m");
 
                 matches.push(PromptMatch {
                     item: item.clone(),
@@ -1283,7 +1333,11 @@ impl PromptCompletionState {
 // ---------------------------------------------------------------------------
 
 /// Highlights characters at `matched_indices` with the given ANSI color escape sequence.
-pub fn highlight_matched_chars(text: &str, matched_indices: &[usize], highlight_ansi: &str) -> String {
+pub fn highlight_matched_chars(
+    text: &str,
+    matched_indices: &[usize],
+    highlight_ansi: &str,
+) -> String {
     if matched_indices.is_empty() {
         return text.to_string();
     }
@@ -1332,15 +1386,16 @@ pub fn render_completion_popup(
     let reset = "\x1b[0m";
 
     // Top border
-    lines.push(format!("{}┌{}┐{}", border_color, "─".repeat(width.saturating_sub(2)), reset));
+    lines.push(format!(
+        "{}┌{}┐{}",
+        border_color,
+        "─".repeat(width.saturating_sub(2)),
+        reset
+    ));
 
     for (idx, m) in matches.iter().enumerate() {
         let is_selected = idx == selected_idx;
-        let prefix = if is_selected {
-            "\x1b[1;36m❯ "
-        } else {
-            "  "
-        };
+        let prefix = if is_selected { "\x1b[1;36m❯ " } else { "  " };
 
         let badge = m.item.category.badge_ansi();
         let icon = m.item.category.icon();
@@ -1353,21 +1408,21 @@ pub fn render_completion_popup(
             truncate_str(&m.item.text, max_text_len)
         };
 
-        let row_bg = if is_selected {
-            "\x1b[48;5;236m"
-        } else {
-            ""
-        };
+        let row_bg = if is_selected { "\x1b[48;5;236m" } else { "" };
 
-        let line = format!(
-            "{row_bg}{prefix}{icon} {badge} {display_text}{reset}"
-        );
+        let line = format!("{row_bg}{prefix}{icon} {badge} {display_text}{reset}");
         lines.push(line);
     }
 
     // Bottom border with helper tips
     let tip = "\x1b[38;5;244m[Tab/Enter] Accept  [↑/↓] Navigate  [Esc] Dismiss\x1b[0m";
-    lines.push(format!("{}└─ {} ─{}┘{}", border_color, tip, "─".repeat(width.saturating_sub(55)), reset));
+    lines.push(format!(
+        "{}└─ {} ─{}┘{}",
+        border_color,
+        tip,
+        "─".repeat(width.saturating_sub(55)),
+        reset
+    ));
 
     lines.join("\n")
 }
@@ -1395,16 +1450,8 @@ pub fn render_reverse_history_search(
     let max_text_len = width.saturating_sub(14);
     for (idx, m) in matches.iter().enumerate() {
         let is_selected = idx == selected_idx;
-        let prefix = if is_selected {
-            "\x1b[1;36m❯ "
-        } else {
-            "  "
-        };
-        let bg = if is_selected {
-            "\x1b[48;5;236m"
-        } else {
-            ""
-        };
+        let prefix = if is_selected { "\x1b[1;36m❯ " } else { "  " };
+        let bg = if is_selected { "\x1b[48;5;236m" } else { "" };
         let text = if let Some(hl) = &m.highlighted_text {
             hl.clone()
         } else {
@@ -1497,7 +1544,8 @@ mod tests {
 
     #[test]
     fn test_ghost_completion_extraction() {
-        let ghost = GhostCompletion::new("cargo b", "cargo build --release", 100, MatchKind::Prefix);
+        let ghost =
+            GhostCompletion::new("cargo b", "cargo build --release", 100, MatchKind::Prefix);
         assert!(ghost.is_some());
         let g = ghost.unwrap();
         assert_eq!(g.prefix, "cargo b");
@@ -1577,11 +1625,26 @@ mod tests {
 
     #[test]
     fn test_prompt_category_detection() {
-        assert_eq!(PromptCategory::detect_from_text("/review diff"), PromptCategory::Review);
-        assert_eq!(PromptCategory::detect_from_text("/test src/ui"), PromptCategory::Test);
-        assert_eq!(PromptCategory::detect_from_text("/fix panic"), PromptCategory::Debug);
-        assert_eq!(PromptCategory::detect_from_text("fn test_fn() {}"), PromptCategory::Code);
-        assert_eq!(PromptCategory::detect_from_text("How do I use this?"), PromptCategory::General);
+        assert_eq!(
+            PromptCategory::detect_from_text("/review diff"),
+            PromptCategory::Review
+        );
+        assert_eq!(
+            PromptCategory::detect_from_text("/test src/ui"),
+            PromptCategory::Test
+        );
+        assert_eq!(
+            PromptCategory::detect_from_text("/fix panic"),
+            PromptCategory::Debug
+        );
+        assert_eq!(
+            PromptCategory::detect_from_text("fn test_fn() {}"),
+            PromptCategory::Code
+        );
+        assert_eq!(
+            PromptCategory::detect_from_text("How do I use this?"),
+            PromptCategory::General
+        );
     }
 
     #[test]
@@ -1598,16 +1661,14 @@ mod tests {
 
     #[test]
     fn test_render_completion_popup() {
-        let matches = vec![
-            PromptMatch {
-                item: PromptHistoryItem::new("git status").with_category(PromptCategory::Command),
-                score: 250,
-                matched_indices: vec![0, 1, 2],
-                match_kind: MatchKind::Prefix,
-                ghost_suffix: Some(" status".to_string()),
-                highlighted_text: Some("\x1b[1;33mgit\x1b[0m status".to_string()),
-            },
-        ];
+        let matches = vec![PromptMatch {
+            item: PromptHistoryItem::new("git status").with_category(PromptCategory::Command),
+            score: 250,
+            matched_indices: vec![0, 1, 2],
+            match_kind: MatchKind::Prefix,
+            ghost_suffix: Some(" status".to_string()),
+            highlighted_text: Some("\x1b[1;33mgit\x1b[0m status".to_string()),
+        }];
         let popup = render_completion_popup(&matches, 0, 60);
         assert!(popup.contains("git"));
         assert!(popup.contains("Cmd"));
@@ -1615,16 +1676,14 @@ mod tests {
 
     #[test]
     fn test_render_reverse_history_search() {
-        let matches = vec![
-            PromptMatch {
-                item: PromptHistoryItem::new("cargo run --bin fusion"),
-                score: 300,
-                matched_indices: vec![0, 1, 2, 3, 4],
-                match_kind: MatchKind::Prefix,
-                ghost_suffix: None,
-                highlighted_text: None,
-            },
-        ];
+        let matches = vec![PromptMatch {
+            item: PromptHistoryItem::new("cargo run --bin fusion"),
+            score: 300,
+            matched_indices: vec![0, 1, 2, 3, 4],
+            match_kind: MatchKind::Prefix,
+            ghost_suffix: None,
+            highlighted_text: None,
+        }];
         let search_view = render_reverse_history_search("cargo", &matches, 0, 10, 70);
         assert!(search_view.contains("bck-i-search"));
         assert!(search_view.contains("cargo run --bin fusion"));

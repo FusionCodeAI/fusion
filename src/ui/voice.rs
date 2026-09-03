@@ -205,8 +205,16 @@ impl AudioBuffer {
     pub fn new(sample_rate: u32, channels: u16) -> Self {
         Self {
             samples: Vec::new(),
-            sample_rate: if sample_rate == 0 { DEFAULT_SAMPLE_RATE } else { sample_rate },
-            channels: if channels == 0 { DEFAULT_CHANNELS } else { channels },
+            sample_rate: if sample_rate == 0 {
+                DEFAULT_SAMPLE_RATE
+            } else {
+                sample_rate
+            },
+            channels: if channels == 0 {
+                DEFAULT_CHANNELS
+            } else {
+                channels
+            },
         }
     }
 
@@ -219,8 +227,16 @@ impl AudioBuffer {
     pub fn with_capacity(capacity: usize, sample_rate: u32, channels: u16) -> Self {
         Self {
             samples: Vec::with_capacity(capacity),
-            sample_rate: if sample_rate == 0 { DEFAULT_SAMPLE_RATE } else { sample_rate },
-            channels: if channels == 0 { DEFAULT_CHANNELS } else { channels },
+            sample_rate: if sample_rate == 0 {
+                DEFAULT_SAMPLE_RATE
+            } else {
+                sample_rate
+            },
+            channels: if channels == 0 {
+                DEFAULT_CHANNELS
+            } else {
+                channels
+            },
         }
     }
 
@@ -228,8 +244,16 @@ impl AudioBuffer {
     pub fn from_i16_samples(samples: Vec<i16>, sample_rate: u32, channels: u16) -> Self {
         Self {
             samples,
-            sample_rate: if sample_rate == 0 { DEFAULT_SAMPLE_RATE } else { sample_rate },
-            channels: if channels == 0 { DEFAULT_CHANNELS } else { channels },
+            sample_rate: if sample_rate == 0 {
+                DEFAULT_SAMPLE_RATE
+            } else {
+                sample_rate
+            },
+            channels: if channels == 0 {
+                DEFAULT_CHANNELS
+            } else {
+                channels
+            },
         }
     }
 
@@ -251,7 +275,11 @@ impl AudioBuffer {
     }
 
     /// Creates an audio buffer from raw little-endian PCM16 byte slice.
-    pub fn from_pcm16_le(bytes: &[u8], sample_rate: u32, channels: u16) -> Result<Self, VoiceError> {
+    pub fn from_pcm16_le(
+        bytes: &[u8],
+        sample_rate: u32,
+        channels: u16,
+    ) -> Result<Self, VoiceError> {
         if bytes.len() % 2 != 0 {
             return Err(VoiceError::EncodingError(
                 "PCM 16-bit byte stream length must be even".to_string(),
@@ -417,7 +445,7 @@ impl AudioBuffer {
         // 2. "fmt " subchunk (16 bytes for standard PCM)
         wav.extend_from_slice(b"fmt ");
         wav.extend_from_slice(&16u32.to_le_bytes()); // Subchunk1Size = 16
-        wav.extend_from_slice(&1u16.to_le_bytes());  // AudioFormat = 1 (PCM)
+        wav.extend_from_slice(&1u16.to_le_bytes()); // AudioFormat = 1 (PCM)
         wav.extend_from_slice(&channels.to_le_bytes());
         wav.extend_from_slice(&sample_rate.to_le_bytes());
         wav.extend_from_slice(&byte_rate.to_le_bytes());
@@ -862,7 +890,9 @@ impl SttProvider {
             "openai" | "whisper" | "openai-whisper" => Some(SttProvider::OpenAi),
             "groq" | "groq-whisper" => Some(SttProvider::Groq),
             "custom" | "http" | "custom_http" | "rest" => Some(SttProvider::CustomHttp),
-            "local" | "whisper-cli" | "whisper_cpp" | "local_whisper" => Some(SttProvider::LocalWhisper),
+            "local" | "whisper-cli" | "whisper_cpp" | "local_whisper" => {
+                Some(SttProvider::LocalWhisper)
+            }
             "mock" | "test" | "dummy" => Some(SttProvider::Mock),
             _ => None,
         }
@@ -1079,7 +1109,11 @@ impl TtsConfig {
                 if trimmed == "1" || trimmed == "true" || trimmed == "yes" || trimmed == "on" {
                     config.enabled = true;
                     break;
-                } else if trimmed == "0" || trimmed == "false" || trimmed == "no" || trimmed == "off" {
+                } else if trimmed == "0"
+                    || trimmed == "false"
+                    || trimmed == "no"
+                    || trimmed == "off"
+                {
                     config.enabled = false;
                     break;
                 }
@@ -1093,7 +1127,11 @@ impl TtsConfig {
                 if trimmed == "1" || trimmed == "true" || trimmed == "yes" || trimmed == "on" {
                     config.muted = true;
                     break;
-                } else if trimmed == "0" || trimmed == "false" || trimmed == "no" || trimmed == "off" {
+                } else if trimmed == "0"
+                    || trimmed == "false"
+                    || trimmed == "no"
+                    || trimmed == "off"
+                {
                     config.muted = false;
                     break;
                 }
@@ -1101,7 +1139,9 @@ impl TtsConfig {
         }
 
         // Platform
-        if let Ok(p_str) = std::env::var("FUSION_TTS_PLATFORM").or_else(|_| std::env::var("TTS_PLATFORM")) {
+        if let Ok(p_str) =
+            std::env::var("FUSION_TTS_PLATFORM").or_else(|_| std::env::var("TTS_PLATFORM"))
+        {
             if let Some(p) = TtsPlatform::from_str_name(&p_str) {
                 config.platform = p;
             }
@@ -1125,14 +1165,18 @@ impl TtsConfig {
         }
 
         // Volume
-        if let Ok(vol_str) = std::env::var("FUSION_TTS_VOLUME").or_else(|_| std::env::var("TTS_VOLUME")) {
+        if let Ok(vol_str) =
+            std::env::var("FUSION_TTS_VOLUME").or_else(|_| std::env::var("TTS_VOLUME"))
+        {
             if let Ok(vol) = vol_str.trim().parse::<f32>() {
                 config.volume = vol.clamp(0.0, 1.0);
             }
         }
 
         // Custom command
-        if let Ok(cmd) = std::env::var("FUSION_TTS_COMMAND").or_else(|_| std::env::var("TTS_COMMAND")) {
+        if let Ok(cmd) =
+            std::env::var("FUSION_TTS_COMMAND").or_else(|_| std::env::var("TTS_COMMAND"))
+        {
             let cmd_clean = cmd.trim().to_string();
             if !cmd_clean.is_empty() {
                 config.custom_command = Some(cmd_clean);
@@ -1225,7 +1269,9 @@ impl TtsConfig {
                 let mut args = Vec::new();
                 // spd-say uses -r for rate (-100 to 100, 0 = normal).
                 // Map 1.0 -> 0, 0.5 -> -50, 2.0 -> 100.
-                let rate = ((self.speech_rate - 1.0) * 100.0).clamp(-100.0, 100.0).round() as i32;
+                let rate = ((self.speech_rate - 1.0) * 100.0)
+                    .clamp(-100.0, 100.0)
+                    .round() as i32;
                 args.push("-r".to_string());
                 args.push(rate.to_string());
                 if let Some(ref voice) = self.voice {
@@ -1264,15 +1310,20 @@ impl TtsConfig {
                 let escaped = text.replace('\'', "''");
                 script.push_str(&format!("$s.Speak('{}');", escaped));
                 script.push_str("$s.Dispose()");
-                Ok(("powershell".to_string(), vec![
-                    "-NoProfile".to_string(),
-                    "-NonInteractive".to_string(),
-                    "-Command".to_string(),
-                    script,
-                ]))
+                Ok((
+                    "powershell".to_string(),
+                    vec![
+                        "-NoProfile".to_string(),
+                        "-NonInteractive".to_string(),
+                        "-Command".to_string(),
+                        script,
+                    ],
+                ))
             }
             TtsPlatform::Custom(ref cmd_template) => {
-                let template = self.custom_command.as_deref()
+                let template = self
+                    .custom_command
+                    .as_deref()
                     .unwrap_or(cmd_template.as_str());
                 if template.is_empty() {
                     return Err(VoiceError::TtsError(
@@ -1506,7 +1557,11 @@ impl VoiceConfig {
                 if trimmed == "1" || trimmed == "true" || trimmed == "yes" || trimmed == "on" {
                     config.enabled = true;
                     break;
-                } else if trimmed == "0" || trimmed == "false" || trimmed == "no" || trimmed == "off" {
+                } else if trimmed == "0"
+                    || trimmed == "false"
+                    || trimmed == "no"
+                    || trimmed == "off"
+                {
                     config.enabled = false;
                     break;
                 }
@@ -1514,14 +1569,17 @@ impl VoiceConfig {
         }
 
         // Provider
-        if let Ok(p_str) = std::env::var("FUSION_STT_PROVIDER").or_else(|_| std::env::var("STT_PROVIDER")) {
+        if let Ok(p_str) =
+            std::env::var("FUSION_STT_PROVIDER").or_else(|_| std::env::var("STT_PROVIDER"))
+        {
             if let Some(p) = SttProvider::from_str_name(&p_str) {
                 config.provider = p;
             }
         }
 
         // Model
-        if let Ok(m) = std::env::var("FUSION_STT_MODEL").or_else(|_| std::env::var("WHISPER_MODEL")) {
+        if let Ok(m) = std::env::var("FUSION_STT_MODEL").or_else(|_| std::env::var("WHISPER_MODEL"))
+        {
             let m_clean = m.trim().to_string();
             if !m_clean.is_empty() {
                 config.model = m_clean;
@@ -1540,12 +1598,18 @@ impl VoiceConfig {
             .ok()
             .and_then(|k| {
                 let trimmed = k.trim().to_string();
-                if trimmed.is_empty() { None } else { Some(trimmed) }
+                if trimmed.is_empty() {
+                    None
+                } else {
+                    Some(trimmed)
+                }
             });
         config.api_key = key;
 
         // Endpoint
-        if let Ok(ep) = std::env::var("FUSION_STT_ENDPOINT").or_else(|_| std::env::var("WHISPER_ENDPOINT")) {
+        if let Ok(ep) =
+            std::env::var("FUSION_STT_ENDPOINT").or_else(|_| std::env::var("WHISPER_ENDPOINT"))
+        {
             let ep_clean = ep.trim().to_string();
             if !ep_clean.is_empty() {
                 config.endpoint = Some(ep_clean);
@@ -1553,7 +1617,9 @@ impl VoiceConfig {
         }
 
         // Language
-        if let Ok(lang) = std::env::var("FUSION_VOICE_LANG").or_else(|_| std::env::var("VOICE_LANGUAGE")) {
+        if let Ok(lang) =
+            std::env::var("FUSION_VOICE_LANG").or_else(|_| std::env::var("VOICE_LANGUAGE"))
+        {
             let lang_clean = lang.trim().to_string();
             if !lang_clean.is_empty() {
                 config.language = Some(lang_clean);
@@ -1573,7 +1639,11 @@ impl VoiceConfig {
                 if trimmed == "1" || trimmed == "true" || trimmed == "yes" || trimmed == "on" {
                     config.tts_enabled = true;
                     break;
-                } else if trimmed == "0" || trimmed == "false" || trimmed == "no" || trimmed == "off" {
+                } else if trimmed == "0"
+                    || trimmed == "false"
+                    || trimmed == "no"
+                    || trimmed == "off"
+                {
                     config.tts_enabled = false;
                     break;
                 }
@@ -1587,7 +1657,11 @@ impl VoiceConfig {
                 if trimmed == "1" || trimmed == "true" || trimmed == "yes" || trimmed == "on" {
                     config.tts_muted = true;
                     break;
-                } else if trimmed == "0" || trimmed == "false" || trimmed == "no" || trimmed == "off" {
+                } else if trimmed == "0"
+                    || trimmed == "false"
+                    || trimmed == "no"
+                    || trimmed == "off"
+                {
                     config.tts_muted = false;
                     break;
                 }
@@ -1595,7 +1669,9 @@ impl VoiceConfig {
         }
 
         // TTS Platform
-        if let Ok(p_str) = std::env::var("FUSION_TTS_PLATFORM").or_else(|_| std::env::var("TTS_PLATFORM")) {
+        if let Ok(p_str) =
+            std::env::var("FUSION_TTS_PLATFORM").or_else(|_| std::env::var("TTS_PLATFORM"))
+        {
             if let Some(p) = TtsPlatform::from_str_name(&p_str) {
                 config.tts_platform = p;
             }
@@ -1772,11 +1848,7 @@ impl TranscriptionRequest {
     }
 
     /// Creates a transcription request from raw audio bytes.
-    pub fn from_bytes(
-        bytes: Vec<u8>,
-        format: AudioFormat,
-        model: impl Into<String>,
-    ) -> Self {
+    pub fn from_bytes(bytes: Vec<u8>, format: AudioFormat, model: impl Into<String>) -> Self {
         let ext = format.file_extension();
         Self {
             audio_bytes: bytes,
@@ -1847,7 +1919,10 @@ impl TranscriptionResult {
 #[async_trait]
 pub trait SpeechToTextAdapter: Send + Sync {
     /// Transcribes the given audio request into text.
-    async fn transcribe(&self, request: &TranscriptionRequest) -> Result<TranscriptionResult, VoiceError>;
+    async fn transcribe(
+        &self,
+        request: &TranscriptionRequest,
+    ) -> Result<TranscriptionResult, VoiceError>;
 
     /// Transcribes an in-memory [`AudioBuffer`].
     async fn transcribe_buffer(
@@ -1878,10 +1953,7 @@ struct MultipartBuilder {
 
 impl MultipartBuilder {
     fn new() -> Self {
-        let boundary = format!(
-            "----FusionBoundary{}",
-            uuid::Uuid::new_v4().simple()
-        );
+        let boundary = format!("----FusionBoundary{}", uuid::Uuid::new_v4().simple());
         Self {
             boundary,
             body: Vec::new(),
@@ -1953,7 +2025,9 @@ impl OpenAiWhisperAdapter {
             .clone()
             .or_else(|| std::env::var("OPENAI_API_KEY").ok())
             .ok_or_else(|| {
-                VoiceError::AuthError("Missing OpenAI API key for Whisper transcription".to_string())
+                VoiceError::AuthError(
+                    "Missing OpenAI API key for Whisper transcription".to_string(),
+                )
             })?;
 
         let endpoint = config.effective_endpoint();
@@ -1963,7 +2037,10 @@ impl OpenAiWhisperAdapter {
 
 #[async_trait]
 impl SpeechToTextAdapter for OpenAiWhisperAdapter {
-    async fn transcribe(&self, request: &TranscriptionRequest) -> Result<TranscriptionResult, VoiceError> {
+    async fn transcribe(
+        &self,
+        request: &TranscriptionRequest,
+    ) -> Result<TranscriptionResult, VoiceError> {
         if self.api_key.trim().is_empty() {
             return Err(VoiceError::AuthError("OpenAI API key is empty".to_string()));
         }
@@ -2011,16 +2088,11 @@ impl SpeechToTextAdapter for OpenAiWhisperAdapter {
             });
         }
 
-        let json_body: serde_json::Value = response
-            .json()
-            .await
-            .map_err(|e| VoiceError::EncodingError(format!("Failed to parse JSON response: {}", e)))?;
+        let json_body: serde_json::Value = response.json().await.map_err(|e| {
+            VoiceError::EncodingError(format!("Failed to parse JSON response: {}", e))
+        })?;
 
-        let text = json_body["text"]
-            .as_str()
-            .unwrap_or("")
-            .trim()
-            .to_string();
+        let text = json_body["text"].as_str().unwrap_or("").trim().to_string();
 
         let language = json_body["language"].as_str().map(|s| s.to_string());
         let duration_secs = json_body["duration"].as_f64();
@@ -2106,7 +2178,10 @@ impl GroqWhisperAdapter {
 
 #[async_trait]
 impl SpeechToTextAdapter for GroqWhisperAdapter {
-    async fn transcribe(&self, request: &TranscriptionRequest) -> Result<TranscriptionResult, VoiceError> {
+    async fn transcribe(
+        &self,
+        request: &TranscriptionRequest,
+    ) -> Result<TranscriptionResult, VoiceError> {
         if self.api_key.trim().is_empty() {
             return Err(VoiceError::AuthError("Groq API key is empty".to_string()));
         }
@@ -2159,16 +2234,11 @@ impl SpeechToTextAdapter for GroqWhisperAdapter {
             });
         }
 
-        let json_body: serde_json::Value = response
-            .json()
-            .await
-            .map_err(|e| VoiceError::EncodingError(format!("Failed to parse JSON response: {}", e)))?;
+        let json_body: serde_json::Value = response.json().await.map_err(|e| {
+            VoiceError::EncodingError(format!("Failed to parse JSON response: {}", e))
+        })?;
 
-        let text = json_body["text"]
-            .as_str()
-            .unwrap_or("")
-            .trim()
-            .to_string();
+        let text = json_body["text"].as_str().unwrap_or("").trim().to_string();
 
         let language = json_body["language"].as_str().map(|s| s.to_string());
         let duration_secs = json_body["duration"].as_f64();
@@ -2228,7 +2298,10 @@ impl CustomHttpSttAdapter {
 
 #[async_trait]
 impl SpeechToTextAdapter for CustomHttpSttAdapter {
-    async fn transcribe(&self, request: &TranscriptionRequest) -> Result<TranscriptionResult, VoiceError> {
+    async fn transcribe(
+        &self,
+        request: &TranscriptionRequest,
+    ) -> Result<TranscriptionResult, VoiceError> {
         let mut form = MultipartBuilder::new();
         form.add_text_field("model", &request.model);
         form.add_file_field(
@@ -2244,7 +2317,10 @@ impl SpeechToTextAdapter for CustomHttpSttAdapter {
 
         let (content_type, body_bytes) = form.finish();
 
-        let mut req = self.client.post(&self.endpoint).header("Content-Type", content_type);
+        let mut req = self
+            .client
+            .post(&self.endpoint)
+            .header("Content-Type", content_type);
         if let Some(key) = &self.api_key {
             req = req.header("Authorization", format!("Bearer {}", key));
         }
@@ -2324,7 +2400,10 @@ impl LocalWhisperAdapter {
 
 #[async_trait]
 impl SpeechToTextAdapter for LocalWhisperAdapter {
-    async fn transcribe(&self, request: &TranscriptionRequest) -> Result<TranscriptionResult, VoiceError> {
+    async fn transcribe(
+        &self,
+        request: &TranscriptionRequest,
+    ) -> Result<TranscriptionResult, VoiceError> {
         let temp_dir = std::env::temp_dir().join(format!(
             "fusion-voice-{}-{}",
             std::process::id(),
@@ -2336,7 +2415,9 @@ impl SpeechToTextAdapter for LocalWhisperAdapter {
 
         tokio::fs::write(&temp_audio_path, &request.audio_bytes)
             .await
-            .map_err(|e| VoiceError::ProcessError(format!("Failed to write temp audio file: {}", e)))?;
+            .map_err(|e| {
+                VoiceError::ProcessError(format!("Failed to write temp audio file: {}", e))
+            })?;
 
         let mut cmd = tokio::process::Command::new(&self.executable);
         cmd.arg(&temp_audio_path)
@@ -2351,10 +2432,9 @@ impl SpeechToTextAdapter for LocalWhisperAdapter {
             cmd.arg("--language").arg(lang);
         }
 
-        let output = cmd
-            .output()
-            .await
-            .map_err(|e| VoiceError::ProcessError(format!("Failed to spawn local whisper CLI: {}", e)))?;
+        let output = cmd.output().await.map_err(|e| {
+            VoiceError::ProcessError(format!("Failed to spawn local whisper CLI: {}", e))
+        })?;
 
         if !output.status.success() {
             let stderr = String::from_utf8_lossy(&output.stderr);
@@ -2442,7 +2522,10 @@ impl Default for MockSttAdapter {
 
 #[async_trait]
 impl SpeechToTextAdapter for MockSttAdapter {
-    async fn transcribe(&self, request: &TranscriptionRequest) -> Result<TranscriptionResult, VoiceError> {
+    async fn transcribe(
+        &self,
+        request: &TranscriptionRequest,
+    ) -> Result<TranscriptionResult, VoiceError> {
         if self.simulated_delay_ms > 0 {
             tokio::time::sleep(Duration::from_millis(self.simulated_delay_ms)).await;
         }
@@ -2486,7 +2569,9 @@ impl SpeechToTextAdapter for MockSttAdapter {
 // ---------------------------------------------------------------------------
 
 /// Creates a speech-to-text adapter instance corresponding to the active `VoiceConfig`.
-pub fn create_stt_adapter(config: &VoiceConfig) -> Result<Box<dyn SpeechToTextAdapter>, VoiceError> {
+pub fn create_stt_adapter(
+    config: &VoiceConfig,
+) -> Result<Box<dyn SpeechToTextAdapter>, VoiceError> {
     match config.provider {
         SttProvider::OpenAi => {
             let adapter = OpenAiWhisperAdapter::from_config(config)?;
@@ -2543,9 +2628,7 @@ pub enum VoiceInputState {
         audio_duration_secs: f64,
     },
     /// Voice capture or transcription encountered an error.
-    Failed {
-        error: String,
-    },
+    Failed { error: String },
     /// Cancelled by the user.
     Cancelled,
 }
@@ -2788,15 +2871,19 @@ pub fn render_voice_badge(state: &VoiceInputState) -> String {
             let meter = AudioLevelMeter::render_meter(*current_rms_db, 6);
             format!("\x1b[1;34m[🎙 Listening {}\x1b[1;34m]\x1b[0m", meter)
         }
-        VoiceInputState::Recording { current_rms_db, duration_ms, .. } => {
+        VoiceInputState::Recording {
+            current_rms_db,
+            duration_ms,
+            ..
+        } => {
             let secs = *duration_ms as f64 / 1000.0;
             let meter = AudioLevelMeter::render_meter(*current_rms_db, 6);
-            format!(
-                "\x1b[1;31m[● REC {:.1}s {}\x1b[1;31m]\x1b[0m",
-                secs, meter
-            )
+            format!("\x1b[1;31m[● REC {:.1}s {}\x1b[1;31m]\x1b[0m", secs, meter)
         }
-        VoiceInputState::Transcribing { audio_duration_secs, .. } => {
+        VoiceInputState::Transcribing {
+            audio_duration_secs,
+            ..
+        } => {
             format!(
                 "\x1b[1;33m[⚡ Transcribing ({:.1}s)...]\x1b[0m",
                 audio_duration_secs
@@ -2832,14 +2919,16 @@ pub fn render_recording_banner(state: &VoiceInputState, width: usize) -> String 
             ..
         } => {
             let secs = *duration_ms as f64 / 1000.0;
-            let meter = AudioLevelMeter::render_meter(*current_rms_db, target_width.saturating_sub(20));
+            let meter =
+                AudioLevelMeter::render_meter(*current_rms_db, target_width.saturating_sub(20));
             format!(
                 "\x1b[1;37;41m ● RECORDING \x1b[0m \x1b[1;31m{:.1}s\x1b[0m [{}] \x1b[2;37m(Press Enter to finish, Ctrl+C to cancel)\x1b[0m",
                 secs, meter
             )
         }
         VoiceInputState::Listening { current_rms_db, .. } => {
-            let meter = AudioLevelMeter::render_meter(*current_rms_db, target_width.saturating_sub(20));
+            let meter =
+                AudioLevelMeter::render_meter(*current_rms_db, target_width.saturating_sub(20));
             format!(
                 "\x1b[1;37;44m 🎙 LISTENING \x1b[0m [{}] \x1b[2;37m(Speak to begin recording)\x1b[0m",
                 meter
@@ -2876,8 +2965,14 @@ mod tests {
 
         assert_eq!(AudioFormat::Flac.file_extension(), "flac");
         assert_eq!(AudioFormat::from_mime_or_ext("wav"), Some(AudioFormat::Wav));
-        assert_eq!(AudioFormat::from_mime_or_ext(".mp3"), Some(AudioFormat::Mp3));
-        assert_eq!(AudioFormat::from_mime_or_ext("audio/ogg"), Some(AudioFormat::Ogg));
+        assert_eq!(
+            AudioFormat::from_mime_or_ext(".mp3"),
+            Some(AudioFormat::Mp3)
+        );
+        assert_eq!(
+            AudioFormat::from_mime_or_ext("audio/ogg"),
+            Some(AudioFormat::Ogg)
+        );
         assert_eq!(AudioFormat::from_mime_or_ext("unknown"), None);
     }
 
@@ -2934,7 +3029,8 @@ mod tests {
         assert_eq!(&wav_bytes[12..16], b"fmt ");
 
         // Parse back from bytes
-        let parsed = AudioBuffer::from_wav_bytes(&wav_bytes).expect("Failed to parse generated WAV");
+        let parsed =
+            AudioBuffer::from_wav_bytes(&wav_bytes).expect("Failed to parse generated WAV");
         assert_eq!(parsed.sample_rate, original.sample_rate);
         assert_eq!(parsed.channels, original.channels);
         assert_eq!(parsed.len(), original.len());

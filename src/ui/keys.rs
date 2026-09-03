@@ -489,7 +489,6 @@ impl KeyHandler {
         }
     }
 
-
     /// Save an undo snapshot of current buffer and cursor position.
     pub fn snapshot_undo(&mut self, buffer: &[char], cursor_pos: usize) {
         if self.undo_stack.len() >= 128 {
@@ -794,7 +793,8 @@ impl KeyHandler {
             }
 
             // Ctrl+J / Ctrl+Enter: Insert newline
-            (KeyCode::Char('j'), KeyModifiers::CONTROL) | (KeyCode::Enter, KeyModifiers::CONTROL) => {
+            (KeyCode::Char('j'), KeyModifiers::CONTROL)
+            | (KeyCode::Enter, KeyModifiers::CONTROL) => {
                 self.snapshot_undo(state.buffer, *state.cursor_pos);
                 state.insert_char('\n');
                 KeyResult::Continue
@@ -876,7 +876,8 @@ impl KeyHandler {
             }
 
             // Alt+Backspace / Ctrl+W: Kill word backward
-            (KeyCode::Backspace, KeyModifiers::ALT) | (KeyCode::Char('w'), KeyModifiers::CONTROL) => {
+            (KeyCode::Backspace, KeyModifiers::ALT)
+            | (KeyCode::Char('w'), KeyModifiers::CONTROL) => {
                 let prev = state.prev_word_pos();
                 if prev < *state.cursor_pos {
                     self.snapshot_undo(state.buffer, *state.cursor_pos);
@@ -912,7 +913,6 @@ impl KeyHandler {
                 }
                 KeyResult::Continue
             }
-
 
             // Ctrl+K: Kill line to end
             (KeyCode::Char('k'), KeyModifiers::CONTROL) => {
@@ -1002,7 +1002,9 @@ impl KeyHandler {
                     let pos = *state.cursor_pos;
                     let first_word: String = state.buffer[prev..pos].iter().collect();
                     let second_word: String = state.buffer[pos..next].iter().collect();
-                    state.buffer.splice(prev..next, second_word.chars().chain(first_word.chars()));
+                    state
+                        .buffer
+                        .splice(prev..next, second_word.chars().chain(first_word.chars()));
                     *state.cursor_pos = next;
                 }
                 KeyResult::Continue
@@ -1056,7 +1058,8 @@ impl KeyHandler {
             }
 
             // Ctrl+_ or Ctrl+/ : Undo
-            (KeyCode::Char('_'), KeyModifiers::CONTROL) | (KeyCode::Char('/'), KeyModifiers::CONTROL) => {
+            (KeyCode::Char('_'), KeyModifiers::CONTROL)
+            | (KeyCode::Char('/'), KeyModifiers::CONTROL) => {
                 self.undo(state);
                 KeyResult::Continue
             }
@@ -1573,8 +1576,7 @@ impl KeyHandler {
             }
 
             // '$' / End: end of line
-            (KeyCode::Char('$'), KeyModifiers::NONE | KeyModifiers::SHIFT)
-            | (KeyCode::End, _) => {
+            (KeyCode::Char('$'), KeyModifiers::NONE | KeyModifiers::SHIFT) | (KeyCode::End, _) => {
                 let (cur_line, _, ranges) = state.line_info();
                 let (start, len) = ranges[cur_line];
                 if len > 0 {
@@ -1770,7 +1772,9 @@ impl KeyHandler {
                 // 'y$': yank to end of line
                 (KeyCode::Char('$'), KeyModifiers::NONE | KeyModifiers::SHIFT) => {
                     let (start, len) = state.current_line_range();
-                    let text: String = state.buffer[*state.cursor_pos..start + len].iter().collect();
+                    let text: String = state.buffer[*state.cursor_pos..start + len]
+                        .iter()
+                        .collect();
                     self.push_kill(text);
                     KeyResult::Continue
                 }
@@ -1780,7 +1784,9 @@ impl KeyHandler {
 
             ViPendingOp::Replace => {
                 if let KeyCode::Char(c) = key.code {
-                    if *state.cursor_pos < state.buffer.len() && state.buffer[*state.cursor_pos] != '\n' {
+                    if *state.cursor_pos < state.buffer.len()
+                        && state.buffer[*state.cursor_pos] != '\n'
+                    {
                         self.snapshot_undo(state.buffer, *state.cursor_pos);
                         state.buffer[*state.cursor_pos] = c;
                     }
@@ -1873,10 +1879,8 @@ mod tests {
         {
             let mut st = make_test_state(&mut buf, &mut cur, &hist, &mut hist_idx, &mut saved);
             // Submit
-            let res = handler.handle_key(
-                KeyEvent::new(KeyCode::Enter, KeyModifiers::NONE),
-                &mut st,
-            );
+            let res =
+                handler.handle_key(KeyEvent::new(KeyCode::Enter, KeyModifiers::NONE), &mut st);
             assert_eq!(res, KeyResult::Submit("h".to_string()));
         }
     }
@@ -2282,10 +2286,8 @@ mod tests {
         {
             let mut st = make_test_state(&mut buf, &mut cur, &hist, &mut hist_idx, &mut saved);
             // Enter when trailing backslash -> turns into newline
-            let res = handler.handle_key(
-                KeyEvent::new(KeyCode::Enter, KeyModifiers::NONE),
-                &mut st,
-            );
+            let res =
+                handler.handle_key(KeyEvent::new(KeyCode::Enter, KeyModifiers::NONE), &mut st);
             assert_eq!(res, KeyResult::Continue);
             assert_eq!(st.text(), "first line\n");
         }

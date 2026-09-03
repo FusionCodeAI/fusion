@@ -937,11 +937,7 @@ impl<'a> HtmlParser<'a> {
         }
 
         let is_closing = trimmed.starts_with('/');
-        let tag_content = if is_closing {
-            &trimmed[1..]
-        } else {
-            trimmed
-        };
+        let tag_content = if is_closing { &trimmed[1..] } else { trimmed };
 
         let tag_name = tag_content
             .split_whitespace()
@@ -1004,10 +1000,16 @@ impl<'a> HtmlParser<'a> {
             ("p", false) => self.ensure_blank_line(),
             ("p", true) => self.ensure_blank_line(),
 
-            ("div" | "article" | "section" | "main" | "header" | "footer" | "aside" | "nav", false) => {
+            (
+                "div" | "article" | "section" | "main" | "header" | "footer" | "aside" | "nav",
+                false,
+            ) => {
                 self.ensure_newline();
             }
-            ("div" | "article" | "section" | "main" | "header" | "footer" | "aside" | "nav", true) => {
+            (
+                "div" | "article" | "section" | "main" | "header" | "footer" | "aside" | "nav",
+                true,
+            ) => {
                 self.ensure_newline();
             }
 
@@ -1306,19 +1308,15 @@ pub fn decode_single_entity(entity: &str) -> Option<String> {
         "rdquo" => Some("”".to_string()),
         "lsquo" => Some("‘".to_string()),
         "rsquo" => Some("’".to_string()),
-        s if s.starts_with("#x") || s.starts_with("#X") => {
-            u32::from_str_radix(&s[2..], 16)
-                .ok()
-                .and_then(char::from_u32)
-                .map(|c| c.to_string())
-        }
-        s if s.starts_with('#') => {
-            s[1..]
-                .parse::<u32>()
-                .ok()
-                .and_then(char::from_u32)
-                .map(|c| c.to_string())
-        }
+        s if s.starts_with("#x") || s.starts_with("#X") => u32::from_str_radix(&s[2..], 16)
+            .ok()
+            .and_then(char::from_u32)
+            .map(|c| c.to_string()),
+        s if s.starts_with('#') => s[1..]
+            .parse::<u32>()
+            .ok()
+            .and_then(char::from_u32)
+            .map(|c| c.to_string()),
         _ => None,
     }
 }
@@ -1494,17 +1492,17 @@ mod tests {
             extract_attribute(tag, "href"),
             Some("https://example.com/api".to_string())
         );
-        assert_eq!(
-            extract_attribute(tag, "target"),
-            Some("_blank".to_string())
-        );
+        assert_eq!(extract_attribute(tag, "target"), Some("_blank".to_string()));
         assert_eq!(extract_attribute(tag, "missing"), None);
     }
 
     #[test]
     fn test_format_from_str() {
         assert_eq!("auto".parse::<FetchFormat>().unwrap(), FetchFormat::Auto);
-        assert_eq!("markdown".parse::<FetchFormat>().unwrap(), FetchFormat::Markdown);
+        assert_eq!(
+            "markdown".parse::<FetchFormat>().unwrap(),
+            FetchFormat::Markdown
+        );
         assert_eq!("md".parse::<FetchFormat>().unwrap(), FetchFormat::Markdown);
         assert_eq!("text".parse::<FetchFormat>().unwrap(), FetchFormat::Text);
         assert_eq!("json".parse::<FetchFormat>().unwrap(), FetchFormat::Json);
@@ -1524,8 +1522,13 @@ mod tests {
     async fn test_invalid_url_scheme_error() {
         let tool = HttpFetchTool::new();
         let ctx = ToolContext::default();
-        let res = tool.execute(json!({"url": "ftp://ftp.example.com/file.txt"}), &ctx).await;
+        let res = tool
+            .execute(json!({"url": "ftp://ftp.example.com/file.txt"}), &ctx)
+            .await;
         assert!(res.is_err());
-        assert!(res.unwrap_err().to_string().contains("Unsupported URL scheme"));
+        assert!(res
+            .unwrap_err()
+            .to_string()
+            .contains("Unsupported URL scheme"));
     }
 }

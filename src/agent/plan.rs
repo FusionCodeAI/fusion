@@ -35,18 +35,11 @@ pub enum StepStatus {
         finished_at: String,
     },
     /// Step failed during execution.
-    Failed {
-        error: String,
-        failed_at: String,
-    },
+    Failed { error: String, failed_at: String },
     /// Step was deliberately skipped by the user or policy.
-    Skipped {
-        reason: String,
-    },
+    Skipped { reason: String },
     /// Step is waiting on unsatisfied prerequisites.
-    Blocked {
-        blocked_by: Vec<String>,
-    },
+    Blocked { blocked_by: Vec<String> },
 }
 
 impl StepStatus {
@@ -137,7 +130,6 @@ impl PhaseStatus {
     pub fn is_skipped(&self) -> bool {
         matches!(self, PhaseStatus::Skipped)
     }
-
 
     pub fn is_terminal(&self) -> bool {
         matches!(
@@ -515,7 +507,11 @@ impl Phase {
 
     /// Checks whether all steps in this phase succeeded.
     pub fn is_completed(&self) -> bool {
-        !self.steps.is_empty() && self.steps.iter().all(|s| s.status.is_completed() || s.status.is_skipped())
+        !self.steps.is_empty()
+            && self
+                .steps
+                .iter()
+                .all(|s| s.status.is_completed() || s.status.is_skipped())
     }
 
     /// Checks whether any step in this phase failed.
@@ -677,7 +673,10 @@ impl Plan {
 
     /// Finds a mutable step by ID anywhere in the plan.
     pub fn find_step_mut(&mut self, step_id: &str) -> Option<&mut PlanStep> {
-        let phase_idx = self.phases.iter().position(|p| p.find_step(step_id).is_some())?;
+        let phase_idx = self
+            .phases
+            .iter()
+            .position(|p| p.find_step(step_id).is_some())?;
         let step = self.phases[phase_idx].find_step_mut(step_id);
         self.updated_at = Utc::now().to_rfc3339();
         step
@@ -744,13 +743,19 @@ impl Plan {
             CheckpointPolicy::AlwaysConfirm => true,
             CheckpointPolicy::PhaseBoundary => {
                 // If it's the first pending step in a phase or marked explicit
-                let is_first = phase.steps.first().map(|s| s.id == step.id).unwrap_or(false);
+                let is_first = phase
+                    .steps
+                    .first()
+                    .map(|s| s.id == step.id)
+                    .unwrap_or(false);
                 is_first || step.requires_confirmation || phase.requires_confirmation
             }
             CheckpointPolicy::RiskBased => {
                 step.risk_level.is_high_or_critical() || step.requires_confirmation
             }
-            CheckpointPolicy::ExplicitOnly => step.requires_confirmation || phase.requires_confirmation,
+            CheckpointPolicy::ExplicitOnly => {
+                step.requires_confirmation || phase.requires_confirmation
+            }
             CheckpointPolicy::AutoApprove => false,
         }
     }
@@ -761,7 +766,11 @@ impl Plan {
             CheckpointPolicy::AlwaysConfirm | CheckpointPolicy::PhaseBoundary => true,
             CheckpointPolicy::ExplicitOnly => phase.requires_confirmation,
             CheckpointPolicy::RiskBased => {
-                phase.requires_confirmation || phase.steps.iter().any(|s| s.risk_level.is_high_or_critical())
+                phase.requires_confirmation
+                    || phase
+                        .steps
+                        .iter()
+                        .any(|s| s.risk_level.is_high_or_critical())
             }
             CheckpointPolicy::AutoApprove => false,
         }
@@ -777,7 +786,11 @@ impl Plan {
             self.state = PlanState::Completed;
         } else if self.has_failures() {
             self.state = PlanState::Failed;
-        } else if self.phases.iter().any(|p| p.status == PhaseStatus::InProgress) {
+        } else if self
+            .phases
+            .iter()
+            .any(|p| p.status == PhaseStatus::InProgress)
+        {
             self.state = PlanState::Executing;
         }
 
@@ -785,11 +798,7 @@ impl Plan {
     }
 
     /// Inserts a new step into a specific phase.
-    pub fn add_step_to_phase(
-        &mut self,
-        phase_id: &str,
-        step: PlanStep,
-    ) -> anyhow::Result<()> {
+    pub fn add_step_to_phase(&mut self, phase_id: &str, step: PlanStep) -> anyhow::Result<()> {
         let phase = self
             .find_phase_mut(phase_id)
             .ok_or_else(|| anyhow::anyhow!("Phase '{}' not found", phase_id))?;
@@ -820,7 +829,10 @@ impl Plan {
             self.title, completed, total, pct
         ));
         out.push_str(&format!("🎯 Goal: {}\n", self.goal));
-        out.push_str(&format!("⚙️  Policy: {:?} | State: {}\n", self.checkpoint_policy, self.state));
+        out.push_str(&format!(
+            "⚙️  Policy: {:?} | State: {}\n",
+            self.checkpoint_policy, self.state
+        ));
         out.push_str("━".repeat(60).as_str());
         out.push('\n');
 
@@ -884,7 +896,10 @@ impl Plan {
                 if let StepStatus::Failed { error, .. } = &step.status {
                     out.push_str(&format!("     ✗ Error: {}\n", error));
                 }
-                if let StepStatus::Completed { result: Some(res), .. } = &step.status {
+                if let StepStatus::Completed {
+                    result: Some(res), ..
+                } = &step.status
+                {
                     let preview = res.lines().next().unwrap_or("Done");
                     out.push_str(&format!("     ✓ Result: {}\n", preview));
                 }
@@ -926,16 +941,15 @@ impl Plan {
             }
 
             for step in &phase.steps {
-                let check = if step.status.is_completed() {
-                    "x"
-                } else {
-                    " "
-                };
+                let check = if step.status.is_completed() { "x" } else { " " };
                 let role = match &step.role {
                     Some(r) => format!(" `{}`", r),
                     None => String::new(),
                 };
-                md.push_str(&format!("- [{}] **{}**{}: {}\n", check, step.id, role, step.title));
+                md.push_str(&format!(
+                    "- [{}] **{}**{}: {}\n",
+                    check, step.id, role, step.title
+                ));
 
                 if !step.description.is_empty() && step.description != step.title {
                     md.push_str(&format!("  - Details: {}\n", step.description));
@@ -971,7 +985,10 @@ impl Plan {
                 title = trimmed.trim_start_matches("# Plan:").trim().to_string();
             } else if trimmed.starts_with("**Goal:**") {
                 goal = trimmed.trim_start_matches("**Goal:**").trim().to_string();
-            } else if trimmed.starts_with("## Phase:") || trimmed.starts_with("## Phase ") || trimmed.starts_with("## ") {
+            } else if trimmed.starts_with("## Phase:")
+                || trimmed.starts_with("## Phase ")
+                || trimmed.starts_with("## ")
+            {
                 if let Some(phase) = current_phase.take() {
                     phases.push(phase);
                 }
@@ -985,7 +1002,10 @@ impl Plan {
 
                 let phase_id = format!("phase-{}", phases.len() + 1);
                 current_phase = Some(Phase::new(phase_id, phase_name, ""));
-            } else if trimmed.starts_with("- [ ]") || trimmed.starts_with("- [x]") || trimmed.starts_with("- [X]") {
+            } else if trimmed.starts_with("- [ ]")
+                || trimmed.starts_with("- [x]")
+                || trimmed.starts_with("- [X]")
+            {
                 let is_checked = trimmed.starts_with("- [x]") || trimmed.starts_with("- [X]");
                 let rest = trimmed[5..].trim();
 
@@ -1038,7 +1058,6 @@ impl Plan {
         self.save_to_file(&path)?;
         Ok(path)
     }
-
 
     /// Loads plan from a JSON file.
     pub fn load_from_file(path: &Path) -> anyhow::Result<Self> {
@@ -1098,7 +1117,11 @@ pub struct PhaseBuilder {
 }
 
 impl PhaseBuilder {
-    pub fn new(id: impl Into<String>, name: impl Into<String>, description: impl Into<String>) -> Self {
+    pub fn new(
+        id: impl Into<String>,
+        name: impl Into<String>,
+        description: impl Into<String>,
+    ) -> Self {
         Self {
             phase: Phase::new(id, name, description),
         }
@@ -1109,11 +1132,7 @@ impl PhaseBuilder {
         self
     }
 
-    pub fn step(
-        self,
-        title: impl Into<String>,
-        description: impl Into<String>,
-    ) -> StepBuilder {
+    pub fn step(self, title: impl Into<String>, description: impl Into<String>) -> StepBuilder {
         let step_id = format!("{}-step-{}", self.phase.id, self.phase.steps.len() + 1);
         let step = PlanStep::new(step_id, self.phase.id.clone(), title, description);
         StepBuilder {
@@ -1212,7 +1231,12 @@ impl ChannelConfirmationHandler {
 impl ConfirmationHandler for ChannelConfirmationHandler {
     async fn handle_checkpoint(&self, checkpoint: &ConfirmationCheckpoint) -> CheckpointDecision {
         let (decision_tx, decision_rx) = oneshot::channel();
-        if self.sender.send((checkpoint.clone(), decision_tx)).await.is_err() {
+        if self
+            .sender
+            .send((checkpoint.clone(), decision_tx))
+            .await
+            .is_err()
+        {
             // Receiver closed, fallback to aborting safely
             return CheckpointDecision::Abort {
                 reason: "Confirmation channel receiver closed".to_string(),
@@ -1232,7 +1256,10 @@ pub struct CliPromptHandler;
 impl ConfirmationHandler for CliPromptHandler {
     async fn handle_checkpoint(&self, checkpoint: &ConfirmationCheckpoint) -> CheckpointDecision {
         println!("\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
-        println!("⏸  CONFIRMATION CHECKPOINT: [{:?}]", checkpoint.checkpoint_type);
+        println!(
+            "⏸  CONFIRMATION CHECKPOINT: [{:?}]",
+            checkpoint.checkpoint_type
+        );
         println!("   Phase: {}", checkpoint.phase_name);
         if let Some(title) = &checkpoint.step_title {
             println!("   Step:  {}", title);
@@ -1282,20 +1309,11 @@ impl ConfirmationHandler for CliPromptHandler {
 #[serde(tag = "event", rename_all = "snake_case")]
 pub enum PlanEvent {
     /// Plan execution initiated.
-    PlanStarted {
-        plan_id: String,
-        title: String,
-    },
+    PlanStarted { plan_id: String, title: String },
     /// A new phase has begun.
-    PhaseStarted {
-        phase_id: String,
-        name: String,
-    },
+    PhaseStarted { phase_id: String, name: String },
     /// A phase has completed.
-    PhaseCompleted {
-        phase_id: String,
-        name: String,
-    },
+    PhaseCompleted { phase_id: String, name: String },
     /// Execution of a step has started.
     StepStarted {
         step_id: String,
@@ -1303,10 +1321,7 @@ pub enum PlanEvent {
         role: Option<String>,
     },
     /// Progress update during step execution.
-    StepProgress {
-        step_id: String,
-        message: String,
-    },
+    StepProgress { step_id: String, message: String },
     /// A step completed successfully.
     StepCompleted {
         step_id: String,
@@ -1327,9 +1342,7 @@ pub enum PlanEvent {
         reason: String,
     },
     /// A confirmation checkpoint was encountered.
-    CheckpointReached {
-        checkpoint: ConfirmationCheckpoint,
-    },
+    CheckpointReached { checkpoint: ConfirmationCheckpoint },
     /// A confirmation checkpoint was resolved.
     CheckpointResolved {
         step_id: Option<String>,
@@ -1341,9 +1354,7 @@ pub enum PlanEvent {
         duration_ms: u64,
     },
     /// Plan was aborted.
-    PlanAborted {
-        reason: String,
-    },
+    PlanAborted { reason: String },
 }
 
 /// Trait abstracting individual step execution.
@@ -1562,7 +1573,8 @@ impl<E: StepExecutor, H: ConfirmationHandler> PlanEngine<E, H> {
                 });
 
                 match decision {
-                    CheckpointDecision::Approve | CheckpointDecision::ApproveWithFeedback { .. } => {
+                    CheckpointDecision::Approve
+                    | CheckpointDecision::ApproveWithFeedback { .. } => {
                         plan.state = PlanState::Executing;
                     }
                     CheckpointDecision::Skip { reason } => {
@@ -1706,19 +1718,15 @@ impl<E: StepExecutor, H: ConfirmationHandler> PlanEngine<E, H> {
 
                 let step_result = self
                     .executor
-                    .execute_step(
-                        plan,
-                        &current_phase,
-                        &current_step,
-                        feedback.as_deref(),
-                    )
+                    .execute_step(plan, &current_phase, &current_step, feedback.as_deref())
                     .await;
 
                 let duration = step_start.elapsed();
 
                 match step_result {
                     Ok(output) => {
-                        plan.phases[phase_idx].steps[step_idx].mark_completed(Some(output.clone()), Some(duration));
+                        plan.phases[phase_idx].steps[step_idx]
+                            .mark_completed(Some(output.clone()), Some(duration));
                         self.emit(PlanEvent::StepCompleted {
                             step_id: step_id.clone(),
                             title: step_title.clone(),
@@ -1728,7 +1736,8 @@ impl<E: StepExecutor, H: ConfirmationHandler> PlanEngine<E, H> {
                     }
                     Err(err) => {
                         let err_msg = err.to_string();
-                        plan.phases[phase_idx].steps[step_idx].mark_failed(&err_msg, Some(duration));
+                        plan.phases[phase_idx].steps[step_idx]
+                            .mark_failed(&err_msg, Some(duration));
                         self.emit(PlanEvent::StepFailed {
                             step_id: step_id.clone(),
                             title: step_title.clone(),
@@ -1747,7 +1756,8 @@ impl<E: StepExecutor, H: ConfirmationHandler> PlanEngine<E, H> {
                             targeted_files: plan.phases[phase_idx].steps[step_idx]
                                 .targeted_files
                                 .clone(),
-                            action_summary: "Step failed with error. Choose recovery action.".into(),
+                            action_summary: "Step failed with error. Choose recovery action."
+                                .into(),
                             prompt: "How would you like to handle this failure?".into(),
                         };
 
@@ -1867,7 +1877,10 @@ Guidelines:
         workspace_context: Option<&str>,
         policy: CheckpointPolicy,
     ) -> anyhow::Result<Plan> {
-        let mut user_msg = format!("Please generate a detailed execution plan for this task:\n\n{}", task_prompt);
+        let mut user_msg = format!(
+            "Please generate a detailed execution plan for this task:\n\n{}",
+            task_prompt
+        );
         if let Some(ctx) = workspace_context {
             user_msg.push_str(&format!("\n\nWorkspace Context:\n{}", ctx));
         }
@@ -1912,7 +1925,11 @@ Guidelines:
                 if trimmed.contains("- [ ]") || trimmed.contains("## Phase") {
                     Plan::from_markdown(trimmed)
                 } else {
-                    anyhow::bail!("Failed to parse plan JSON: {}. Response was: {}", e, trimmed);
+                    anyhow::bail!(
+                        "Failed to parse plan JSON: {}. Response was: {}",
+                        e,
+                        trimmed
+                    );
                 }
             }
         }
@@ -1966,10 +1983,13 @@ Guidelines:
                             .and_then(|s| s.as_str())
                             .unwrap_or(step_title);
 
-                        let mut step = PlanStep::new(step_id, phase_id.clone(), step_title, step_desc);
+                        let mut step =
+                            PlanStep::new(step_id, phase_id.clone(), step_title, step_desc);
 
                         if let Some(role_str) = s_val.get("role").and_then(|s| s.as_str()) {
-                            step.role = Some(SubagentRole::from_str(role_str).unwrap_or(SubagentRole::General));
+                            step.role = Some(
+                                SubagentRole::from_str(role_str).unwrap_or(SubagentRole::General),
+                            );
                         }
 
                         if let Some(risk_str) = s_val.get("risk_level").and_then(|s| s.as_str()) {
@@ -1981,18 +2001,24 @@ Guidelines:
                             };
                         }
 
-                        if let Some(req_conf) = s_val.get("requires_confirmation").and_then(|b| b.as_bool()) {
+                        if let Some(req_conf) =
+                            s_val.get("requires_confirmation").and_then(|b| b.as_bool())
+                        {
                             step.requires_confirmation = req_conf;
                         }
 
-                        if let Some(files) = s_val.get("targeted_files").and_then(|f| f.as_array()) {
+                        if let Some(files) = s_val.get("targeted_files").and_then(|f| f.as_array())
+                        {
                             step.targeted_files = files
                                 .iter()
                                 .filter_map(|f| f.as_str().map(|s| s.to_string()))
                                 .collect();
                         }
 
-                        if let Some(criteria) = s_val.get("verification_criteria").and_then(|c| c.as_array()) {
+                        if let Some(criteria) = s_val
+                            .get("verification_criteria")
+                            .and_then(|c| c.as_array())
+                        {
                             step.verification_criteria = criteria
                                 .iter()
                                 .filter_map(|c| c.as_str().map(|s| s.to_string()))
@@ -2084,7 +2110,10 @@ impl Tool for PlanTool {
                 } else if plan.is_completed() {
                     Ok("All steps in the plan are already completed!".to_string())
                 } else {
-                    Ok("No pending steps ready for execution (some steps may be blocked).".to_string())
+                    Ok(
+                        "No pending steps ready for execution (some steps may be blocked)."
+                            .to_string(),
+                    )
                 }
             }
             "mark_completed" => {
@@ -2092,7 +2121,10 @@ impl Tool for PlanTool {
                     .get("step_id")
                     .and_then(|s| s.as_str())
                     .ok_or_else(|| anyhow::anyhow!("Missing 'step_id' parameter"))?;
-                let result = args.get("result").and_then(|r| r.as_str()).map(|s| s.to_string());
+                let result = args
+                    .get("result")
+                    .and_then(|r| r.as_str())
+                    .map(|s| s.to_string());
 
                 if let Some(step) = plan.find_step_mut(step_id) {
                     step.mark_completed(result, None);
@@ -2197,7 +2229,11 @@ mod tests {
 
     #[test]
     fn test_step_dependency_resolution() {
-        let mut plan = Plan::new("Deploy App", "Deploy service", CheckpointPolicy::AlwaysConfirm);
+        let mut plan = Plan::new(
+            "Deploy App",
+            "Deploy service",
+            CheckpointPolicy::AlwaysConfirm,
+        );
         let mut phase = Phase::new("phase-1", "Deployment", "Setup and deploy");
 
         let mut step1 = PlanStep::new("step-1", "phase-1", "Build binary", "Run cargo build");
@@ -2257,8 +2293,12 @@ mod tests {
             .build();
 
         let mock_executor = MockStepExecutor::new();
-        mock_executor.set_output("phase-1-step-1", "Task 1 completed successfully").await;
-        mock_executor.set_output("phase-1-step-2", "Task 2 completed successfully").await;
+        mock_executor
+            .set_output("phase-1-step-1", "Task 1 completed successfully")
+            .await;
+        mock_executor
+            .set_output("phase-1-step-2", "Task 2 completed successfully")
+            .await;
 
         let auto_handler = AutoApproveHandler;
         let (tx, mut rx) = mpsc::unbounded_channel();
@@ -2275,8 +2315,12 @@ mod tests {
             events.push(evt);
         }
         assert!(!events.is_empty());
-        assert!(events.iter().any(|e| matches!(e, PlanEvent::PlanStarted { .. })));
-        assert!(events.iter().any(|e| matches!(e, PlanEvent::PlanCompleted { .. })));
+        assert!(events
+            .iter()
+            .any(|e| matches!(e, PlanEvent::PlanStarted { .. })));
+        assert!(events
+            .iter()
+            .any(|e| matches!(e, PlanEvent::PlanCompleted { .. })));
     }
 
     #[tokio::test]
@@ -2315,9 +2359,7 @@ mod tests {
     #[tokio::test]
     async fn test_plan_tool_actions() {
         let plan = PlanBuilder::new("Tool Plan", "Inspect tool interactions")
-            .phase("P1", "Phase 1", |p| {
-                p.step("Step A", "Do work").done()
-            })
+            .phase("P1", "Phase 1", |p| p.step("Step A", "Do work").done())
             .build();
 
         let active_plan = Arc::new(RwLock::new(Some(plan)));
@@ -2325,15 +2367,24 @@ mod tests {
         let ctx = ToolContext::default();
 
         // 1. Status action
-        let status = tool.execute(json!({"action": "status"}), &ctx).await.unwrap();
+        let status = tool
+            .execute(json!({"action": "status"}), &ctx)
+            .await
+            .unwrap();
         assert!(status.contains("Tool Plan"));
 
         // 2. Checklist action
-        let checklist = tool.execute(json!({"action": "checklist"}), &ctx).await.unwrap();
+        let checklist = tool
+            .execute(json!({"action": "checklist"}), &ctx)
+            .await
+            .unwrap();
         assert!(checklist.contains("Step A"));
 
         // 3. Next step action
-        let next = tool.execute(json!({"action": "next_step"}), &ctx).await.unwrap();
+        let next = tool
+            .execute(json!({"action": "next_step"}), &ctx)
+            .await
+            .unwrap();
         assert!(next.contains("Step A"));
 
         // 4. Mark completed action

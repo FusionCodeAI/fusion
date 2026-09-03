@@ -454,9 +454,13 @@ impl SubagentMetrics {
     /// Formats an in-depth diagnostic profiling report.
     pub fn format_detailed_profile(&self) -> String {
         let mut out = String::new();
-        out.push_str(&format!("════════════════════════════════════════════════════════════════════════════════\n"));
+        out.push_str(&format!(
+            "════════════════════════════════════════════════════════════════════════════════\n"
+        ));
         out.push_str(&format!(" SUBAGENT PROFILE: {} ({})\n", self.name, self.id));
-        out.push_str(&format!("════════════════════════════════════════════════════════════════════════════════\n"));
+        out.push_str(&format!(
+            "════════════════════════════════════════════════════════════════════════════════\n"
+        ));
         out.push_str(&format!("  Role:             {}\n", self.role));
         out.push_str(&format!("  Model:            {}\n", self.model));
         out.push_str(&format!("  Status:           {}\n", self.status));
@@ -465,21 +469,48 @@ impl SubagentMetrics {
         if let Some(end) = &self.completed_at {
             out.push_str(&format!("  Completed At:     {}\n", end));
         }
-        out.push_str(&format!("  Duration:         {:.3}s ({} ms)\n", self.duration_ms as f64 / 1000.0, self.duration_ms));
-        out.push_str(&format!("  Turns Executed:   {}/{} (avg {:.1} ms/turn)\n", self.turns, self.max_turns, self.avg_turn_duration_ms()));
+        out.push_str(&format!(
+            "  Duration:         {:.3}s ({} ms)\n",
+            self.duration_ms as f64 / 1000.0,
+            self.duration_ms
+        ));
+        out.push_str(&format!(
+            "  Turns Executed:   {}/{} (avg {:.1} ms/turn)\n",
+            self.turns,
+            self.max_turns,
+            self.avg_turn_duration_ms()
+        ));
         out.push_str(&format!("  Tokens:\n"));
         out.push_str(&format!("    - Prompt:       {}\n", self.prompt_tokens));
         out.push_str(&format!("    - Completion:   {}\n", self.completion_tokens));
         out.push_str(&format!("    - Total:        {}\n", self.total_tokens));
         if self.cache_read_tokens > 0 || self.cache_write_tokens > 0 {
             out.push_str(&format!("    - Cache Read:   {}\n", self.cache_read_tokens));
-            out.push_str(&format!("    - Cache Write:  {}\n", self.cache_write_tokens));
+            out.push_str(&format!(
+                "    - Cache Write:  {}\n",
+                self.cache_write_tokens
+            ));
         }
-        out.push_str(&format!("  Throughput:       {:.1} compl tokens/sec, {:.1} total tokens/sec\n", self.completion_tokens_per_second(), self.total_tokens_per_second()));
-        out.push_str(&format!("  Estimated Cost:   ${:.5} (input: ${:.5}, output: ${:.5})\n", self.estimated_cost_usd, self.cost_breakdown.input_cost, self.cost_breakdown.output_cost));
-        
+        out.push_str(&format!(
+            "  Throughput:       {:.1} compl tokens/sec, {:.1} total tokens/sec\n",
+            self.completion_tokens_per_second(),
+            self.total_tokens_per_second()
+        ));
+        out.push_str(&format!(
+            "  Estimated Cost:   ${:.5} (input: ${:.5}, output: ${:.5})\n",
+            self.estimated_cost_usd,
+            self.cost_breakdown.input_cost,
+            self.cost_breakdown.output_cost
+        ));
+
         let total_tools = self.total_tool_calls();
-        out.push_str(&format!("  Tool Invocations: {} (success: {}, failed: {}, rate: {:.1}%)\n", total_tools, self.total_tool_successes(), self.total_tool_failures(), self.tool_success_rate() * 100.0));
+        out.push_str(&format!(
+            "  Tool Invocations: {} (success: {}, failed: {}, rate: {:.1}%)\n",
+            total_tools,
+            self.total_tool_successes(),
+            self.total_tool_failures(),
+            self.tool_success_rate() * 100.0
+        ));
 
         if !self.tool_metrics.is_empty() {
             out.push_str("\n  ┌─ Tool Breakdown ─────────────────────────────────────────────────────────────\n");
@@ -504,7 +535,9 @@ impl SubagentMetrics {
 
         if !self.turns_history.is_empty() {
             out.push_str("\n  ┌─ Turn Timeline ─────────────────────────────────────────────────────────────\n");
-            out.push_str("  │ Turn   Duration    Prompt Tok   Compl Tok   Total Tok   Tools   Status\n");
+            out.push_str(
+                "  │ Turn   Duration    Prompt Tok   Compl Tok   Total Tok   Tools   Status\n",
+            );
             out.push_str("  ├─────────────────────────────────────────────────────────────────────────────\n");
             for turn in &self.turns_history {
                 out.push_str(&format!(
@@ -529,7 +562,9 @@ impl SubagentMetrics {
             out.push_str(&format!("\n  Output Preview: {}\n", prev));
         }
 
-        out.push_str("════════════════════════════════════════════════════════════════════════════════\n");
+        out.push_str(
+            "════════════════════════════════════════════════════════════════════════════════\n",
+        );
         out
     }
 }
@@ -638,7 +673,9 @@ impl SubagentFleetMetrics {
     /// Formats a clean ASCII summary table of the entire fleet.
     pub fn format_summary_table(&self) -> String {
         let mut out = String::new();
-        out.push_str("┌─ Subagent Fleet Summary ───────────────────────────────────────────────────────┐\n");
+        out.push_str(
+            "┌─ Subagent Fleet Summary ───────────────────────────────────────────────────────┐\n",
+        );
         out.push_str(&format!(
             "│ Agents: {:<4} Total | {:<3} Succ | {:<3} Fail | {:<3} Cancel | {:<3} Running | Succ Rate: {:<5.1}% │\n",
             self.total_subagents,
@@ -671,7 +708,9 @@ impl SubagentFleetMetrics {
             self.total_tool_failures,
             self.tool_success_rate * 100.0
         ));
-        out.push_str("└───────────────────────────────────────────────────────────────────────────────┘\n");
+        out.push_str(
+            "└───────────────────────────────────────────────────────────────────────────────┘\n",
+        );
         out
     }
 
@@ -732,16 +771,45 @@ impl SubagentFleetMetrics {
         md.push_str("## Executive Summary\n\n");
         md.push_str("| Metric | Value |\n");
         md.push_str("| :--- | :--- |\n");
-        md.push_str(&format!("| **Total Subagents** | {} |\n", self.total_subagents));
-        md.push_str(&format!("| **Successful Missions** | {} ({:.1}%) |\n", self.completed_count, self.overall_success_rate * 100.0));
-        md.push_str(&format!("| **Failed Missions** | {} |\n", self.failed_count));
-        md.push_str(&format!("| **Cancelled Missions** | {} |\n", self.cancelled_count));
-        md.push_str(&format!("| **Total Execution Duration** | {:.2}s |\n", self.total_duration_ms as f64 / 1000.0));
+        md.push_str(&format!(
+            "| **Total Subagents** | {} |\n",
+            self.total_subagents
+        ));
+        md.push_str(&format!(
+            "| **Successful Missions** | {} ({:.1}%) |\n",
+            self.completed_count,
+            self.overall_success_rate * 100.0
+        ));
+        md.push_str(&format!(
+            "| **Failed Missions** | {} |\n",
+            self.failed_count
+        ));
+        md.push_str(&format!(
+            "| **Cancelled Missions** | {} |\n",
+            self.cancelled_count
+        ));
+        md.push_str(&format!(
+            "| **Total Execution Duration** | {:.2}s |\n",
+            self.total_duration_ms as f64 / 1000.0
+        ));
         md.push_str(&format!("| **Latency Percentiles (p50 / p90 / p95 / max)** | {:.2}s / {:.2}s / {:.2}s / {:.2}s |\n", self.p50_duration_ms / 1000.0, self.p90_duration_ms / 1000.0, self.p95_duration_ms / 1000.0, self.max_duration_ms as f64 / 1000.0));
-        md.push_str(&format!("| **Tokens (Total / Prompt / Completion)** | {} / {} / {} |\n", self.total_tokens, self.total_prompt_tokens, self.total_completion_tokens));
-        md.push_str(&format!("| **Average Tokens / Subagent** | {:.0} |\n", self.avg_tokens_per_subagent));
-        md.push_str(&format!("| **Total Estimated Cost** | ${:.4} |\n", self.total_cost_usd));
-        md.push_str(&format!("| **Total Tool Invocations** | {} (Success Rate: {:.1}%) |\n\n", self.total_tool_calls, self.tool_success_rate * 100.0));
+        md.push_str(&format!(
+            "| **Tokens (Total / Prompt / Completion)** | {} / {} / {} |\n",
+            self.total_tokens, self.total_prompt_tokens, self.total_completion_tokens
+        ));
+        md.push_str(&format!(
+            "| **Average Tokens / Subagent** | {:.0} |\n",
+            self.avg_tokens_per_subagent
+        ));
+        md.push_str(&format!(
+            "| **Total Estimated Cost** | ${:.4} |\n",
+            self.total_cost_usd
+        ));
+        md.push_str(&format!(
+            "| **Total Tool Invocations** | {} (Success Rate: {:.1}%) |\n\n",
+            self.total_tool_calls,
+            self.tool_success_rate * 100.0
+        ));
 
         if !self.role_breakdown.is_empty() {
             md.push_str("## Role Performance Breakdown\n\n");
@@ -973,10 +1041,7 @@ impl SubagentMetricsCollector {
     pub fn start_tool(&self, id: &str, tool_name: &str, call_key: Option<&str>) {
         let key = call_key.unwrap_or(tool_name).to_string();
         let mut lock = self.state.lock().unwrap();
-        let entry = lock
-            .tool_start_instants
-            .entry(id.to_string())
-            .or_default();
+        let entry = lock.tool_start_instants.entry(id.to_string()).or_default();
         entry.insert(key, (tool_name.to_string(), Instant::now()));
     }
 
@@ -1148,14 +1213,7 @@ impl SubagentMetricsCollector {
                 role,
                 task,
             } => {
-                self.start_subagent(
-                    id,
-                    name,
-                    role.to_string(),
-                    task,
-                    "default",
-                    20,
-                );
+                self.start_subagent(id, name, role.to_string(), task, "default", 20);
             }
             SubagentProgress::TurnStarted {
                 id,
@@ -1176,7 +1234,8 @@ impl SubagentMetricsCollector {
                 self.record_message_delta(id, content);
             }
             SubagentProgress::ToolStarted { id, tool, args } => {
-                let call_key = format!("{}_{}", tool, Utc::now().timestamp_nanos_opt().unwrap_or(0));
+                let call_key =
+                    format!("{}_{}", tool, Utc::now().timestamp_nanos_opt().unwrap_or(0));
                 let arg_bytes = serde_json::to_vec(args).map(|b| b.len()).unwrap_or(0);
                 self.start_tool(id, tool, Some(&call_key));
                 // Add estimated prompt tokens for tool call
@@ -1189,11 +1248,7 @@ impl SubagentMetricsCollector {
                 success,
             } => {
                 let output_bytes = output.len();
-                let err_opt = if *success {
-                    None
-                } else {
-                    Some(output.clone())
-                };
+                let err_opt = if *success { None } else { Some(output.clone()) };
                 self.finish_tool(id, tool, None, output_bytes, *success, err_opt);
             }
             SubagentProgress::Completed {
@@ -1328,10 +1383,7 @@ impl SubagentMetricsCollector {
             total_tool_successes += a.total_tool_successes();
             total_tool_failures += a.total_tool_failures();
 
-            role_map
-                .entry(a.role.clone())
-                .or_default()
-                .push(a);
+            role_map.entry(a.role.clone()).or_default().push(a);
 
             for (name, tm) in &a.tool_metrics {
                 let entry = tool_breakdown
@@ -1340,9 +1392,14 @@ impl SubagentMetricsCollector {
                 entry.invocations += tm.invocations;
                 entry.successes += tm.successes;
                 entry.failures += tm.failures;
-                entry.total_duration_ms = entry.total_duration_ms.saturating_add(tm.total_duration_ms);
-                entry.total_output_bytes = entry.total_output_bytes.saturating_add(tm.total_output_bytes);
-                if entry.min_duration_ms == 0 || (tm.min_duration_ms > 0 && tm.min_duration_ms < entry.min_duration_ms) {
+                entry.total_duration_ms =
+                    entry.total_duration_ms.saturating_add(tm.total_duration_ms);
+                entry.total_output_bytes = entry
+                    .total_output_bytes
+                    .saturating_add(tm.total_output_bytes);
+                if entry.min_duration_ms == 0
+                    || (tm.min_duration_ms > 0 && tm.min_duration_ms < entry.min_duration_ms)
+                {
                     entry.min_duration_ms = tm.min_duration_ms;
                 }
                 entry.max_duration_ms = entry.max_duration_ms.max(tm.max_duration_ms);
@@ -1389,7 +1446,10 @@ impl SubagentMetricsCollector {
                 .count();
             let fail = role_agents
                 .iter()
-                .filter(|a| a.status == SubagentMetricStatus::Failed || a.status == SubagentMetricStatus::TimedOut)
+                .filter(|a| {
+                    a.status == SubagentMetricStatus::Failed
+                        || a.status == SubagentMetricStatus::TimedOut
+                })
                 .count();
             let canc = role_agents
                 .iter()
@@ -1406,8 +1466,16 @@ impl SubagentMetricsCollector {
             let t_succ: usize = role_agents.iter().map(|a| a.total_tool_successes()).sum();
             let t_fail: usize = role_agents.iter().map(|a| a.total_tool_failures()).sum();
 
-            let r_succ_rate = if count == 0 { 1.0 } else { succ as f64 / count as f64 };
-            let r_tool_rate = if t_calls == 0 { 1.0 } else { t_succ as f64 / t_calls as f64 };
+            let r_succ_rate = if count == 0 {
+                1.0
+            } else {
+                succ as f64 / count as f64
+            };
+            let r_tool_rate = if t_calls == 0 {
+                1.0
+            } else {
+                t_succ as f64 / t_calls as f64
+            };
 
             role_breakdown.insert(
                 role_name.clone(),
@@ -1419,11 +1487,19 @@ impl SubagentMetricsCollector {
                     cancelled_count: canc,
                     success_rate: r_succ_rate,
                     total_duration_ms: dur,
-                    avg_duration_ms: if count == 0 { 0.0 } else { dur as f64 / count as f64 },
+                    avg_duration_ms: if count == 0 {
+                        0.0
+                    } else {
+                        dur as f64 / count as f64
+                    },
                     total_prompt_tokens: p_tok,
                     total_completion_tokens: c_tok,
                     total_tokens: t_tok,
-                    avg_tokens_per_agent: if count == 0 { 0.0 } else { t_tok as f64 / count as f64 },
+                    avg_tokens_per_agent: if count == 0 {
+                        0.0
+                    } else {
+                        t_tok as f64 / count as f64
+                    },
                     total_cost_usd: cost,
                     total_tool_calls: t_calls,
                     tool_successes: t_succ,
@@ -1635,7 +1711,14 @@ mod tests {
     fn test_subagent_lifecycle_collection() {
         let collector = SubagentMetricsCollector::new();
 
-        collector.start_subagent("sub1", "ScoutAgent", "Scout", "Find tests", "claude-3-5", 10);
+        collector.start_subagent(
+            "sub1",
+            "ScoutAgent",
+            "Scout",
+            "Find tests",
+            "claude-3-5",
+            10,
+        );
         assert_eq!(collector.active().len(), 1);
 
         collector.start_turn("sub1", 1);

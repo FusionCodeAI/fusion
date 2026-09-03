@@ -28,7 +28,9 @@ use thiserror::Error;
 use uuid::Uuid;
 
 use crate::agent::session::{Session, TokenStats};
-use crate::agent::tokens::{estimate_message_tokens, estimate_messages_tokens, estimate_text_tokens};
+use crate::agent::tokens::{
+    estimate_message_tokens, estimate_messages_tokens, estimate_text_tokens,
+};
 use crate::agent::undo::Checkpoint;
 use crate::provider::types::{Message, Role, ToolCall};
 use crate::tools::edit::resolve_path;
@@ -207,12 +209,7 @@ impl SessionFilePatch {
 
     /// Convenience constructor for a deleted file.
     pub fn deleted(path: impl Into<PathBuf>, old_content: impl Into<String>) -> Self {
-        Self::new(
-            path,
-            FileEditKind::Deleted,
-            Some(old_content.into()),
-            None,
-        )
+        Self::new(path, FileEditKind::Deleted, Some(old_content.into()), None)
     }
 
     /// Path formatted as a clean POSIX-style relative string (forward slashes).
@@ -472,7 +469,11 @@ impl SessionPatchSummary {
 
     /// Formats a single-line summary (e.g. `3 files changed, 45 insertions(+), 12 deletions(-)`).
     pub fn format_summary_line(&self) -> String {
-        let file_word = if self.total_files == 1 { "file" } else { "files" };
+        let file_word = if self.total_files == 1 {
+            "file"
+        } else {
+            "files"
+        };
         let ins_word = if self.total_additions == 1 {
             "insertion(+)"
         } else {
@@ -486,7 +487,12 @@ impl SessionPatchSummary {
 
         format!(
             "{} {} changed, {} {}, {} {}",
-            self.total_files, file_word, self.total_additions, ins_word, self.total_deletions, del_word
+            self.total_files,
+            file_word,
+            self.total_additions,
+            ins_word,
+            self.total_deletions,
+            del_word
         )
     }
 
@@ -618,7 +624,11 @@ impl SessionPatchOptions {
     }
 
     /// Sets path prefixes (e.g. `a/` and `b/`).
-    pub fn with_prefixes(mut self, prefix_a: impl Into<String>, prefix_b: impl Into<String>) -> Self {
+    pub fn with_prefixes(
+        mut self,
+        prefix_a: impl Into<String>,
+        prefix_b: impl Into<String>,
+    ) -> Self {
         self.path_prefix_a = prefix_a.into();
         self.path_prefix_b = prefix_b.into();
         self
@@ -721,7 +731,9 @@ impl SessionPatch {
         let mut out = String::new();
 
         if options.include_headers {
-            out.push_str("# ====================================================================\n");
+            out.push_str(
+                "# ====================================================================\n",
+            );
             out.push_str("# Fusion Session Unified Patch\n");
             if let Some(id) = &self.session_id {
                 out.push_str(&format!("# Session ID:   {}\n", id));
@@ -733,7 +745,10 @@ impl SessionPatch {
                 out.push_str(&format!("# Model:        {}\n", model));
             }
             out.push_str(&format!("# Created:      {}\n", self.created_at));
-            out.push_str(&format!("# Summary:      {}\n", self.summary.format_summary_line()));
+            out.push_str(&format!(
+                "# Summary:      {}\n",
+                self.summary.format_summary_line()
+            ));
 
             if options.include_stats_comment && !self.files.is_empty() {
                 out.push_str("#\n# File Breakdown:\n");
@@ -742,7 +757,9 @@ impl SessionPatch {
                     out.push_str(&format!("#   {}\n", line));
                 }
             }
-            out.push_str("# ====================================================================\n\n");
+            out.push_str(
+                "# ====================================================================\n\n",
+            );
         }
 
         for file in &self.files {
@@ -773,7 +790,10 @@ impl SessionPatch {
             if let Some(model) = &self.model {
                 out.push_str(&format!("\x1b[1mModel:\x1b[0m        {}\n", model));
             }
-            out.push_str(&format!("\x1b[1mSummary:\x1b[0m      {}\n\n", self.summary.format_summary_line()));
+            out.push_str(&format!(
+                "\x1b[1mSummary:\x1b[0m      {}\n\n",
+                self.summary.format_summary_line()
+            ));
 
             if options.include_stats_comment && !self.files.is_empty() {
                 out.push_str("\x1b[1;33mDiff Statistics:\x1b[0m\n");
@@ -832,11 +852,15 @@ impl SessionPatch {
 
     /// Creates an inverted patch that undoes/rolls back all changes in this session.
     pub fn reverse(&self) -> Self {
-        let reversed_files: Vec<SessionFilePatch> = self.files.iter().map(|f| f.reverse()).collect();
+        let reversed_files: Vec<SessionFilePatch> =
+            self.files.iter().map(|f| f.reverse()).collect();
         let summary = SessionPatchSummary::from_files(&reversed_files);
         Self {
             session_id: self.session_id.clone(),
-            session_title: self.session_title.as_ref().map(|t| format!("Rollback: {}", t)),
+            session_title: self
+                .session_title
+                .as_ref()
+                .map(|t| format!("Rollback: {}", t)),
             model: self.model.clone(),
             created_at: Utc::now().to_rfc3339(),
             files: reversed_files,
@@ -850,7 +874,12 @@ impl SessionPatch {
     where
         F: Fn(&SessionFilePatch) -> bool,
     {
-        let filtered: Vec<SessionFilePatch> = self.files.iter().filter(|f| predicate(f)).cloned().collect();
+        let filtered: Vec<SessionFilePatch> = self
+            .files
+            .iter()
+            .filter(|f| predicate(f))
+            .cloned()
+            .collect();
         let summary = SessionPatchSummary::from_files(&filtered);
         Self {
             session_id: self.session_id.clone(),
@@ -1268,7 +1297,8 @@ impl SessionPatchAggregator {
 
         match name.as_str() {
             "write" | "write_file" => {
-                let path_str = extract_string_arg(&args_val, &["path", "file_path", "file", "target"]);
+                let path_str =
+                    extract_string_arg(&args_val, &["path", "file_path", "file", "target"]);
                 let content = extract_string_arg(&args_val, &["content", "text", "body", "code"]);
 
                 if let (Some(path_s), Some(new_content)) = (path_str, content) {
@@ -1294,9 +1324,16 @@ impl SessionPatchAggregator {
                 }
             }
             "edit" | "edit_file" => {
-                let path_str = extract_string_arg(&args_val, &["path", "file_path", "file", "target"]);
-                let old_text = extract_string_arg(&args_val, &["old_text", "old_string", "old_content", "find", "search"]);
-                let new_text = extract_string_arg(&args_val, &["new_text", "new_string", "new_content", "replace"]);
+                let path_str =
+                    extract_string_arg(&args_val, &["path", "file_path", "file", "target"]);
+                let old_text = extract_string_arg(
+                    &args_val,
+                    &["old_text", "old_string", "old_content", "find", "search"],
+                );
+                let new_text = extract_string_arg(
+                    &args_val,
+                    &["new_text", "new_string", "new_content", "replace"],
+                );
 
                 if let (Some(path_s), Some(old_t), Some(new_t)) = (path_str, old_text, new_text) {
                     let norm = normalize_relative_path(&path_s);
@@ -1334,7 +1371,9 @@ impl SessionPatchAggregator {
                 }
             }
             "patch" | "apply_patch" => {
-                if let Some(patch_str) = extract_string_arg(&args_val, &["patch", "diff", "unified_diff", "content"]) {
+                if let Some(patch_str) =
+                    extract_string_arg(&args_val, &["patch", "diff", "unified_diff", "content"])
+                {
                     if let Ok(file_patches) = parse_unified_diff(&patch_str) {
                         for fp in file_patches {
                             if let Some(target_p) = fp.target_path(1, false) {
@@ -1375,7 +1414,9 @@ impl SessionPatchAggregator {
                                         target_path: None,
                                     };
 
-                                    if let Ok(applied) = apply_file_patch_to_string(base, &fp, &patch_opts) {
+                                    if let Ok(applied) =
+                                        apply_file_patch_to_string(base, &fp, &patch_opts)
+                                    {
                                         tracker.current_content = Some(applied.0);
                                     }
                                 }
@@ -1385,7 +1426,8 @@ impl SessionPatchAggregator {
                 }
             }
             "delete_file" | "remove_file" | "rm" => {
-                let path_str = extract_string_arg(&args_val, &["path", "file_path", "file", "target"]);
+                let path_str =
+                    extract_string_arg(&args_val, &["path", "file_path", "file", "target"]);
                 if let Some(path_s) = path_str {
                     let norm = normalize_relative_path(&path_s);
                     let orig_path = PathBuf::from(path_s);
@@ -1513,7 +1555,9 @@ pub enum SessionPatchError {
         total_turns: usize,
     },
 
-    #[error("Message index {message_index} is out of bounds (session has {total_messages} message(s))")]
+    #[error(
+        "Message index {message_index} is out of bounds (session has {total_messages} message(s))"
+    )]
     MessageNotFound {
         message_index: usize,
         total_messages: usize,
@@ -1523,9 +1567,7 @@ pub enum SessionPatchError {
     EmptyTurn,
 
     #[error("Session integrity validation failed: {details}")]
-    IntegrityError {
-        details: String,
-    },
+    IntegrityError { details: String },
 
     #[error("Session patching conflict: {0}")]
     Conflict(String),
@@ -1839,10 +1881,7 @@ pub enum SessionPatchOp {
         new_content: String,
     },
     /// Replaces the entire turn `turn_index` (1-based) with new turn data.
-    ModifyTurn {
-        turn_index: usize,
-        turn: TurnData,
-    },
+    ModifyTurn { turn_index: usize, turn: TurnData },
     /// Inserts a new turn before or after turn `turn_index` (1-based).
     InsertTurn {
         turn_index: usize,
@@ -1850,70 +1889,41 @@ pub enum SessionPatchOp {
         position: InsertPosition,
     },
     /// Appends a new turn to the end of the conversation.
-    AppendTurn {
-        turn: TurnData,
-    },
+    AppendTurn { turn: TurnData },
     /// Prepends a new turn to the beginning of the conversation.
-    PrependTurn {
-        turn: TurnData,
-    },
+    PrependTurn { turn: TurnData },
     /// Deletes turn `turn_index` (1-based).
-    DeleteTurn {
-        turn_index: usize,
-    },
+    DeleteTurn { turn_index: usize },
     /// Deletes a range of turns [start_turn..=end_turn] (1-based, inclusive).
-    DeleteTurnRange {
-        start_turn: usize,
-        end_turn: usize,
-    },
+    DeleteTurnRange { start_turn: usize, end_turn: usize },
     /// Truncates the session, keeping only turns 1..=turn_index.
-    TruncateAfterTurn {
-        turn_index: usize,
-    },
+    TruncateAfterTurn { turn_index: usize },
     /// Truncates the session, dropping turns 1..turn_index and keeping turns from turn_index onward.
-    TruncateBeforeTurn {
-        turn_index: usize,
-    },
+    TruncateBeforeTurn { turn_index: usize },
     /// Swaps two turns by their 1-based indices.
-    SwapTurns {
-        turn_a: usize,
-        turn_b: usize,
-    },
+    SwapTurns { turn_a: usize, turn_b: usize },
     /// Modifies a specific message by 0-based message index.
     ModifyMessage {
         message_index: usize,
         new_message: Message,
     },
     /// Deletes a specific message by 0-based message index.
-    DeleteMessage {
-        message_index: usize,
-    },
+    DeleteMessage { message_index: usize },
     /// Inserts a message at 0-based message index.
     InsertMessage {
         message_index: usize,
         message: Message,
     },
     /// Sets or removes the session system prompt.
-    SetSystemPrompt {
-        system_prompt: Option<String>,
-    },
+    SetSystemPrompt { system_prompt: Option<String> },
     /// Sets the active LLM model.
-    SetActiveModel {
-        model: String,
-    },
+    SetActiveModel { model: String },
     /// Sets or removes the session title.
-    SetTitle {
-        title: Option<String>,
-    },
+    SetTitle { title: Option<String> },
     /// Sets a metadata key-value pair.
-    SetMetadata {
-        key: String,
-        value: String,
-    },
+    SetMetadata { key: String, value: String },
     /// Removes a metadata key.
-    RemoveMetadata {
-        key: String,
-    },
+    RemoveMetadata { key: String },
 }
 
 pub type TurnPatchOp = SessionPatchOp;
@@ -2089,7 +2099,11 @@ impl SessionIntegrityReport {
         let mut lines = Vec::new();
         lines.push(format!(
             "Session integrity: {} ({} errors, {} warnings)",
-            if self.is_valid { "Valid with warnings" } else { "Invalid" },
+            if self.is_valid {
+                "Valid with warnings"
+            } else {
+                "Invalid"
+            },
             self.error_count,
             self.warning_count
         ));
@@ -2105,7 +2119,11 @@ impl SessionIntegrityReport {
                 IntegritySeverity::Error => "ERROR",
                 IntegritySeverity::Warning => "WARN",
             };
-            let fix = if issue.auto_fixable { " [auto-fixable]" } else { "" };
+            let fix = if issue.auto_fixable {
+                " [auto-fixable]"
+            } else {
+                ""
+            };
             lines.push(format!(
                 "  {}. [{}] [{}] {}: {}{}",
                 idx + 1,
@@ -2147,7 +2165,8 @@ pub fn validate_session_integrity(session: &Session) -> SessionIntegrityReport {
                         message_index: Some(msg_idx),
                         turn_index: turn_num,
                         code: "STRAY_SYSTEM_MESSAGE".to_string(),
-                        description: "System message found after conversation initiation".to_string(),
+                        description: "System message found after conversation initiation"
+                            .to_string(),
                         auto_fixable: true,
                     });
                 }
@@ -2177,7 +2196,8 @@ pub fn validate_session_integrity(session: &Session) -> SessionIntegrityReport {
                         message_index: Some(msg_idx),
                         turn_index: turn_num,
                         code: "CONSECUTIVE_USER_MESSAGES".to_string(),
-                        description: "Consecutive user message without assistant response".to_string(),
+                        description: "Consecutive user message without assistant response"
+                            .to_string(),
                         auto_fixable: true,
                     });
                 }
@@ -2200,11 +2220,10 @@ pub fn validate_session_integrity(session: &Session) -> SessionIntegrityReport {
                     });
                 }
             }
-            Role::Tool => {
-                match &msg.tool_call_id {
-                    Some(call_id) => {
-                        if open_tool_calls.remove(call_id).is_none() {
-                            issues.push(IntegrityIssue {
+            Role::Tool => match &msg.tool_call_id {
+                Some(call_id) => {
+                    if open_tool_calls.remove(call_id).is_none() {
+                        issues.push(IntegrityIssue {
                                 severity: IntegritySeverity::Error,
                                 message_index: Some(msg_idx),
                                 turn_index: turn_num,
@@ -2215,20 +2234,20 @@ pub fn validate_session_integrity(session: &Session) -> SessionIntegrityReport {
                                 ),
                                 auto_fixable: true,
                             });
-                        }
-                    }
-                    None => {
-                        issues.push(IntegrityIssue {
-                            severity: IntegritySeverity::Error,
-                            message_index: Some(msg_idx),
-                            turn_index: turn_num,
-                            code: "MISSING_TOOL_CALL_ID".to_string(),
-                            description: "Tool message is missing required 'tool_call_id' field".to_string(),
-                            auto_fixable: true,
-                        });
                     }
                 }
-            }
+                None => {
+                    issues.push(IntegrityIssue {
+                        severity: IntegritySeverity::Error,
+                        message_index: Some(msg_idx),
+                        turn_index: turn_num,
+                        code: "MISSING_TOOL_CALL_ID".to_string(),
+                        description: "Tool message is missing required 'tool_call_id' field"
+                            .to_string(),
+                        auto_fixable: true,
+                    });
+                }
+            },
         }
 
         let has_text = !msg.content.trim().is_empty();
@@ -2634,7 +2653,9 @@ fn apply_single_op(session: &mut Session, op: &SessionPatchOp) -> Result<(), Ses
             if let Some(idx) = user_msg_idx {
                 session.messages[idx].content = new_content.clone();
             } else {
-                session.messages.insert(turn.start_message_index, Message::user(new_content.clone()));
+                session
+                    .messages
+                    .insert(turn.start_message_index, Message::user(new_content.clone()));
             }
             session.touch();
             Ok(())
@@ -2659,7 +2680,10 @@ fn apply_single_op(session: &mut Session, op: &SessionPatchOp) -> Result<(), Ses
             if let Some(idx) = asst_msg_idx {
                 session.messages[idx].content = new_content.clone();
             } else {
-                session.messages.insert(turn.end_message_index, Message::assistant(new_content.clone()));
+                session.messages.insert(
+                    turn.end_message_index,
+                    Message::assistant(new_content.clone()),
+                );
             }
             session.touch();
             Ok(())
@@ -2676,7 +2700,10 @@ fn apply_single_op(session: &mut Session, op: &SessionPatchOp) -> Result<(), Ses
                 });
             }
             let t = &turns[*turn_index - 1];
-            session.messages.splice(t.start_message_index..t.end_message_index, turn.messages.clone());
+            session.messages.splice(
+                t.start_message_index..t.end_message_index,
+                turn.messages.clone(),
+            );
             session.touch();
             Ok(())
         }
@@ -2695,7 +2722,9 @@ fn apply_single_op(session: &mut Session, op: &SessionPatchOp) -> Result<(), Ses
                     .iter()
                     .position(|m| m.role != Role::System)
                     .unwrap_or(session.messages.len());
-                session.messages.splice(insert_pos..insert_pos, turn.messages.clone());
+                session
+                    .messages
+                    .splice(insert_pos..insert_pos, turn.messages.clone());
             } else {
                 if *turn_index == 0 || *turn_index > turns.len() + 1 {
                     return Err(SessionPatchError::TurnNotFound {
@@ -2719,7 +2748,9 @@ fn apply_single_op(session: &mut Session, op: &SessionPatchOp) -> Result<(), Ses
                         }
                     }
                 };
-                session.messages.splice(insert_idx..insert_idx, turn.messages.clone());
+                session
+                    .messages
+                    .splice(insert_idx..insert_idx, turn.messages.clone());
             }
             session.touch();
             Ok(())
@@ -2741,7 +2772,9 @@ fn apply_single_op(session: &mut Session, op: &SessionPatchOp) -> Result<(), Ses
                 .iter()
                 .position(|m| m.role != Role::System)
                 .unwrap_or(0);
-            session.messages.splice(insert_pos..insert_pos, turn.messages.clone());
+            session
+                .messages
+                .splice(insert_pos..insert_pos, turn.messages.clone());
             session.touch();
             Ok(())
         }
@@ -2754,7 +2787,9 @@ fn apply_single_op(session: &mut Session, op: &SessionPatchOp) -> Result<(), Ses
                 });
             }
             let turn = &turns[*turn_index - 1];
-            session.messages.drain(turn.start_message_index..turn.end_message_index);
+            session
+                .messages
+                .drain(turn.start_message_index..turn.end_message_index);
             session.touch();
             Ok(())
         }
@@ -2843,8 +2878,10 @@ fn apply_single_op(session: &mut Session, op: &SessionPatchOp) -> Result<(), Ses
             let msgs_first = turns[idx_first - 1].messages.clone();
             let msgs_second = turns[idx_second - 1].messages.clone();
 
-            let range_second = turns[idx_second - 1].start_message_index..turns[idx_second - 1].end_message_index;
-            let range_first = turns[idx_first - 1].start_message_index..turns[idx_first - 1].end_message_index;
+            let range_second =
+                turns[idx_second - 1].start_message_index..turns[idx_second - 1].end_message_index;
+            let range_first =
+                turns[idx_first - 1].start_message_index..turns[idx_first - 1].end_message_index;
 
             session.messages.splice(range_second, msgs_first);
             session.messages.splice(range_first, msgs_second);
@@ -2992,10 +3029,8 @@ impl SessionPatcher {
 
     /// Replaces the entire turn `turn_index` (1-based) with new turn data.
     pub fn modify_turn(&mut self, turn_index: usize, turn: TurnData) -> &mut Self {
-        self.operations.push(SessionPatchOp::ModifyTurn {
-            turn_index,
-            turn,
-        });
+        self.operations
+            .push(SessionPatchOp::ModifyTurn { turn_index, turn });
         self
     }
 
@@ -3048,7 +3083,8 @@ impl SessionPatcher {
 
     /// Deletes turn `turn_index` (1-based).
     pub fn delete_turn(&mut self, turn_index: usize) -> &mut Self {
-        self.operations.push(SessionPatchOp::DeleteTurn { turn_index });
+        self.operations
+            .push(SessionPatchOp::DeleteTurn { turn_index });
         self
     }
 
@@ -3109,8 +3145,9 @@ impl SessionPatcher {
 
     /// Updates the session-level system prompt.
     pub fn set_system_prompt(&mut self, prompt: Option<String>) -> &mut Self {
-        self.operations
-            .push(SessionPatchOp::SetSystemPrompt { system_prompt: prompt });
+        self.operations.push(SessionPatchOp::SetSystemPrompt {
+            system_prompt: prompt,
+        });
         self
     }
 
@@ -3139,9 +3176,8 @@ impl SessionPatcher {
 
     /// Removes a metadata key.
     pub fn remove_metadata(&mut self, key: impl Into<String>) -> &mut Self {
-        self.operations.push(SessionPatchOp::RemoveMetadata {
-            key: key.into(),
-        });
+        self.operations
+            .push(SessionPatchOp::RemoveMetadata { key: key.into() });
         self
     }
 
@@ -3550,7 +3586,9 @@ mod tests {
             .unwrap()
             .contains("pub fn sub"));
 
-        let main_patch = patch.get_file("src/main.rs").expect("src/main.rs must exist");
+        let main_patch = patch
+            .get_file("src/main.rs")
+            .expect("src/main.rs must exist");
         assert_eq!(main_patch.kind, FileEditKind::Created);
 
         let patch_text = patch.to_unified_diff(&options);
@@ -3563,7 +3601,11 @@ mod tests {
     fn test_stat_table_formatting() {
         let patch = SessionPatch::builder()
             .add_created("src/lib.rs", "fn hello() {}\n")
-            .add_modified("Cargo.toml", "[package]\n", "[package]\nversion = \"0.2.0\"\n")
+            .add_modified(
+                "Cargo.toml",
+                "[package]\n",
+                "[package]\nversion = \"0.2.0\"\n",
+            )
             .build();
 
         let stat_table = patch.format_stat();
@@ -3725,7 +3767,10 @@ mod tests {
         let turns = extract_patchable_turns(&s);
         assert_eq!(turns.len(), 1);
         assert!(turns[0].user_message.is_none());
-        assert_eq!(turns[0].assistant_message.as_deref(), Some("unsolicited greeting"));
+        assert_eq!(
+            turns[0].assistant_message.as_deref(),
+            Some("unsolicited greeting")
+        );
     }
 
     #[test]
@@ -3783,7 +3828,10 @@ mod tests {
         patch_modify_turn_assistant(&mut s, 2, "Actually great!").unwrap();
 
         let turns = extract_patchable_turns(&s);
-        assert_eq!(turns[1].assistant_message.as_deref(), Some("Actually great!"));
+        assert_eq!(
+            turns[1].assistant_message.as_deref(),
+            Some("Actually great!")
+        );
     }
 
     #[test]
@@ -3795,7 +3843,10 @@ mod tests {
         let turns = extract_patchable_turns(&s);
         assert_eq!(turns.len(), 3);
         assert_eq!(turns[1].user_message.as_deref(), Some("Replaced user"));
-        assert_eq!(turns[1].assistant_message.as_deref(), Some("Replaced assistant"));
+        assert_eq!(
+            turns[1].assistant_message.as_deref(),
+            Some("Replaced assistant")
+        );
     }
 
     #[test]
@@ -3855,7 +3906,10 @@ mod tests {
         assert_eq!(report.turns_after, 4);
 
         let turns = extract_patchable_turns(&s);
-        assert_eq!(turns.last().unwrap().user_message.as_deref(), Some("Last Q"));
+        assert_eq!(
+            turns.last().unwrap().user_message.as_deref(),
+            Some("Last Q")
+        );
     }
 
     #[test]
@@ -3876,10 +3930,7 @@ mod tests {
         let empty = TurnData::from_messages(vec![]);
         let result = patch_append_turn(&mut s, empty);
         assert!(result.is_err());
-        assert!(matches!(
-            result.unwrap_err(),
-            SessionPatchError::EmptyTurn
-        ));
+        assert!(matches!(result.unwrap_err(), SessionPatchError::EmptyTurn));
     }
 
     // --- Delete operations ---
@@ -4105,7 +4156,10 @@ mod tests {
 
         let report = validate_session_integrity(&s);
         assert!(report.has_errors());
-        let orphan = report.issues.iter().find(|i| i.code == "ORPHAN_TOOL_RESULT");
+        let orphan = report
+            .issues
+            .iter()
+            .find(|i| i.code == "ORPHAN_TOOL_RESULT");
         assert!(orphan.is_some());
     }
 
@@ -4124,7 +4178,10 @@ mod tests {
         // No tool result, session ends with dangling call
 
         let report = validate_session_integrity(&s);
-        let dangling = report.issues.iter().find(|i| i.code == "DANGLING_TOOL_CALL");
+        let dangling = report
+            .issues
+            .iter()
+            .find(|i| i.code == "DANGLING_TOOL_CALL");
         assert!(dangling.is_some());
     }
 
@@ -4136,7 +4193,10 @@ mod tests {
         s.add_assistant_message("Response");
 
         let report = validate_session_integrity(&s);
-        let consecutive = report.issues.iter().find(|i| i.code == "CONSECUTIVE_USER_MESSAGES");
+        let consecutive = report
+            .issues
+            .iter()
+            .find(|i| i.code == "CONSECUTIVE_USER_MESSAGES");
         assert!(consecutive.is_some());
     }
 
@@ -4230,7 +4290,11 @@ mod tests {
 
         assert_eq!(report.stray_systems_fixed, 1);
         // Stray content moved to system_prompt
-        assert!(s.system_prompt.as_deref().unwrap_or("").contains("stray system instruction"));
+        assert!(s
+            .system_prompt
+            .as_deref()
+            .unwrap_or("")
+            .contains("stray system instruction"));
     }
 
     // --- Session forking ---
@@ -4381,7 +4445,8 @@ mod tests {
     #[test]
     fn test_patcher_remove_metadata() {
         let mut s = make_surgical_session();
-        s.metadata.insert("existing".to_string(), "value".to_string());
+        s.metadata
+            .insert("existing".to_string(), "value".to_string());
 
         let mut patcher = SessionPatcher::new(s);
         patcher.remove_metadata("existing");
@@ -4397,13 +4462,9 @@ mod tests {
         s.add_user_message("Hi");
         s.add_assistant_message("Hello");
 
-        let mut patcher = SessionPatcher::new(s)
-            .with_strict_integrity(true);
+        let mut patcher = SessionPatcher::new(s).with_strict_integrity(true);
         // Insert an orphan tool result to trigger integrity error
-        patcher.insert_message(
-            2,
-            Message::tool_result("no_such_call", "orphaned"),
-        );
+        patcher.insert_message(2, Message::tool_result("no_such_call", "orphaned"));
 
         let result = patcher.apply();
         assert!(result.is_err());
@@ -4422,10 +4483,7 @@ mod tests {
         let mut patcher = SessionPatcher::new(s)
             .with_auto_repair(true)
             .with_strict_integrity(false);
-        patcher.insert_message(
-            2,
-            Message::tool_result("no_such_call", "orphaned"),
-        );
+        patcher.insert_message(2, Message::tool_result("no_such_call", "orphaned"));
 
         // Should succeed because auto-repair removes the orphan
         let result = patcher.apply();
@@ -4435,8 +4493,7 @@ mod tests {
     #[test]
     fn test_patcher_no_token_recompute() {
         let s = make_surgical_session();
-        let mut patcher = SessionPatcher::new(s)
-            .with_auto_recompute_tokens(false);
+        let mut patcher = SessionPatcher::new(s).with_auto_recompute_tokens(false);
         patcher.modify_user(1, "Changed");
 
         let (_, report) = patcher.apply_with_report().unwrap();
@@ -4492,7 +4549,10 @@ mod tests {
 
         assert_eq!(turns.len(), 3);
         assert!(turns[0].tool_calls_count > 0);
-        assert_eq!(turns[0].user_message.as_deref(), Some("Please create src/lib.rs with an add function."));
+        assert_eq!(
+            turns[0].user_message.as_deref(),
+            Some("Please create src/lib.rs with an add function.")
+        );
     }
 
     #[test]
@@ -4501,7 +4561,10 @@ mod tests {
         patch_modify_turn_user(&mut s, 1, "Updated tool question").unwrap();
 
         let turns = extract_patchable_turns(&s);
-        assert_eq!(turns[0].user_message.as_deref(), Some("Updated tool question"));
+        assert_eq!(
+            turns[0].user_message.as_deref(),
+            Some("Updated tool question")
+        );
         // Tool call messages should still be there
         assert!(turns[0].tool_calls_count > 0);
     }
@@ -4614,8 +4677,14 @@ mod tests {
     fn test_insert_position_serialization() {
         let before = serde_json::to_string(&InsertPosition::Before).unwrap();
         let after = serde_json::to_string(&InsertPosition::After).unwrap();
-        assert_eq!(serde_json::from_str::<InsertPosition>(&before).unwrap(), InsertPosition::Before);
-        assert_eq!(serde_json::from_str::<InsertPosition>(&after).unwrap(), InsertPosition::After);
+        assert_eq!(
+            serde_json::from_str::<InsertPosition>(&before).unwrap(),
+            InsertPosition::Before
+        );
+        assert_eq!(
+            serde_json::from_str::<InsertPosition>(&after).unwrap(),
+            InsertPosition::After
+        );
     }
 
     #[test]

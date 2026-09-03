@@ -4,11 +4,11 @@
 //! that pings configured LLM providers, measures Time to First Token (TTFT), tokens per second (tok/s),
 //! generation latency, total round-trip time, and formats performance comparison tables.
 
+use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 use std::future::Future;
 use std::io::{stdout, IsTerminal, Write};
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
-use serde::{Deserialize, Serialize};
 
 use crate::agent::loop_runner::AgentRunner;
 use crate::agent::session::Session;
@@ -383,7 +383,10 @@ impl ProviderBenchmarkSummary {
         let p95_ttft = Duration::from_nanos(ttft_nanos[p95_idx] as u64);
 
         // Throughput stats
-        let mut tps_vals: Vec<f64> = successful_runs.iter().map(|r| r.tokens_per_second).collect();
+        let mut tps_vals: Vec<f64> = successful_runs
+            .iter()
+            .map(|r| r.tokens_per_second)
+            .collect();
         tps_vals.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
 
         let sum_tps: f64 = tps_vals.iter().sum();
@@ -399,11 +402,10 @@ impl ProviderBenchmarkSummary {
         let avg_latency =
             Duration::from_nanos((sum_total_latency / (successful_runs.len() as u128)) as u64);
 
-        let total_tokens_generated: usize = successful_runs
-            .iter()
-            .map(|r| r.tokens_generated)
-            .sum();
-        let avg_completion_tokens = (total_tokens_generated as f64) / (successful_runs.len() as f64);
+        let total_tokens_generated: usize =
+            successful_runs.iter().map(|r| r.tokens_generated).sum();
+        let avg_completion_tokens =
+            (total_tokens_generated as f64) / (successful_runs.len() as f64);
 
         let rating = PerformanceRating::evaluate(avg_ttft, avg_tokens_per_second, true);
 
@@ -474,7 +476,14 @@ pub fn discover_benchmark_targets(
     config: &Config,
     options: &BenchmarkOptions,
 ) -> Vec<BenchmarkTarget> {
-    let all_known_providers = ["deepseek", "anthropic", "openai", "xai", "openrouter", "ollama"];
+    let all_known_providers = [
+        "deepseek",
+        "anthropic",
+        "openai",
+        "xai",
+        "openrouter",
+        "ollama",
+    ];
 
     let requested_providers: Vec<String> = if !options.provider_filters.is_empty() {
         options
@@ -502,7 +511,9 @@ pub fn discover_benchmark_targets(
         let is_configured = if is_ollama {
             !url.trim().is_empty()
         } else {
-            key.as_deref().map(|k| !k.trim().is_empty()).unwrap_or(false)
+            key.as_deref()
+                .map(|k| !k.trim().is_empty())
+                .unwrap_or(false)
         };
 
         // Determine target model
@@ -752,16 +763,17 @@ where
                     runs.push(res);
                 }
 
-                ProviderBenchmarkSummary::from_runs(
-                    &target.provider,
-                    &target.model,
-                    &runs,
-                )
+                ProviderBenchmarkSummary::from_runs(&target.provider, &target.model, &runs)
             }));
         }
 
         for (idx, fut) in futures.into_iter().enumerate() {
-            progress_callback("Running parallel benchmark...", idx + 1, total_targets, None);
+            progress_callback(
+                "Running parallel benchmark...",
+                idx + 1,
+                total_targets,
+                None,
+            );
             if let Ok(summary) = fut.await {
                 summaries.push(summary);
             }
@@ -799,11 +811,8 @@ where
                 runs.push(res);
             }
 
-            let summary = ProviderBenchmarkSummary::from_runs(
-                &target.provider,
-                &target.model,
-                &runs,
-            );
+            let summary =
+                ProviderBenchmarkSummary::from_runs(&target.provider, &target.model, &runs);
 
             summaries.push(summary);
         }
@@ -915,7 +924,10 @@ pub fn format_benchmark_table(
             }
         } else if s.successful_rounds > 0 {
             if color {
-                format!("\x1b[1;33m{}/{}\x1b[0m", s.successful_rounds, s.total_rounds)
+                format!(
+                    "\x1b[1;33m{}/{}\x1b[0m",
+                    s.successful_rounds, s.total_rounds
+                )
             } else {
                 format!("{}/{}", s.successful_rounds, s.total_rounds)
             }
@@ -970,8 +982,12 @@ pub fn format_benchmark_table(
 pub fn format_benchmark_markdown(summaries: &[ProviderBenchmarkSummary], rounds: usize) -> String {
     let mut out = String::new();
     out.push_str("### ⚡ LLM Provider Benchmark Results\n\n");
-    out.push_str("| Provider | Model | Status | TTFT | Speed (tok/s) | Total Latency | Tokens | Rating |\n");
-    out.push_str("|:---------|:------|:------:|-----:|--------------:|--------------:|-------:|:------:|\n");
+    out.push_str(
+        "| Provider | Model | Status | TTFT | Speed (tok/s) | Total Latency | Tokens | Rating |\n",
+    );
+    out.push_str(
+        "|:---------|:------|:------:|-----:|--------------:|--------------:|-------:|:------:|\n",
+    );
 
     for s in summaries {
         let status = if !s.is_configured {
@@ -1017,7 +1033,10 @@ pub fn format_benchmark_markdown(summaries: &[ProviderBenchmarkSummary], rounds:
     }
 
     if rounds > 1 {
-        out.push_str(&format!("\n*Averaged across {} rounds per provider.*\n", rounds));
+        out.push_str(&format!(
+            "\n*Averaged across {} rounds per provider.*\n",
+            rounds
+        ));
     }
 
     out
@@ -1034,8 +1053,10 @@ pub fn format_rankings_and_recommendation(
     active_provider: &str,
     color: bool,
 ) -> String {
-    let successful: Vec<&ProviderBenchmarkSummary> =
-        summaries.iter().filter(|s| s.successful_rounds > 0).collect();
+    let successful: Vec<&ProviderBenchmarkSummary> = summaries
+        .iter()
+        .filter(|s| s.successful_rounds > 0)
+        .collect();
 
     if successful.is_empty() {
         return String::new();
@@ -1280,7 +1301,8 @@ pub fn parse_benchmark_args(args: &[String]) -> BenchmarkOptions {
                 opts.provider_filters.push(other.to_string());
                 idx += 1;
                 // Next token might be model name if not a flag
-                if idx < args.len() && !args[idx].starts_with('-') && opts.model_override.is_none() {
+                if idx < args.len() && !args[idx].starts_with('-') && opts.model_override.is_none()
+                {
                     opts.model_override = Some(args[idx].clone());
                     idx += 1;
                 }
@@ -1312,15 +1334,13 @@ pub fn run_async_future<F: Future>(f: F) -> F::Output {
 }
 
 /// Top-level handler for `/benchmark` command.
-pub fn handle_benchmark_command(
-    args: &[String],
-    runner: &mut AgentRunner,
-    _session: &mut Session,
-) {
+pub fn handle_benchmark_command(args: &[String], runner: &mut AgentRunner, _session: &mut Session) {
     let mut opts = parse_benchmark_args(args);
 
     // If user asked for active provider specifically
-    if args.first().map(|s| s.as_str()) == Some("active") || args.first().map(|s| s.as_str()) == Some("current") {
+    if args.first().map(|s| s.as_str()) == Some("active")
+        || args.first().map(|s| s.as_str()) == Some("current")
+    {
         opts.provider_filters = vec![runner.config().default_provider.clone()];
     }
 
@@ -1356,37 +1376,38 @@ pub fn handle_benchmark_command(
     let summaries = run_async_future(async {
         let mut active_spinner: Option<SpinnerHandle> = None;
 
-        let results = run_benchmark_suite(&client, &targets, &opts, |msg, _curr, _total, run_res| {
-            if is_interactive {
-                if let Some(res) = run_res {
-                    if let Some(sp) = active_spinner.take() {
-                        if res.success {
-                            sp.success(&format!(
-                                "{} ({}) - TTFT: {}, Speed: {:.1} tok/s",
-                                res.provider,
-                                res.model,
-                                format_duration_compact(res.ttft),
-                                res.tokens_per_second
-                            ));
+        let results =
+            run_benchmark_suite(&client, &targets, &opts, |msg, _curr, _total, run_res| {
+                if is_interactive {
+                    if let Some(res) = run_res {
+                        if let Some(sp) = active_spinner.take() {
+                            if res.success {
+                                sp.success(&format!(
+                                    "{} ({}) - TTFT: {}, Speed: {:.1} tok/s",
+                                    res.provider,
+                                    res.model,
+                                    format_duration_compact(res.ttft),
+                                    res.tokens_per_second
+                                ));
+                            } else {
+                                sp.error(&format!(
+                                    "{} ({}) - {}",
+                                    res.provider,
+                                    res.model,
+                                    res.error_message.as_deref().unwrap_or("Failed")
+                                ));
+                            }
+                        }
+                    } else {
+                        if let Some(sp) = &active_spinner {
+                            sp.set_message(msg.to_string());
                         } else {
-                            sp.error(&format!(
-                                "{} ({}) - {}",
-                                res.provider,
-                                res.model,
-                                res.error_message.as_deref().unwrap_or("Failed")
-                            ));
+                            active_spinner = Some(Spinner::start(msg.to_string()));
                         }
                     }
-                } else {
-                    if let Some(sp) = &active_spinner {
-                        sp.set_message(msg.to_string());
-                    } else {
-                        active_spinner = Some(Spinner::start(msg.to_string()));
-                    }
                 }
-            }
-        })
-        .await;
+            })
+            .await;
 
         if let Some(sp) = active_spinner {
             sp.stop();
@@ -1525,7 +1546,11 @@ mod tests {
         let opts = parse_benchmark_args(&args);
         assert_eq!(
             opts.provider_filters,
-            vec!["anthropic".to_string(), "openai".to_string(), "ollama".to_string()]
+            vec![
+                "anthropic".to_string(),
+                "openai".to_string(),
+                "ollama".to_string()
+            ]
         );
         assert_eq!(opts.output_format, BenchmarkOutputFormat::Json);
         assert!(opts.quiet);

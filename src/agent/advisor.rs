@@ -4,10 +4,10 @@ use std::time::Duration;
 use futures::future::join_all;
 use serde::{Deserialize, Serialize};
 
+use crate::agent::consensus::{resolve_consensus, ConsensusResolution, ConsensusStrategy};
 use crate::config::Config;
 use crate::provider::types::Message;
 use crate::provider::LlmClient;
-use crate::agent::consensus::{resolve_consensus, ConsensusResolution, ConsensusStrategy};
 
 /// Assessed risk level from an advisor.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
@@ -229,7 +229,9 @@ impl AdvisorRegistry {
 
     /// Looks up an advisor by name.
     pub fn get(&self, name: &str) -> Option<&Advisor> {
-        self.advisors.iter().find(|a| a.name.eq_ignore_ascii_case(name))
+        self.advisors
+            .iter()
+            .find(|a| a.name.eq_ignore_ascii_case(name))
     }
 
     /// Returns true if no advisors are registered.
@@ -352,7 +354,10 @@ impl AdvisorEngine {
         let action_description = if proposed_plan.trim().is_empty() {
             String::new()
         } else {
-            format!("PROPOSED PLAN / IMPLEMENTATION STRATEGY:\n{}", proposed_plan)
+            format!(
+                "PROPOSED PLAN / IMPLEMENTATION STRATEGY:\n{}",
+                proposed_plan
+            )
         };
 
         self.consult(user_request, &action_description).await
@@ -369,8 +374,8 @@ impl AdvisorEngine {
             return Vec::new();
         }
 
-        let args_formatted = serde_json::to_string_pretty(tool_args)
-            .unwrap_or_else(|_| tool_args.to_string());
+        let args_formatted =
+            serde_json::to_string_pretty(tool_args).unwrap_or_else(|_| tool_args.to_string());
 
         let action_description = format!(
             "PROPOSED TOOL CALL (PRE-EXECUTION CHECK):\nTool Name: {}\nArguments:\n{}",
@@ -381,11 +386,7 @@ impl AdvisorEngine {
     }
 
     /// General consultation method fanning out parallel advisory queries.
-    pub async fn consult(
-        &self,
-        user_request: &str,
-        proposed_action: &str,
-    ) -> Vec<AdvisorCritique> {
+    pub async fn consult(&self, user_request: &str, proposed_action: &str) -> Vec<AdvisorCritique> {
         consult_advisors(
             &self.advisors,
             user_request,
@@ -403,7 +404,9 @@ impl AdvisorEngine {
 
     /// Checks if any critique identified a Critical risk.
     pub fn has_critical_risk(critiques: &[AdvisorCritique]) -> bool {
-        critiques.iter().any(|c| c.risk_level == RiskLevel::Critical)
+        critiques
+            .iter()
+            .any(|c| c.risk_level == RiskLevel::Critical)
     }
 
     /// Checks if any critique identified a High or Critical risk.
@@ -453,7 +456,9 @@ impl AdvisorEngine {
         tool_args: &serde_json::Value,
         strategy: ConsensusStrategy,
     ) -> (Vec<AdvisorCritique>, ConsensusResolution) {
-        let critiques = self.critique_tool_call(user_request, tool_name, tool_args).await;
+        let critiques = self
+            .critique_tool_call(user_request, tool_name, tool_args)
+            .await;
         let resolution = resolve_consensus(&critiques, strategy);
         (critiques, resolution)
     }
@@ -548,9 +553,7 @@ async fn consult_single_advisor(
     .await;
 
     match completion_result {
-        Ok(Ok((content, _reasoning, _tool_calls))) => {
-            parse_advisor_response(advisor, &content)
-        }
+        Ok(Ok((content, _reasoning, _tool_calls))) => parse_advisor_response(advisor, &content),
         Ok(Err(e)) => {
             tracing::warn!("Advisor '{}' request failed: {}", advisor.name, e);
             AdvisorCritique {
@@ -740,7 +743,11 @@ mod tests {
         assert_eq!(default_reg.len(), 3);
         assert_eq!(
             default_reg.names(),
-            vec!["ArchitectureAdvisor", "SecurityAdvisor", "CodeReviewAdvisor"]
+            vec![
+                "ArchitectureAdvisor",
+                "SecurityAdvisor",
+                "CodeReviewAdvisor"
+            ]
         );
     }
 
@@ -915,10 +922,22 @@ mod tests {
 
         for (raw, expected) in [
             (r#"{"approved": true, "risk_level": "low"}"#, RiskLevel::Low),
-            (r#"{"approved": true, "risk_level": "Medium"}"#, RiskLevel::Medium),
-            (r#"{"approved": false, "risk_level": "high"}"#, RiskLevel::High),
-            (r#"{"approved": false, "risk_level": "severe"}"#, RiskLevel::Critical),
-            (r#"{"approved": true, "risk_level": "mystery"}"#, RiskLevel::Low),
+            (
+                r#"{"approved": true, "risk_level": "Medium"}"#,
+                RiskLevel::Medium,
+            ),
+            (
+                r#"{"approved": false, "risk_level": "high"}"#,
+                RiskLevel::High,
+            ),
+            (
+                r#"{"approved": false, "risk_level": "severe"}"#,
+                RiskLevel::Critical,
+            ),
+            (
+                r#"{"approved": true, "risk_level": "mystery"}"#,
+                RiskLevel::Low,
+            ),
         ] {
             let critique = parse_advisor_response(&advisor, raw);
             assert_eq!(critique.risk_level, expected, "raw: {raw}");
@@ -930,21 +949,30 @@ mod tests {
         // Non-JSON responses with caution words fall back to text heuristics.
         let advisor = Advisor::security();
 
-        let warn = parse_advisor_response(&advisor, "Proceed with caution: the command overwrites a config file.");
+        let warn = parse_advisor_response(
+            &advisor,
+            "Proceed with caution: the command overwrites a config file.",
+        );
         assert!(warn.approved);
         assert_eq!(warn.risk_level, RiskLevel::Medium);
 
         let danger = parse_advisor_response(&advisor, "Danger: this deletes git history.");
         assert_eq!(danger.risk_level, RiskLevel::High);
 
-        let blocked = parse_advisor_response(&advisor, "Disapproved: secret leakage risk in proposed action.");
+        let blocked = parse_advisor_response(
+            &advisor,
+            "Disapproved: secret leakage risk in proposed action.",
+        );
         assert!(!blocked.approved);
     }
 
     #[test]
     fn test_parse_advisor_response_preserves_focus() {
         let advisor = Advisor::architecture();
-        let critique = parse_advisor_response(&advisor, r#"{"approved": true, "risk_level": "low", "critique": "OK"}"#);
+        let critique = parse_advisor_response(
+            &advisor,
+            r#"{"approved": true, "risk_level": "low", "critique": "OK"}"#,
+        );
         assert_eq!(critique.focus, advisor.focus);
     }
 
@@ -1045,7 +1073,9 @@ mod tests {
         reg.register(Advisor::new("CustomAdvisor", "focus-b", "prompt-b"));
         assert_eq!(reg.len(), 2);
 
-        let found = reg.get("customadvisor").expect("duplicate name must be found");
+        let found = reg
+            .get("customadvisor")
+            .expect("duplicate name must be found");
         assert_eq!(found.focus, "focus-a");
     }
 
@@ -1089,7 +1119,11 @@ mod tests {
 
         let engine = AdvisorEngine::new(client, config);
         let (critiques, resolution) = engine
-            .consult_with_consensus("Refactor module", "Split file in two", ConsensusStrategy::Unanimous)
+            .consult_with_consensus(
+                "Refactor module",
+                "Split file in two",
+                ConsensusStrategy::Unanimous,
+            )
             .await;
         assert!(critiques.is_empty());
         assert_eq!(resolution.total_advisors, 0);

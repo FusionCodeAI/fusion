@@ -106,7 +106,9 @@ impl SymbolKind {
             }
             // Group class and struct together if searching for "type" or "class"
             if target == SymbolKind::TypeAlias
-                && (*self == SymbolKind::TypeAlias || *self == SymbolKind::Struct || *self == SymbolKind::Enum)
+                && (*self == SymbolKind::TypeAlias
+                    || *self == SymbolKind::Struct
+                    || *self == SymbolKind::Enum)
             {
                 return true;
             }
@@ -291,7 +293,12 @@ fn get_rules() -> &'static HashMap<Language, LanguageRules> {
     &RULES
 }
 
-fn make_pattern(kind: SymbolKind, pattern: &str, name_group: usize, vis_group: Option<usize>) -> SymbolPattern {
+fn make_pattern(
+    kind: SymbolKind,
+    pattern: &str,
+    name_group: usize,
+    vis_group: Option<usize>,
+) -> SymbolPattern {
     make_pattern_full(kind, pattern, name_group, vis_group, None)
 }
 
@@ -450,7 +457,10 @@ fn init_all_rules() -> HashMap<Language, LanguageRules> {
             Some(1),
         ),
     ];
-    let ts_container = Regex::new(r#"^\s*(?:export\s+)?(?:abstract\s+)?(?:class|interface)\s+([a-zA-Z_$][a-zA-Z0-9_$]*)"#).ok();
+    let ts_container = Regex::new(
+        r#"^\s*(?:export\s+)?(?:abstract\s+)?(?:class|interface)\s+([a-zA-Z_$][a-zA-Z0-9_$]*)"#,
+    )
+    .ok();
     map.insert(
         Language::TypeScript,
         LanguageRules {
@@ -703,7 +713,8 @@ fn init_all_rules() -> HashMap<Language, LanguageRules> {
             Some(1),
         ),
     ];
-    let kt_container = Regex::new(r#"^\s*(?:class|object|interface)\s+([a-zA-Z_][a-zA-Z0-9_]*)"#).ok();
+    let kt_container =
+        Regex::new(r#"^\s*(?:class|object|interface)\s+([a-zA-Z_][a-zA-Z0-9_]*)"#).ok();
     map.insert(
         Language::Kotlin,
         LanguageRules {
@@ -788,7 +799,8 @@ fn init_all_rules() -> HashMap<Language, LanguageRules> {
             Some(1),
         ),
     ];
-    let swift_container = Regex::new(r#"^\s*(?:class|struct|enum|protocol|actor)\s+([a-zA-Z_][a-zA-Z0-9_]*)"#).ok();
+    let swift_container =
+        Regex::new(r#"^\s*(?:class|struct|enum|protocol|actor)\s+([a-zA-Z_][a-zA-Z0-9_]*)"#).ok();
     map.insert(
         Language::Swift,
         LanguageRules {
@@ -1103,7 +1115,9 @@ impl SymbolScanner {
         let lang = Language::from_extension(ext);
         let all_rules = get_rules();
 
-        let rules = all_rules.get(&lang).or_else(|| all_rules.get(&Language::Generic));
+        let rules = all_rules
+            .get(&lang)
+            .or_else(|| all_rules.get(&Language::Generic));
 
         let Some(rules) = rules else {
             return Vec::new();
@@ -1128,16 +1142,28 @@ impl SymbolScanner {
 
             // Collect doc comments
             if trimmed.starts_with("///") || trimmed.starts_with("//!") {
-                let doc = trimmed.trim_start_matches("///").trim_start_matches("//!").trim();
+                let doc = trimmed
+                    .trim_start_matches("///")
+                    .trim_start_matches("//!")
+                    .trim();
                 recent_doc_lines.push(doc.to_string());
                 continue;
-            } else if trimmed.starts_with("/**") || trimmed.starts_with("/*") || trimmed.starts_with('*') {
-                let doc = trimmed.trim_start_matches("/**").trim_start_matches("/*").trim_start_matches('*').trim();
+            } else if trimmed.starts_with("/**")
+                || trimmed.starts_with("/*")
+                || trimmed.starts_with('*')
+            {
+                let doc = trimmed
+                    .trim_start_matches("/**")
+                    .trim_start_matches("/*")
+                    .trim_start_matches('*')
+                    .trim();
                 if !doc.is_empty() && doc != "/" {
                     recent_doc_lines.push(doc.to_string());
                 }
                 continue;
-            } else if (is_python || lang == Language::Ruby || lang == Language::Shell) && trimmed.starts_with('#') {
+            } else if (is_python || lang == Language::Ruby || lang == Language::Shell)
+                && trimmed.starts_with('#')
+            {
                 let doc = trimmed.trim_start_matches('#').trim();
                 recent_doc_lines.push(doc.to_string());
                 continue;
@@ -1203,7 +1229,9 @@ impl SymbolScanner {
 
                     let col = name_match.start() + 1;
                     let visibility = pat.vis_group.and_then(|idx| {
-                        caps.get(idx).map(|m| m.as_str().trim().to_string()).filter(|s| !s.is_empty())
+                        caps.get(idx)
+                            .map(|m| m.as_str().trim().to_string())
+                            .filter(|s| !s.is_empty())
                     });
 
                     let signature = trimmed.to_string();
@@ -1222,8 +1250,13 @@ impl SymbolScanner {
                         signature,
                         language: lang.as_str().to_string(),
                         visibility,
-                        container: pat.container_group
-                            .and_then(|idx| caps.get(idx).map(|m| m.as_str().trim().to_string()).filter(|s| !s.is_empty()))
+                        container: pat
+                            .container_group
+                            .and_then(|idx| {
+                                caps.get(idx)
+                                    .map(|m| m.as_str().trim().to_string())
+                                    .filter(|s| !s.is_empty())
+                            })
                             .or_else(|| current_container.clone()),
                         doc_comment,
                     });
@@ -1295,10 +1328,8 @@ impl SymbolQuery {
                     }
                 } else if q_trimmed.contains('*') {
                     // Simple wildcard match
-                    let regex_pattern = format!(
-                        "^{}$",
-                        regex::escape(q_trimmed).replace(r"\*", ".*")
-                    );
+                    let regex_pattern =
+                        format!("^{}$", regex::escape(q_trimmed).replace(r"\*", ".*"));
                     if let Ok(rx) = RegexBuilder::new(&regex_pattern)
                         .case_insensitive(!self.case_sensitive)
                         .build()
@@ -1308,7 +1339,9 @@ impl SymbolQuery {
                         }
                     }
                 } else if self.case_sensitive {
-                    if !symbol.name.contains(q_trimmed) && !symbol.qualified_name().contains(q_trimmed) {
+                    if !symbol.name.contains(q_trimmed)
+                        && !symbol.qualified_name().contains(q_trimmed)
+                    {
                         return false;
                     }
                 } else {
@@ -1604,10 +1637,7 @@ impl Tool for SymbolsTool {
             .or_else(|| args.get("ext").and_then(|v| v.as_str()))
             .map(|s| s.to_string());
 
-        let exact = args
-            .get("exact")
-            .and_then(|v| v.as_bool())
-            .unwrap_or(false);
+        let exact = args.get("exact").and_then(|v| v.as_bool()).unwrap_or(false);
 
         let case_sensitive = args
             .get("case_sensitive")
@@ -1666,11 +1696,10 @@ impl Tool for SymbolsTool {
         let query_clone = query.clone();
 
         // Run file traversal and parsing in blocking threadpool
-        let (symbols, files_scanned) = tokio::task::spawn_blocking(move || {
-            scan_workspace(&target, &cwd, &query_clone)
-        })
-        .await
-        .map_err(|e| anyhow::anyhow!("Symbol scanning task failed: {e}"))??;
+        let (symbols, files_scanned) =
+            tokio::task::spawn_blocking(move || scan_workspace(&target, &cwd, &query_clone))
+                .await
+                .map_err(|e| anyhow::anyhow!("Symbol scanning task failed: {e}"))??;
 
         match format {
             "json" => Ok(serde_json::to_string_pretty(&symbols)?),
@@ -1742,7 +1771,10 @@ macro_rules! register_tool {
         let new_sym = symbols.iter().find(|s| s.name == "new").unwrap();
         assert_eq!(new_sym.container.as_deref(), Some("ToolRegistry"));
         assert_eq!(new_sym.qualified_name(), "ToolRegistry::new");
-        assert_eq!(new_sym.doc_comment.as_deref(), Some("Create a new registry."));
+        assert_eq!(
+            new_sym.doc_comment.as_deref(),
+            Some("Create a new registry.")
+        );
     }
 
     #[test]

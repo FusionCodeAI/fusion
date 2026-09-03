@@ -169,10 +169,7 @@ impl ConsensusResolution {
             "🔴 **REJECTED**"
         };
 
-        out.push_str(&format!(
-            "### Advisor Consensus: {}\n\n",
-            status_str
-        ));
+        out.push_str(&format!("### Advisor Consensus: {}\n\n", status_str));
         out.push_str(&format!("- **Strategy**: {}\n", self.strategy));
         out.push_str(&format!(
             "- **Vote Count**: {} / {} approved\n",
@@ -324,7 +321,8 @@ impl ConsensusPolicy {
 
     /// Builder method to set custom advisor weight.
     pub fn with_advisor_weight(mut self, advisor_name: impl Into<String>, weight: f64) -> Self {
-        self.advisor_weights.insert(advisor_name.into(), weight.max(0.0));
+        self.advisor_weights
+            .insert(advisor_name.into(), weight.max(0.0));
         self
     }
 }
@@ -399,7 +397,10 @@ impl ConsensusEngine {
         critiques: &[AdvisorCritique],
         threshold: f64,
     ) -> ConsensusResolution {
-        self.resolve_with_strategy(critiques, ConsensusStrategy::Supermajority(threshold.clamp(0.0, 1.0)))
+        self.resolve_with_strategy(
+            critiques,
+            ConsensusStrategy::Supermajority(threshold.clamp(0.0, 1.0)),
+        )
     }
 
     /// Resolves using Security-First Veto voting.
@@ -531,7 +532,10 @@ pub fn resolve_consensus_with_policy(
 
     // 3. Check hard global auto-vetoes
     if policy.critical_auto_veto && highest_risk == RiskLevel::Critical {
-        for c in critiques.iter().filter(|c| c.risk_level == RiskLevel::Critical) {
+        for c in critiques
+            .iter()
+            .filter(|c| c.risk_level == RiskLevel::Critical)
+        {
             veto_reasons.push(format!(
                 "Critical Risk Veto by {}: {}",
                 c.advisor, c.critique
@@ -558,9 +562,7 @@ pub fn resolve_consensus_with_policy(
 
     // 5. Evaluate strategy-specific votes and determine approval & confidence
     let (mut strategy_approved, confidence, votes) = match &policy.strategy {
-        ConsensusStrategy::Majority => {
-            evaluate_majority_strategy(critiques, policy)
-        }
+        ConsensusStrategy::Majority => evaluate_majority_strategy(critiques, policy),
         ConsensusStrategy::Unanimous => {
             evaluate_unanimous_strategy(critiques, policy, &mut veto_reasons)
         }
@@ -573,9 +575,16 @@ pub fn resolve_consensus_with_policy(
         ConsensusStrategy::SecurityVeto => {
             evaluate_security_veto_strategy(critiques, policy, &mut veto_reasons)
         }
-        ConsensusStrategy::CustomWeighted { weights, default_weight } => {
-            evaluate_custom_weighted_strategy(critiques, weights, *default_weight, policy, &mut veto_reasons)
-        }
+        ConsensusStrategy::CustomWeighted {
+            weights,
+            default_weight,
+        } => evaluate_custom_weighted_strategy(
+            critiques,
+            weights,
+            *default_weight,
+            policy,
+            &mut veto_reasons,
+        ),
     };
 
     // 6. Confidence threshold check
@@ -743,7 +752,11 @@ fn evaluate_unanimous_strategy(
     }
 
     let is_approved = approved_count == total;
-    let confidence = if is_approved { 1.0 } else { approved_count as f64 / total as f64 };
+    let confidence = if is_approved {
+        1.0
+    } else {
+        approved_count as f64 / total as f64
+    };
 
     (is_approved, confidence, votes)
 }
@@ -827,7 +840,8 @@ fn evaluate_risk_weighted_strategy(
         .copied()
         .unwrap_or(8.0)
         / 8.0;
-    let confidence = (raw_ratio * (1.0 - (max_risk_penalty * critical_scale * 0.5))).clamp(0.0, 1.0);
+    let confidence =
+        (raw_ratio * (1.0 - (max_risk_penalty * critical_scale * 0.5))).clamp(0.0, 1.0);
     // Approval requires positive weight to strictly exceed negative weight
     // and confidence to reach the 0.5 barrier.
     let is_approved = positive_weight > negative_weight && confidence >= 0.50;
@@ -884,7 +898,11 @@ fn evaluate_security_veto_strategy(
     let approval_fraction = approved_count as f64 / total as f64;
     let is_majority = approved_count > (total / 2);
     let is_approved = !security_veto && is_majority;
-    let confidence = if security_veto { 0.0 } else { approval_fraction };
+    let confidence = if security_veto {
+        0.0
+    } else {
+        approval_fraction
+    };
 
     (is_approved, confidence, votes)
 }
@@ -1006,7 +1024,12 @@ fn generate_consensus_summary(
 mod tests {
     use super::*;
 
-    fn sample_critique(advisor: &str, approved: bool, risk: RiskLevel, text: &str) -> AdvisorCritique {
+    fn sample_critique(
+        advisor: &str,
+        approved: bool,
+        risk: RiskLevel,
+        text: &str,
+    ) -> AdvisorCritique {
         AdvisorCritique {
             advisor: advisor.to_string(),
             focus: format!("{} focus", advisor),
@@ -1038,9 +1061,19 @@ mod tests {
     fn test_majority_voting() {
         // 2 approve, 1 reject -> Approved
         let critiques = vec![
-            sample_critique("ArchitectureAdvisor", true, RiskLevel::Low, "Good modular structure"),
+            sample_critique(
+                "ArchitectureAdvisor",
+                true,
+                RiskLevel::Low,
+                "Good modular structure",
+            ),
             sample_critique("SecurityAdvisor", true, RiskLevel::Low, "Safe operations"),
-            sample_critique("CodeReviewAdvisor", false, RiskLevel::Medium, "Needs minor formatting"),
+            sample_critique(
+                "CodeReviewAdvisor",
+                false,
+                RiskLevel::Medium,
+                "Needs minor formatting",
+            ),
         ];
 
         let resolution = resolve_majority(&critiques);
@@ -1054,8 +1087,18 @@ mod tests {
         // 1 approve, 2 reject -> Rejected
         let critiques_rejected = vec![
             sample_critique("ArchitectureAdvisor", true, RiskLevel::Low, "Fine"),
-            sample_critique("SecurityAdvisor", false, RiskLevel::High, "Command injection risk"),
-            sample_critique("CodeReviewAdvisor", false, RiskLevel::Medium, "Poor error handling"),
+            sample_critique(
+                "SecurityAdvisor",
+                false,
+                RiskLevel::High,
+                "Command injection risk",
+            ),
+            sample_critique(
+                "CodeReviewAdvisor",
+                false,
+                RiskLevel::Medium,
+                "Poor error handling",
+            ),
         ];
 
         let res_rejected = resolve_majority(&critiques_rejected);
@@ -1094,7 +1137,12 @@ mod tests {
         // 2 approve, 1 reject -> Rejected with veto reason
         let critiques_rejected = vec![
             sample_critique("ArchitectureAdvisor", true, RiskLevel::Low, "Approved"),
-            sample_critique("SecurityAdvisor", false, RiskLevel::Low, "Needs token limit"),
+            sample_critique(
+                "SecurityAdvisor",
+                false,
+                RiskLevel::Low,
+                "Needs token limit",
+            ),
             sample_critique("CodeReviewAdvisor", true, RiskLevel::Low, "Approved"),
         ];
 
@@ -1110,9 +1158,24 @@ mod tests {
     fn test_risk_weighted_voting() {
         // 2 Low risk approvals vs 1 High risk rejection -> Rejected due to heavy high-risk weight
         let critiques = vec![
-            sample_critique("ArchitectureAdvisor", true, RiskLevel::Low, "Architecturally fine"),
-            sample_critique("CodeReviewAdvisor", true, RiskLevel::Low, "Code is idiomatic"),
-            sample_critique("SecurityAdvisor", false, RiskLevel::High, "Exposes internal credentials"),
+            sample_critique(
+                "ArchitectureAdvisor",
+                true,
+                RiskLevel::Low,
+                "Architecturally fine",
+            ),
+            sample_critique(
+                "CodeReviewAdvisor",
+                true,
+                RiskLevel::Low,
+                "Code is idiomatic",
+            ),
+            sample_critique(
+                "SecurityAdvisor",
+                false,
+                RiskLevel::High,
+                "Exposes internal credentials",
+            ),
         ];
 
         let resolution = resolve_risk_weighted(&critiques);
@@ -1121,9 +1184,24 @@ mod tests {
 
         // 2 Medium risk approvals vs 1 Low risk rejection -> Approved with confidence
         let critiques_app = vec![
-            sample_critique("ArchitectureAdvisor", true, RiskLevel::Medium, "Acceptable coupling"),
-            sample_critique("SecurityAdvisor", true, RiskLevel::Medium, "Safe with caveats"),
-            sample_critique("CodeReviewAdvisor", false, RiskLevel::Low, "Nit: comment typo"),
+            sample_critique(
+                "ArchitectureAdvisor",
+                true,
+                RiskLevel::Medium,
+                "Acceptable coupling",
+            ),
+            sample_critique(
+                "SecurityAdvisor",
+                true,
+                RiskLevel::Medium,
+                "Safe with caveats",
+            ),
+            sample_critique(
+                "CodeReviewAdvisor",
+                false,
+                RiskLevel::Low,
+                "Nit: comment typo",
+            ),
         ];
 
         let res_app = resolve_risk_weighted(&critiques_app);
@@ -1137,7 +1215,12 @@ mod tests {
         let critiques = vec![
             sample_critique("ArchitectureAdvisor", true, RiskLevel::Low, "Fine"),
             sample_critique("CodeReviewAdvisor", true, RiskLevel::Low, "Fine"),
-            sample_critique("SecurityAdvisor", false, RiskLevel::Critical, "Command executes `rm -rf /`"),
+            sample_critique(
+                "SecurityAdvisor",
+                false,
+                RiskLevel::Critical,
+                "Command executes `rm -rf /`",
+            ),
         ];
 
         let resolution = resolve_majority(&critiques);
@@ -1162,7 +1245,12 @@ mod tests {
 
         // Security disapproval triggers immediate veto
         let critiques_sec_disapprove = vec![
-            sample_critique("SecurityAdvisor", false, RiskLevel::Medium, "Potential directory traversal"),
+            sample_critique(
+                "SecurityAdvisor",
+                false,
+                RiskLevel::Medium,
+                "Potential directory traversal",
+            ),
             sample_critique("ArchitectureAdvisor", true, RiskLevel::Low, "Modular"),
             sample_critique("CodeReviewAdvisor", true, RiskLevel::Low, "Looks fine"),
         ];
@@ -1219,8 +1307,18 @@ mod tests {
     fn test_consensus_engine_and_formatting() {
         let engine = ConsensusEngine::with_strategy(ConsensusStrategy::Majority);
         let critiques = vec![
-            sample_critique("SecurityAdvisor", true, RiskLevel::Low, "No vulnerabilities found"),
-            sample_critique("ArchitectureAdvisor", true, RiskLevel::Low, "Clean separation of concerns"),
+            sample_critique(
+                "SecurityAdvisor",
+                true,
+                RiskLevel::Low,
+                "No vulnerabilities found",
+            ),
+            sample_critique(
+                "ArchitectureAdvisor",
+                true,
+                RiskLevel::Low,
+                "Clean separation of concerns",
+            ),
         ];
 
         let resolution = engine.resolve(&critiques);
@@ -1251,7 +1349,12 @@ mod tests {
         let critiques_peak = vec![
             sample_critique("ArchitectureAdvisor", true, RiskLevel::Low, "Fine"),
             sample_critique("SecurityAdvisor", true, RiskLevel::Low, "Fine"),
-            sample_critique("CodeReviewAdvisor", false, RiskLevel::Critical, "Deletes production data"),
+            sample_critique(
+                "CodeReviewAdvisor",
+                false,
+                RiskLevel::Critical,
+                "Deletes production data",
+            ),
         ];
         let res_peak = resolve_majority(&critiques_peak);
         assert!((res_peak.aggregate_risk_score - 6.4).abs() < 1e-9);
@@ -1265,7 +1368,12 @@ mod tests {
         let critiques = vec![
             sample_critique("ArchitectureAdvisor", true, RiskLevel::Low, "OK"),
             sample_critique("CodeReviewAdvisor", true, RiskLevel::Low, "OK"),
-            sample_critique("SecurityAdvisor", false, RiskLevel::Critical, "Executes arbitrary shell"),
+            sample_critique(
+                "SecurityAdvisor",
+                false,
+                RiskLevel::Critical,
+                "Executes arbitrary shell",
+            ),
         ];
         let res = resolve_majority(&critiques);
         assert_eq!(res.approved_count, 2);
@@ -1287,7 +1395,10 @@ mod tests {
         let res = resolve_consensus_with_policy(&critiques, &policy);
         assert!(!res.is_approved());
         assert!(res.has_veto());
-        assert!(res.veto_reasons.iter().any(|r| r.contains("High Risk Policy Veto")));
+        assert!(res
+            .veto_reasons
+            .iter()
+            .any(|r| r.contains("High Risk Policy Veto")));
     }
 
     #[test]
@@ -1296,13 +1407,19 @@ mod tests {
             min_quorum: 3,
             ..ConsensusPolicy::majority()
         };
-        let critiques = vec![
-            sample_critique("ArchitectureAdvisor", true, RiskLevel::Low, "OK"),
-        ];
+        let critiques = vec![sample_critique(
+            "ArchitectureAdvisor",
+            true,
+            RiskLevel::Low,
+            "OK",
+        )];
         let res = resolve_consensus_with_policy(&critiques, &policy);
         assert!(!res.is_approved());
         assert!(res.has_veto());
-        assert!(res.veto_reasons.iter().any(|r| r.contains("Quorum not reached")));
+        assert!(res
+            .veto_reasons
+            .iter()
+            .any(|r| r.contains("Quorum not reached")));
     }
 
     #[test]
@@ -1318,7 +1435,10 @@ mod tests {
         let res = resolve_consensus_with_policy(&critiques, &policy);
         assert!(!res.is_approved());
         assert!(res.has_veto());
-        assert!(res.veto_reasons.iter().any(|r| r.contains("fell below required policy threshold")));
+        assert!(res
+            .veto_reasons
+            .iter()
+            .any(|r| r.contains("fell below required policy threshold")));
     }
 
     #[test]
@@ -1343,7 +1463,12 @@ mod tests {
     fn test_security_veto_flags_high_risk_even_when_approved() {
         // An approving security advisor that still assesses High risk vetoes.
         let critiques = vec![
-            sample_critique("SecurityAdvisor", true, RiskLevel::High, "Runs as root: not advised"),
+            sample_critique(
+                "SecurityAdvisor",
+                true,
+                RiskLevel::High,
+                "Runs as root: not advised",
+            ),
             sample_critique("ArchitectureAdvisor", true, RiskLevel::Low, "OK"),
             sample_critique("CodeReviewAdvisor", true, RiskLevel::Low, "OK"),
         ];
@@ -1412,7 +1537,10 @@ mod tests {
             ConsensusStrategy::Supermajority(0.75).to_string(),
             "Supermajority (75.0%)"
         );
-        assert_eq!(ConsensusStrategy::default(), ConsensusStrategy::RiskWeighted);
+        assert_eq!(
+            ConsensusStrategy::default(),
+            ConsensusStrategy::RiskWeighted
+        );
     }
 
     #[test]

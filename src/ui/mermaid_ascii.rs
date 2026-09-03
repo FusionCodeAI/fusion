@@ -46,7 +46,9 @@ struct FlowEdge {
 pub fn clean_label(label: &str) -> String {
     let mut s = label.to_string();
     // Normalize newlines and HTML break tags to " / "
-    for br in &["<br/>", "<br>", "<br />", "<br\\>", "\\n", "\r\n", "\n", "\r"] {
+    for br in &[
+        "<br/>", "<br>", "<br />", "<br\\>", "\\n", "\r\n", "\n", "\r",
+    ] {
         s = s.replace(br, " / ");
     }
     // Replace non-breaking spaces with standard space
@@ -174,7 +176,9 @@ fn render_flowchart_ascii(source: &str) -> Option<String> {
                 }
 
                 if let Some(from_node) = parse_node_spec(left_str) {
-                    nodes.entry(from_node.id.clone()).or_insert(from_node.clone());
+                    nodes
+                        .entry(from_node.id.clone())
+                        .or_insert(from_node.clone());
                     if let Some(to_node) = parse_node_spec(right_str) {
                         nodes.entry(to_node.id.clone()).or_insert(to_node.clone());
                         edges.push(FlowEdge {
@@ -336,11 +340,7 @@ fn render_td_ascii(nodes: &HashMap<String, FlowNode>, edges: &[FlowEdge]) -> Opt
 
             let center_indent = (box_width / 2).saturating_sub(1);
             if let Some(lbl) = edge_label {
-                out.push_str(&format!(
-                    "  {}| ({})\n",
-                    " ".repeat(center_indent),
-                    lbl
-                ));
+                out.push_str(&format!("  {}| ({})\n", " ".repeat(center_indent), lbl));
             } else {
                 out.push_str(&format!("  {}|\n", " ".repeat(center_indent)));
             }
@@ -452,7 +452,10 @@ fn render_sequence_ascii(source: &str) -> Option<String> {
 
     for line in source.lines() {
         let trimmed = line.trim();
-        if trimmed.is_empty() || trimmed.starts_with("%%") || trimmed.eq_ignore_ascii_case("sequencediagram") {
+        if trimmed.is_empty()
+            || trimmed.starts_with("%%")
+            || trimmed.eq_ignore_ascii_case("sequencediagram")
+        {
             continue;
         }
 
@@ -471,12 +474,7 @@ fn render_sequence_ascii(source: &str) -> Option<String> {
         }
 
         // Check arrows: ->>, -->>, ->, -->
-        let arrows = [
-            ("-->>", true),
-            ("->>", false),
-            ("-->", true),
-            ("->", false),
-        ];
+        let arrows = [("-->>", true), ("->>", false), ("-->", true), ("->", false)];
 
         for &(arrow, is_dotted) in &arrows {
             if let Some((left, right)) = trimmed.split_once(arrow) {

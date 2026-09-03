@@ -25,8 +25,7 @@ use similar::{ChangeTag, TextDiff};
 use std::borrow::Cow;
 
 use crate::ui::diff_view::{
-    highlight_tokens_to_spans, tokenize_line, DiffFile, DiffLine, DiffLineType,
-    SyntaxLanguage,
+    highlight_tokens_to_spans, tokenize_line, DiffFile, DiffLine, DiffLineType, SyntaxLanguage,
 };
 use crate::ui::table::{get_terminal_width, visible_width};
 use crate::ui::termux::is_termux;
@@ -181,7 +180,11 @@ impl DiffStats {
             self.additions,
             self.deletions,
             self.hunks_count,
-            if self.hunks_count == 1 { "hunk" } else { "hunks" }
+            if self.hunks_count == 1 {
+                "hunk"
+            } else {
+                "hunks"
+            }
         )
     }
 }
@@ -598,9 +601,8 @@ impl SideBySideDocument {
                                     let del_text = del.value().trim_end_matches(['\r', '\n']);
                                     let ins_text = ins.value().trim_end_matches(['\r', '\n']);
 
-                                    let mut row = SideBySideRow::modified(
-                                        old_no, del_text, new_no, ins_text,
-                                    );
+                                    let mut row =
+                                        SideBySideRow::modified(old_no, del_text, new_no, ins_text);
 
                                     if compute_word_diff {
                                         let (del_ranges, ins_ranges) =
@@ -669,12 +671,8 @@ impl SideBySideDocument {
                         (Some(del), Some(ins)) => {
                             let old_no = del.old_lineno.unwrap_or(0);
                             let new_no = ins.new_lineno.unwrap_or(0);
-                            let mut row = SideBySideRow::modified(
-                                old_no,
-                                &del.content,
-                                new_no,
-                                &ins.content,
-                            );
+                            let mut row =
+                                SideBySideRow::modified(old_no, &del.content, new_no, &ins.content);
                             if compute_word_diff {
                                 let (del_ranges, ins_ranges) =
                                     compute_intra_line_highlights(&del.content, &ins.content);
@@ -1109,10 +1107,7 @@ pub fn render_side_by_side_ansi(
                     ));
                 }
             } else {
-                out.push_str(&format!(
-                    "{}│{}\n",
-                    left_cell_str, right_cell_str
-                ));
+                out.push_str(&format!("{}│{}\n", left_cell_str, right_cell_str));
             }
         }
 
@@ -1294,12 +1289,7 @@ pub fn render_unified_ansi(
                         }
                     } else {
                         if color {
-                            out.push_str(&format!(
-                                "{}- {}{}\n",
-                                ansi::RED,
-                                content,
-                                ansi::RESET
-                            ));
+                            out.push_str(&format!("{}- {}{}\n", ansi::RED, content, ansi::RESET));
                         } else {
                             out.push_str(&format!("- {}\n", content));
                         }
@@ -1335,12 +1325,7 @@ pub fn render_unified_ansi(
                         }
                     } else {
                         if color {
-                            out.push_str(&format!(
-                                "{}+ {}{}\n",
-                                ansi::GREEN,
-                                content,
-                                ansi::RESET
-                            ));
+                            out.push_str(&format!("{}+ {}{}\n", ansi::GREEN, content, ansi::RESET));
                         } else {
                             out.push_str(&format!("+ {}\n", content));
                         }
@@ -1550,7 +1535,12 @@ fn render_side_cell(
             );
             out.push_str(&highlighted);
         } else if !base_color.is_empty() {
-            out.push_str(&format!("{}{}{}", base_color, truncated_content, ansi::RESET));
+            out.push_str(&format!(
+                "{}{}{}",
+                base_color,
+                truncated_content,
+                ansi::RESET
+            ));
         } else {
             out.push_str(&truncated_content);
         }
@@ -1841,12 +1831,7 @@ fn render_hunk_separator(
     }
 }
 
-fn render_mid_separator(
-    left_w: usize,
-    right_w: usize,
-    b: &BorderChars,
-    color: bool,
-) -> String {
+fn render_mid_separator(left_w: usize, right_w: usize, b: &BorderChars, color: bool) -> String {
     let l_line = b.h.repeat(left_w);
     let r_line = b.h.repeat(right_w);
 
@@ -1975,9 +1960,11 @@ impl<'a> Widget for SideBySideWidget<'a> {
         let render_side_by_side = match self.config.mode {
             DiffDisplayMode::SideBySide => true,
             DiffDisplayMode::Unified => false,
-            DiffDisplayMode::Auto => {
-                is_side_by_side_supported(area.width as usize, is_termux_env, self.config.min_side_by_side_width)
-            }
+            DiffDisplayMode::Auto => is_side_by_side_supported(
+                area.width as usize,
+                is_termux_env,
+                self.config.min_side_by_side_width,
+            ),
         };
 
         if render_side_by_side {
@@ -2036,11 +2023,15 @@ impl<'a> SideBySideWidget<'a> {
             // Hunk header row
             left_lines.push(Line::from(vec![Span::styled(
                 format!("@@ -{},{} @@", hunk.old_start, hunk.old_lines),
-                Style::default().fg(theme.accent).add_modifier(Modifier::BOLD),
+                Style::default()
+                    .fg(theme.accent)
+                    .add_modifier(Modifier::BOLD),
             )]));
             right_lines.push(Line::from(vec![Span::styled(
                 format!("@@ +{},{} @@", hunk.new_start, hunk.new_lines),
-                Style::default().fg(theme.accent).add_modifier(Modifier::BOLD),
+                Style::default()
+                    .fg(theme.accent)
+                    .add_modifier(Modifier::BOLD),
             )]));
 
             for row in &hunk.rows {
@@ -2059,13 +2050,15 @@ impl<'a> SideBySideWidget<'a> {
                     DiffChangeKind::Deleted | DiffChangeKind::Modified => {
                         l_spans.push(Span::styled("- ", Style::default().fg(Color::Red)));
                         let tokens = tokenize_line(&row.left.content, lang);
-                        let spans = highlight_tokens_to_spans(&tokens, DiffLineType::Deletion, theme);
+                        let spans =
+                            highlight_tokens_to_spans(&tokens, DiffLineType::Deletion, theme);
                         l_spans.extend(spans);
                     }
                     DiffChangeKind::Unchanged => {
                         l_spans.push(Span::styled("  ", Style::default().fg(theme.muted)));
                         let tokens = tokenize_line(&row.left.content, lang);
-                        let spans = highlight_tokens_to_spans(&tokens, DiffLineType::Context, theme);
+                        let spans =
+                            highlight_tokens_to_spans(&tokens, DiffLineType::Context, theme);
                         l_spans.extend(spans);
                     }
                     DiffChangeKind::Empty | DiffChangeKind::Added => {
@@ -2089,13 +2082,15 @@ impl<'a> SideBySideWidget<'a> {
                     DiffChangeKind::Added | DiffChangeKind::Modified => {
                         r_spans.push(Span::styled("+ ", Style::default().fg(Color::Green)));
                         let tokens = tokenize_line(&row.right.content, lang);
-                        let spans = highlight_tokens_to_spans(&tokens, DiffLineType::Addition, theme);
+                        let spans =
+                            highlight_tokens_to_spans(&tokens, DiffLineType::Addition, theme);
                         r_spans.extend(spans);
                     }
                     DiffChangeKind::Unchanged => {
                         r_spans.push(Span::styled("  ", Style::default().fg(theme.muted)));
                         let tokens = tokenize_line(&row.right.content, lang);
-                        let spans = highlight_tokens_to_spans(&tokens, DiffLineType::Context, theme);
+                        let spans =
+                            highlight_tokens_to_spans(&tokens, DiffLineType::Context, theme);
                         r_spans.extend(spans);
                     }
                     DiffChangeKind::Empty | DiffChangeKind::Deleted => {
@@ -2160,19 +2155,33 @@ impl<'a> SideBySideWidget<'a> {
 
         for hunk in &self.doc.hunks {
             lines.push(Line::from(vec![
-                Span::styled("@@ ", Style::default().fg(theme.accent).add_modifier(Modifier::BOLD)),
                 Span::styled(
-                    format!("-{},{} +{},{}", hunk.old_start, hunk.old_lines, hunk.new_start, hunk.new_lines),
+                    "@@ ",
+                    Style::default()
+                        .fg(theme.accent)
+                        .add_modifier(Modifier::BOLD),
+                ),
+                Span::styled(
+                    format!(
+                        "-{},{} +{},{}",
+                        hunk.old_start, hunk.old_lines, hunk.new_start, hunk.new_lines
+                    ),
                     Style::default().fg(theme.accent),
                 ),
-                Span::styled(" @@", Style::default().fg(theme.accent).add_modifier(Modifier::BOLD)),
+                Span::styled(
+                    " @@",
+                    Style::default()
+                        .fg(theme.accent)
+                        .add_modifier(Modifier::BOLD),
+                ),
             ]));
 
             for row in &hunk.rows {
                 match row.kind {
                     DiffChangeKind::Unchanged => {
                         let tokens = tokenize_line(&row.left.content, lang);
-                        let spans = highlight_tokens_to_spans(&tokens, DiffLineType::Context, theme);
+                        let spans =
+                            highlight_tokens_to_spans(&tokens, DiffLineType::Context, theme);
                         let mut r = vec![
                             Span::styled(
                                 format!("{:4} │ ", row.left.line_number.unwrap_or(0)),
@@ -2185,7 +2194,8 @@ impl<'a> SideBySideWidget<'a> {
                     }
                     DiffChangeKind::Deleted => {
                         let tokens = tokenize_line(&row.left.content, lang);
-                        let spans = highlight_tokens_to_spans(&tokens, DiffLineType::Deletion, theme);
+                        let spans =
+                            highlight_tokens_to_spans(&tokens, DiffLineType::Deletion, theme);
                         let mut r = vec![
                             Span::styled(
                                 format!("{:4} │ ", row.left.line_number.unwrap_or(0)),
@@ -2198,7 +2208,8 @@ impl<'a> SideBySideWidget<'a> {
                     }
                     DiffChangeKind::Added => {
                         let tokens = tokenize_line(&row.right.content, lang);
-                        let spans = highlight_tokens_to_spans(&tokens, DiffLineType::Addition, theme);
+                        let spans =
+                            highlight_tokens_to_spans(&tokens, DiffLineType::Addition, theme);
                         let mut r = vec![
                             Span::styled(
                                 format!("{:4} │ ", row.right.line_number.unwrap_or(0)),
@@ -2212,7 +2223,8 @@ impl<'a> SideBySideWidget<'a> {
                     DiffChangeKind::Modified => {
                         // Deletion line
                         let del_tokens = tokenize_line(&row.left.content, lang);
-                        let del_spans = highlight_tokens_to_spans(&del_tokens, DiffLineType::Deletion, theme);
+                        let del_spans =
+                            highlight_tokens_to_spans(&del_tokens, DiffLineType::Deletion, theme);
                         let mut del_r = vec![
                             Span::styled(
                                 format!("{:4} │ ", row.left.line_number.unwrap_or(0)),
@@ -2225,7 +2237,8 @@ impl<'a> SideBySideWidget<'a> {
 
                         // Addition line
                         let ins_tokens = tokenize_line(&row.right.content, lang);
-                        let ins_spans = highlight_tokens_to_spans(&ins_tokens, DiffLineType::Addition, theme);
+                        let ins_spans =
+                            highlight_tokens_to_spans(&ins_tokens, DiffLineType::Addition, theme);
                         let mut ins_r = vec![
                             Span::styled(
                                 format!("{:4} │ ", row.right.line_number.unwrap_or(0)),
@@ -2597,8 +2610,14 @@ mod tests {
 
     #[test]
     fn test_ratatui_widget_scrolling() {
-        let old = (1..=50).map(|i| format!("old line {}", i)).collect::<Vec<_>>().join("\n");
-        let new = (1..=50).map(|i| format!("new line {}", i)).collect::<Vec<_>>().join("\n");
+        let old = (1..=50)
+            .map(|i| format!("old line {}", i))
+            .collect::<Vec<_>>()
+            .join("\n");
+        let new = (1..=50)
+            .map(|i| format!("new line {}", i))
+            .collect::<Vec<_>>()
+            .join("\n");
 
         let doc = SideBySideDocument::from_texts(&old, &new, Some("scroll.txt"), 1, true);
 
@@ -2637,8 +2656,8 @@ mod tests {
 
     #[test]
     fn test_side_by_side_cell_and_row_constructors() {
-        let cell = SideBySideCell::new(Some(42), "content", DiffChangeKind::Added)
-            .with_highlight(0, 4);
+        let cell =
+            SideBySideCell::new(Some(42), "content", DiffChangeKind::Added).with_highlight(0, 4);
         assert_eq!(cell.line_number, Some(42));
         assert_eq!(cell.content, "content");
         assert_eq!(cell.kind, DiffChangeKind::Added);

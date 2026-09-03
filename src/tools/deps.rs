@@ -83,9 +83,8 @@ impl Ecosystem {
             "npm" | "node" | "javascript" | "typescript" | "js" | "ts" | "package.json" => {
                 Some(Ecosystem::Npm)
             }
-            "pypi" | "python" | "pip" | "pipfile" | "poetry" | "requirements.txt" | "pyproject.toml" => {
-                Some(Ecosystem::PyPI)
-            }
+            "pypi" | "python" | "pip" | "pipfile" | "poetry" | "requirements.txt"
+            | "pyproject.toml" => Some(Ecosystem::PyPI),
             "go" | "golang" | "go.mod" => Some(Ecosystem::Go),
             "gem" | "ruby" | "rubygems" | "gemfile" => Some(Ecosystem::Gem),
             "all" | "*" | "" => None,
@@ -308,7 +307,16 @@ impl SemVer {
 
         // Strip leading constraint / syntax characters
         let s = clean
-            .trim_start_matches(|c: char| c == 'v' || c == '=' || c == '^' || c == '~' || c == '>' || c == '<' || c == '@' || c == ' ')
+            .trim_start_matches(|c: char| {
+                c == 'v'
+                    || c == '='
+                    || c == '^'
+                    || c == '~'
+                    || c == '>'
+                    || c == '<'
+                    || c == '@'
+                    || c == ' '
+            })
             .trim();
 
         if s.is_empty() {
@@ -324,7 +332,10 @@ impl SemVer {
 
         // Split prerelease (-...)
         let (core, pre) = if let Some(idx) = without_build.find('-') {
-            (&without_build[..idx], Some(without_build[idx + 1..].to_string()))
+            (
+                &without_build[..idx],
+                Some(without_build[idx + 1..].to_string()),
+            )
         } else {
             (without_build, None)
         };
@@ -459,7 +470,11 @@ pub fn parse_cargo_toml(content: &str, path: &str) -> Vec<Dependency> {
         if trimmed.starts_with('[') && trimmed.ends_with(']') {
             let section = trimmed.trim_start_matches('[').trim_end_matches(']').trim();
 
-            if section == "dependencies" || section.ends_with(".dependencies") && !section.contains("dev-dependencies") && !section.contains("build-dependencies") {
+            if section == "dependencies"
+                || section.ends_with(".dependencies")
+                    && !section.contains("dev-dependencies")
+                    && !section.contains("build-dependencies")
+            {
                 current_section = Some((section, DependencyType::Normal));
             } else if section == "dev-dependencies" || section.ends_with(".dev-dependencies") {
                 current_section = Some((section, DependencyType::Dev));
@@ -479,7 +494,11 @@ pub fn parse_cargo_toml(content: &str, path: &str) -> Vec<Dependency> {
 
         // Parse key = value line
         if let Some((key_part, val_part)) = trimmed.split_once('=') {
-            let name = key_part.trim().trim_matches('"').trim_matches('\'').to_string();
+            let name = key_part
+                .trim()
+                .trim_matches('"')
+                .trim_matches('\'')
+                .to_string();
             if name.is_empty() {
                 continue;
             }
@@ -487,7 +506,9 @@ pub fn parse_cargo_toml(content: &str, path: &str) -> Vec<Dependency> {
             let val = val_part.split('#').next().unwrap_or(val_part).trim();
 
             // Case 1: Simple string `serde = "1.0.100"`
-            if val.starts_with('"') && val.ends_with('"') || (val.starts_with('\'') && val.ends_with('\'')) {
+            if val.starts_with('"') && val.ends_with('"')
+                || (val.starts_with('\'') && val.ends_with('\''))
+            {
                 let req = val.trim_matches('"').trim_matches('\'').to_string();
                 let mut dep = Dependency::new(name, req.clone(), dep_type, Ecosystem::Cargo, path);
                 if let Some(base) = extract_base_version(&req) {
@@ -533,7 +554,8 @@ pub fn parse_cargo_toml(content: &str, path: &str) -> Vec<Dependency> {
                     "*".to_string()
                 };
 
-                let mut dep = Dependency::new(name, final_req.clone(), dep_type, Ecosystem::Cargo, path);
+                let mut dep =
+                    Dependency::new(name, final_req.clone(), dep_type, Ecosystem::Cargo, path);
                 if let Some(base) = extract_base_version(&final_req) {
                     dep.resolved_version = Some(base);
                 }
@@ -630,7 +652,9 @@ pub fn parse_package_lock_json(content: &str) -> HashMap<String, String> {
     if let Some(dependencies) = val.get("dependencies").and_then(|d| d.as_object()) {
         for (name, dep_info) in dependencies {
             if let Some(ver) = dep_info.get("version").and_then(|v| v.as_str()) {
-                resolved.entry(name.clone()).or_insert_with(|| ver.to_string());
+                resolved
+                    .entry(name.clone())
+                    .or_insert_with(|| ver.to_string());
             }
         }
     }
@@ -659,9 +683,9 @@ pub fn parse_requirements_txt(content: &str, path: &str) -> Vec<Dependency> {
         let pkg_part = line.split(';').next().unwrap_or(line).trim();
 
         // Split extras (e.g. `requests[security]>=2.20.0`)
-        let (name_part, spec_part) = if let Some(op_idx) = pkg_part.find(|c: char| {
-            c == '=' || c == '>' || c == '<' || c == '~' || c == '!' || c == '@'
-        }) {
+        let (name_part, spec_part) = if let Some(op_idx) = pkg_part
+            .find(|c: char| c == '=' || c == '>' || c == '<' || c == '~' || c == '!' || c == '@')
+        {
             (&pkg_part[..op_idx], &pkg_part[op_idx..])
         } else {
             (pkg_part, "*")
@@ -677,7 +701,13 @@ pub fn parse_requirements_txt(content: &str, path: &str) -> Vec<Dependency> {
         }
 
         let requirement = spec_part.trim().to_string();
-        let mut dep = Dependency::new(name, requirement.clone(), DependencyType::Normal, Ecosystem::PyPI, path);
+        let mut dep = Dependency::new(
+            name,
+            requirement.clone(),
+            DependencyType::Normal,
+            Ecosystem::PyPI,
+            path,
+        );
         if let Some(base) = extract_base_version(&requirement) {
             dep.resolved_version = Some(base);
         }
@@ -704,14 +734,19 @@ pub fn parse_pyproject_toml(content: &str, path: &str) -> Vec<Dependency> {
             let section = trimmed.trim_matches(|c| c == '[' || c == ']').trim();
             in_project_deps = section == "project.dependencies" || section == "project";
             in_poetry_deps = section == "tool.poetry.dependencies";
-            in_poetry_dev_deps = section == "tool.poetry.dev-dependencies" || section == "tool.poetry.group.dev.dependencies";
+            in_poetry_dev_deps = section == "tool.poetry.dev-dependencies"
+                || section == "tool.poetry.group.dev.dependencies";
             continue;
         }
 
         if in_project_deps {
             // Check for list element `"requests>=2.28.0",`
             if trimmed.starts_with('"') || trimmed.starts_with('\'') {
-                let clean_item = trimmed.trim_matches(',').trim_matches('"').trim_matches('\'').trim();
+                let clean_item = trimmed
+                    .trim_matches(',')
+                    .trim_matches('"')
+                    .trim_matches('\'')
+                    .trim();
                 let parsed = parse_requirements_txt(clean_item, path);
                 for d in parsed {
                     deps.push(d);
@@ -730,7 +765,14 @@ pub fn parse_pyproject_toml(content: &str, path: &str) -> Vec<Dependency> {
                     continue;
                 }
 
-                let val = v.split('#').next().unwrap_or(v).trim().trim_matches('"').trim_matches('\'').to_string();
+                let val = v
+                    .split('#')
+                    .next()
+                    .unwrap_or(v)
+                    .trim()
+                    .trim_matches('"')
+                    .trim_matches('\'')
+                    .to_string();
                 let mut dep = Dependency::new(name, val.clone(), dep_type, Ecosystem::PyPI, path);
                 if let Some(base) = extract_base_version(&val) {
                     dep.resolved_version = Some(base);
@@ -772,8 +814,16 @@ pub fn parse_pipfile(content: &str, path: &str) -> Vec<Dependency> {
         if in_packages {
             if let Some((k, v)) = trimmed.split_once('=') {
                 let name = k.trim().trim_matches('"').trim_matches('\'').to_string();
-                let val = v.split('#').next().unwrap_or(v).trim().trim_matches('"').trim_matches('\'').to_string();
-                let mut dep = Dependency::new(name, val.clone(), current_type, Ecosystem::PyPI, path);
+                let val = v
+                    .split('#')
+                    .next()
+                    .unwrap_or(v)
+                    .trim()
+                    .trim_matches('"')
+                    .trim_matches('\'')
+                    .to_string();
+                let mut dep =
+                    Dependency::new(name, val.clone(), current_type, Ecosystem::PyPI, path);
                 if let Some(base) = extract_base_version(&val) {
                     dep.resolved_version = Some(base);
                 }
@@ -828,7 +878,13 @@ pub fn parse_go_mod(content: &str, path: &str) -> Vec<Dependency> {
             if parts.len() >= 2 {
                 let name = parts[0].to_string();
                 let ver = parts[1].to_string();
-                let mut dep = Dependency::new(name, ver.clone(), DependencyType::Normal, Ecosystem::Go, path);
+                let mut dep = Dependency::new(
+                    name,
+                    ver.clone(),
+                    DependencyType::Normal,
+                    Ecosystem::Go,
+                    path,
+                );
                 if let Some(base) = extract_base_version(&ver) {
                     dep.resolved_version = Some(base);
                 }
@@ -854,14 +910,28 @@ pub fn parse_gemfile(content: &str, path: &str) -> Vec<Dependency> {
             let rest = trimmed.strip_prefix("gem ").unwrap_or("").trim();
             let parts: Vec<&str> = rest.split(',').collect();
             if !parts.is_empty() {
-                let name = parts[0].trim().trim_matches('"').trim_matches('\'').to_string();
+                let name = parts[0]
+                    .trim()
+                    .trim_matches('"')
+                    .trim_matches('\'')
+                    .to_string();
                 let req = if parts.len() > 1 {
-                    parts[1].trim().trim_matches('"').trim_matches('\'').to_string()
+                    parts[1]
+                        .trim()
+                        .trim_matches('"')
+                        .trim_matches('\'')
+                        .to_string()
                 } else {
                     "*".to_string()
                 };
 
-                let mut dep = Dependency::new(name, req.clone(), DependencyType::Normal, Ecosystem::Gem, path);
+                let mut dep = Dependency::new(
+                    name,
+                    req.clone(),
+                    DependencyType::Normal,
+                    Ecosystem::Gem,
+                    path,
+                );
                 if let Some(base) = extract_base_version(&req) {
                     dep.resolved_version = Some(base);
                 }
@@ -878,11 +948,20 @@ pub fn parse_gemfile(content: &str, path: &str) -> Vec<Dependency> {
 // ===========================================================================
 
 /// Lookup known security vulnerabilities for a package.
-pub fn check_security_advisories(ecosystem: Ecosystem, name: &str, version_str: &str) -> Vec<SecurityAdvisory> {
+pub fn check_security_advisories(
+    ecosystem: Ecosystem,
+    name: &str,
+    version_str: &str,
+) -> Vec<SecurityAdvisory> {
     let mut advisories = Vec::new();
     let current_ver = SemVer::parse(version_str);
 
-    let check_vuln = |id: &str, title: &str, sev: &str, affected_below: &str, patched: &str| -> Option<SecurityAdvisory> {
+    let check_vuln = |id: &str,
+                      title: &str,
+                      sev: &str,
+                      affected_below: &str,
+                      patched: &str|
+     -> Option<SecurityAdvisory> {
         let max_affected = SemVer::parse(affected_below)?;
         if let Some(ver) = &current_ver {
             if ver.cmp_version(&max_affected) == std::cmp::Ordering::Less {
@@ -899,133 +978,265 @@ pub fn check_security_advisories(ecosystem: Ecosystem, name: &str, version_str: 
     };
 
     match ecosystem {
-        Ecosystem::Cargo => {
-            match name {
-                "crossbeam-channel" => {
-                    if let Some(a) = check_vuln("RUSTSEC-2020-0052", "Memory corruption in crossbeam-channel", "high", "0.5.2", "0.5.2") {
-                        advisories.push(a);
-                    }
+        Ecosystem::Cargo => match name {
+            "crossbeam-channel" => {
+                if let Some(a) = check_vuln(
+                    "RUSTSEC-2020-0052",
+                    "Memory corruption in crossbeam-channel",
+                    "high",
+                    "0.5.2",
+                    "0.5.2",
+                ) {
+                    advisories.push(a);
                 }
-                "smallvec" => {
-                    if let Some(a) = check_vuln("RUSTSEC-2021-0003", "Use-after-free in SmallVec::into_inner", "critical", "1.6.1", "1.6.1") {
-                        advisories.push(a);
-                    }
-                }
-                "tokio" => {
-                    if let Some(a) = check_vuln("RUSTSEC-2021-0124", "Data race in tokio join/select handles", "medium", "0.2.22", "0.2.22") {
-                        advisories.push(a);
-                    }
-                }
-                "time" => {
-                    if let Some(a) = check_vuln("RUSTSEC-2020-0071", "Potential segfault in time formatting", "medium", "0.2.23", "0.2.23") {
-                        advisories.push(a);
-                    }
-                }
-                "openssl" => {
-                    if let Some(a) = check_vuln("RUSTSEC-2023-0022", "OpenSSL certificate validation bypass", "critical", "0.10.48", "0.10.48") {
-                        advisories.push(a);
-                    }
-                }
-                "hyper" => {
-                    if let Some(a) = check_vuln("RUSTSEC-2023-0034", "HTTP/2 Rapid Reset attack vulnerability", "high", "0.14.27", "0.14.27") {
-                        advisories.push(a);
-                    }
-                }
-                "idna" => {
-                    if let Some(a) = check_vuln("RUSTSEC-2024-0336", "Punycode domain spoofing vulnerability", "medium", "0.4.0", "0.4.0") {
-                        advisories.push(a);
-                    }
-                }
-                _ => {}
             }
-        }
-        Ecosystem::Npm => {
-            match name {
-                "lodash" => {
-                    if let Some(a) = check_vuln("GHSA-p6mc-m468-83gw", "Prototype Pollution in lodash", "high", "4.17.21", "4.17.21") {
-                        advisories.push(a);
-                    }
+            "smallvec" => {
+                if let Some(a) = check_vuln(
+                    "RUSTSEC-2021-0003",
+                    "Use-after-free in SmallVec::into_inner",
+                    "critical",
+                    "1.6.1",
+                    "1.6.1",
+                ) {
+                    advisories.push(a);
                 }
-                "axios" => {
-                    if let Some(a) = check_vuln("GHSA-wf5p-g6vw-rhxx", "Server-Side Request Forgery in axios", "high", "1.6.0", "1.6.0") {
-                        advisories.push(a);
-                    }
-                }
-                "minimist" => {
-                    if let Some(a) = check_vuln("GHSA-xvch-5gv4-984h", "Prototype Pollution in minimist", "critical", "1.2.6", "1.2.6") {
-                        advisories.push(a);
-                    }
-                }
-                "semver" => {
-                    if let Some(a) = check_vuln("GHSA-c2qf-rxjj-qqgw", "Regular Expression Denial of Service in semver", "medium", "7.5.2", "7.5.2") {
-                        advisories.push(a);
-                    }
-                }
-                "express" => {
-                    if let Some(a) = check_vuln("GHSA-qw6h-v8gh-w3fs", "Express open redirect vulnerability", "medium", "4.19.2", "4.19.2") {
-                        advisories.push(a);
-                    }
-                }
-                "ws" => {
-                    if let Some(a) = check_vuln("GHSA-3h5v-q93c-6h6q", "Denial of Service in ws server", "high", "8.17.1", "8.17.1") {
-                        advisories.push(a);
-                    }
-                }
-                "tar" => {
-                    if let Some(a) = check_vuln("GHSA-9r2w-394v-53qc", "Arbitrary File Creation/Overwrite in node-tar", "high", "6.2.1", "6.2.1") {
-                        advisories.push(a);
-                    }
-                }
-                _ => {}
             }
-        }
-        Ecosystem::PyPI => {
-            match name {
-                "requests" => {
-                    if let Some(a) = check_vuln("CVE-2023-32681", "Unintended leak of Proxy-Authorization header in requests", "medium", "2.31.0", "2.31.0") {
-                        advisories.push(a);
-                    }
+            "tokio" => {
+                if let Some(a) = check_vuln(
+                    "RUSTSEC-2021-0124",
+                    "Data race in tokio join/select handles",
+                    "medium",
+                    "0.2.22",
+                    "0.2.22",
+                ) {
+                    advisories.push(a);
                 }
-                "urllib3" => {
-                    if let Some(a) = check_vuln("CVE-2023-45803", "Cookie leak in urllib3 redirect handling", "high", "2.0.7", "2.0.7") {
-                        advisories.push(a);
-                    }
-                }
-                "flask" => {
-                    if let Some(a) = check_vuln("CVE-2023-30861", "High risk session cookie disclosure in Flask", "high", "2.2.5", "2.2.5") {
-                        advisories.push(a);
-                    }
-                }
-                "django" => {
-                    if let Some(a) = check_vuln("CVE-2024-45230", "Denial of Service in django.utils.html.urlize", "high", "4.2.16", "4.2.16") {
-                        advisories.push(a);
-                    }
-                }
-                "cryptography" => {
-                    if let Some(a) = check_vuln("CVE-2023-49083", "NULL pointer dereference in PKCS7 parsing", "medium", "42.0.4", "42.0.4") {
-                        advisories.push(a);
-                    }
-                }
-                "aiohttp" => {
-                    if let Some(a) = check_vuln("CVE-2024-27306", "HTTP request smuggling in aiohttp", "high", "3.9.4", "3.9.4") {
-                        advisories.push(a);
-                    }
-                }
-                "jinja2" => {
-                    if let Some(a) = check_vuln("CVE-2024-34064", "HTML attribute injection in Jinja2", "medium", "3.1.4", "3.1.4") {
-                        advisories.push(a);
-                    }
-                }
-                _ => {}
             }
-        }
+            "time" => {
+                if let Some(a) = check_vuln(
+                    "RUSTSEC-2020-0071",
+                    "Potential segfault in time formatting",
+                    "medium",
+                    "0.2.23",
+                    "0.2.23",
+                ) {
+                    advisories.push(a);
+                }
+            }
+            "openssl" => {
+                if let Some(a) = check_vuln(
+                    "RUSTSEC-2023-0022",
+                    "OpenSSL certificate validation bypass",
+                    "critical",
+                    "0.10.48",
+                    "0.10.48",
+                ) {
+                    advisories.push(a);
+                }
+            }
+            "hyper" => {
+                if let Some(a) = check_vuln(
+                    "RUSTSEC-2023-0034",
+                    "HTTP/2 Rapid Reset attack vulnerability",
+                    "high",
+                    "0.14.27",
+                    "0.14.27",
+                ) {
+                    advisories.push(a);
+                }
+            }
+            "idna" => {
+                if let Some(a) = check_vuln(
+                    "RUSTSEC-2024-0336",
+                    "Punycode domain spoofing vulnerability",
+                    "medium",
+                    "0.4.0",
+                    "0.4.0",
+                ) {
+                    advisories.push(a);
+                }
+            }
+            _ => {}
+        },
+        Ecosystem::Npm => match name {
+            "lodash" => {
+                if let Some(a) = check_vuln(
+                    "GHSA-p6mc-m468-83gw",
+                    "Prototype Pollution in lodash",
+                    "high",
+                    "4.17.21",
+                    "4.17.21",
+                ) {
+                    advisories.push(a);
+                }
+            }
+            "axios" => {
+                if let Some(a) = check_vuln(
+                    "GHSA-wf5p-g6vw-rhxx",
+                    "Server-Side Request Forgery in axios",
+                    "high",
+                    "1.6.0",
+                    "1.6.0",
+                ) {
+                    advisories.push(a);
+                }
+            }
+            "minimist" => {
+                if let Some(a) = check_vuln(
+                    "GHSA-xvch-5gv4-984h",
+                    "Prototype Pollution in minimist",
+                    "critical",
+                    "1.2.6",
+                    "1.2.6",
+                ) {
+                    advisories.push(a);
+                }
+            }
+            "semver" => {
+                if let Some(a) = check_vuln(
+                    "GHSA-c2qf-rxjj-qqgw",
+                    "Regular Expression Denial of Service in semver",
+                    "medium",
+                    "7.5.2",
+                    "7.5.2",
+                ) {
+                    advisories.push(a);
+                }
+            }
+            "express" => {
+                if let Some(a) = check_vuln(
+                    "GHSA-qw6h-v8gh-w3fs",
+                    "Express open redirect vulnerability",
+                    "medium",
+                    "4.19.2",
+                    "4.19.2",
+                ) {
+                    advisories.push(a);
+                }
+            }
+            "ws" => {
+                if let Some(a) = check_vuln(
+                    "GHSA-3h5v-q93c-6h6q",
+                    "Denial of Service in ws server",
+                    "high",
+                    "8.17.1",
+                    "8.17.1",
+                ) {
+                    advisories.push(a);
+                }
+            }
+            "tar" => {
+                if let Some(a) = check_vuln(
+                    "GHSA-9r2w-394v-53qc",
+                    "Arbitrary File Creation/Overwrite in node-tar",
+                    "high",
+                    "6.2.1",
+                    "6.2.1",
+                ) {
+                    advisories.push(a);
+                }
+            }
+            _ => {}
+        },
+        Ecosystem::PyPI => match name {
+            "requests" => {
+                if let Some(a) = check_vuln(
+                    "CVE-2023-32681",
+                    "Unintended leak of Proxy-Authorization header in requests",
+                    "medium",
+                    "2.31.0",
+                    "2.31.0",
+                ) {
+                    advisories.push(a);
+                }
+            }
+            "urllib3" => {
+                if let Some(a) = check_vuln(
+                    "CVE-2023-45803",
+                    "Cookie leak in urllib3 redirect handling",
+                    "high",
+                    "2.0.7",
+                    "2.0.7",
+                ) {
+                    advisories.push(a);
+                }
+            }
+            "flask" => {
+                if let Some(a) = check_vuln(
+                    "CVE-2023-30861",
+                    "High risk session cookie disclosure in Flask",
+                    "high",
+                    "2.2.5",
+                    "2.2.5",
+                ) {
+                    advisories.push(a);
+                }
+            }
+            "django" => {
+                if let Some(a) = check_vuln(
+                    "CVE-2024-45230",
+                    "Denial of Service in django.utils.html.urlize",
+                    "high",
+                    "4.2.16",
+                    "4.2.16",
+                ) {
+                    advisories.push(a);
+                }
+            }
+            "cryptography" => {
+                if let Some(a) = check_vuln(
+                    "CVE-2023-49083",
+                    "NULL pointer dereference in PKCS7 parsing",
+                    "medium",
+                    "42.0.4",
+                    "42.0.4",
+                ) {
+                    advisories.push(a);
+                }
+            }
+            "aiohttp" => {
+                if let Some(a) = check_vuln(
+                    "CVE-2024-27306",
+                    "HTTP request smuggling in aiohttp",
+                    "high",
+                    "3.9.4",
+                    "3.9.4",
+                ) {
+                    advisories.push(a);
+                }
+            }
+            "jinja2" => {
+                if let Some(a) = check_vuln(
+                    "CVE-2024-34064",
+                    "HTML attribute injection in Jinja2",
+                    "medium",
+                    "3.1.4",
+                    "3.1.4",
+                ) {
+                    advisories.push(a);
+                }
+            }
+            _ => {}
+        },
         Ecosystem::Go => {
             if name.contains("golang.org/x/net") {
-                if let Some(a) = check_vuln("GO-2023-2102", "HTTP/2 Rapid Reset in x/net", "high", "0.17.0", "v0.17.0") {
+                if let Some(a) = check_vuln(
+                    "GO-2023-2102",
+                    "HTTP/2 Rapid Reset in x/net",
+                    "high",
+                    "0.17.0",
+                    "v0.17.0",
+                ) {
                     advisories.push(a);
                 }
             } else if name.contains("gin-gonic/gin") {
-                if let Some(a) = check_vuln("GO-2023-1737", "Context bypass in gin-gonic/gin", "medium", "1.9.1", "v1.9.1") {
+                if let Some(a) = check_vuln(
+                    "GO-2023-1737",
+                    "Context bypass in gin-gonic/gin",
+                    "medium",
+                    "1.9.1",
+                    "v1.9.1",
+                ) {
                     advisories.push(a);
                 }
             }
@@ -1110,8 +1321,14 @@ pub async fn fetch_latest_version(
                 .or_else(|| crate_obj.get("max_version").and_then(|v| v.as_str()))?
                 .to_string();
 
-            let description = crate_obj.get("description").and_then(|v| v.as_str()).map(|s| s.to_string());
-            let homepage = crate_obj.get("homepage").and_then(|v| v.as_str()).map(|s| s.to_string());
+            let description = crate_obj
+                .get("description")
+                .and_then(|v| v.as_str())
+                .map(|s| s.to_string());
+            let homepage = crate_obj
+                .get("homepage")
+                .and_then(|v| v.as_str())
+                .map(|s| s.to_string());
 
             Some(RegistryMetadata {
                 latest_version,
@@ -1141,8 +1358,14 @@ pub async fn fetch_latest_version(
                 .and_then(|v| v.as_str())?
                 .to_string();
 
-            let description = val.get("description").and_then(|v| v.as_str()).map(|s| s.to_string());
-            let homepage = val.get("homepage").and_then(|v| v.as_str()).map(|s| s.to_string());
+            let description = val
+                .get("description")
+                .and_then(|v| v.as_str())
+                .map(|s| s.to_string());
+            let homepage = val
+                .get("homepage")
+                .and_then(|v| v.as_str())
+                .map(|s| s.to_string());
 
             Some(RegistryMetadata {
                 latest_version,
@@ -1168,8 +1391,14 @@ pub async fn fetch_latest_version(
             let val: Value = resp.json().await.ok()?;
             let info = val.get("info")?;
             let latest_version = info.get("version").and_then(|v| v.as_str())?.to_string();
-            let description = info.get("summary").and_then(|v| v.as_str()).map(|s| s.to_string());
-            let homepage = info.get("home_page").and_then(|v| v.as_str()).map(|s| s.to_string());
+            let description = info
+                .get("summary")
+                .and_then(|v| v.as_str())
+                .map(|s| s.to_string());
+            let homepage = info
+                .get("home_page")
+                .and_then(|v| v.as_str())
+                .map(|s| s.to_string());
 
             Some(RegistryMetadata {
                 latest_version,
@@ -1218,8 +1447,14 @@ pub async fn fetch_latest_version(
 
             let val: Value = resp.json().await.ok()?;
             let latest_version = val.get("version").and_then(|v| v.as_str())?.to_string();
-            let description = val.get("info").and_then(|v| v.as_str()).map(|s| s.to_string());
-            let homepage = val.get("homepage_uri").and_then(|v| v.as_str()).map(|s| s.to_string());
+            let description = val
+                .get("info")
+                .and_then(|v| v.as_str())
+                .map(|s| s.to_string());
+            let homepage = val
+                .get("homepage_uri")
+                .and_then(|v| v.as_str())
+                .map(|s| s.to_string());
 
             Some(RegistryMetadata {
                 latest_version,
@@ -1239,7 +1474,11 @@ pub async fn fetch_latest_version(
 // ===========================================================================
 
 /// Find all supported dependency manifests in a directory tree.
-pub fn find_manifests(root: &Path, max_depth: usize, filter_eco: Option<Ecosystem>) -> Vec<(PathBuf, Ecosystem)> {
+pub fn find_manifests(
+    root: &Path,
+    max_depth: usize,
+    filter_eco: Option<Ecosystem>,
+) -> Vec<(PathBuf, Ecosystem)> {
     let mut found = Vec::new();
     find_manifests_recursive(root, 0, max_depth, filter_eco, &mut found);
     found
@@ -1386,9 +1625,9 @@ pub async fn audit_manifest(
             let eco = d.ecosystem;
             let cache_ref = cache.clone();
             let client_ref = http_client.clone();
-            futures.push(async move {
-                fetch_latest_version(&client_ref, &cache_ref, eco, &name).await
-            });
+            futures.push(
+                async move { fetch_latest_version(&client_ref, &cache_ref, eco, &name).await },
+            );
         }
 
         let results = futures::future::join_all(futures).await;
@@ -1412,7 +1651,9 @@ pub async fn audit_manifest(
 
         if let Some(latest_str) = &d.latest_version {
             let current_str = d.resolved_version.as_deref().unwrap_or(&d.requirement);
-            if let (Some(cur_sem), Some(lat_sem)) = (SemVer::parse(current_str), SemVer::parse(latest_str)) {
+            if let (Some(cur_sem), Some(lat_sem)) =
+                (SemVer::parse(current_str), SemVer::parse(latest_str))
+            {
                 if let Some(bump) = cur_sem.bump_to(&lat_sem, is_cargo) {
                     d.status = OutdatedStatus::Outdated(bump);
                 } else {
@@ -1423,7 +1664,9 @@ pub async fn audit_manifest(
             } else {
                 d.status = OutdatedStatus::Unknown;
             }
-        } else if d.resolved_version.is_none() && (d.requirement == "*" || d.requirement == "workspace") {
+        } else if d.resolved_version.is_none()
+            && (d.requirement == "*" || d.requirement == "workspace")
+        {
             d.status = OutdatedStatus::ConstraintOnly;
         } else {
             d.status = OutdatedStatus::Unknown;
@@ -1523,10 +1766,20 @@ pub async fn audit_workspace(
     let mut scanned_manifests = Vec::new();
 
     for (path, eco) in manifests_to_audit {
-        match audit_manifest(&path, eco, client.as_ref(), &cache, check_online, dep_filter).await {
+        match audit_manifest(
+            &path,
+            eco,
+            client.as_ref(),
+            &cache,
+            check_online,
+            dep_filter,
+        )
+        .await
+        {
             Ok(mut res) => {
                 if outdated_only {
-                    res.dependencies.retain(|d| d.is_outdated() || d.is_vulnerable());
+                    res.dependencies
+                        .retain(|d| d.is_outdated() || d.is_vulnerable());
                 }
                 scanned_manifests.push(res);
             }
@@ -1588,7 +1841,8 @@ pub async fn audit_workspace(
         ));
     }
     if total_outdated == 0 && total_vulnerable == 0 && total_dependencies > 0 {
-        recommendations.push("All dependencies are up to date! Great job maintaining freshness.".to_string());
+        recommendations
+            .push("All dependencies are up to date! Great job maintaining freshness.".to_string());
     }
 
     Ok(AuditReport {
@@ -1629,7 +1883,12 @@ pub fn format_table(report: &AuditReport) -> String {
         ));
         out.push_str(&format!(
             "Health Score: {}/100 | Total: {} | Outdated: {} (Major: {}, Minor: {}, Patch: {})\n",
-            m.health_score, m.total_count, m.outdated_count, m.major_count, m.minor_count, m.patch_count
+            m.health_score,
+            m.total_count,
+            m.outdated_count,
+            m.major_count,
+            m.minor_count,
+            m.patch_count
         ));
 
         if m.dependencies.is_empty() {
@@ -1669,13 +1928,22 @@ pub fn format_table(report: &AuditReport) -> String {
     }
 
     out.push_str("=== Summary ===\n");
-    out.push_str(&format!("Scanned Manifests:    {}\n", report.manifests.len()));
-    out.push_str(&format!("Total Dependencies:   {}\n", report.total_dependencies));
+    out.push_str(&format!(
+        "Scanned Manifests:    {}\n",
+        report.manifests.len()
+    ));
+    out.push_str(&format!(
+        "Total Dependencies:   {}\n",
+        report.total_dependencies
+    ));
     out.push_str(&format!(
         "Outdated Packages:    {} (Major: {}, Minor: {}, Patch: {})\n",
         report.total_outdated, report.total_major, report.total_minor, report.total_patch
     ));
-    out.push_str(&format!("Vulnerabilities:      {}\n", report.total_vulnerable));
+    out.push_str(&format!(
+        "Vulnerabilities:      {}\n",
+        report.total_vulnerable
+    ));
     out.push_str(&format!(
         "Overall Health Score: {}/100 [{}]\n",
         report.overall_health_score, report.health_rating
@@ -1707,7 +1975,11 @@ pub fn format_markdown(report: &AuditReport) -> String {
     }
 
     for m in &report.manifests {
-        out.push_str(&format!("## `{}` ({})\n\n", m.path, m.ecosystem.display_name()));
+        out.push_str(&format!(
+            "## `{}` ({})\n\n",
+            m.path,
+            m.ecosystem.display_name()
+        ));
         out.push_str(&format!(
             "Health: **{}/100** | Total: **{}** | Outdated: **{}** (Major: {}, Minor: {}, Patch: {})\n\n",
             m.health_score, m.total_count, m.outdated_count, m.major_count, m.minor_count, m.patch_count
@@ -1867,15 +2139,15 @@ impl Tool for DepsTool {
             .and_then(|v| v.as_str())
             .unwrap_or("table");
 
-        let max_depth = args
-            .get("max_depth")
-            .and_then(|v| v.as_u64())
-            .unwrap_or(4) as usize;
+        let max_depth = args.get("max_depth").and_then(|v| v.as_u64()).unwrap_or(4) as usize;
 
         let target_path = resolve_path(path_arg, &ctx.cwd);
 
         if !target_path.exists() {
-            return Ok(format!("Error: Path does not exist: {}", target_path.display()));
+            return Ok(format!(
+                "Error: Path does not exist: {}",
+                target_path.display()
+            ));
         }
 
         let report = audit_workspace(
@@ -2132,11 +2404,17 @@ require rsc.io/quote v1.5.2
         let deps = parse_go_mod(content, "go.mod");
         assert_eq!(deps.len(), 3);
 
-        let gin_dep = deps.iter().find(|d| d.name == "github.com/gin-gonic/gin").unwrap();
+        let gin_dep = deps
+            .iter()
+            .find(|d| d.name == "github.com/gin-gonic/gin")
+            .unwrap();
         assert_eq!(gin_dep.requirement, "v1.9.1");
         assert_eq!(gin_dep.dep_type, DependencyType::Normal);
 
-        let testify_dep = deps.iter().find(|d| d.name == "github.com/stretchr/testify").unwrap();
+        let testify_dep = deps
+            .iter()
+            .find(|d| d.name == "github.com/stretchr/testify")
+            .unwrap();
         assert_eq!(testify_dep.dep_type, DependencyType::Optional);
     }
 
@@ -2196,7 +2474,13 @@ gem 'puma'
 
     #[test]
     fn test_formatters() {
-        let mut dep = Dependency::new("tokio", "1.20.0", DependencyType::Normal, Ecosystem::Cargo, "Cargo.toml");
+        let mut dep = Dependency::new(
+            "tokio",
+            "1.20.0",
+            DependencyType::Normal,
+            Ecosystem::Cargo,
+            "Cargo.toml",
+        );
         dep.resolved_version = Some("1.20.0".to_string());
         dep.latest_version = Some("1.36.0".to_string());
         dep.status = OutdatedStatus::Outdated(BumpType::Minor);

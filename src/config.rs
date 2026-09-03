@@ -24,9 +24,8 @@ pub use env_loader::{
 pub mod workspace;
 pub use workspace::{
     find_workspace_config_file, find_workspace_root, is_workspace_config_file,
-    workspace_config_candidates, LoadedWorkspaceConfig, WorkspaceConfig,
-    WorkspaceConfigError, WorkspaceConfigFormat, WorkspaceMcpServerConfig,
-    WorkspaceOverrideEntry, WorkspaceToolSettings,
+    workspace_config_candidates, LoadedWorkspaceConfig, WorkspaceConfig, WorkspaceConfigError,
+    WorkspaceConfigFormat, WorkspaceMcpServerConfig, WorkspaceOverrideEntry, WorkspaceToolSettings,
 };
 /// Supported LLM providers in Fusion.
 pub const SUPPORTED_PROVIDERS: &[&str] = &[
@@ -46,13 +45,20 @@ pub const MODEL_SHORTHANDS: &[(&str, &str, &str)] = &[
     ("minimax-m2", "fusion", "MiniMaxAI/MiniMax-M2.7"),
     ("kimi", "fusion", "moonshotai/Kimi-K2.6"),
     ("kimi-k2.6", "fusion", "moonshotai/Kimi-K2.6"),
-    ("deepseek-v4", "fusion", "deepseek-ai/DeepSeek-V4-Flash-0731"),
+    (
+        "deepseek-v4",
+        "fusion",
+        "deepseek-ai/DeepSeek-V4-Flash-0731",
+    ),
     ("flash", "fusion", "deepseek-ai/DeepSeek-V4-Flash-0731"),
     ("v4", "fusion", "deepseek-ai/DeepSeek-V4-Flash-0731"),
     ("fusion", "fusion", "deepseek-ai/DeepSeek-V4-Flash-0731"),
-    ("fusion-default", "fusion", "deepseek-ai/DeepSeek-V4-Flash-0731"),
+    (
+        "fusion-default",
+        "fusion",
+        "deepseek-ai/DeepSeek-V4-Flash-0731",
+    ),
     ("default", "fusion", "deepseek-ai/DeepSeek-V4-Flash-0731"),
-
     // DeepSeek
     ("deepseek", "deepseek", "deepseek-chat"),
     ("deepseek-chat", "deepseek", "deepseek-chat"),
@@ -65,40 +71,86 @@ pub const MODEL_SHORTHANDS: &[(&str, &str, &str)] = &[
     ("reasoner", "deepseek", "deepseek-reasoner"),
     ("deepseek-coder", "deepseek", "deepseek-coder"),
     ("coder", "deepseek", "deepseek-coder"),
-
     // Anthropic / Claude
-    ("claude-3-7-sonnet-latest", "anthropic", "claude-3-7-sonnet-20250219"),
-    ("claude-3-7-sonnet-20250219", "anthropic", "claude-3-7-sonnet-20250219"),
-    ("claude-3-7-sonnet", "anthropic", "claude-3-7-sonnet-20250219"),
-    ("claude-3.7-sonnet", "anthropic", "claude-3-7-sonnet-20250219"),
+    (
+        "claude-3-7-sonnet-latest",
+        "anthropic",
+        "claude-3-7-sonnet-20250219",
+    ),
+    (
+        "claude-3-7-sonnet-20250219",
+        "anthropic",
+        "claude-3-7-sonnet-20250219",
+    ),
+    (
+        "claude-3-7-sonnet",
+        "anthropic",
+        "claude-3-7-sonnet-20250219",
+    ),
+    (
+        "claude-3.7-sonnet",
+        "anthropic",
+        "claude-3-7-sonnet-20250219",
+    ),
     ("claude-3-7", "anthropic", "claude-3-7-sonnet-20250219"),
     ("claude-3.7", "anthropic", "claude-3-7-sonnet-20250219"),
     ("3.7-sonnet", "anthropic", "claude-3-7-sonnet-20250219"),
     ("sonnet-3.7", "anthropic", "claude-3-7-sonnet-20250219"),
-    ("claude-3-5-sonnet-latest", "anthropic", "claude-3-5-sonnet-20241022"),
-    ("claude-3-5-sonnet-20241022", "anthropic", "claude-3-5-sonnet-20241022"),
-    ("claude-3-5-sonnet", "anthropic", "claude-3-5-sonnet-20241022"),
-    ("claude-3.5-sonnet", "anthropic", "claude-3-5-sonnet-20241022"),
+    (
+        "claude-3-5-sonnet-latest",
+        "anthropic",
+        "claude-3-5-sonnet-20241022",
+    ),
+    (
+        "claude-3-5-sonnet-20241022",
+        "anthropic",
+        "claude-3-5-sonnet-20241022",
+    ),
+    (
+        "claude-3-5-sonnet",
+        "anthropic",
+        "claude-3-5-sonnet-20241022",
+    ),
+    (
+        "claude-3.5-sonnet",
+        "anthropic",
+        "claude-3-5-sonnet-20241022",
+    ),
     ("sonnet-3.5", "anthropic", "claude-3-5-sonnet-20241022"),
     ("sonnet-3-5", "anthropic", "claude-3-5-sonnet-20241022"),
     ("claude-sonnet", "anthropic", "claude-3-5-sonnet-20241022"),
     ("sonnet", "anthropic", "claude-3-5-sonnet-20241022"),
     ("claude", "anthropic", "claude-3-5-sonnet-20241022"),
-    ("claude-3-5-haiku-latest", "anthropic", "claude-3-5-haiku-20241022"),
-    ("claude-3-5-haiku-20241022", "anthropic", "claude-3-5-haiku-20241022"),
+    (
+        "claude-3-5-haiku-latest",
+        "anthropic",
+        "claude-3-5-haiku-20241022",
+    ),
+    (
+        "claude-3-5-haiku-20241022",
+        "anthropic",
+        "claude-3-5-haiku-20241022",
+    ),
     ("claude-3-5-haiku", "anthropic", "claude-3-5-haiku-20241022"),
     ("claude-3.5-haiku", "anthropic", "claude-3-5-haiku-20241022"),
     ("haiku-3.5", "anthropic", "claude-3-5-haiku-20241022"),
     ("haiku-3-5", "anthropic", "claude-3-5-haiku-20241022"),
     ("claude-haiku", "anthropic", "claude-3-5-haiku-20241022"),
     ("haiku", "anthropic", "claude-3-5-haiku-20241022"),
-    ("claude-3-opus-latest", "anthropic", "claude-3-opus-20240229"),
-    ("claude-3-opus-20240229", "anthropic", "claude-3-opus-20240229"),
+    (
+        "claude-3-opus-latest",
+        "anthropic",
+        "claude-3-opus-20240229",
+    ),
+    (
+        "claude-3-opus-20240229",
+        "anthropic",
+        "claude-3-opus-20240229",
+    ),
     ("claude-3-opus", "anthropic", "claude-3-opus-20240229"),
     ("claude-3.0-opus", "anthropic", "claude-3-opus-20240229"),
     ("claude-opus", "anthropic", "claude-3-opus-20240229"),
     ("opus", "anthropic", "claude-3-opus-20240229"),
-
     // OpenAI
     ("gpt-4o", "openai", "gpt-4o"),
     ("4o", "openai", "gpt-4o"),
@@ -117,7 +169,6 @@ pub const MODEL_SHORTHANDS: &[(&str, &str, &str)] = &[
     ("gpt-3.5-turbo", "openai", "gpt-3.5-turbo"),
     ("3.5-turbo", "openai", "gpt-3.5-turbo"),
     ("gpt-3.5", "openai", "gpt-3.5-turbo"),
-
     // xAI / Grok
     ("grok-2-latest", "xai", "grok-2-latest"),
     ("grok-2", "xai", "grok-2-latest"),
@@ -128,7 +179,6 @@ pub const MODEL_SHORTHANDS: &[(&str, &str, &str)] = &[
     ("grok-2-vision-latest", "xai", "grok-2-vision-1212"),
     ("grok-2-vision", "xai", "grok-2-vision-1212"),
     ("grok-vision", "xai", "grok-2-vision-1212"),
-
     // Ollama / Local models
     ("llama3.3", "ollama", "llama3.3"),
     ("llama3.2", "ollama", "llama3.2"),
@@ -143,15 +193,11 @@ pub const MODEL_SHORTHANDS: &[(&str, &str, &str)] = &[
     ("qwen", "ollama", "qwen2.5-coder"),
 ];
 
-
 /// Configuration errors with actionable resolution hints.
 #[derive(Debug, thiserror::Error, Clone, PartialEq)]
 pub enum ConfigError {
     #[error("Missing API key for provider '{provider}'.\nHint: {hint}")]
-    MissingApiKey {
-        provider: String,
-        hint: String,
-    },
+    MissingApiKey { provider: String, hint: String },
 
     #[error("Invalid base URL for provider '{provider}': '{url}'.\nHint: {hint}")]
     InvalidBaseUrl {
@@ -161,9 +207,7 @@ pub enum ConfigError {
     },
 
     #[error("Unknown provider '{provider}'.\nHint: Available providers are: {}", SUPPORTED_PROVIDERS.join(", "))]
-    UnknownProvider {
-        provider: String,
-    },
+    UnknownProvider { provider: String },
 
     #[error("Invalid configuration for '{field}': {message}\nHint: {hint}")]
     InvalidValue {
@@ -178,45 +222,118 @@ pub struct Config {
     #[serde(default = "default_config_version")]
     pub version: u32,
 
-    #[serde(default = "default_provider_name", alias = "provider", alias = "model_provider")]
+    #[serde(
+        default = "default_provider_name",
+        alias = "provider",
+        alias = "model_provider"
+    )]
     pub default_provider: String,
 
-    #[serde(default = "default_model_name", alias = "model", alias = "selected_model")]
+    #[serde(
+        default = "default_model_name",
+        alias = "model",
+        alias = "selected_model"
+    )]
     pub default_model: String,
 
-    #[serde(default, skip_serializing_if = "Option::is_none", alias = "temperature", alias = "temp")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        alias = "temperature",
+        alias = "temp"
+    )]
     pub default_temperature: Option<f32>,
 
-    #[serde(default, skip_serializing_if = "Option::is_none", alias = "tokens", alias = "max_token")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        alias = "tokens",
+        alias = "max_token"
+    )]
     pub max_tokens: Option<u32>,
 
     // Provider API keys & custom base URLs
-    #[serde(default, skip_serializing_if = "Option::is_none", alias = "openai_key", alias = "open_ai_api_key")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        alias = "openai_key",
+        alias = "open_ai_api_key"
+    )]
     pub openai_api_key: Option<String>,
-    #[serde(default, skip_serializing_if = "Option::is_none", alias = "openai_url", alias = "openai_endpoint")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        alias = "openai_url",
+        alias = "openai_endpoint"
+    )]
     pub openai_base_url: Option<String>,
 
-    #[serde(default, skip_serializing_if = "Option::is_none", alias = "anthropic_key", alias = "claude_api_key")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        alias = "anthropic_key",
+        alias = "claude_api_key"
+    )]
     pub anthropic_api_key: Option<String>,
-    #[serde(default, skip_serializing_if = "Option::is_none", alias = "anthropic_url", alias = "anthropic_endpoint")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        alias = "anthropic_url",
+        alias = "anthropic_endpoint"
+    )]
     pub anthropic_base_url: Option<String>,
 
-    #[serde(default, skip_serializing_if = "Option::is_none", alias = "deepseek_key", alias = "deep_seek_api_key")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        alias = "deepseek_key",
+        alias = "deep_seek_api_key"
+    )]
     pub deepseek_api_key: Option<String>,
-    #[serde(default, skip_serializing_if = "Option::is_none", alias = "deepseek_url", alias = "deepseek_endpoint")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        alias = "deepseek_url",
+        alias = "deepseek_endpoint"
+    )]
     pub deepseek_base_url: Option<String>,
 
-    #[serde(default, skip_serializing_if = "Option::is_none", alias = "xai_key", alias = "grok_api_key")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        alias = "xai_key",
+        alias = "grok_api_key"
+    )]
     pub xai_api_key: Option<String>,
-    #[serde(default, skip_serializing_if = "Option::is_none", alias = "xai_url", alias = "grok_url")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        alias = "xai_url",
+        alias = "grok_url"
+    )]
     pub xai_base_url: Option<String>,
 
-    #[serde(default, skip_serializing_if = "Option::is_none", alias = "openrouter_key", alias = "open_router_api_key")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        alias = "openrouter_key",
+        alias = "open_router_api_key"
+    )]
     pub openrouter_api_key: Option<String>,
-    #[serde(default, skip_serializing_if = "Option::is_none", alias = "openrouter_url")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        alias = "openrouter_url"
+    )]
     pub openrouter_base_url: Option<String>,
 
-    #[serde(default, skip_serializing_if = "Option::is_none", alias = "ollama_url", alias = "ollama_host", alias = "ollama_endpoint")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        alias = "ollama_url",
+        alias = "ollama_host",
+        alias = "ollama_endpoint"
+    )]
     pub ollama_base_url: Option<String>,
 
     // Fusion API (primary provider)
@@ -226,33 +343,68 @@ pub struct Config {
     pub fusion_base_url: Option<String>,
 
     // Multi-Agent & Advisor configurations
-    #[serde(default = "default_false", alias = "advisors", alias = "enable_advisors")]
+    #[serde(
+        default = "default_false",
+        alias = "advisors",
+        alias = "enable_advisors"
+    )]
     pub advisors_enabled: bool,
 
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub advisor_model: Option<String>,
 
     // Terminal Audio / Sound cues configuration
-    #[serde(default = "default_false", alias = "sound", alias = "audio", alias = "audio_cues", alias = "bell")]
+    #[serde(
+        default = "default_false",
+        alias = "sound",
+        alias = "audio",
+        alias = "audio_cues",
+        alias = "bell"
+    )]
     pub sound_enabled: bool,
 
-    #[serde(default = "default_true", alias = "bell_completion", alias = "sound_on_completion")]
+    #[serde(
+        default = "default_true",
+        alias = "bell_completion",
+        alias = "sound_on_completion"
+    )]
     pub bell_on_completion: bool,
 
-    #[serde(default = "default_true", alias = "bell_error", alias = "sound_on_error")]
+    #[serde(
+        default = "default_true",
+        alias = "bell_error",
+        alias = "sound_on_error"
+    )]
     pub bell_on_error: bool,
 
     // Desktop & Terminal Notification configuration
-    #[serde(default = "default_true", alias = "notify", alias = "notification_enabled", alias = "notifications")]
+    #[serde(
+        default = "default_true",
+        alias = "notify",
+        alias = "notification_enabled",
+        alias = "notifications"
+    )]
     pub notify_enabled: bool,
 
-    #[serde(default = "default_true", alias = "notify_completion", alias = "notify_on_completion")]
+    #[serde(
+        default = "default_true",
+        alias = "notify_completion",
+        alias = "notify_on_completion"
+    )]
     pub notify_on_completion: bool,
 
-    #[serde(default = "default_true", alias = "notify_error", alias = "notify_on_error")]
+    #[serde(
+        default = "default_true",
+        alias = "notify_error",
+        alias = "notify_on_error"
+    )]
     pub notify_on_error: bool,
 
-    #[serde(default, skip_serializing_if = "Option::is_none", alias = "notify_min_duration")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        alias = "notify_min_duration"
+    )]
     pub notify_min_duration_secs: Option<f64>,
 }
 
@@ -570,7 +722,9 @@ impl Config {
             if cfg.anthropic_api_key.is_none() && cfg.default_provider == "anthropic" {
                 cfg.anthropic_api_key = Some(generic_k.clone());
             }
-            if cfg.xai_api_key.is_none() && (cfg.default_provider == "xai" || cfg.default_provider == "grok") {
+            if cfg.xai_api_key.is_none()
+                && (cfg.default_provider == "xai" || cfg.default_provider == "grok")
+            {
                 cfg.xai_api_key = Some(generic_k.clone());
             }
             if cfg.openrouter_api_key.is_none() && cfg.default_provider == "openrouter" {
@@ -591,7 +745,8 @@ impl Config {
             }
         } else {
             // Resolve default model shorthand if needed
-            let (_, resolved) = Self::resolve_model(&cfg.default_model, Some(&cfg.default_provider));
+            let (_, resolved) =
+                Self::resolve_model(&cfg.default_model, Some(&cfg.default_provider));
             cfg.default_model = resolved;
         }
 
@@ -626,7 +781,12 @@ impl Config {
         }
 
         // Audio & Terminal Bell settings
-        if let Some(snd) = first_non_empty_env(&["FUSION_SOUND", "FUSION_BELL", "FUSION_AUDIO_CUES", "SOUND_ENABLED"]) {
+        if let Some(snd) = first_non_empty_env(&[
+            "FUSION_SOUND",
+            "FUSION_BELL",
+            "FUSION_AUDIO_CUES",
+            "SOUND_ENABLED",
+        ]) {
             let lower = snd.to_lowercase();
             if lower == "1" || lower == "true" || lower == "yes" || lower == "on" {
                 cfg.sound_enabled = true;
@@ -640,7 +800,9 @@ impl Config {
                 cfg.sound_enabled = false;
             }
         }
-        if let Some(bell_comp) = first_non_empty_env(&["FUSION_BELL_COMPLETION", "BELL_ON_COMPLETION"]) {
+        if let Some(bell_comp) =
+            first_non_empty_env(&["FUSION_BELL_COMPLETION", "BELL_ON_COMPLETION"])
+        {
             let lower = bell_comp.to_lowercase();
             if lower == "0" || lower == "false" || lower == "no" || lower == "off" {
                 cfg.bell_on_completion = false;
@@ -656,7 +818,9 @@ impl Config {
                 cfg.bell_on_error = true;
             }
         }
-        if let Some(notif) = first_non_empty_env(&["FUSION_NOTIFY", "FUSION_NOTIFICATIONS", "NOTIFY_ENABLED"]) {
+        if let Some(notif) =
+            first_non_empty_env(&["FUSION_NOTIFY", "FUSION_NOTIFICATIONS", "NOTIFY_ENABLED"])
+        {
             let lower = notif.to_lowercase();
             if lower == "1" || lower == "true" || lower == "yes" || lower == "on" {
                 cfg.notify_enabled = true;
@@ -670,7 +834,9 @@ impl Config {
                 cfg.notify_enabled = false;
             }
         }
-        if let Some(min_d) = first_non_empty_env(&["FUSION_NOTIFY_MIN_DURATION", "NOTIFY_MIN_DURATION"]) {
+        if let Some(min_d) =
+            first_non_empty_env(&["FUSION_NOTIFY_MIN_DURATION", "NOTIFY_MIN_DURATION"])
+        {
             if let Ok(secs) = min_d.parse::<f64>() {
                 if secs >= 0.0 {
                     cfg.notify_min_duration_secs = Some(secs);
@@ -789,7 +955,11 @@ impl Config {
         if lower.starts_with("claude") {
             return Some("anthropic");
         }
-        if lower.starts_with("gpt-") || lower.starts_with("o1") || lower.starts_with("o3") || lower.starts_with("text-embedding") {
+        if lower.starts_with("gpt-")
+            || lower.starts_with("o1")
+            || lower.starts_with("o3")
+            || lower.starts_with("text-embedding")
+        {
             return Some("openai");
         }
         if lower.starts_with("deepseek") {
@@ -801,7 +971,12 @@ impl Config {
         if lower.contains('/') {
             return Some("openrouter");
         }
-        if lower.starts_with("llama") || lower.starts_with("mistral") || lower.starts_with("mixtral") || lower.starts_with("qwen") || lower.contains(':') {
+        if lower.starts_with("llama")
+            || lower.starts_with("mistral")
+            || lower.starts_with("mixtral")
+            || lower.starts_with("qwen")
+            || lower.contains(':')
+        {
             return Some("ollama");
         }
 
@@ -851,7 +1026,10 @@ impl Config {
 
     pub fn is_known_provider(provider: &str) -> bool {
         let lower = provider.trim().to_lowercase();
-        SUPPORTED_PROVIDERS.contains(&lower.as_str()) || lower == "grok" || lower == "claude" || lower == "fusion"
+        SUPPORTED_PROVIDERS.contains(&lower.as_str())
+            || lower == "grok"
+            || lower == "claude"
+            || lower == "fusion"
     }
 
     /// Normalizes model name for a specific provider.
@@ -861,7 +1039,8 @@ impl Config {
 
         // Check if the model itself is a shorthand for this provider
         for &(alias, prov, canonical) in MODEL_SHORTHANDS {
-            if prov == provider && (alias == model_lower || canonical.to_lowercase() == model_lower) {
+            if prov == provider && (alias == model_lower || canonical.to_lowercase() == model_lower)
+            {
                 return canonical.to_string();
             }
         }
@@ -871,7 +1050,8 @@ impl Config {
 
     /// Updates the default model, auto-detecting and updating the provider if appropriate.
     pub fn set_model(&mut self, model_or_shorthand: &str) {
-        let (provider, model) = Self::resolve_model(model_or_shorthand, Some(&self.default_provider));
+        let (provider, model) =
+            Self::resolve_model(model_or_shorthand, Some(&self.default_provider));
         self.default_provider = provider;
         self.default_model = model;
     }
@@ -894,31 +1074,49 @@ impl Config {
             }
             "deepseek" => {
                 let key = self.deepseek_api_key.clone();
-                let url = self.deepseek_base_url.clone().unwrap_or_else(|| "https://api.deepseek.com".to_string());
+                let url = self
+                    .deepseek_base_url
+                    .clone()
+                    .unwrap_or_else(|| "https://api.deepseek.com".to_string());
                 (key, url)
             }
             "anthropic" | "claude" => {
                 let key = self.anthropic_api_key.clone();
-                let url = self.anthropic_base_url.clone().unwrap_or_else(|| "https://api.anthropic.com/v1".to_string());
+                let url = self
+                    .anthropic_base_url
+                    .clone()
+                    .unwrap_or_else(|| "https://api.anthropic.com/v1".to_string());
                 (key, url)
             }
             "openai" => {
                 let key = self.openai_api_key.clone();
-                let url = self.openai_base_url.clone().unwrap_or_else(|| "https://api.openai.com/v1".to_string());
+                let url = self
+                    .openai_base_url
+                    .clone()
+                    .unwrap_or_else(|| "https://api.openai.com/v1".to_string());
                 (key, url)
             }
             "xai" | "grok" => {
                 let key = self.xai_api_key.clone();
-                let url = self.xai_base_url.clone().unwrap_or_else(|| "https://api.x.ai/v1".to_string());
+                let url = self
+                    .xai_base_url
+                    .clone()
+                    .unwrap_or_else(|| "https://api.x.ai/v1".to_string());
                 (key, url)
             }
             "openrouter" => {
                 let key = self.openrouter_api_key.clone();
-                let url = self.openrouter_base_url.clone().unwrap_or_else(|| "https://openrouter.ai/api/v1".to_string());
+                let url = self
+                    .openrouter_base_url
+                    .clone()
+                    .unwrap_or_else(|| "https://openrouter.ai/api/v1".to_string());
                 (key, url)
             }
             "ollama" => {
-                let url = self.ollama_base_url.clone().unwrap_or_else(|| "http://localhost:11434".to_string());
+                let url = self
+                    .ollama_base_url
+                    .clone()
+                    .unwrap_or_else(|| "http://localhost:11434".to_string());
                 (None, url)
             }
             _ => {
@@ -992,7 +1190,8 @@ impl Config {
                 return Err(ConfigError::InvalidValue {
                     field: "default_temperature".to_string(),
                     message: format!("temperature {} is outside valid range [0.0, 2.0]", temp),
-                    hint: "Set temperature between 0.0 (deterministic) and 2.0 (creative).".to_string(),
+                    hint: "Set temperature between 0.0 (deterministic) and 2.0 (creative)."
+                        .to_string(),
                 });
             }
         }
@@ -1033,8 +1232,10 @@ impl Config {
 
     /// Looks up a preset by loose name/alias and applies it in-place.
     pub fn apply_preset_by_name(&mut self, name: &str) -> Result<ConfigPreset, PresetError> {
-        let preset = ConfigPreset::from_str_loose(name)
-            .ok_or_else(|| PresetError::UnknownPreset { name: name.to_string() })?;
+        let preset =
+            ConfigPreset::from_str_loose(name).ok_or_else(|| PresetError::UnknownPreset {
+                name: name.to_string(),
+            })?;
         self.apply_preset(preset);
         Ok(preset)
     }
@@ -1046,9 +1247,18 @@ mod tests {
 
     #[test]
     fn test_sanitize_env_var() {
-        assert_eq!(sanitize_env_var("  sk-123456  "), Some("sk-123456".to_string()));
-        assert_eq!(sanitize_env_var("\"sk-123456\""), Some("sk-123456".to_string()));
-        assert_eq!(sanitize_env_var("'sk-123456'"), Some("sk-123456".to_string()));
+        assert_eq!(
+            sanitize_env_var("  sk-123456  "),
+            Some("sk-123456".to_string())
+        );
+        assert_eq!(
+            sanitize_env_var("\"sk-123456\""),
+            Some("sk-123456".to_string())
+        );
+        assert_eq!(
+            sanitize_env_var("'sk-123456'"),
+            Some("sk-123456".to_string())
+        );
         assert_eq!(sanitize_env_var(""), None);
         assert_eq!(sanitize_env_var("   "), None);
         assert_eq!(sanitize_env_var("your-api-key-here"), None);
@@ -1170,11 +1380,17 @@ mod tests {
         );
         assert_eq!(
             Config::resolve_model("anthropic:sonnet", None),
-            ("anthropic".to_string(), "claude-3-5-sonnet-20241022".to_string())
+            (
+                "anthropic".to_string(),
+                "claude-3-5-sonnet-20241022".to_string()
+            )
         );
         assert_eq!(
             Config::resolve_model("openrouter/meta-llama/llama-3-70b", None),
-            ("openrouter".to_string(), "meta-llama/llama-3-70b".to_string())
+            (
+                "openrouter".to_string(),
+                "meta-llama/llama-3-70b".to_string()
+            )
         );
     }
 
@@ -1184,10 +1400,7 @@ mod tests {
             Config::detect_provider_for_model("claude-3-5-sonnet-20241022"),
             Some("anthropic")
         );
-        assert_eq!(
-            Config::detect_provider_for_model("gpt-4o"),
-            Some("openai")
-        );
+        assert_eq!(Config::detect_provider_for_model("gpt-4o"), Some("openai"));
         assert_eq!(
             Config::detect_provider_for_model("deepseek-chat"),
             Some("deepseek")

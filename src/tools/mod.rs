@@ -1,95 +1,95 @@
 pub mod bash;
 pub mod clipboard;
+pub mod compat;
+pub mod deps;
+pub mod diff_stats;
+pub mod docgen;
 pub mod edit;
 pub mod env_cleaner;
 pub mod fetch;
-pub mod web_search;
 pub mod file;
+pub mod git;
+pub mod git_branch;
+pub mod git_log;
+pub mod github;
 pub mod glob;
 pub mod grep;
 pub mod grep_filter;
-pub mod search;
-pub mod git;
-pub mod git_branch;
 pub mod guardrails;
-pub mod patch;
-pub mod watch;
-pub mod system;
-pub mod syntax;
-pub mod mcp;
-pub mod symbols;
-pub mod process;
-pub mod compat;
-pub mod types;
-pub mod sqlite;
-pub mod mock_server;
-pub mod regex_test;
-pub mod deps;
-pub mod tree;
-pub mod docgen;
-pub mod ports;
-pub mod git_log;
 pub mod hex;
-pub mod diff_stats;
 pub mod json_schema;
-pub mod github;
+pub mod mcp;
+pub mod mock_server;
+pub mod patch;
+pub mod ports;
+pub mod process;
+pub mod regex_test;
+pub mod search;
+pub mod sqlite;
+pub mod symbols;
+pub mod syntax;
+pub mod system;
+pub mod tree;
+pub mod types;
+pub mod watch;
+pub mod web_search;
 pub use bash::BashTool;
 pub use clipboard::{
     ClipboardBackendKind, ClipboardManager, ClipboardStatus, ClipboardTool, ReadClipboardTool,
     WriteClipboardTool, DEFAULT_CLIPBOARD_TIMEOUT,
 };
+pub use compat::*;
+pub use deps::*;
+pub use diff_stats::*;
+pub use docgen::*;
 pub use edit::EditFileTool;
 pub use env_cleaner::{
     is_sensitive, is_sensitive_key, is_sensitive_value, mask_value, sanitize_env, EnvCleaner,
     EnvSanitizer, SanitizationPolicy, SanitizationReason, SanitizationReport, SanitizationResult,
 };
-pub use file::{ReadFileTool, WriteFileTool};
 pub use fetch::{FetchFormat, FetchOptions, FetchResult, HttpFetchTool};
+pub use file::{ReadFileTool, WriteFileTool};
+pub use git::{GitDiffTool, GitStatusTool};
+pub use git_branch::{
+    format_branch_list, list_branches, parse_upstream_tracking, validate_branch_name, BranchInfo,
+    BranchListReport, BranchOpResult, GitBranchTool,
+};
+pub use git_log::*;
+pub use github::*;
+pub use glob::GlobTool;
 pub use grep::GrepTool;
 pub use grep_filter::{
     FileTypeRegistry, FilterableGrepEngine, GrepFilter, GrepMatch, GrepOptions, GrepPathFilter,
     GrepSearchResult, PathFilter, PathFilterBuilder,
 };
-pub use glob::GlobTool;
-pub use git::{GitDiffTool, GitStatusTool};
-pub use git_branch::{
-    format_branch_list, list_branches, parse_upstream_tracking, validate_branch_name,
-    BranchInfo, BranchListReport, BranchOpResult, GitBranchTool,
-};
 pub use guardrails::*;
+pub use hex::*;
+pub use json_schema::*;
+pub use mcp::*;
+pub use mock_server::*;
 pub use patch::PatchTool;
+pub use ports::*;
+pub use process::{
+    global_process_manager, LogOutput, ManagedProcess, OutputBuffer, OutputLine, OutputStream,
+    ProcessConfig, ProcessInfo, ProcessManager, ProcessStatus, ProcessTool, GLOBAL_PROCESS_MANAGER,
+};
+pub use regex_test::*;
+pub use sqlite::{
+    parse_columns_from_ddl, ColumnDef, MasterEntry, QueryResult, Row, SqlValue, SqliteHeader,
+    SqliteReader, SqliteTool, TableSchema,
+};
+pub use symbols::{
+    scan_workspace, Language, Symbol, SymbolKind, SymbolQuery, SymbolScanner, SymbolsTool,
+};
+pub use syntax::*;
+pub use system::*;
+pub use tree::*;
+pub use types::*;
 pub use watch::{
     global_watcher_manager, ChangeKind, FileChange, FileRecord, FileSnapshot, WatchConfig,
     WatchTool, WatcherInfo, WatcherManager, WorkspaceWatcher,
 };
 pub use web_search::WebSearchTool;
-pub use system::*;
-pub use syntax::*;
-pub use mcp::*;
-pub use symbols::{
-    scan_workspace, Language, Symbol, SymbolKind, SymbolQuery, SymbolScanner, SymbolsTool,
-};
-pub use sqlite::{
-    parse_columns_from_ddl, ColumnDef, MasterEntry, QueryResult, Row, SqlValue, SqliteHeader,
-    SqliteReader, SqliteTool, TableSchema,
-};
-pub use process::{
-    global_process_manager, LogOutput, ManagedProcess, OutputBuffer, OutputLine, OutputStream,
-    ProcessConfig, ProcessInfo, ProcessManager, ProcessStatus, ProcessTool, GLOBAL_PROCESS_MANAGER,
-};
-pub use types::*;
-pub use compat::*;
-pub use regex_test::*;
-pub use mock_server::*;
-pub use deps::*;
-pub use tree::*;
-pub use docgen::*;
-pub use ports::*;
-pub use git_log::*;
-pub use hex::*;
-pub use diff_stats::*;
-pub use json_schema::*;
-pub use github::*;
 
 use std::sync::Arc;
 
@@ -438,7 +438,9 @@ mod tests {
         assert!(registry.contains("gh_pr"));
         assert!(registry.contains("github_pr"));
         assert!(registry.contains("pull_request"));
-        let tool = registry.get("github").expect("github tool should be in registry");
+        let tool = registry
+            .get("github")
+            .expect("github tool should be in registry");
         assert_eq!(tool.name(), "github");
     }
 }

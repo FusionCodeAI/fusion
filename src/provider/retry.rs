@@ -1,10 +1,10 @@
+use reqwest::header::HeaderMap;
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::future::Future;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
 use std::time::{Duration, Instant};
-use reqwest::header::HeaderMap;
-use serde::{Deserialize, Serialize};
 use tokio::sync::mpsc;
 
 use crate::provider::types::StreamChunk;
@@ -71,11 +71,7 @@ impl FastRng {
             x ^= x >> 12;
             x ^= x << 25;
             x ^= x >> 27;
-            let next = if x == 0 {
-                0x853c_49e6_748f_ea9b
-            } else {
-                x
-            };
+            let next = if x == 0 { 0x853c_49e6_748f_ea9b } else { x };
             if self
                 .state
                 .compare_exchange_weak(current, next, Ordering::Relaxed, Ordering::Relaxed)
@@ -604,10 +600,7 @@ pub fn classify_error_str(err: &str) -> Option<RetryReason> {
     }
 
     // Overloaded (529)
-    if lower.contains("529")
-        || lower.contains("overloaded_error")
-        || lower.contains("overloaded")
-    {
+    if lower.contains("529") || lower.contains("overloaded_error") || lower.contains("overloaded") {
         return Some(RetryReason::Overloaded);
     }
 
@@ -861,10 +854,7 @@ pub struct RetryingStream {
 }
 
 impl RetryingStream {
-    pub fn new(
-        rx: mpsc::Receiver<StreamChunk>,
-        stats: Arc<std::sync::Mutex<RetryStats>>,
-    ) -> Self {
+    pub fn new(rx: mpsc::Receiver<StreamChunk>, stats: Arc<std::sync::Mutex<RetryStats>>) -> Self {
         Self { rx, stats }
     }
 
@@ -1067,10 +1057,7 @@ impl CircuitBreaker {
         }
     }
 
-    fn transition(
-        guard: &mut CircuitBreakerInner,
-        to: CircuitState,
-    ) {
+    fn transition(guard: &mut CircuitBreakerInner, to: CircuitState) {
         if guard.state != to {
             let from = guard.state;
             guard.state = to;
@@ -1653,7 +1640,10 @@ mod tests {
 
         // Unregistered providers use the shared default.
         assert_eq!(policies.policy_for("legacy").max_retries, 3);
-        assert_eq!(policies.policy_for("legacy").initial_delay, Duration::from_millis(100));
+        assert_eq!(
+            policies.policy_for("legacy").initial_delay,
+            Duration::from_millis(100)
+        );
 
         policies.set_policy("fusion", fusion);
         assert!(policies.has_policy("fusion"));
@@ -1668,10 +1658,7 @@ mod tests {
         assert_eq!(policies.default_policy().max_retries, 3);
 
         // Replacing a provider's policy overwrites in place.
-        policies.set_policy(
-            "fusion",
-            RetryPolicy::builder().max_retries(9).build(),
-        );
+        policies.set_policy("fusion", RetryPolicy::builder().max_retries(9).build());
         assert_eq!(policies.len(), 1);
         assert_eq!(policies.len(), 1);
         assert_eq!(policies.policy_for("fusion").max_retries, 9);
@@ -1694,7 +1681,10 @@ mod tests {
     fn test_provider_policies_no_retry_default() {
         let policies = ProviderRetryPolicies::new(RetryPolicy::no_retry());
         assert_eq!(policies.policy_for("fusion").max_retries, 0);
-        assert!(policies.policy_for("fusion").retryable_status_codes.is_empty());
+        assert!(policies
+            .policy_for("fusion")
+            .retryable_status_codes
+            .is_empty());
         assert!(!policies.policy_for("fusion").honor_retry_after);
     }
 
@@ -1797,11 +1787,7 @@ mod tests {
 
     #[test]
     fn test_circuit_breaker_half_open_success_threshold() {
-        let breaker = CircuitBreaker::with_half_open_threshold(
-            1,
-            Duration::from_millis(10),
-            3,
-        );
+        let breaker = CircuitBreaker::with_half_open_threshold(1, Duration::from_millis(10), 3);
         breaker.record_failure();
         std::thread::sleep(Duration::from_millis(15));
         assert_eq!(breaker.state(), CircuitState::HalfOpen);
@@ -1923,8 +1909,16 @@ mod tests {
         for _ in 0..8 {
             let delay = backoff.next_delay(None);
             // Decorrelated samples within [initial, min(prev * 3, max_delay)].
-            assert!(delay >= Duration::from_millis(100).min(delay), "below floor: {:?}", delay);
-            assert!(delay <= Duration::from_secs(2), "above ceiling: {:?}", delay);
+            assert!(
+                delay >= Duration::from_millis(100).min(delay),
+                "below floor: {:?}",
+                delay
+            );
+            assert!(
+                delay <= Duration::from_secs(2),
+                "above ceiling: {:?}",
+                delay
+            );
             prev = delay;
         }
         let _ = prev;

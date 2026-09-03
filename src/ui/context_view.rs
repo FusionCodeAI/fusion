@@ -303,10 +303,10 @@ impl ContextCategory {
     /// Secondary / Accent Ratatui color.
     pub fn ratatui_accent_color(&self) -> Color {
         match self {
-            ContextCategory::System => Color::Rgb(56, 189, 248),   // Light Sky Blue
+            ContextCategory::System => Color::Rgb(56, 189, 248), // Light Sky Blue
             ContextCategory::History => Color::Rgb(192, 132, 252), // Light Purple
-            ContextCategory::Tools => Color::Rgb(250, 204, 21),   // Light Amber
-            ContextCategory::Free => Color::Rgb(74, 222, 128),    // Light Emerald
+            ContextCategory::Tools => Color::Rgb(250, 204, 21),  // Light Amber
+            ContextCategory::Free => Color::Rgb(74, 222, 128),   // Light Emerald
         }
     }
 
@@ -323,10 +323,18 @@ impl ContextCategory {
     /// One-line description of what this category encompasses.
     pub fn description(&self) -> &'static str {
         match self {
-            ContextCategory::System => "System instructions, runtime directives, & environment metadata",
-            ContextCategory::History => "Conversation turns, user queries, assistant outputs, & tool results",
-            ContextCategory::Tools => "Registered tool specifications, JSON schemas, & MCP functions",
-            ContextCategory::Free => "Available token capacity before reaching model context limits",
+            ContextCategory::System => {
+                "System instructions, runtime directives, & environment metadata"
+            }
+            ContextCategory::History => {
+                "Conversation turns, user queries, assistant outputs, & tool results"
+            }
+            ContextCategory::Tools => {
+                "Registered tool specifications, JSON schemas, & MCP functions"
+            }
+            ContextCategory::Free => {
+                "Available token capacity before reaching model context limits"
+            }
         }
     }
 }
@@ -833,7 +841,8 @@ impl ContextDistribution {
             4 + estimate_text_tokens(system_text)
         };
         let system_sections = Self::extract_system_sections(system_text, max_context);
-        let system_breakdown = SystemPromptBreakdown::from_sections(system_sections.clone(), system_tokens);
+        let system_breakdown =
+            SystemPromptBreakdown::from_sections(system_sections.clone(), system_tokens);
 
         // 2. Calculate History tokens and message items
         let history_tokens = estimate_messages_tokens(messages);
@@ -866,7 +875,9 @@ impl ContextDistribution {
             formatted_tokens: format_token_count(system_tokens),
             pct_of_total: system_pct,
             pct_of_used: (system_tokens as f32 / used_f) * 100.0,
-            item_count: system_sections.len().max(if system_tokens > 0 { 1 } else { 0 }),
+            item_count: system_sections
+                .len()
+                .max(if system_tokens > 0 { 1 } else { 0 }),
             item_label: "sections".to_string(),
             details: if system_tokens == 0 {
                 "No system prompt specified".to_string()
@@ -913,7 +924,10 @@ impl ContextDistribution {
             item_count: 1,
             item_label: "headroom".to_string(),
             details: if free_tokens > 0 {
-                format!("{} available headroom before model limit", format_token_count(free_tokens))
+                format!(
+                    "{} available headroom before model limit",
+                    format_token_count(free_tokens)
+                )
             } else {
                 "Context window completely exhausted / overflowing".to_string()
             },
@@ -1059,7 +1073,10 @@ impl ContextDistribution {
 
     /// Header badge and color for context utilization.
     pub fn utilization_badge(&self) -> (&'static str, Color) {
-        (self.utilization_alert.badge(), self.utilization_alert.color())
+        (
+            self.utilization_alert.badge(),
+            self.utilization_alert.color(),
+        )
     }
 
     /// Helper to extract structured section items and classify them across Base, Tools, Skills, Memory.
@@ -1642,7 +1659,10 @@ impl ContextInspectorState {
     ) -> Option<ContextInspectorResult> {
         // 1. Help Modal toggle or dismissal
         if self.show_help {
-            if matches!(code, KeyCode::Char('?') | KeyCode::Char('h') | KeyCode::Esc | KeyCode::Enter) {
+            if matches!(
+                code,
+                KeyCode::Char('?') | KeyCode::Char('h') | KeyCode::Esc | KeyCode::Enter
+            ) {
                 self.show_help = false;
             }
             return None;
@@ -1892,9 +1912,21 @@ impl<'a> Widget for ContextBarWidget<'a> {
         let tools_w = ((d.tools_tokens as f32 / total) * width as f32).round() as usize;
 
         // Ensure visible representation (at least 1 char if tokens > 0)
-        let safe_sys_w = if d.system_tokens > 0 && sys_w == 0 { 1 } else { sys_w };
-        let safe_hist_w = if d.history_tokens > 0 && hist_w == 0 { 1 } else { hist_w };
-        let safe_tools_w = if d.tools_tokens > 0 && tools_w == 0 { 1 } else { tools_w };
+        let safe_sys_w = if d.system_tokens > 0 && sys_w == 0 {
+            1
+        } else {
+            sys_w
+        };
+        let safe_hist_w = if d.history_tokens > 0 && hist_w == 0 {
+            1
+        } else {
+            hist_w
+        };
+        let safe_tools_w = if d.tools_tokens > 0 && tools_w == 0 {
+            1
+        } else {
+            tools_w
+        };
 
         let used_w = safe_sys_w + safe_hist_w + safe_tools_w;
         let _safe_free_w = width.saturating_sub(used_w);
@@ -1930,7 +1962,11 @@ impl<'a> Widget for ContextBarWidget<'a> {
         cur_x = tools_end;
 
         // 4. Render Free budget slice (Green / Gray Shade)
-        let free_symbol = if d.free_tokens > 0 { BLOCK_LIGHT_SHADE } else { BLOCK_DARK_SHADE };
+        let free_symbol = if d.free_tokens > 0 {
+            BLOCK_LIGHT_SHADE
+        } else {
+            BLOCK_DARK_SHADE
+        };
         let free_fg = if d.free_tokens > 0 {
             Color::DarkGray
         } else {
@@ -1938,9 +1974,7 @@ impl<'a> Widget for ContextBarWidget<'a> {
         };
 
         for x in cur_x..area.right() {
-            buf[(x, bar_y)]
-                .set_symbol(free_symbol)
-                .set_fg(free_fg);
+            buf[(x, bar_y)].set_symbol(free_symbol).set_fg(free_fg);
         }
 
         // Render Legend Row if height >= 2 and option is enabled
@@ -1950,27 +1984,37 @@ impl<'a> Widget for ContextBarWidget<'a> {
                 Span::styled("█ ", Style::default().fg(Color::Cyan)),
                 Span::styled(
                     format!("Sys: {} ", format_token_count(d.system_tokens)),
-                    Style::default().fg(Color::White).add_modifier(Modifier::BOLD),
+                    Style::default()
+                        .fg(Color::White)
+                        .add_modifier(Modifier::BOLD),
                 ),
                 Span::styled("█ ", Style::default().fg(Color::Magenta)),
                 Span::styled(
                     format!("Hist: {} ", format_token_count(d.history_tokens)),
-                    Style::default().fg(Color::White).add_modifier(Modifier::BOLD),
+                    Style::default()
+                        .fg(Color::White)
+                        .add_modifier(Modifier::BOLD),
                 ),
                 Span::styled("█ ", Style::default().fg(Color::Yellow)),
                 Span::styled(
                     format!("Tools: {} ", format_token_count(d.tools_tokens)),
-                    Style::default().fg(Color::White).add_modifier(Modifier::BOLD),
+                    Style::default()
+                        .fg(Color::White)
+                        .add_modifier(Modifier::BOLD),
                 ),
                 Span::styled("░ ", Style::default().fg(Color::Green)),
                 Span::styled(
                     format!("Free: {}", format_token_count(d.free_tokens)),
-                    Style::default().fg(Color::Green).add_modifier(Modifier::BOLD),
+                    Style::default()
+                        .fg(Color::Green)
+                        .add_modifier(Modifier::BOLD),
                 ),
                 Span::raw(" • "),
                 Span::styled(
                     format!("{:.1}% Used ", d.utilization_pct),
-                    Style::default().fg(d.utilization_color()).add_modifier(Modifier::BOLD),
+                    Style::default()
+                        .fg(d.utilization_color())
+                        .add_modifier(Modifier::BOLD),
                 ),
                 Span::styled(
                     d.utilization_alert.badge(),
@@ -2046,7 +2090,9 @@ impl<'a> Widget for ContextProgressBarWidget<'a> {
             String::new()
         };
 
-        let bar_width = (area.width as usize).saturating_sub(suffix.len() + 2).max(4);
+        let bar_width = (area.width as usize)
+            .saturating_sub(suffix.len() + 2)
+            .max(4);
         let filled_chars = ((d.utilization_pct / 100.0) * bar_width as f32).round() as usize;
         let filled = filled_chars.min(bar_width);
         let empty = bar_width.saturating_sub(filled);
@@ -2101,13 +2147,34 @@ impl<'a> ContextInspectorWidget<'a> {
         let (status_badge, _) = d.utilization_badge();
 
         let title_line = Line::from(vec![
-            Span::styled(" 🧠 CONTEXT WINDOW & TOKEN BUDGET ", Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD)),
-            Span::styled(format!("• Model: {} ", d.model), Style::default().fg(Color::White).add_modifier(Modifier::BOLD)),
             Span::styled(
-                format!("(Capacity: {} • Used: {} / {:.1}%) ", d.format_capacity(), format_token_count(d.used_tokens), d.utilization_pct),
+                " 🧠 CONTEXT WINDOW & TOKEN BUDGET ",
+                Style::default()
+                    .fg(Color::Cyan)
+                    .add_modifier(Modifier::BOLD),
+            ),
+            Span::styled(
+                format!("• Model: {} ", d.model),
+                Style::default()
+                    .fg(Color::White)
+                    .add_modifier(Modifier::BOLD),
+            ),
+            Span::styled(
+                format!(
+                    "(Capacity: {} • Used: {} / {:.1}%) ",
+                    d.format_capacity(),
+                    format_token_count(d.used_tokens),
+                    d.utilization_pct
+                ),
                 Style::default().fg(Color::Gray),
             ),
-            Span::styled(format!(" {} ", status_badge), Style::default().fg(Color::Black).bg(status_color).add_modifier(Modifier::BOLD)),
+            Span::styled(
+                format!(" {} ", status_badge),
+                Style::default()
+                    .fg(Color::Black)
+                    .bg(status_color)
+                    .add_modifier(Modifier::BOLD),
+            ),
         ]);
 
         buf.set_line(area.x, area.y, &title_line, area.width);
@@ -2190,7 +2257,11 @@ impl<'a> ContextInspectorWidget<'a> {
             let card_block = Block::default()
                 .title(format!(" {} {} ", cat.icon(), cat.name()))
                 .borders(Borders::ALL)
-                .border_type(if is_selected { BorderType::Thick } else { BorderType::Rounded })
+                .border_type(if is_selected {
+                    BorderType::Thick
+                } else {
+                    BorderType::Rounded
+                })
                 .border_style(Style::default().fg(border_color));
 
             let inner = card_block.inner(card_chunks[i]);
@@ -2200,7 +2271,9 @@ impl<'a> ContextInspectorWidget<'a> {
                 let line1 = Line::from(vec![
                     Span::styled(
                         format!("{}", stats.formatted_tokens),
-                        Style::default().fg(cat.ratatui_color(theme)).add_modifier(Modifier::BOLD),
+                        Style::default()
+                            .fg(cat.ratatui_color(theme))
+                            .add_modifier(Modifier::BOLD),
                     ),
                     Span::styled(
                         format!(" ({:.1}%)", stats.pct_of_total),
@@ -2209,12 +2282,10 @@ impl<'a> ContextInspectorWidget<'a> {
                 ]);
                 buf.set_line(inner.x, inner.y, &line1, inner.width);
 
-                let line2 = Line::from(vec![
-                    Span::styled(
-                        format!("{} {}", stats.item_count, stats.item_label),
-                        Style::default().fg(Color::DarkGray),
-                    ),
-                ]);
+                let line2 = Line::from(vec![Span::styled(
+                    format!("{} {}", stats.item_count, stats.item_label),
+                    Style::default().fg(Color::DarkGray),
+                )]);
                 buf.set_line(inner.x, inner.y + 1, &line2, inner.width);
             }
         }
@@ -2241,34 +2312,85 @@ impl<'a> ContextInspectorWidget<'a> {
             let mut budget_lines = Vec::new();
             budget_lines.push(Line::from(vec![
                 Span::styled("• Total Capacity:     ", Style::default().fg(Color::Gray)),
-                Span::styled(d.format_capacity(), Style::default().fg(Color::White).add_modifier(Modifier::BOLD)),
-                Span::styled(format!(" ({:.1}% effective budget)", (d.effective_budget as f32 / d.max_context.max(1) as f32) * 100.0), Style::default().fg(Color::DarkGray)),
+                Span::styled(
+                    d.format_capacity(),
+                    Style::default()
+                        .fg(Color::White)
+                        .add_modifier(Modifier::BOLD),
+                ),
+                Span::styled(
+                    format!(
+                        " ({:.1}% effective budget)",
+                        (d.effective_budget as f32 / d.max_context.max(1) as f32) * 100.0
+                    ),
+                    Style::default().fg(Color::DarkGray),
+                ),
             ]));
             budget_lines.push(Line::from(vec![
                 Span::styled("• Prompt Tokens:      ", Style::default().fg(Color::Gray)),
-                Span::styled(format!("{} ({} cumulative)", format_token_count(d.used_tokens), d.format_prompt_tokens()), Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD)),
+                Span::styled(
+                    format!(
+                        "{} ({} cumulative)",
+                        format_token_count(d.used_tokens),
+                        d.format_prompt_tokens()
+                    ),
+                    Style::default()
+                        .fg(Color::Cyan)
+                        .add_modifier(Modifier::BOLD),
+                ),
             ]));
             budget_lines.push(Line::from(vec![
                 Span::styled("• Completion Tokens:  ", Style::default().fg(Color::Gray)),
-                Span::styled(d.format_completion_tokens(), Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD)),
-                Span::styled(format!(" across {} turn{}", d.total_turns, if d.total_turns == 1 { "" } else { "s" }), Style::default().fg(Color::Gray)),
+                Span::styled(
+                    d.format_completion_tokens(),
+                    Style::default()
+                        .fg(Color::Yellow)
+                        .add_modifier(Modifier::BOLD),
+                ),
+                Span::styled(
+                    format!(
+                        " across {} turn{}",
+                        d.total_turns,
+                        if d.total_turns == 1 { "" } else { "s" }
+                    ),
+                    Style::default().fg(Color::Gray),
+                ),
             ]));
             budget_lines.push(Line::from(vec![
                 Span::styled("• Cache Usage:        ", Style::default().fg(Color::Gray)),
                 Span::styled(
-                    format!("{} Read • {} Written ", d.format_cache_read_tokens(), d.format_cache_write_tokens()),
-                    Style::default().fg(Color::Green).add_modifier(Modifier::BOLD),
+                    format!(
+                        "{} Read • {} Written ",
+                        d.format_cache_read_tokens(),
+                        d.format_cache_write_tokens()
+                    ),
+                    Style::default()
+                        .fg(Color::Green)
+                        .add_modifier(Modifier::BOLD),
                 ),
-                Span::styled(format!("(Hit Rate: {:.1}%)", d.cache_hit_rate()), Style::default().fg(Color::White)),
+                Span::styled(
+                    format!("(Hit Rate: {:.1}%)", d.cache_hit_rate()),
+                    Style::default().fg(Color::White),
+                ),
             ]));
             budget_lines.push(Line::from(vec![
                 Span::styled("• Context Alert:      ", Style::default().fg(Color::Gray)),
-                Span::styled(d.utilization_alert.label(), Style::default().fg(d.utilization_color()).add_modifier(Modifier::BOLD)),
+                Span::styled(
+                    d.utilization_alert.label(),
+                    Style::default()
+                        .fg(d.utilization_color())
+                        .add_modifier(Modifier::BOLD),
+                ),
             ]));
 
             for (idx, line) in budget_lines.iter().enumerate() {
                 if idx < budget_inner.height as usize {
-                    buf.set_line(budget_inner.x, budget_inner.y + idx as u16, line, budget_inner.width);
+                    buf.set_line(
+                        budget_inner.x,
+                        budget_inner.y + idx as u16,
+                        line,
+                        budget_inner.width,
+                    );
                 }
             }
 
@@ -2286,20 +2408,45 @@ impl<'a> ContextInspectorWidget<'a> {
                 buf.set_line(
                     top_inner.x,
                     top_inner.y,
-                    &Line::from(Span::styled("No conversation messages in session", Style::default().fg(Color::DarkGray))),
+                    &Line::from(Span::styled(
+                        "No conversation messages in session",
+                        Style::default().fg(Color::DarkGray),
+                    )),
                     top_inner.width,
                 );
             } else {
                 for (idx, msg) in top_msgs.iter().enumerate() {
                     if idx < top_inner.height as usize {
                         let line = Line::from(vec![
-                            Span::styled(format!("#{:<2} ", msg.index + 1), Style::default().fg(Color::DarkGray)),
-                            Span::styled(format!("{:<6} ", msg.role_badge()), Style::default().fg(msg.role_color())),
-                            Span::styled(format!("{:<6} ", msg.formatted_tokens), Style::default().fg(Color::White).add_modifier(Modifier::BOLD)),
-                            Span::styled(format!("({:.1}%) ", msg.pct_of_history), Style::default().fg(Color::Gray)),
-                            Span::styled(msg.preview.chars().take(24).collect::<String>(), Style::default().fg(Color::DarkGray)),
+                            Span::styled(
+                                format!("#{:<2} ", msg.index + 1),
+                                Style::default().fg(Color::DarkGray),
+                            ),
+                            Span::styled(
+                                format!("{:<6} ", msg.role_badge()),
+                                Style::default().fg(msg.role_color()),
+                            ),
+                            Span::styled(
+                                format!("{:<6} ", msg.formatted_tokens),
+                                Style::default()
+                                    .fg(Color::White)
+                                    .add_modifier(Modifier::BOLD),
+                            ),
+                            Span::styled(
+                                format!("({:.1}%) ", msg.pct_of_history),
+                                Style::default().fg(Color::Gray),
+                            ),
+                            Span::styled(
+                                msg.preview.chars().take(24).collect::<String>(),
+                                Style::default().fg(Color::DarkGray),
+                            ),
                         ]);
-                        buf.set_line(top_inner.x, top_inner.y + idx as u16, &line, top_inner.width);
+                        buf.set_line(
+                            top_inner.x,
+                            top_inner.y + idx as u16,
+                            &line,
+                            top_inner.width,
+                        );
                     }
                 }
             }
@@ -2346,16 +2493,8 @@ impl<'a> ContextInspectorWidget<'a> {
                 b.tool_definitions_tokens,
                 b.tool_definitions_pct,
             ),
-            (
-                SystemSectionCategory::Skills,
-                b.skills_tokens,
-                b.skills_pct,
-            ),
-            (
-                SystemSectionCategory::Memory,
-                b.memory_tokens,
-                b.memory_pct,
-            ),
+            (SystemSectionCategory::Skills, b.skills_tokens, b.skills_pct),
+            (SystemSectionCategory::Memory, b.memory_tokens, b.memory_pct),
         ];
 
         for (i, (cat, tokens, pct)) in pillars.iter().enumerate() {
@@ -2372,12 +2511,11 @@ impl<'a> ContextInspectorWidget<'a> {
                 let line1 = Line::from(vec![
                     Span::styled(
                         format_token_count(*tokens),
-                        Style::default().fg(cat.color()).add_modifier(Modifier::BOLD),
+                        Style::default()
+                            .fg(cat.color())
+                            .add_modifier(Modifier::BOLD),
                     ),
-                    Span::styled(
-                        format!(" ({:.1}%)", pct),
-                        Style::default().fg(Color::Gray),
-                    ),
+                    Span::styled(format!(" ({:.1}%)", pct), Style::default().fg(Color::Gray)),
                 ]);
                 buf.set_line(inner.x, inner.y, &line1, inner.width);
             }
@@ -2418,26 +2556,45 @@ impl<'a> ContextInspectorWidget<'a> {
 
             let is_selected = self.state.selected_index == idx;
             let title_style = if is_selected {
-                Style::default().fg(Color::Black).bg(Color::Cyan).add_modifier(Modifier::BOLD)
+                Style::default()
+                    .fg(Color::Black)
+                    .bg(Color::Cyan)
+                    .add_modifier(Modifier::BOLD)
             } else {
-                Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD)
+                Style::default()
+                    .fg(Color::Cyan)
+                    .add_modifier(Modifier::BOLD)
             };
 
             let line1 = Line::from(vec![
-                Span::styled(format!(" {} ", sec.category.badge()), Style::default().fg(sec.category.color()).add_modifier(Modifier::BOLD)),
+                Span::styled(
+                    format!(" {} ", sec.category.badge()),
+                    Style::default()
+                        .fg(sec.category.color())
+                        .add_modifier(Modifier::BOLD),
+                ),
                 Span::styled(format!("📌 {} ", sec.title), title_style),
                 Span::styled(
-                    format!("• {} tokens ({:.1}% of system, {:.2}% total) ", sec.formatted_tokens, sec.pct_of_system, sec.pct_of_total),
+                    format!(
+                        "• {} tokens ({:.1}% of system, {:.2}% total) ",
+                        sec.formatted_tokens, sec.pct_of_system, sec.pct_of_total
+                    ),
                     Style::default().fg(Color::White),
                 ),
-                Span::styled(format!("• {} lines", sec.line_count), Style::default().fg(Color::Gray)),
+                Span::styled(
+                    format!("• {} lines", sec.line_count),
+                    Style::default().fg(Color::Gray),
+                ),
             ]);
             buf.set_line(list_inner.x, y, &line1, list_inner.width);
 
             let line2 = Line::from(vec![
                 Span::raw("      "),
                 Span::styled(
-                    sec.preview.chars().take(list_inner.width.saturating_sub(8) as usize).collect::<String>(),
+                    sec.preview
+                        .chars()
+                        .take(list_inner.width.saturating_sub(8) as usize)
+                        .collect::<String>(),
                     Style::default().fg(Color::DarkGray),
                 ),
             ]);
@@ -2479,11 +2636,36 @@ impl<'a> ContextInspectorWidget<'a> {
         // Table Header
         if inner.height >= 2 {
             let header = Line::from(vec![
-                Span::styled("  #  ", Style::default().fg(Color::Gray).add_modifier(Modifier::BOLD)),
-                Span::styled("Role       ", Style::default().fg(Color::Gray).add_modifier(Modifier::BOLD)),
-                Span::styled("Tokens    ", Style::default().fg(Color::Gray).add_modifier(Modifier::BOLD)),
-                Span::styled("Share   ", Style::default().fg(Color::Gray).add_modifier(Modifier::BOLD)),
-                Span::styled("Preview", Style::default().fg(Color::Gray).add_modifier(Modifier::BOLD)),
+                Span::styled(
+                    "  #  ",
+                    Style::default()
+                        .fg(Color::Gray)
+                        .add_modifier(Modifier::BOLD),
+                ),
+                Span::styled(
+                    "Role       ",
+                    Style::default()
+                        .fg(Color::Gray)
+                        .add_modifier(Modifier::BOLD),
+                ),
+                Span::styled(
+                    "Tokens    ",
+                    Style::default()
+                        .fg(Color::Gray)
+                        .add_modifier(Modifier::BOLD),
+                ),
+                Span::styled(
+                    "Share   ",
+                    Style::default()
+                        .fg(Color::Gray)
+                        .add_modifier(Modifier::BOLD),
+                ),
+                Span::styled(
+                    "Preview",
+                    Style::default()
+                        .fg(Color::Gray)
+                        .add_modifier(Modifier::BOLD),
+                ),
             ]);
             buf.set_line(inner.x, inner.y, &header, inner.width);
         }
@@ -2501,20 +2683,37 @@ impl<'a> ContextInspectorWidget<'a> {
                 Span::styled(
                     format!(" {:<3} ", idx + 1),
                     if is_selected {
-                        Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD)
+                        Style::default()
+                            .fg(Color::Yellow)
+                            .add_modifier(Modifier::BOLD)
                     } else {
                         Style::default().fg(Color::DarkGray)
                     },
                 ),
                 Span::styled(
                     format!("{:<10} ", msg.role_badge()),
-                    Style::default().fg(msg.role_color()).add_modifier(Modifier::BOLD),
+                    Style::default()
+                        .fg(msg.role_color())
+                        .add_modifier(Modifier::BOLD),
                 ),
-                Span::styled(format!("{:<9} ", msg.formatted_tokens), Style::default().fg(Color::White)),
-                Span::styled(format!("{:>4.1}%  ", msg.pct_of_history), Style::default().fg(Color::Gray)),
                 Span::styled(
-                    msg.preview.chars().take(inner.width.saturating_sub(32) as usize).collect::<String>(),
-                    Style::default().fg(if is_selected { Color::White } else { Color::DarkGray }),
+                    format!("{:<9} ", msg.formatted_tokens),
+                    Style::default().fg(Color::White),
+                ),
+                Span::styled(
+                    format!("{:>4.1}%  ", msg.pct_of_history),
+                    Style::default().fg(Color::Gray),
+                ),
+                Span::styled(
+                    msg.preview
+                        .chars()
+                        .take(inner.width.saturating_sub(32) as usize)
+                        .collect::<String>(),
+                    Style::default().fg(if is_selected {
+                        Color::White
+                    } else {
+                        Color::DarkGray
+                    }),
                 ),
             ]);
 
@@ -2556,12 +2755,42 @@ impl<'a> ContextInspectorWidget<'a> {
         // Header
         if inner.height >= 2 {
             let header = Line::from(vec![
-                Span::styled("  Tool Name          ", Style::default().fg(Color::Gray).add_modifier(Modifier::BOLD)),
-                Span::styled("Category            ", Style::default().fg(Color::Gray).add_modifier(Modifier::BOLD)),
-                Span::styled("Params ", Style::default().fg(Color::Gray).add_modifier(Modifier::BOLD)),
-                Span::styled("Tokens    ", Style::default().fg(Color::Gray).add_modifier(Modifier::BOLD)),
-                Span::styled("Share   ", Style::default().fg(Color::Gray).add_modifier(Modifier::BOLD)),
-                Span::styled("Description", Style::default().fg(Color::Gray).add_modifier(Modifier::BOLD)),
+                Span::styled(
+                    "  Tool Name          ",
+                    Style::default()
+                        .fg(Color::Gray)
+                        .add_modifier(Modifier::BOLD),
+                ),
+                Span::styled(
+                    "Category            ",
+                    Style::default()
+                        .fg(Color::Gray)
+                        .add_modifier(Modifier::BOLD),
+                ),
+                Span::styled(
+                    "Params ",
+                    Style::default()
+                        .fg(Color::Gray)
+                        .add_modifier(Modifier::BOLD),
+                ),
+                Span::styled(
+                    "Tokens    ",
+                    Style::default()
+                        .fg(Color::Gray)
+                        .add_modifier(Modifier::BOLD),
+                ),
+                Span::styled(
+                    "Share   ",
+                    Style::default()
+                        .fg(Color::Gray)
+                        .add_modifier(Modifier::BOLD),
+                ),
+                Span::styled(
+                    "Description",
+                    Style::default()
+                        .fg(Color::Gray)
+                        .add_modifier(Modifier::BOLD),
+                ),
             ]);
             buf.set_line(inner.x, inner.y, &header, inner.width);
         }
@@ -2579,17 +2808,36 @@ impl<'a> ContextInspectorWidget<'a> {
                 Span::styled(
                     format!("  {:<18} ", tool.name),
                     if is_selected {
-                        Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD)
+                        Style::default()
+                            .fg(Color::Yellow)
+                            .add_modifier(Modifier::BOLD)
                     } else {
                         Style::default().fg(Color::Cyan)
                     },
                 ),
-                Span::styled(format!("{:<19} ", tool.category), Style::default().fg(Color::Gray)),
-                Span::styled(format!("{:<6} ", tool.param_count), Style::default().fg(Color::White)),
-                Span::styled(format!("{:<9} ", tool.formatted_tokens), Style::default().fg(Color::White).add_modifier(Modifier::BOLD)),
-                Span::styled(format!("{:>4.1}%  ", tool.pct_of_tools), Style::default().fg(Color::Gray)),
                 Span::styled(
-                    tool.description.chars().take(inner.width.saturating_sub(65) as usize).collect::<String>(),
+                    format!("{:<19} ", tool.category),
+                    Style::default().fg(Color::Gray),
+                ),
+                Span::styled(
+                    format!("{:<6} ", tool.param_count),
+                    Style::default().fg(Color::White),
+                ),
+                Span::styled(
+                    format!("{:<9} ", tool.formatted_tokens),
+                    Style::default()
+                        .fg(Color::White)
+                        .add_modifier(Modifier::BOLD),
+                ),
+                Span::styled(
+                    format!("{:>4.1}%  ", tool.pct_of_tools),
+                    Style::default().fg(Color::Gray),
+                ),
+                Span::styled(
+                    tool.description
+                        .chars()
+                        .take(inner.width.saturating_sub(65) as usize)
+                        .collect::<String>(),
                     Style::default().fg(Color::DarkGray),
                 ),
             ]);
@@ -2617,49 +2865,80 @@ impl<'a> ContextInspectorWidget<'a> {
         }
 
         let mut lines = Vec::new();
-        lines.push(Line::from(vec![
-            Span::styled(
-                "Current vs Projected Post-Compaction Context Window:",
-                Style::default().fg(Color::White).add_modifier(Modifier::BOLD),
-            ),
-        ]));
+        lines.push(Line::from(vec![Span::styled(
+            "Current vs Projected Post-Compaction Context Window:",
+            Style::default()
+                .fg(Color::White)
+                .add_modifier(Modifier::BOLD),
+        )]));
 
         lines.push(Line::from(vec![
-            Span::styled("• Current Used Tokens:    ", Style::default().fg(Color::Gray)),
+            Span::styled(
+                "• Current Used Tokens:    ",
+                Style::default().fg(Color::Gray),
+            ),
             Span::styled(
                 format!("{} tokens ", format_token_count(d.used_tokens)),
                 Style::default().fg(Color::Red).add_modifier(Modifier::BOLD),
             ),
             Span::styled(
-                format!("({:.1}% utilization, {} free headroom)", d.utilization_pct, format_token_count(d.free_tokens)),
+                format!(
+                    "({:.1}% utilization, {} free headroom)",
+                    d.utilization_pct,
+                    format_token_count(d.free_tokens)
+                ),
                 Style::default().fg(Color::Gray),
             ),
         ]));
 
         lines.push(Line::from(vec![
-            Span::styled("• Projected Post-Compact: ", Style::default().fg(Color::Gray)),
+            Span::styled(
+                "• Projected Post-Compact: ",
+                Style::default().fg(Color::Gray),
+            ),
             Span::styled(
                 format!("{} tokens ", format_token_count(p.projected_total_tokens)),
-                Style::default().fg(Color::Green).add_modifier(Modifier::BOLD),
+                Style::default()
+                    .fg(Color::Green)
+                    .add_modifier(Modifier::BOLD),
             ),
             Span::styled(
-                format!("({:.1}% utilization, {} free headroom)", p.projected_utilization_pct, format_token_count(p.projected_free_tokens)),
+                format!(
+                    "({:.1}% utilization, {} free headroom)",
+                    p.projected_utilization_pct,
+                    format_token_count(p.projected_free_tokens)
+                ),
                 Style::default().fg(Color::Gray),
             ),
         ]));
 
         lines.push(Line::from(vec![
-            Span::styled("• Projected Token Savings:", Style::default().fg(Color::Gray)),
             Span::styled(
-                format!("-{} tokens (-{:.1}% reduction in history)", format_token_count(p.tokens_saved), p.reduction_pct),
-                Style::default().fg(Color::Green).add_modifier(Modifier::BOLD),
+                "• Projected Token Savings:",
+                Style::default().fg(Color::Gray),
+            ),
+            Span::styled(
+                format!(
+                    "-{} tokens (-{:.1}% reduction in history)",
+                    format_token_count(p.tokens_saved),
+                    p.reduction_pct
+                ),
+                Style::default()
+                    .fg(Color::Green)
+                    .add_modifier(Modifier::BOLD),
             ),
         ]));
 
         lines.push(Line::from(vec![
-            Span::styled("• Pruning Operations:     ", Style::default().fg(Color::Gray)),
             Span::styled(
-                format!("{} older tool execution outputs pruned & {} historical turns summarized", p.pruned_tool_count, p.summarized_turn_count),
+                "• Pruning Operations:     ",
+                Style::default().fg(Color::Gray),
+            ),
+            Span::styled(
+                format!(
+                    "{} older tool execution outputs pruned & {} historical turns summarized",
+                    p.pruned_tool_count, p.summarized_turn_count
+                ),
                 Style::default().fg(Color::White),
             ),
         ]));
@@ -2667,10 +2946,23 @@ impl<'a> ContextInspectorWidget<'a> {
         lines.push(Line::raw(""));
         lines.push(Line::from(vec![
             Span::styled("Press ", Style::default().fg(Color::Gray)),
-            Span::styled("[ Enter ]", Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD)),
+            Span::styled(
+                "[ Enter ]",
+                Style::default()
+                    .fg(Color::Yellow)
+                    .add_modifier(Modifier::BOLD),
+            ),
             Span::styled(" or ", Style::default().fg(Color::Gray)),
-            Span::styled("[ c ]", Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD)),
-            Span::styled(" to execute compaction immediately in the active session.", Style::default().fg(Color::White)),
+            Span::styled(
+                "[ c ]",
+                Style::default()
+                    .fg(Color::Yellow)
+                    .add_modifier(Modifier::BOLD),
+            ),
+            Span::styled(
+                " to execute compaction immediately in the active session.",
+                Style::default().fg(Color::White),
+            ),
         ]));
 
         for (idx, line) in lines.iter().enumerate() {
@@ -2683,17 +2975,45 @@ impl<'a> ContextInspectorWidget<'a> {
     /// Renders bottom keybindings footer.
     fn render_footer(&self, area: Rect, buf: &mut Buffer) {
         let footer_spans = vec![
-            Span::styled(" Tab", Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD)),
+            Span::styled(
+                " Tab",
+                Style::default()
+                    .fg(Color::Cyan)
+                    .add_modifier(Modifier::BOLD),
+            ),
             Span::styled(":Switch Tab  ", Style::default().fg(Color::DarkGray)),
-            Span::styled("↑↓/jk", Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD)),
+            Span::styled(
+                "↑↓/jk",
+                Style::default()
+                    .fg(Color::Cyan)
+                    .add_modifier(Modifier::BOLD),
+            ),
             Span::styled(":Navigate  ", Style::default().fg(Color::DarkGray)),
-            Span::styled("Enter/Space", Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD)),
+            Span::styled(
+                "Enter/Space",
+                Style::default()
+                    .fg(Color::Cyan)
+                    .add_modifier(Modifier::BOLD),
+            ),
             Span::styled(":Inspect  ", Style::default().fg(Color::DarkGray)),
-            Span::styled("c", Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD)),
+            Span::styled(
+                "c",
+                Style::default()
+                    .fg(Color::Yellow)
+                    .add_modifier(Modifier::BOLD),
+            ),
             Span::styled(":Compact  ", Style::default().fg(Color::DarkGray)),
-            Span::styled("?", Style::default().fg(Color::White).add_modifier(Modifier::BOLD)),
+            Span::styled(
+                "?",
+                Style::default()
+                    .fg(Color::White)
+                    .add_modifier(Modifier::BOLD),
+            ),
             Span::styled(":Help  ", Style::default().fg(Color::DarkGray)),
-            Span::styled("Esc/q", Style::default().fg(Color::Red).add_modifier(Modifier::BOLD)),
+            Span::styled(
+                "Esc/q",
+                Style::default().fg(Color::Red).add_modifier(Modifier::BOLD),
+            ),
             Span::styled(":Close", Style::default().fg(Color::DarkGray)),
         ];
 
@@ -2737,7 +3057,12 @@ impl<'a> ContextInspectorWidget<'a> {
         for (idx, (key, desc)) in help_lines.iter().enumerate() {
             if idx < inner.height as usize {
                 let line = Line::from(vec![
-                    Span::styled(format!("  {:<16} ", key), Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD)),
+                    Span::styled(
+                        format!("  {:<16} ", key),
+                        Style::default()
+                            .fg(Color::Cyan)
+                            .add_modifier(Modifier::BOLD),
+                    ),
                     Span::styled(*desc, Style::default().fg(Color::White)),
                 ]);
                 buf.set_line(inner.x, inner.y + idx as u16, &line, inner.width);
@@ -2773,13 +3098,14 @@ impl<'a> Widget for ContextInspectorWidget<'a> {
         self.render_header(chunks[0], buf);
 
         // 2. Visual Stacked Bar
-        let bar_widget = ContextBarWidget::new(self.distribution, &self.state.theme)
-            .with_options(ContextBarOptions {
+        let bar_widget = ContextBarWidget::new(self.distribution, &self.state.theme).with_options(
+            ContextBarOptions {
                 show_labels: false,
                 show_percentages: false,
                 show_legend: false,
                 compact: true,
-            });
+            },
+        );
         bar_widget.render(chunks[1], buf);
 
         // 3. Tab Bar
@@ -2817,9 +3143,21 @@ pub fn render_context_bar_ansi(d: &ContextDistribution, bar_width: usize) -> Str
     let hist_w = ((d.history_tokens as f32 / total) * width as f32).round() as usize;
     let tools_w = ((d.tools_tokens as f32 / total) * width as f32).round() as usize;
 
-    let safe_sys_w = if d.system_tokens > 0 && sys_w == 0 { 1 } else { sys_w };
-    let safe_hist_w = if d.history_tokens > 0 && hist_w == 0 { 1 } else { hist_w };
-    let safe_tools_w = if d.tools_tokens > 0 && tools_w == 0 { 1 } else { tools_w };
+    let safe_sys_w = if d.system_tokens > 0 && sys_w == 0 {
+        1
+    } else {
+        sys_w
+    };
+    let safe_hist_w = if d.history_tokens > 0 && hist_w == 0 {
+        1
+    } else {
+        hist_w
+    };
+    let safe_tools_w = if d.tools_tokens > 0 && tools_w == 0 {
+        1
+    } else {
+        tools_w
+    };
 
     let used_w = safe_sys_w + safe_hist_w + safe_tools_w;
     let free_w = width.saturating_sub(used_w);
@@ -2944,8 +3282,7 @@ pub fn render_context_inspector_ansi(d: &ContextDistribution, width: usize) -> S
 
     out.push_str(&format!(
         "  {ANSI_BOLD_GREEN}🟢 Free Budget:{ANSI_RESET} {:<7} ({:>4.1}%) • unallocated headroom\n",
-        d.free_stats.formatted_tokens,
-        d.free_stats.pct_of_total,
+        d.free_stats.formatted_tokens, d.free_stats.pct_of_total,
     ));
 
     // Session Token Budget & Cache line
@@ -3030,7 +3367,9 @@ fn run_context_inspector_loop(
         if event::poll(std::time::Duration::from_millis(100))? {
             if let Event::Key(key_event) = event::read()? {
                 if key_event.kind == KeyEventKind::Press {
-                    if let Some(action) = state.handle_key(key_event.code, key_event.modifiers, dist) {
+                    if let Some(action) =
+                        state.handle_key(key_event.code, key_event.modifiers, dist)
+                    {
                         return Ok(Some(action));
                     }
                 }
@@ -3078,9 +3417,16 @@ mod tests {
     fn sample_messages() -> Vec<Message> {
         vec![
             Message::user("Please analyze src/ui/budget.rs and tell me how it works."),
-            Message::assistant("Certainly! Let me inspect the budget warning banners and thresholds."),
-            Message::tool_result("call_1", "Contents of budget.rs: 1400 lines of pure Rust code..."),
-            Message::assistant("The budget module provides warning banners at 80% and 95% capacity."),
+            Message::assistant(
+                "Certainly! Let me inspect the budget warning banners and thresholds.",
+            ),
+            Message::tool_result(
+                "call_1",
+                "Contents of budget.rs: 1400 lines of pure Rust code...",
+            ),
+            Message::assistant(
+                "The budget module provides warning banners at 80% and 95% capacity.",
+            ),
         ]
     }
 
@@ -3088,9 +3434,15 @@ mod tests {
     fn test_context_distribution_calculation() {
         let tools = sample_tools();
         let messages = sample_messages();
-        let sys_prompt = "# Directives\nYou are an expert assistant.\n# Constraints\nPure Rust only.";
+        let sys_prompt =
+            "# Directives\nYou are an expert assistant.\n# Constraints\nPure Rust only.";
 
-        let dist = ContextDistribution::from_parts("claude-3-5-sonnet", Some(sys_prompt), &messages, &tools);
+        let dist = ContextDistribution::from_parts(
+            "claude-3-5-sonnet",
+            Some(sys_prompt),
+            &messages,
+            &tools,
+        );
 
         assert_eq!(dist.model, "claude-3-5-sonnet");
         assert_eq!(dist.max_context, 200_000);
@@ -3098,8 +3450,14 @@ mod tests {
         assert!(dist.system_tokens > 0);
         assert!(dist.history_tokens > 0);
         assert!(dist.tools_tokens > 0);
-        assert_eq!(dist.used_tokens, dist.system_tokens + dist.history_tokens + dist.tools_tokens);
-        assert_eq!(dist.free_tokens, dist.max_context.saturating_sub(dist.used_tokens));
+        assert_eq!(
+            dist.used_tokens,
+            dist.system_tokens + dist.history_tokens + dist.tools_tokens
+        );
+        assert_eq!(
+            dist.free_tokens,
+            dist.max_context.saturating_sub(dist.used_tokens)
+        );
 
         // Proportions
         assert!(dist.system_pct > 0.0);
@@ -3240,7 +3598,12 @@ Working directory is `/workspace/fusion`. Bookmarked 12 symbols.
     fn test_ansi_rendering_outputs() {
         let tools = sample_tools();
         let messages = sample_messages();
-        let dist = ContextDistribution::from_parts("claude-3-5-sonnet", Some("System prompt"), &messages, &tools);
+        let dist = ContextDistribution::from_parts(
+            "claude-3-5-sonnet",
+            Some("System prompt"),
+            &messages,
+            &tools,
+        );
 
         let bar_str = render_context_bar_ansi(&dist, 36);
         assert!(bar_str.starts_with('['));
@@ -3268,7 +3631,12 @@ Working directory is `/workspace/fusion`. Bookmarked 12 symbols.
 
     #[test]
     fn test_context_bar_widget_ratatui_buffer() {
-        let dist = ContextDistribution::from_parts("claude-3-5-sonnet", Some("System prompt"), &sample_messages(), &sample_tools());
+        let dist = ContextDistribution::from_parts(
+            "claude-3-5-sonnet",
+            Some("System prompt"),
+            &sample_messages(),
+            &sample_tools(),
+        );
         let theme = Theme::auto();
 
         let widget = ContextBarWidget::new(&dist, &theme).with_options(ContextBarOptions {
@@ -3288,8 +3656,15 @@ Working directory is `/workspace/fusion`. Bookmarked 12 symbols.
 
     #[test]
     fn test_context_progress_bar_widget_ratatui_buffer() {
-        let dist = ContextDistribution::from_parts("claude-3-5-sonnet", Some("System prompt"), &sample_messages(), &sample_tools());
-        let widget = ContextProgressBarWidget::new(&dist).with_percentage(true).with_capacity(true);
+        let dist = ContextDistribution::from_parts(
+            "claude-3-5-sonnet",
+            Some("System prompt"),
+            &sample_messages(),
+            &sample_tools(),
+        );
+        let widget = ContextProgressBarWidget::new(&dist)
+            .with_percentage(true)
+            .with_capacity(true);
 
         let mut buffer = Buffer::empty(Rect::new(0, 0, 60, 1));
         widget.render(Rect::new(0, 0, 60, 1), &mut buffer);
@@ -3300,7 +3675,12 @@ Working directory is `/workspace/fusion`. Bookmarked 12 symbols.
 
     #[test]
     fn test_context_inspector_widget_ratatui_buffer_all_tabs() {
-        let dist = ContextDistribution::from_parts("claude-3-5-sonnet", Some("# Sys\nRules\n# Skills\nWorkflow\n# Memory\nState"), &sample_messages(), &sample_tools());
+        let dist = ContextDistribution::from_parts(
+            "claude-3-5-sonnet",
+            Some("# Sys\nRules\n# Skills\nWorkflow\n# Memory\nState"),
+            &sample_messages(),
+            &sample_tools(),
+        );
 
         for tab in ContextInspectorTab::ALL {
             let mut state = ContextInspectorState::new();
@@ -3318,7 +3698,12 @@ Working directory is `/workspace/fusion`. Bookmarked 12 symbols.
 
     #[test]
     fn test_state_tab_and_navigation() {
-        let dist = ContextDistribution::from_parts("claude-3-5-sonnet", None, &sample_messages(), &sample_tools());
+        let dist = ContextDistribution::from_parts(
+            "claude-3-5-sonnet",
+            None,
+            &sample_messages(),
+            &sample_tools(),
+        );
         let mut state = ContextInspectorState::new();
 
         assert_eq!(state.active_tab, ContextInspectorTab::Overview);

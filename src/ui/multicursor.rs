@@ -27,7 +27,9 @@ use std::fmt;
 // ---------------------------------------------------------------------------
 
 /// 2D text coordinate (0-indexed line and character column).
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize, Default)]
+#[derive(
+    Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize, Default,
+)]
 pub struct Position {
     /// 0-indexed line number.
     pub line: usize,
@@ -562,7 +564,11 @@ impl MultiCursorState {
         }
 
         // Retain primary identity
-        let primary_offset = self.cursors.get(self.primary_idx).map(|c| c.offset).unwrap_or(0);
+        let primary_offset = self
+            .cursors
+            .get(self.primary_idx)
+            .map(|c| c.offset)
+            .unwrap_or(0);
 
         // Sort by start position
         self.cursors.sort_by(|a, b| {
@@ -642,13 +648,19 @@ impl MultiCursorState {
     }
 
     /// Find next occurrence of current selected text or word under cursor and add cursor.
-    pub fn add_cursor_at_next_match(&mut self, buffer: &MultilineBuffer, case_sensitive: bool) -> bool {
+    pub fn add_cursor_at_next_match(
+        &mut self,
+        buffer: &MultilineBuffer,
+        case_sensitive: bool,
+    ) -> bool {
         let pattern = if self.primary().has_selection() {
             let sel = self.primary().selection();
             buffer.slice(sel.start(), sel.end())
         } else {
             // Find word under primary cursor
-            if let Some((start, end)) = LineJumpHelper::find_word_range_at(buffer.chars(), self.primary().offset) {
+            if let Some((start, end)) =
+                LineJumpHelper::find_word_range_at(buffer.chars(), self.primary().offset)
+            {
                 // Select word first if not selected
                 let prim = self.primary_mut();
                 *prim = Cursor::with_selection(start, end);
@@ -699,7 +711,9 @@ impl MultiCursorState {
         let pattern = if self.primary().has_selection() {
             let sel = self.primary().selection();
             buffer.slice(sel.start(), sel.end())
-        } else if let Some((start, end)) = LineJumpHelper::find_word_range_at(buffer.chars(), self.primary().offset) {
+        } else if let Some((start, end)) =
+            LineJumpHelper::find_word_range_at(buffer.chars(), self.primary().offset)
+        {
             buffer.slice(start, end)
         } else {
             return 0;
@@ -713,8 +727,16 @@ impl MultiCursorState {
         let pattern_len = pattern.chars().count();
         let mut new_cursors = Vec::new();
 
-        let pat_to_find = if case_sensitive { pattern.clone() } else { pattern.to_lowercase() };
-        let haystack = if case_sensitive { full_text.clone() } else { full_text.to_lowercase() };
+        let pat_to_find = if case_sensitive {
+            pattern.clone()
+        } else {
+            pattern.to_lowercase()
+        };
+        let haystack = if case_sensitive {
+            full_text.clone()
+        } else {
+            full_text.to_lowercase()
+        };
 
         let mut search_idx = 0;
         while let Some(found_idx) = haystack[search_idx..].find(&pat_to_find) {
@@ -1043,7 +1065,10 @@ impl WordWrapEngine {
 /// Helper to detect comment or blockquote prefix from lines.
 fn detect_common_prefix(lines: &[&str]) -> String {
     for prefix in &["// ", "/// ", "# ", "> ", "* ", "- "] {
-        if lines.iter().all(|l| l.trim().is_empty() || l.starts_with(prefix)) {
+        if lines
+            .iter()
+            .all(|l| l.trim().is_empty() || l.starts_with(prefix))
+        {
             return (*prefix).to_string();
         }
     }
@@ -1128,7 +1153,8 @@ impl HorizontalScrollState {
 
     /// Compute 0-indexed screen column corresponding to buffer column if visible.
     pub fn cursor_screen_col(&self, cursor_col: usize) -> Option<usize> {
-        if cursor_col >= self.scroll_offset && cursor_col < self.scroll_offset + self.viewport_width {
+        if cursor_col >= self.scroll_offset && cursor_col < self.scroll_offset + self.viewport_width
+        {
             Some(cursor_col - self.scroll_offset)
         } else {
             None
@@ -1452,49 +1478,97 @@ impl ReadlineKey {
     pub fn to_command(&self) -> ReadlineCommand {
         match self {
             ReadlineKey::Char(c) => ReadlineCommand::InsertChar(*c),
-            ReadlineKey::Ctrl('a') => ReadlineCommand::MoveLineStart { extend_selection: false },
-            ReadlineKey::Ctrl('e') => ReadlineCommand::MoveLineEnd { extend_selection: false },
+            ReadlineKey::Ctrl('a') => ReadlineCommand::MoveLineStart {
+                extend_selection: false,
+            },
+            ReadlineKey::Ctrl('e') => ReadlineCommand::MoveLineEnd {
+                extend_selection: false,
+            },
             ReadlineKey::Ctrl('k') => ReadlineCommand::KillLineToEnd,
             ReadlineKey::Ctrl('u') => ReadlineCommand::KillLineToStart,
             ReadlineKey::Ctrl('w') => ReadlineCommand::KillWordBackward,
             ReadlineKey::Ctrl('y') => ReadlineCommand::Yank,
-            ReadlineKey::Ctrl('b') => ReadlineCommand::MoveCharLeft { extend_selection: false },
-            ReadlineKey::Ctrl('f') => ReadlineCommand::MoveCharRight { extend_selection: false },
-            ReadlineKey::Ctrl('p') => ReadlineCommand::MoveLineUp { extend_selection: false },
-            ReadlineKey::Ctrl('n') => ReadlineCommand::MoveLineDown { extend_selection: false },
+            ReadlineKey::Ctrl('b') => ReadlineCommand::MoveCharLeft {
+                extend_selection: false,
+            },
+            ReadlineKey::Ctrl('f') => ReadlineCommand::MoveCharRight {
+                extend_selection: false,
+            },
+            ReadlineKey::Ctrl('p') => ReadlineCommand::MoveLineUp {
+                extend_selection: false,
+            },
+            ReadlineKey::Ctrl('n') => ReadlineCommand::MoveLineDown {
+                extend_selection: false,
+            },
             ReadlineKey::Ctrl('h') => ReadlineCommand::Backspace,
             ReadlineKey::Ctrl('d') => ReadlineCommand::Delete,
             ReadlineKey::Ctrl('t') => ReadlineCommand::TransposeChars,
             ReadlineKey::Ctrl('_') | ReadlineKey::Ctrl('z') => ReadlineCommand::Undo,
-            ReadlineKey::Alt('b') => ReadlineCommand::MoveWordLeft { extend_selection: false },
-            ReadlineKey::Alt('f') => ReadlineCommand::MoveWordRight { extend_selection: false },
+            ReadlineKey::Alt('b') => ReadlineCommand::MoveWordLeft {
+                extend_selection: false,
+            },
+            ReadlineKey::Alt('f') => ReadlineCommand::MoveWordRight {
+                extend_selection: false,
+            },
             ReadlineKey::Alt('d') => ReadlineCommand::KillWordForward,
             ReadlineKey::Alt('y') => ReadlineCommand::YankPop,
             ReadlineKey::Alt('t') => ReadlineCommand::TransposeWords,
             ReadlineKey::Alt('u') => ReadlineCommand::TransformWord(CaseTransform::Uppercase),
             ReadlineKey::Alt('l') => ReadlineCommand::TransformWord(CaseTransform::Lowercase),
             ReadlineKey::Alt('c') => ReadlineCommand::TransformWord(CaseTransform::Titlecase),
-            ReadlineKey::Alt('n') => ReadlineCommand::AddCursorNextMatch { case_sensitive: true },
-            ReadlineKey::Alt('a') => ReadlineCommand::SelectAllMatches { case_sensitive: true },
+            ReadlineKey::Alt('n') => ReadlineCommand::AddCursorNextMatch {
+                case_sensitive: true,
+            },
+            ReadlineKey::Alt('a') => ReadlineCommand::SelectAllMatches {
+                case_sensitive: true,
+            },
             ReadlineKey::Enter => ReadlineCommand::InsertNewline { auto_indent: false },
             ReadlineKey::ShiftEnter => ReadlineCommand::InsertNewline { auto_indent: true },
             ReadlineKey::Backspace => ReadlineCommand::Backspace,
             ReadlineKey::Delete => ReadlineCommand::Delete,
             ReadlineKey::Tab => ReadlineCommand::InsertStr("    ".to_string()),
-            ReadlineKey::Left => ReadlineCommand::MoveCharLeft { extend_selection: false },
-            ReadlineKey::Right => ReadlineCommand::MoveCharRight { extend_selection: false },
-            ReadlineKey::Up => ReadlineCommand::MoveLineUp { extend_selection: false },
-            ReadlineKey::Down => ReadlineCommand::MoveLineDown { extend_selection: false },
-            ReadlineKey::Home => ReadlineCommand::MoveLineStart { extend_selection: false },
-            ReadlineKey::End => ReadlineCommand::MoveLineEnd { extend_selection: false },
-            ReadlineKey::PageUp => ReadlineCommand::MoveBufferStart { extend_selection: false },
-            ReadlineKey::PageDown => ReadlineCommand::MoveBufferEnd { extend_selection: false },
-            ReadlineKey::ShiftLeft => ReadlineCommand::MoveCharLeft { extend_selection: true },
-            ReadlineKey::ShiftRight => ReadlineCommand::MoveCharRight { extend_selection: true },
-            ReadlineKey::ShiftUp => ReadlineCommand::MoveLineUp { extend_selection: true },
-            ReadlineKey::ShiftDown => ReadlineCommand::MoveLineDown { extend_selection: true },
-            ReadlineKey::CtrlLeft => ReadlineCommand::MoveWordLeft { extend_selection: false },
-            ReadlineKey::CtrlRight => ReadlineCommand::MoveWordRight { extend_selection: false },
+            ReadlineKey::Left => ReadlineCommand::MoveCharLeft {
+                extend_selection: false,
+            },
+            ReadlineKey::Right => ReadlineCommand::MoveCharRight {
+                extend_selection: false,
+            },
+            ReadlineKey::Up => ReadlineCommand::MoveLineUp {
+                extend_selection: false,
+            },
+            ReadlineKey::Down => ReadlineCommand::MoveLineDown {
+                extend_selection: false,
+            },
+            ReadlineKey::Home => ReadlineCommand::MoveLineStart {
+                extend_selection: false,
+            },
+            ReadlineKey::End => ReadlineCommand::MoveLineEnd {
+                extend_selection: false,
+            },
+            ReadlineKey::PageUp => ReadlineCommand::MoveBufferStart {
+                extend_selection: false,
+            },
+            ReadlineKey::PageDown => ReadlineCommand::MoveBufferEnd {
+                extend_selection: false,
+            },
+            ReadlineKey::ShiftLeft => ReadlineCommand::MoveCharLeft {
+                extend_selection: true,
+            },
+            ReadlineKey::ShiftRight => ReadlineCommand::MoveCharRight {
+                extend_selection: true,
+            },
+            ReadlineKey::ShiftUp => ReadlineCommand::MoveLineUp {
+                extend_selection: true,
+            },
+            ReadlineKey::ShiftDown => ReadlineCommand::MoveLineDown {
+                extend_selection: true,
+            },
+            ReadlineKey::CtrlLeft => ReadlineCommand::MoveWordLeft {
+                extend_selection: false,
+            },
+            ReadlineKey::CtrlRight => ReadlineCommand::MoveWordRight {
+                extend_selection: false,
+            },
             ReadlineKey::CtrlUp => ReadlineCommand::AddCursorAbove,
             ReadlineKey::CtrlDown => ReadlineCommand::AddCursorBelow,
             ReadlineKey::Escape => ReadlineCommand::ClearSecondaryCursors,
@@ -1660,7 +1734,10 @@ impl LineJumpHelper {
             }
         } else {
             let is_ident = is_identifier_char(chars[p - 1]);
-            while p > 0 && !chars[p - 1].is_whitespace() && is_identifier_char(chars[p - 1]) == is_ident {
+            while p > 0
+                && !chars[p - 1].is_whitespace()
+                && is_identifier_char(chars[p - 1]) == is_ident
+            {
                 p -= 1;
             }
         }
@@ -1688,7 +1765,11 @@ impl LineJumpHelper {
                     p += 1;
                 }
             } else {
-                while p < len && is_identifier_char(chars[p]) && !chars[p].is_uppercase() && chars[p] != '_' {
+                while p < len
+                    && is_identifier_char(chars[p])
+                    && !chars[p].is_uppercase()
+                    && chars[p] != '_'
+                {
                     p += 1;
                 }
             }
@@ -1996,7 +2077,11 @@ impl BlockOperations {
     }
 
     /// Move line block down by one line (swap with line below). Returns true if moved.
-    pub fn move_lines_down(buffer: &mut MultilineBuffer, start_line: usize, end_line: usize) -> bool {
+    pub fn move_lines_down(
+        buffer: &mut MultilineBuffer,
+        start_line: usize,
+        end_line: usize,
+    ) -> bool {
         if end_line + 1 >= buffer.line_count() {
             return false;
         }
@@ -2108,7 +2193,13 @@ impl BlockOperations {
     }
 
     /// Surround selection or range with opening and closing delimiters.
-    pub fn surround(buffer: &mut MultilineBuffer, start: usize, end: usize, open: &str, close: &str) {
+    pub fn surround(
+        buffer: &mut MultilineBuffer,
+        start: usize,
+        end: usize,
+        open: &str,
+        close: &str,
+    ) {
         let s = min(start, end);
         let e = max(start, end);
         let inner = buffer.slice(s, e);
@@ -2258,11 +2349,7 @@ impl BufferHistory {
     }
 
     /// Perform undo. Reverts buffer and cursors to prior snapshot.
-    pub fn undo(
-        &mut self,
-        buffer: &mut MultilineBuffer,
-        cursors: &mut MultiCursorState,
-    ) -> bool {
+    pub fn undo(&mut self, buffer: &mut MultilineBuffer, cursors: &mut MultiCursorState) -> bool {
         if let Some(snapshot) = self.undo_stack.pop() {
             self.redo_stack.push(BufferSnapshot {
                 chars: buffer.chars().to_vec(),
@@ -2277,11 +2364,7 @@ impl BufferHistory {
     }
 
     /// Perform redo. Restores previously undone snapshot.
-    pub fn redo(
-        &mut self,
-        buffer: &mut MultilineBuffer,
-        cursors: &mut MultiCursorState,
-    ) -> bool {
+    pub fn redo(&mut self, buffer: &mut MultilineBuffer, cursors: &mut MultiCursorState) -> bool {
         if let Some(snapshot) = self.redo_stack.pop() {
             self.undo_stack.push(BufferSnapshot {
                 chars: buffer.chars().to_vec(),
@@ -2729,7 +2812,8 @@ impl EditorBuffer {
                 cur.collapse();
                 killed_fragments.push(deleted);
             } else if cur.offset > 0 {
-                let word_start = LineJumpHelper::find_prev_word_boundary(self.buffer.chars(), cur.offset, false);
+                let word_start =
+                    LineJumpHelper::find_prev_word_boundary(self.buffer.chars(), cur.offset, false);
                 let deleted = self.buffer.delete_range(word_start, cur.offset);
                 cur.offset = word_start;
                 killed_fragments.push(deleted);
@@ -2774,7 +2858,8 @@ impl EditorBuffer {
                 cur.collapse();
                 killed_fragments.push(deleted);
             } else if cur.offset < self.buffer.len() {
-                let word_end = LineJumpHelper::find_next_word_boundary(self.buffer.chars(), cur.offset, false);
+                let word_end =
+                    LineJumpHelper::find_next_word_boundary(self.buffer.chars(), cur.offset, false);
                 let deleted = self.buffer.delete_range(cur.offset, word_end);
                 killed_fragments.push(deleted);
             }
@@ -2955,7 +3040,8 @@ impl EditorBuffer {
         self.last_action_was_yank = false;
 
         for cur in self.cursors.cursors_mut() {
-            let target = LineJumpHelper::find_prev_word_boundary(self.buffer.chars(), cur.offset, false);
+            let target =
+                LineJumpHelper::find_prev_word_boundary(self.buffer.chars(), cur.offset, false);
             if extend_selection {
                 if cur.anchor.is_none() {
                     cur.anchor = Some(cur.offset);
@@ -2977,7 +3063,8 @@ impl EditorBuffer {
         self.last_action_was_yank = false;
 
         for cur in self.cursors.cursors_mut() {
-            let target = LineJumpHelper::find_next_word_boundary(self.buffer.chars(), cur.offset, false);
+            let target =
+                LineJumpHelper::find_next_word_boundary(self.buffer.chars(), cur.offset, false);
             if extend_selection {
                 if cur.anchor.is_none() {
                     cur.anchor = Some(cur.offset);
@@ -3189,10 +3276,14 @@ impl EditorBuffer {
         self.last_action_was_yank = false;
 
         let primary_off = self.cursors.primary().offset;
-        let prev_start = LineJumpHelper::find_prev_word_boundary(self.buffer.chars(), primary_off, false);
-        let prev_end = LineJumpHelper::find_next_word_boundary(self.buffer.chars(), prev_start, false);
-        let next_start = LineJumpHelper::find_next_word_boundary(self.buffer.chars(), prev_end, false);
-        let next_end = LineJumpHelper::find_next_word_boundary(self.buffer.chars(), next_start, false);
+        let prev_start =
+            LineJumpHelper::find_prev_word_boundary(self.buffer.chars(), primary_off, false);
+        let prev_end =
+            LineJumpHelper::find_next_word_boundary(self.buffer.chars(), prev_start, false);
+        let next_start =
+            LineJumpHelper::find_next_word_boundary(self.buffer.chars(), prev_end, false);
+        let next_end =
+            LineJumpHelper::find_next_word_boundary(self.buffer.chars(), next_start, false);
 
         if prev_start < prev_end && next_start < next_end && prev_end <= next_start {
             let word1 = self.buffer.slice(prev_start, prev_end);
@@ -3201,7 +3292,8 @@ impl EditorBuffer {
 
             let combined = format!("{}{}{}", word2, separator, word1);
             self.buffer.replace_range(prev_start, next_end, &combined);
-            self.cursors.reset_to_single(prev_start + combined.chars().count());
+            self.cursors
+                .reset_to_single(prev_start + combined.chars().count());
         }
 
         self.sync_scroll();
@@ -3221,7 +3313,8 @@ impl EditorBuffer {
                 let sel = cur.selection();
                 (sel.start(), sel.end())
             } else {
-                let end = LineJumpHelper::find_next_word_boundary(self.buffer.chars(), cur.offset, false);
+                let end =
+                    LineJumpHelper::find_next_word_boundary(self.buffer.chars(), cur.offset, false);
                 (cur.offset, end)
             };
 
@@ -3302,14 +3395,18 @@ impl EditorBuffer {
 
     /// Add a cursor at the next match of current selection or word under cursor.
     pub fn add_cursor_at_next_match(&mut self, case_sensitive: bool) -> bool {
-        let res = self.cursors.add_cursor_at_next_match(&self.buffer, case_sensitive);
+        let res = self
+            .cursors
+            .add_cursor_at_next_match(&self.buffer, case_sensitive);
         self.sync_scroll();
         res
     }
 
     /// Select all occurrences of current selection across entire buffer.
     pub fn select_all_matches(&mut self, case_sensitive: bool) -> usize {
-        let count = self.cursors.select_all_matches(&self.buffer, case_sensitive);
+        let count = self
+            .cursors
+            .select_all_matches(&self.buffer, case_sensitive);
         self.sync_scroll();
         count
     }
@@ -3350,7 +3447,8 @@ impl EditorBuffer {
         self.history.record(&self.buffer, &self.cursors);
         let rewrapped = WordWrapEngine::rewrap_paragraph(&self.buffer.text(), width);
         self.buffer.set_text(&rewrapped);
-        self.cursors.reset_to_single(min(self.cursors.primary().offset, self.buffer.len()));
+        self.cursors
+            .reset_to_single(min(self.cursors.primary().offset, self.buffer.len()));
         self.sync_scroll();
     }
 
@@ -3570,7 +3668,8 @@ impl EditorBuffer {
     pub fn render_prompt_line(&self) -> (String, Option<usize>) {
         let pos = self.cursor_position();
         let line_text = self.buffer.line_text(pos.line).unwrap_or_default();
-        self.horizontal_scroll.render_line_with_scroll(&line_text, Some(pos.col))
+        self.horizontal_scroll
+            .render_line_with_scroll(&line_text, Some(pos.col))
     }
 }
 
@@ -3696,7 +3795,8 @@ mod tests {
         let bol = LineJumpHelper::calculate_jump(&buf, 15, LineJumpTarget::BeginningOfLine, false);
         assert_eq!(bol, 11);
 
-        let fnw = LineJumpHelper::calculate_jump(&buf, 11, LineJumpTarget::FirstNonWhitespace, false);
+        let fnw =
+            LineJumpHelper::calculate_jump(&buf, 11, LineJumpTarget::FirstNonWhitespace, false);
         assert_eq!(fnw, 13); // After two spaces
 
         let last = LineJumpHelper::calculate_jump(&buf, 0, LineJumpTarget::LastLine, false);
@@ -3759,7 +3859,9 @@ mod tests {
         BlockOperations::sort_lines(&mut buf, 0, 2, SortOptions::default());
         assert_eq!(buf.text(), "apple\nbanana\ncherry");
 
-        let mut align_buf = MultilineBuffer::from_str("name = \"fusion\"\nversion = \"1.0\"\ndescription = \"assistant\"");
+        let mut align_buf = MultilineBuffer::from_str(
+            "name = \"fusion\"\nversion = \"1.0\"\ndescription = \"assistant\"",
+        );
         BlockOperations::align_column_by_delimiter(&mut align_buf, 0, 2, '=');
         let lines = align_buf.lines();
         assert_eq!(lines[0], "name        = \"fusion\"");

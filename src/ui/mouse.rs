@@ -252,12 +252,18 @@ pub enum ListMouseAction {
 impl ListMouseAction {
     /// Returns true if the action requests a selection change.
     pub fn is_select(&self) -> bool {
-        matches!(self, ListMouseAction::Select(_) | ListMouseAction::SelectAndSubmit(_))
+        matches!(
+            self,
+            ListMouseAction::Select(_) | ListMouseAction::SelectAndSubmit(_)
+        )
     }
 
     /// Returns true if the action requests item submission/confirmation.
     pub fn is_submit(&self) -> bool {
-        matches!(self, ListMouseAction::SelectAndSubmit(_) | ListMouseAction::SubmitCurrent)
+        matches!(
+            self,
+            ListMouseAction::SelectAndSubmit(_) | ListMouseAction::SubmitCurrent
+        )
     }
 
     /// Returns true if the action represents a scroll request.
@@ -706,12 +712,8 @@ impl ListMouseHandler {
             (current_selected + (delta as usize)).min(total_items.saturating_sub(1))
         };
 
-        let new_scroll = Self::ensure_selection_visible(
-            new_selected,
-            current_scroll,
-            visible_rows,
-            total_items,
-        );
+        let new_scroll =
+            Self::ensure_selection_visible(new_selected, current_scroll, visible_rows, total_items);
 
         (new_selected, new_scroll)
     }

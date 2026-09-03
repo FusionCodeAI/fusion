@@ -118,12 +118,21 @@ fn test_cli_help_flag() {
 fn test_cli_acp_mode_flag() {
     // 1. Invocation with --acp flag
     let cli_acp = Cli::try_parse_from(["fusion", "--acp"]).expect("Failed to parse --acp flag");
-    assert!(cli_acp.acp, "Expected acp field to be true when --acp is passed");
-    assert!(cli_acp.prompt.is_none(), "Prompt should be None when only --acp is provided");
+    assert!(
+        cli_acp.acp,
+        "Expected acp field to be true when --acp is passed"
+    );
+    assert!(
+        cli_acp.prompt.is_none(),
+        "Prompt should be None when only --acp is provided"
+    );
 
     // 2. Default invocation without --acp flag
     let cli_default = Cli::try_parse_from(["fusion"]).expect("Failed to parse default arguments");
-    assert!(!cli_default.acp, "Expected acp field to be false by default");
+    assert!(
+        !cli_default.acp,
+        "Expected acp field to be false by default"
+    );
 }
 
 #[test]
@@ -166,10 +175,7 @@ fn test_cli_arguments_combinations() {
         Some(Path::new("/custom/project/dir"))
     );
     assert!(cli_full.no_advisors);
-    assert_eq!(
-        cli_full.prompt.as_deref(),
-        Some("Refactor error handling")
-    );
+    assert_eq!(cli_full.prompt.as_deref(), Some("Refactor error handling"));
 
     // 3. Shell completion generation flag
     let cli_comp = Cli::try_parse_from(["fusion", "--generate-completion", "zsh"])
@@ -324,15 +330,15 @@ FALLBACK_PORT=${PORT:-8080}
     // 3. Test load_dotenv_from directory with tempfile
     let temp = tempdir().expect("Failed to create tempdir for .env loader test");
     let env_file_path = temp.path().join(".env");
-    fs::write(&env_file_path, "FUSION_TEST_KEY=secret_value_123\nPORT=9000\n")
-        .expect("Failed to write .env file");
+    fs::write(
+        &env_file_path,
+        "FUSION_TEST_KEY=secret_value_123\nPORT=9000\n",
+    )
+    .expect("Failed to write .env file");
 
     let loaded_env =
         load_dotenv_from(temp.path()).expect("Failed to load dotenv from temp directory");
-    assert_eq!(
-        loaded_env.get("FUSION_TEST_KEY"),
-        Some("secret_value_123")
-    );
+    assert_eq!(loaded_env.get("FUSION_TEST_KEY"), Some("secret_value_123"));
     assert_eq!(loaded_env.get("PORT"), Some("9000"));
 }
 
@@ -407,17 +413,17 @@ fn test_config_model_shorthands_and_provider_detection() {
     let haiku_res = Config::resolve_model_shorthand("haiku");
     assert_eq!(haiku_res, Some(("anthropic", "claude-3-5-haiku-20241022")));
 
-    assert_eq!(Config::resolve_model_shorthand("nonexistent-shorthand"), None);
+    assert_eq!(
+        Config::resolve_model_shorthand("nonexistent-shorthand"),
+        None
+    );
 
     // 2. Provider detection from model names
     assert_eq!(
         Config::detect_provider_for_model("claude-3-5-sonnet-20241022"),
         Some("anthropic")
     );
-    assert_eq!(
-        Config::detect_provider_for_model("gpt-4o"),
-        Some("openai")
-    );
+    assert_eq!(Config::detect_provider_for_model("gpt-4o"), Some("openai"));
     assert_eq!(
         Config::detect_provider_for_model("o1-preview"),
         Some("openai")
@@ -426,10 +432,7 @@ fn test_config_model_shorthands_and_provider_detection() {
         Config::detect_provider_for_model("deepseek-chat"),
         Some("deepseek")
     );
-    assert_eq!(
-        Config::detect_provider_for_model("grok-2"),
-        Some("xai")
-    );
+    assert_eq!(Config::detect_provider_for_model("grok-2"), Some("xai"));
     assert_eq!(
         Config::detect_provider_for_model("meta-llama/llama-3-70b-instruct"),
         Some("openrouter")
@@ -494,11 +497,20 @@ async fn test_offline_mode_online_retains_provider() {
         Box::new(MockConnectivityProber { online: true }),
         Box::new(MockOllamaProber {
             reachable: true,
-            models: vec![make_test_ollama_model("qwen2.5-coder:32b", Some("32B"), None, None, None)],
+            models: vec![make_test_ollama_model(
+                "qwen2.5-coder:32b",
+                Some("32B"),
+                None,
+                None,
+                None,
+            )],
         }),
     );
 
-    assert_eq!(detector.detect_network_status(), NetworkEnvironmentStatus::Online);
+    assert_eq!(
+        detector.detect_network_status(),
+        NetworkEnvironmentStatus::Online
+    );
 
     let transition = detector.auto_switch_if_offline(&mut config).await;
     assert_eq!(
@@ -520,9 +532,27 @@ async fn test_offline_mode_fallback_to_ollama_with_models() {
     config.default_model = "deepseek-chat".to_string();
 
     let mock_models = vec![
-        make_test_ollama_model("llama3.1:8b", Some("8B"), Some("Q4_K_M"), Some(4_900_000_000), None),
-        make_test_ollama_model("qwen2.5-coder:32b", Some("32B"), Some("Q4_K_M"), Some(19_000_000_000), None),
-        make_test_ollama_model("mistral:7b", Some("7B"), Some("Q4_0"), Some(4_100_000_000), None),
+        make_test_ollama_model(
+            "llama3.1:8b",
+            Some("8B"),
+            Some("Q4_K_M"),
+            Some(4_900_000_000),
+            None,
+        ),
+        make_test_ollama_model(
+            "qwen2.5-coder:32b",
+            Some("32B"),
+            Some("Q4_K_M"),
+            Some(19_000_000_000),
+            None,
+        ),
+        make_test_ollama_model(
+            "mistral:7b",
+            Some("7B"),
+            Some("Q4_0"),
+            Some(4_100_000_000),
+            None,
+        ),
     ];
 
     let detector_config = OfflineDetectorConfig::default();
@@ -534,7 +564,10 @@ async fn test_offline_mode_fallback_to_ollama_with_models() {
         }),
     );
 
-    assert_eq!(detector.detect_network_status(), NetworkEnvironmentStatus::Offline);
+    assert_eq!(
+        detector.detect_network_status(),
+        NetworkEnvironmentStatus::Offline
+    );
 
     let transition = detector.auto_switch_if_offline(&mut config).await;
     assert!(transition.is_switched());
@@ -557,7 +590,10 @@ async fn test_offline_mode_fallback_to_ollama_with_models() {
             assert!(notice.contains("Switched provider from 'deepseek'"));
             assert!(notice.contains("qwen2.5-coder:32b"));
         }
-        _ => panic!("Expected SwitchedToOllama transition result, got: {:?}", transition),
+        _ => panic!(
+            "Expected SwitchedToOllama transition result, got: {:?}",
+            transition
+        ),
     }
 
     assert_eq!(config.default_provider, "ollama");
@@ -755,7 +791,8 @@ fn test_session_lifecycle_messages_and_tools() {
     assert_eq!(session.messages()[0].role, Role::System);
 
     // 2. Add User Message (should auto-generate title from first user message)
-    session.add_user_message("Please help me refactor the database module to use connection pooling.");
+    session
+        .add_user_message("Please help me refactor the database module to use connection pooling.");
     assert_eq!(session.total_messages(), 2);
     assert_eq!(session.messages()[1].role, Role::User);
     assert!(session.title().is_some());
@@ -768,7 +805,10 @@ fn test_session_lifecycle_messages_and_tools() {
         name: "read".to_string(),
         arguments: "{\"path\": \"src/db.rs\"}".to_string(),
     };
-    session.add_assistant_with_tools("Checking the current DB implementation...", vec![tool_call.clone()]);
+    session.add_assistant_with_tools(
+        "Checking the current DB implementation...",
+        vec![tool_call.clone()],
+    );
     assert_eq!(session.total_messages(), 3);
     assert_eq!(session.messages()[2].role, Role::Assistant);
     assert!(session.messages()[2].tool_calls.is_some());
@@ -787,7 +827,9 @@ fn test_session_lifecycle_messages_and_tools() {
     );
 
     // 5. Add Final Assistant Message
-    session.add_assistant_message("I suggest introducing `r2d2` or `deadpool` for connection pooling.");
+    session.add_assistant_message(
+        "I suggest introducing `r2d2` or `deadpool` for connection pooling.",
+    );
     assert_eq!(session.total_messages(), 5);
 
     // 6. Record token usage
@@ -918,18 +960,11 @@ fn test_session_modify_resave_and_reload() {
         .expect("Failed second save");
 
     // 3. Reload again and verify mutations persisted
-    let final_session =
-        Session::load_from_path(&file_path).expect("Failed second reload");
+    let final_session = Session::load_from_path(&file_path).expect("Failed second reload");
     assert_eq!(final_session.active_model(), "deepseek-reasoner");
     assert_eq!(final_session.total_messages(), 4);
-    assert_eq!(
-        final_session.working_dir(),
-        Some(temp.path())
-    );
-    assert_eq!(
-        final_session.messages()[2].content,
-        "Turn 2 user request"
-    );
+    assert_eq!(final_session.working_dir(), Some(temp.path()));
+    assert_eq!(final_session.messages()[2].content, "Turn 2 user request");
     assert_eq!(
         final_session.messages()[3].content,
         "Turn 2 assistant response"
@@ -949,11 +984,17 @@ fn test_session_delete_and_cleanup() {
 
     // Delete session
     Session::delete_by_path(&file_path).expect("Failed to delete session file");
-    assert!(!file_path.exists(), "Session file should be removed from disk");
+    assert!(
+        !file_path.exists(),
+        "Session file should be removed from disk"
+    );
 
     // Loading deleted session should fail gracefully
     let load_res = Session::load_from_path(&file_path);
-    assert!(load_res.is_err(), "Loading nonexistent session must return Err");
+    assert!(
+        load_res.is_err(),
+        "Loading nonexistent session must return Err"
+    );
 }
 
 #[test]
@@ -1006,17 +1047,30 @@ async fn test_tool_registry_and_definitions() {
     // Verify all primary tools and aliases exist in the registry
     assert!(registry.get("bash").is_some(), "bash tool missing");
     assert!(registry.get("read").is_some(), "read tool missing");
-    assert!(registry.get("read_file").is_some(), "read_file alias missing");
+    assert!(
+        registry.get("read_file").is_some(),
+        "read_file alias missing"
+    );
     assert!(registry.get("write").is_some(), "write tool missing");
-    assert!(registry.get("write_file").is_some(), "write_file alias missing");
+    assert!(
+        registry.get("write_file").is_some(),
+        "write_file alias missing"
+    );
     assert!(registry.get("edit").is_some(), "edit tool missing");
-    assert!(registry.get("edit_file").is_some(), "edit_file alias missing");
+    assert!(
+        registry.get("edit_file").is_some(),
+        "edit_file alias missing"
+    );
     assert!(registry.get("grep").is_some(), "grep tool missing");
     assert!(registry.get("glob").is_some(), "glob tool missing");
 
     // Definitions list should contain the 6 registered tools
     let defs = registry.definitions();
-    assert_eq!(defs.len(), 6, "Expected 6 tool definitions in default registry");
+    assert_eq!(
+        defs.len(),
+        6,
+        "Expected 6 tool definitions in default registry"
+    );
 
     let tool_names: Vec<String> = defs.into_iter().map(|d| d.name).collect();
     assert!(tool_names.contains(&"bash".to_string()));
@@ -1049,7 +1103,11 @@ async fn test_tool_file_read_write_edit_cycle() {
         )
         .await;
 
-    assert!(write_res.is_ok(), "Write tool execution failed: {:?}", write_res);
+    assert!(
+        write_res.is_ok(),
+        "Write tool execution failed: {:?}",
+        write_res
+    );
     let write_output = write_res.unwrap();
     assert!(write_output.contains("Successfully wrote"));
 
@@ -1069,7 +1127,11 @@ async fn test_tool_file_read_write_edit_cycle() {
         )
         .await;
 
-    assert!(read_res.is_ok(), "Read tool execution failed: {:?}", read_res);
+    assert!(
+        read_res.is_ok(),
+        "Read tool execution failed: {:?}",
+        read_res
+    );
     let read_output = read_res.unwrap();
     assert!(read_output.contains("1 | Line 1: Alpha"));
     assert!(read_output.contains("2 | Line 2: Beta"));
@@ -1110,7 +1172,11 @@ async fn test_tool_file_read_write_edit_cycle() {
         )
         .await;
 
-    assert!(edit_res.is_ok(), "Edit tool execution failed: {:?}", edit_res);
+    assert!(
+        edit_res.is_ok(),
+        "Edit tool execution failed: {:?}",
+        edit_res
+    );
     let edit_output = edit_res.unwrap();
     assert!(edit_output.contains("Successfully edited"));
 
@@ -1235,7 +1301,10 @@ async fn test_bash_tool_execution() {
     match fail_res {
         Ok(output) => {
             assert!(
-                output.contains("No such file") || output.contains("exit status") || output.contains("failed") || output.contains("cannot access"),
+                output.contains("No such file")
+                    || output.contains("exit status")
+                    || output.contains("failed")
+                    || output.contains("cannot access"),
                 "Output should report command failure: {}",
                 output
             );
@@ -1243,7 +1312,9 @@ async fn test_bash_tool_execution() {
         Err(e) => {
             let err_str = e.to_string();
             assert!(
-                err_str.contains("failed") || err_str.contains("No such file") || err_str.contains("exit"),
+                err_str.contains("failed")
+                    || err_str.contains("No such file")
+                    || err_str.contains("exit"),
                 "Error should report failure: {}",
                 err_str
             );

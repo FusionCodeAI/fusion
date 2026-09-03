@@ -89,31 +89,52 @@ impl JsonRpcError {
     }
 
     pub fn parse_error(details: impl Into<String>) -> Self {
-        Self::new(error_codes::PARSE_ERROR, format!("Parse error: {}", details.into()))
+        Self::new(
+            error_codes::PARSE_ERROR,
+            format!("Parse error: {}", details.into()),
+        )
     }
 
     pub fn invalid_request(details: impl Into<String>) -> Self {
-        Self::new(error_codes::INVALID_REQUEST, format!("Invalid request: {}", details.into()))
+        Self::new(
+            error_codes::INVALID_REQUEST,
+            format!("Invalid request: {}", details.into()),
+        )
     }
 
     pub fn method_not_found(method: impl Into<String>) -> Self {
-        Self::new(error_codes::METHOD_NOT_FOUND, format!("Method not found: {}", method.into()))
+        Self::new(
+            error_codes::METHOD_NOT_FOUND,
+            format!("Method not found: {}", method.into()),
+        )
     }
 
     pub fn invalid_params(details: impl Into<String>) -> Self {
-        Self::new(error_codes::INVALID_PARAMS, format!("Invalid params: {}", details.into()))
+        Self::new(
+            error_codes::INVALID_PARAMS,
+            format!("Invalid params: {}", details.into()),
+        )
     }
 
     pub fn internal_error(details: impl Into<String>) -> Self {
-        Self::new(error_codes::INTERNAL_ERROR, format!("Internal error: {}", details.into()))
+        Self::new(
+            error_codes::INTERNAL_ERROR,
+            format!("Internal error: {}", details.into()),
+        )
     }
 
     pub fn session_not_found(session_id: &str) -> Self {
-        Self::new(error_codes::SESSION_NOT_FOUND, format!("Session not found: {}", session_id))
+        Self::new(
+            error_codes::SESSION_NOT_FOUND,
+            format!("Session not found: {}", session_id),
+        )
     }
 
     pub fn not_initialized() -> Self {
-        Self::new(error_codes::SERVER_NOT_INITIALIZED, "Server not initialized. Call 'initialize' first.")
+        Self::new(
+            error_codes::SERVER_NOT_INITIALIZED,
+            "Server not initialized. Call 'initialize' first.",
+        )
     }
 }
 
@@ -316,7 +337,10 @@ impl Default for AgentInfo {
         Self {
             name: "fusion".to_string(),
             version: env!("CARGO_PKG_VERSION").to_string(),
-            description: Some("Fast, lightweight, pure-Rust AI coding assistant with subagents and advisors".to_string()),
+            description: Some(
+                "Fast, lightweight, pure-Rust AI coding assistant with subagents and advisors"
+                    .to_string(),
+            ),
         }
     }
 }
@@ -597,10 +621,7 @@ pub enum SessionUpdate {
         error: Option<String>,
     },
     /// Advisor review started.
-    AdvisorStarted {
-        advisor: String,
-        role: String,
-    },
+    AdvisorStarted { advisor: String, role: String },
     /// Advisor review feedback.
     AdvisorCritique {
         advisor: String,
@@ -630,9 +651,7 @@ pub enum SessionUpdate {
         level: Option<String>,
     },
     /// Execution plan update.
-    Plan {
-        steps: Vec<String>,
-    },
+    Plan { steps: Vec<String> },
     /// Subagent execution status update.
     SubagentUpdate {
         name: String,

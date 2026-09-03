@@ -145,12 +145,16 @@ impl TraceRedactor {
         self.home_dir_raw.as_deref()
     }
 
-
     /// Registers known secret strings (such as active API keys from configuration) to be strictly scrubbed.
     pub fn with_known_secrets(mut self, secrets: &[&str]) -> Self {
         for s in secrets {
             let trimmed = s.trim();
-            if trimmed.len() >= 6 && !self.exact_secrets.iter().any(|existing| existing == trimmed) {
+            if trimmed.len() >= 6
+                && !self
+                    .exact_secrets
+                    .iter()
+                    .any(|existing| existing == trimmed)
+            {
                 self.exact_secrets.push(trimmed.to_string());
             }
         }
@@ -183,20 +187,27 @@ impl TraceRedactor {
 
         // 2. Private Keys (PEM format RSA, EC, OpenSSH, PGP)
         // Regex handles multi-line PEM blocks
-        let pem_regex = Regex::new(r"(?s)-----BEGIN [A-Z0-9 ]*PRIVATE KEY-----.*?-----END [A-Z0-9 ]*PRIVATE KEY-----")
-            .expect("valid regex");
+        let pem_regex = Regex::new(
+            r"(?s)-----BEGIN [A-Z0-9 ]*PRIVATE KEY-----.*?-----END [A-Z0-9 ]*PRIVATE KEY-----",
+        )
+        .expect("valid regex");
         let pem_matches = pem_regex.find_iter(&text).count();
         if pem_matches > 0 {
-            text = pem_regex.replace_all(&text, "[REDACTED_PRIVATE_KEY]").to_string();
+            text = pem_regex
+                .replace_all(&text, "[REDACTED_PRIVATE_KEY]")
+                .to_string();
             audit.record(RedactionCategory::PrivateKey, pem_matches);
         }
 
         // 3. Provider & Cloud API Keys
         // Anthropic: sk-ant-api03-... or sk-ant-...
-        let anthropic_regex = Regex::new(r"sk-ant-(?:api03-)?[A-Za-z0-9_-]{20,}").expect("valid regex");
+        let anthropic_regex =
+            Regex::new(r"sk-ant-(?:api03-)?[A-Za-z0-9_-]{20,}").expect("valid regex");
         let ant_count = anthropic_regex.find_iter(&text).count();
         if ant_count > 0 {
-            text = anthropic_regex.replace_all(&text, "[REDACTED_API_KEY]").to_string();
+            text = anthropic_regex
+                .replace_all(&text, "[REDACTED_API_KEY]")
+                .to_string();
             audit.record(RedactionCategory::ApiKey, ant_count);
         }
 
@@ -204,15 +215,20 @@ impl TraceRedactor {
         let openai_regex = Regex::new(r"sk-(?:proj-)?[A-Za-z0-9_-]{20,}").expect("valid regex");
         let oai_count = openai_regex.find_iter(&text).count();
         if oai_count > 0 {
-            text = openai_regex.replace_all(&text, "[REDACTED_API_KEY]").to_string();
+            text = openai_regex
+                .replace_all(&text, "[REDACTED_API_KEY]")
+                .to_string();
             audit.record(RedactionCategory::ApiKey, oai_count);
         }
 
         // OpenRouter: sk-or-v1-...
-        let openrouter_regex = Regex::new(r"sk-or-(?:v1-)?[A-Za-z0-9_-]{20,}").expect("valid regex");
+        let openrouter_regex =
+            Regex::new(r"sk-or-(?:v1-)?[A-Za-z0-9_-]{20,}").expect("valid regex");
         let or_count = openrouter_regex.find_iter(&text).count();
         if or_count > 0 {
-            text = openrouter_regex.replace_all(&text, "[REDACTED_API_KEY]").to_string();
+            text = openrouter_regex
+                .replace_all(&text, "[REDACTED_API_KEY]")
+                .to_string();
             audit.record(RedactionCategory::ApiKey, or_count);
         }
 
@@ -220,7 +236,9 @@ impl TraceRedactor {
         let google_regex = Regex::new(r"AIza[0-9A-Za-z_-]{35}").expect("valid regex");
         let g_count = google_regex.find_iter(&text).count();
         if g_count > 0 {
-            text = google_regex.replace_all(&text, "[REDACTED_API_KEY]").to_string();
+            text = google_regex
+                .replace_all(&text, "[REDACTED_API_KEY]")
+                .to_string();
             audit.record(RedactionCategory::ApiKey, g_count);
         }
 
@@ -228,7 +246,9 @@ impl TraceRedactor {
         let aws_regex = Regex::new(r"\bAKIA[0-9A-Z]{16}\b").expect("valid regex");
         let aws_count = aws_regex.find_iter(&text).count();
         if aws_count > 0 {
-            text = aws_regex.replace_all(&text, "[REDACTED_AWS_KEY]").to_string();
+            text = aws_regex
+                .replace_all(&text, "[REDACTED_AWS_KEY]")
+                .to_string();
             audit.record(RedactionCategory::ApiKey, aws_count);
         }
 
@@ -236,17 +256,22 @@ impl TraceRedactor {
         let hf_regex = Regex::new(r"hf_[A-Za-z0-9]{30,}").expect("valid regex");
         let hf_count = hf_regex.find_iter(&text).count();
         if hf_count > 0 {
-            text = hf_regex.replace_all(&text, "[REDACTED_API_KEY]").to_string();
+            text = hf_regex
+                .replace_all(&text, "[REDACTED_API_KEY]")
+                .to_string();
             audit.record(RedactionCategory::ApiKey, hf_count);
         }
 
         // 4. Auth & Bearer Tokens
         // GitHub: ghp_..., gho_..., github_pat_...
-        let github_regex = Regex::new(r"\b(?:gh[pousr]_[A-Za-z0-9]{20,}|github_pat_[A-Za-z0-9_]{22,})\b")
-            .expect("valid regex");
+        let github_regex =
+            Regex::new(r"\b(?:gh[pousr]_[A-Za-z0-9]{20,}|github_pat_[A-Za-z0-9_]{22,})\b")
+                .expect("valid regex");
         let gh_count = github_regex.find_iter(&text).count();
         if gh_count > 0 {
-            text = github_regex.replace_all(&text, "[REDACTED_GITHUB_TOKEN]").to_string();
+            text = github_regex
+                .replace_all(&text, "[REDACTED_GITHUB_TOKEN]")
+                .to_string();
             audit.record(RedactionCategory::AuthToken, gh_count);
         }
 
@@ -254,15 +279,20 @@ impl TraceRedactor {
         let slack_regex = Regex::new(r"xox[baprs]-[0-9A-Za-z-]{10,}").expect("valid regex");
         let slack_count = slack_regex.find_iter(&text).count();
         if slack_count > 0 {
-            text = slack_regex.replace_all(&text, "[REDACTED_SLACK_TOKEN]").to_string();
+            text = slack_regex
+                .replace_all(&text, "[REDACTED_SLACK_TOKEN]")
+                .to_string();
             audit.record(RedactionCategory::AuthToken, slack_count);
         }
 
         // Bearer tokens in headers or strings: Bearer <token>
-        let bearer_regex = Regex::new(r"(?i)\bBearer\s+([A-Za-z0-9_\-\.]{16,})\b").expect("valid regex");
+        let bearer_regex =
+            Regex::new(r"(?i)\bBearer\s+([A-Za-z0-9_\-\.]{16,})\b").expect("valid regex");
         let bearer_count = bearer_regex.find_iter(&text).count();
         if bearer_count > 0 {
-            text = bearer_regex.replace_all(&text, "Bearer [REDACTED_TOKEN]").to_string();
+            text = bearer_regex
+                .replace_all(&text, "Bearer [REDACTED_TOKEN]")
+                .to_string();
             audit.record(RedactionCategory::AuthToken, bearer_count);
         }
 
@@ -281,8 +311,9 @@ impl TraceRedactor {
         }
 
         // CLI flags: --password <val>, --secret <val>, --api-key <val>
-        let cli_secret_regex = Regex::new(r"(?i)(--(?:password|passwd|secret|api-key|token)\s+)([^\s]+)")
-            .expect("valid regex");
+        let cli_secret_regex =
+            Regex::new(r"(?i)(--(?:password|passwd|secret|api-key|token)\s+)([^\s]+)")
+                .expect("valid regex");
         let cli_matches = cli_secret_regex.find_iter(&text).count();
         if cli_matches > 0 {
             text = cli_secret_regex
@@ -292,8 +323,8 @@ impl TraceRedactor {
         }
 
         // Connection string credentials: postgres://user:password@host
-        let uri_cred_regex = Regex::new(r"(?i)([a-z][a-z0-9+.-]*://[^:\s]+:)([^@\s]+)(@)")
-            .expect("valid regex");
+        let uri_cred_regex =
+            Regex::new(r"(?i)([a-z][a-z0-9+.-]*://[^:\s]+:)([^@\s]+)(@)").expect("valid regex");
         let uri_matches = uri_cred_regex.find_iter(&text).count();
         if uri_matches > 0 {
             text = uri_cred_regex
@@ -313,7 +344,8 @@ impl TraceRedactor {
         }
 
         // Generic Unix / macOS user paths: /Users/<user>/ or /home/<user>/
-        let unix_user_regex = Regex::new(r"/(?:Users|home)/([a-zA-Z0-9_.-]+)").expect("valid regex");
+        let unix_user_regex =
+            Regex::new(r"/(?:Users|home)/([a-zA-Z0-9_.-]+)").expect("valid regex");
         let mut path_count = 0;
         text = unix_user_regex
             .replace_all(&text, |caps: &regex::Captures| {
@@ -322,7 +354,11 @@ impl TraceRedactor {
                     caps[0].to_string()
                 } else {
                     path_count += 1;
-                    let prefix = if caps[0].starts_with("/Users") { "/Users" } else { "/home" };
+                    let prefix = if caps[0].starts_with("/Users") {
+                        "/Users"
+                    } else {
+                        "/home"
+                    };
                     format!("{}/[USER]", prefix)
                 }
             })
@@ -332,7 +368,8 @@ impl TraceRedactor {
         }
 
         // Windows user paths: C:\Users\<user>\
-        let win_user_regex = Regex::new(r"(?i)[a-z]:\\Users\\([a-zA-Z0-9_.-]+)").expect("valid regex");
+        let win_user_regex =
+            Regex::new(r"(?i)[a-z]:\\Users\\([a-zA-Z0-9_.-]+)").expect("valid regex");
         let mut win_count = 0;
         text = win_user_regex
             .replace_all(&text, |caps: &regex::Captures| {
@@ -350,10 +387,13 @@ impl TraceRedactor {
         }
 
         // 7. Email Addresses
-        let email_regex = Regex::new(r"\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b").expect("valid regex");
+        let email_regex =
+            Regex::new(r"\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b").expect("valid regex");
         let email_count = email_regex.find_iter(&text).count();
         if email_count > 0 {
-            text = email_regex.replace_all(&text, "[REDACTED_EMAIL]").to_string();
+            text = email_regex
+                .replace_all(&text, "[REDACTED_EMAIL]")
+                .to_string();
             audit.record(RedactionCategory::Email, email_count);
         }
 
@@ -389,7 +429,9 @@ impl TraceRedactor {
         for custom_re in &self.custom_patterns {
             let count = custom_re.find_iter(&text).count();
             if count > 0 {
-                text = custom_re.replace_all(&text, "[REDACTED_CUSTOM]").to_string();
+                text = custom_re
+                    .replace_all(&text, "[REDACTED_CUSTOM]")
+                    .to_string();
                 audit.record(RedactionCategory::Custom, count);
             }
         }
@@ -444,7 +486,11 @@ pub struct GitInfo {
 
 impl SystemInfo {
     /// Collects system environment information safely.
-    pub fn collect(config: Option<&Config>, redactor: &TraceRedactor, audit: &mut RedactionAudit) -> Self {
+    pub fn collect(
+        config: Option<&Config>,
+        redactor: &TraceRedactor,
+        audit: &mut RedactionAudit,
+    ) -> Self {
         let os = std::env::consts::OS.to_string();
         let os_family = std::env::consts::FAMILY.to_string();
         let arch = std::env::consts::ARCH.to_string();
@@ -456,12 +502,15 @@ impl SystemInfo {
         let target_platform = format!("{}-{}", arch, os);
 
         // Safe Shell inspection (basename only to avoid user path leak)
-        let shell = std::env::var("SHELL").or_else(|_| std::env::var("COMSPEC")).ok().map(|s| {
-            Path::new(&s)
-                .file_name()
-                .map(|f| f.to_string_lossy().to_string())
-                .unwrap_or(s)
-        });
+        let shell = std::env::var("SHELL")
+            .or_else(|_| std::env::var("COMSPEC"))
+            .ok()
+            .map(|s| {
+                Path::new(&s)
+                    .file_name()
+                    .map(|f| f.to_string_lossy().to_string())
+                    .unwrap_or(s)
+            });
 
         // Terminal inspection
         let terminal = std::env::var("TERM_PROGRAM")
@@ -532,13 +581,17 @@ impl SystemInfo {
             return None;
         }
 
-        let branch = String::from_utf8_lossy(&branch_output.stdout).trim().to_string();
+        let branch = String::from_utf8_lossy(&branch_output.stdout)
+            .trim()
+            .to_string();
 
         let commit_output = std::process::Command::new("git")
             .args(["rev-parse", "--short", "HEAD"])
             .output()
             .ok()?;
-        let short_commit = String::from_utf8_lossy(&commit_output.stdout).trim().to_string();
+        let short_commit = String::from_utf8_lossy(&commit_output.stdout)
+            .trim()
+            .to_string();
 
         let status_output = std::process::Command::new("git")
             .args(["status", "--porcelain"])
@@ -825,16 +878,21 @@ impl DiagnosticTrace {
                         let clean_args = redactor.redact(&tc.arguments, &mut audit);
 
                         // Pretty format arguments if valid JSON
-                        let formatted_args = match serde_json::from_str::<serde_json::Value>(&clean_args) {
-                            Ok(v) => serde_json::to_string_pretty(&v).unwrap_or(clean_args),
-                            Err(_) => clean_args,
-                        };
+                        let formatted_args =
+                            match serde_json::from_str::<serde_json::Value>(&clean_args) {
+                                Ok(v) => serde_json::to_string_pretty(&v).unwrap_or(clean_args),
+                                Err(_) => clean_args,
+                            };
 
                         // Sanitize and cap output
                         let clean_output = redactor.redact(&raw_output, &mut audit);
-                        let is_truncated = clean_output.chars().count() > opts.max_tool_output_chars;
+                        let is_truncated =
+                            clean_output.chars().count() > opts.max_tool_output_chars;
                         let truncated_output = if is_truncated {
-                            let head: String = clean_output.chars().take(opts.max_tool_output_chars).collect();
+                            let head: String = clean_output
+                                .chars()
+                                .take(opts.max_tool_output_chars)
+                                .collect();
                             format!(
                                 "{}\n\n... [Output truncated: {} bytes total, showing first {} characters]",
                                 head, output_bytes, opts.max_tool_output_chars
@@ -884,7 +942,10 @@ impl DiagnosticTrace {
 
                 let clean_content = redactor.redact(&msg.content, &mut audit);
                 let content_snippet = if clean_content.chars().count() > opts.max_transcript_chars {
-                    let head: String = clean_content.chars().take(opts.max_transcript_chars).collect();
+                    let head: String = clean_content
+                        .chars()
+                        .take(opts.max_transcript_chars)
+                        .collect();
                     format!("{}... [truncated]", head)
                 } else {
                     clean_content
@@ -923,7 +984,10 @@ impl DiagnosticTrace {
         md.push_str("# Fusion Diagnostic Trace\n\n");
         md.push_str(&format!("> **Trace ID:** `{}`  \n", self.trace_id));
         md.push_str(&format!("> **Generated:** `{}`  \n", self.generated_at));
-        md.push_str(&format!("> **Fusion Version:** `v{}`  \n", self.system_info.fusion_version));
+        md.push_str(&format!(
+            "> **Fusion Version:** `v{}`  \n",
+            self.system_info.fusion_version
+        ));
         md.push_str(&format!(
             "> **Privacy Audit:** {}  \n\n",
             if self.redaction_audit.is_clean() {
@@ -950,7 +1014,10 @@ impl DiagnosticTrace {
         ));
         md.push_str(&format!(
             "| **Title** | {} |\n",
-            self.session_metadata.title.as_deref().unwrap_or("*(untitled)*")
+            self.session_metadata
+                .title
+                .as_deref()
+                .unwrap_or("*(untitled)*")
         ));
         md.push_str(&format!(
             "| **Active Model** | `{}` |\n",
@@ -1032,16 +1099,41 @@ impl DiagnosticTrace {
         md.push_str("## 3. System Environment\n\n");
         md.push_str("| Environment Property | Value |\n");
         md.push_str("| :--- | :--- |\n");
-        md.push_str(&format!("| **Operating System** | `{}` (`{}`) |\n", self.system_info.os, self.system_info.os_family));
-        md.push_str(&format!("| **Architecture** | `{}` ({}-bit) |\n", self.system_info.arch, self.system_info.pointer_width));
-        md.push_str(&format!("| **CPU Cores** | {} |\n", self.system_info.cpu_cores));
-        md.push_str(&format!("| **Fusion Version** | `v{}` |\n", self.system_info.fusion_version));
-        md.push_str(&format!("| **Target Triple** | `{}` |\n", self.system_info.target_platform));
-        md.push_str(&format!("| **Shell** | `{}` |\n", self.system_info.shell.as_deref().unwrap_or("unknown")));
-        md.push_str(&format!("| **Terminal** | `{}` |\n", self.system_info.terminal.as_deref().unwrap_or("unknown")));
+        md.push_str(&format!(
+            "| **Operating System** | `{}` (`{}`) |\n",
+            self.system_info.os, self.system_info.os_family
+        ));
+        md.push_str(&format!(
+            "| **Architecture** | `{}` ({}-bit) |\n",
+            self.system_info.arch, self.system_info.pointer_width
+        ));
+        md.push_str(&format!(
+            "| **CPU Cores** | {} |\n",
+            self.system_info.cpu_cores
+        ));
+        md.push_str(&format!(
+            "| **Fusion Version** | `v{}` |\n",
+            self.system_info.fusion_version
+        ));
+        md.push_str(&format!(
+            "| **Target Triple** | `{}` |\n",
+            self.system_info.target_platform
+        ));
+        md.push_str(&format!(
+            "| **Shell** | `{}` |\n",
+            self.system_info.shell.as_deref().unwrap_or("unknown")
+        ));
+        md.push_str(&format!(
+            "| **Terminal** | `{}` |\n",
+            self.system_info.terminal.as_deref().unwrap_or("unknown")
+        ));
 
         if let Some(git) = &self.system_info.git_info {
-            let status = if git.is_dirty { "dirty (uncommitted changes)" } else { "clean" };
+            let status = if git.is_dirty {
+                "dirty (uncommitted changes)"
+            } else {
+                "clean"
+            };
             md.push_str(&format!(
                 "| **Git Status** | Branch `{}` at `{}` ({}) |\n",
                 git.branch, git.short_commit, status
@@ -1057,7 +1149,11 @@ impl DiagnosticTrace {
             md.push_str("| Provider | Key Status |\n");
             md.push_str("| :--- | :--- |\n");
             for (p, configured) in &self.system_info.provider_keys_status {
-                let badge = if *configured { "✓ Configured" } else { "✗ Missing Key" };
+                let badge = if *configured {
+                    "✓ Configured"
+                } else {
+                    "✗ Missing Key"
+                };
                 md.push_str(&format!("| `{}` | {} |\n", p, badge));
             }
             md.push_str("\n");
@@ -1078,12 +1174,30 @@ impl DiagnosticTrace {
         md.push_str("## 4. Token Usage & Cost Profile\n\n");
         md.push_str("| Metric | Token Count |\n");
         md.push_str("| :--- | :---: |\n");
-        md.push_str(&format!("| **Prompt Tokens** | `{}` |\n", self.session_metadata.token_stats.prompt_tokens));
-        md.push_str(&format!("| **Completion Tokens** | `{}` |\n", self.session_metadata.token_stats.completion_tokens));
-        md.push_str(&format!("| **Total Tokens** | `{}` |\n", self.session_metadata.token_stats.total_tokens));
-        md.push_str(&format!("| **Cache Read Tokens** | `{}` |\n", self.session_metadata.token_stats.cache_read_tokens));
-        md.push_str(&format!("| **Cache Write Tokens** | `{}` |\n", self.session_metadata.token_stats.cache_write_tokens));
-        md.push_str(&format!("| **Total Turns** | `{}` |\n\n", self.session_metadata.token_stats.total_turns));
+        md.push_str(&format!(
+            "| **Prompt Tokens** | `{}` |\n",
+            self.session_metadata.token_stats.prompt_tokens
+        ));
+        md.push_str(&format!(
+            "| **Completion Tokens** | `{}` |\n",
+            self.session_metadata.token_stats.completion_tokens
+        ));
+        md.push_str(&format!(
+            "| **Total Tokens** | `{}` |\n",
+            self.session_metadata.token_stats.total_tokens
+        ));
+        md.push_str(&format!(
+            "| **Cache Read Tokens** | `{}` |\n",
+            self.session_metadata.token_stats.cache_read_tokens
+        ));
+        md.push_str(&format!(
+            "| **Cache Write Tokens** | `{}` |\n",
+            self.session_metadata.token_stats.cache_write_tokens
+        ));
+        md.push_str(&format!(
+            "| **Total Turns** | `{}` |\n\n",
+            self.session_metadata.token_stats.total_turns
+        ));
 
         // 5. Recent Tool Executions
         md.push_str(&format!(
@@ -1095,7 +1209,11 @@ impl DiagnosticTrace {
             md.push_str("*(No tool executions recorded in this session)*\n\n");
         } else {
             for (i, tool) in self.tool_executions.iter().enumerate() {
-                let status_icon = if tool.success { "✓ Success" } else { "✗ Error/Failed" };
+                let status_icon = if tool.success {
+                    "✓ Success"
+                } else {
+                    "✗ Error/Failed"
+                };
                 md.push_str(&format!(
                     "### Tool #{}: `{}` ({})\n\n",
                     i + 1,
@@ -1107,7 +1225,11 @@ impl DiagnosticTrace {
                 md.push_str(&format!(
                     "- **Output Size:** {} bytes{}\n\n",
                     tool.output_bytes,
-                    if tool.is_truncated { " *(truncated)*" } else { "" }
+                    if tool.is_truncated {
+                        " *(truncated)*"
+                    } else {
+                        ""
+                    }
                 ));
 
                 md.push_str("**Arguments:**\n");
@@ -1139,7 +1261,11 @@ impl DiagnosticTrace {
                 };
 
                 let tool_info = if item.tool_calls_count > 0 {
-                    format!(" (requested {} tool call{})", item.tool_calls_count, if item.tool_calls_count == 1 { "" } else { "s" })
+                    format!(
+                        " (requested {} tool call{})",
+                        item.tool_calls_count,
+                        if item.tool_calls_count == 1 { "" } else { "s" }
+                    )
                 } else {
                     String::new()
                 };
@@ -1174,11 +1300,11 @@ impl DiagnosticTrace {
                 if !dir.exists() {
                     fs::create_dir_all(&dir)?;
                 }
-                let safe_timestamp = self
-                    .generated_at
-                    .replace(':', "-")
-                    .replace('.', "-");
-                dir.join(format!("trace_{}_{}.md", self.session_metadata.id, safe_timestamp))
+                let safe_timestamp = self.generated_at.replace(':', "-").replace('.', "-");
+                dir.join(format!(
+                    "trace_{}_{}.md",
+                    self.session_metadata.id, safe_timestamp
+                ))
             }
         };
 
@@ -1259,7 +1385,10 @@ pub fn handle_trace_command(
             };
 
             println!("\x1b[1;32m✓\x1b[0m Diagnostic trace successfully generated!");
-            println!("  \x1b[1;37mFile:\x1b[0m     \x1b[36m{}\x1b[0m", saved_path.display());
+            println!(
+                "  \x1b[1;37mFile:\x1b[0m     \x1b[36m{}\x1b[0m",
+                saved_path.display()
+            );
             println!("  \x1b[1;37mSession:\x1b[0m  {}", session.id());
             println!("  \x1b[1;37mModel:\x1b[0m    {}", session.active_model());
             println!("  \x1b[1;37mStatus:\x1b[0m   {}\n", status_line);
@@ -1492,7 +1621,9 @@ impl TraceRecord {
     /// Converts this record into a standard OpenTelemetry (OTLP) Span.
     pub fn to_otel_span(&self) -> OtelSpan {
         let kind = match self.event_type {
-            TraceEventType::ToolInvocation | TraceEventType::LlmRequest => OtelSpanKind::Client as i32,
+            TraceEventType::ToolInvocation | TraceEventType::LlmRequest => {
+                OtelSpanKind::Client as i32
+            }
             TraceEventType::AgentSession | TraceEventType::AgentTurn => OtelSpanKind::Server as i32,
             _ => OtelSpanKind::Internal as i32,
         };
@@ -1650,9 +1781,7 @@ impl TraceRecord {
             })
             .collect();
 
-        let end_nano = self
-            .end_time_unix_nano
-            .unwrap_or(self.start_time_unix_nano);
+        let end_nano = self.end_time_unix_nano.unwrap_or(self.start_time_unix_nano);
 
         OtelSpan {
             trace_id: self.trace_id.clone(),
@@ -1706,12 +1835,24 @@ pub struct OtelStatus {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(untagged)]
 pub enum OtelAnyValue {
-    StringValue { string_value: String },
-    BoolValue { bool_value: bool },
-    IntValue { int_value: i64 },
-    DoubleValue { double_value: f64 },
-    ArrayValue { array_value: Vec<OtelAnyValue> },
-    KvlistValue { kvlist_value: HashMap<String, OtelAnyValue> },
+    StringValue {
+        string_value: String,
+    },
+    BoolValue {
+        bool_value: bool,
+    },
+    IntValue {
+        int_value: i64,
+    },
+    DoubleValue {
+        double_value: f64,
+    },
+    ArrayValue {
+        array_value: Vec<OtelAnyValue>,
+    },
+    KvlistValue {
+        kvlist_value: HashMap<String, OtelAnyValue>,
+    },
 }
 
 impl From<&str> for OtelAnyValue {
@@ -2236,8 +2377,9 @@ impl TraceReader {
             }
 
             if let Some(toks) = &r.token_metrics {
-                total_tokens.prompt_tokens =
-                    total_tokens.prompt_tokens.saturating_add(toks.prompt_tokens);
+                total_tokens.prompt_tokens = total_tokens
+                    .prompt_tokens
+                    .saturating_add(toks.prompt_tokens);
                 total_tokens.completion_tokens = total_tokens
                     .completion_tokens
                     .saturating_add(toks.completion_tokens);
@@ -2253,9 +2395,14 @@ impl TraceReader {
 
             if let Some(tool) = &r.tool_metadata {
                 let dur = r.duration_ms.unwrap_or(0.0);
-                let entry = tool_data
-                    .entry(tool.tool_name.clone())
-                    .or_insert((0, 0, 0.0, f64::MAX, 0.0, 0));
+                let entry = tool_data.entry(tool.tool_name.clone()).or_insert((
+                    0,
+                    0,
+                    0.0,
+                    f64::MAX,
+                    0.0,
+                    0,
+                ));
                 entry.0 += 1; // count
                 if tool.is_error || r.status.is_error() {
                     entry.1 += 1; // errors
@@ -2290,11 +2437,7 @@ impl TraceReader {
 
         let mut tool_breakdown = HashMap::new();
         for (name, (cnt, errs, tot_dur, min_dur, max_dur, bytes)) in tool_data {
-            let avg = if cnt > 0 {
-                tot_dur / (cnt as f64)
-            } else {
-                0.0
-            };
+            let avg = if cnt > 0 { tot_dur / (cnt as f64) } else { 0.0 };
             let success_rate = if cnt > 0 {
                 ((cnt - errs) as f64) / (cnt as f64)
             } else {
@@ -2465,7 +2608,10 @@ impl ExecutionTraceLogger {
 
         let mut attributes = HashMap::new();
         if let Some(m) = model {
-            attributes.insert("model".to_string(), serde_json::Value::String(m.to_string()));
+            attributes.insert(
+                "model".to_string(),
+                serde_json::Value::String(m.to_string()),
+            );
         }
 
         SpanGuard::new(
@@ -2999,7 +3145,10 @@ mod tests {
         };
 
         session.add_assistant_with_tools("I will run grep tool.", vec![tool_call]);
-        session.add_tool_result("call_123", "Found in /Users/alice/repo/src/main.rs:1: fn main() { ... }");
+        session.add_tool_result(
+            "call_123",
+            "Found in /Users/alice/repo/src/main.rs:1: fn main() { ... }",
+        );
         session.add_assistant_message("I found the main function.");
 
         session.record_usage(120, 45);
@@ -3007,7 +3156,10 @@ mod tests {
         let trace = generate_trace(&session, None, None);
 
         assert_eq!(trace.session_metadata.active_model, "deepseek-chat");
-        assert_eq!(trace.session_metadata.title.as_deref(), Some("Test Debug Session"));
+        assert_eq!(
+            trace.session_metadata.title.as_deref(),
+            Some("Test Debug Session")
+        );
         assert_eq!(trace.tool_executions.len(), 1);
         assert_eq!(trace.tool_executions[0].tool_name, "grep");
         assert_eq!(trace.session_metadata.token_stats.prompt_tokens, 120);
@@ -3131,10 +3283,7 @@ mod tests {
         assert_eq!(deserialized.name, "tool:grep");
         assert_eq!(deserialized.duration_ms, Some(125.0));
         assert_eq!(deserialized.status, TraceStatus::Ok);
-        assert_eq!(
-            deserialized.token_metrics.unwrap().total_tokens,
-            200
-        );
+        assert_eq!(deserialized.token_metrics.unwrap().total_tokens, 200);
         assert_eq!(
             deserialized.tool_metadata.as_ref().unwrap().tool_name,
             "grep"
@@ -3415,20 +3564,17 @@ mod tests {
         let otel_span = record.to_otel_span();
         assert_eq!(otel_span.trace_id, trace_id);
         assert_eq!(otel_span.span_id, span_id);
-        assert_eq!(otel_span.parent_span_id.as_deref(), Some("0011223344556677"));
+        assert_eq!(
+            otel_span.parent_span_id.as_deref(),
+            Some("0011223344556677")
+        );
         assert_eq!(otel_span.kind, OtelSpanKind::Client as i32);
         assert_eq!(otel_span.status.code, OtelStatusCode::Ok as i32);
 
-        let has_session_attr = otel_span
-            .attributes
-            .iter()
-            .any(|kv| kv.key == "session.id");
+        let has_session_attr = otel_span.attributes.iter().any(|kv| kv.key == "session.id");
         assert!(has_session_attr);
 
-        let has_tool_attr = otel_span
-            .attributes
-            .iter()
-            .any(|kv| kv.key == "tool.name");
+        let has_tool_attr = otel_span.attributes.iter().any(|kv| kv.key == "tool.name");
         assert!(has_tool_attr);
     }
 
@@ -3445,10 +3591,7 @@ mod tests {
             .export_otlp_payload(None)
             .expect("export payload failed");
         assert_eq!(payload.resource_spans.len(), 1);
-        assert_eq!(
-            payload.resource_spans[0].scope_spans[0].spans.len(),
-            1
-        );
+        assert_eq!(payload.resource_spans[0].scope_spans[0].spans.len(), 1);
 
         let json_str = logger
             .export_otlp_json_string(None)

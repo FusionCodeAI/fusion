@@ -223,7 +223,11 @@ impl PrunerConfig {
     }
 
     /// Adds a custom pair of thinking tags to recognize.
-    pub fn with_custom_thinking_tag(mut self, open: impl Into<String>, close: impl Into<String>) -> Self {
+    pub fn with_custom_thinking_tag(
+        mut self,
+        open: impl Into<String>,
+        close: impl Into<String>,
+    ) -> Self {
         self.custom_thinking_tags.push((open.into(), close.into()));
         self
     }
@@ -711,7 +715,12 @@ pub fn truncate_tool_output_smart(
             let mut error_sections: Vec<&str> = Vec::new();
             for line in &lines {
                 let l = line.to_lowercase();
-                if l.contains("error") || l.contains("fatal") || l.contains("panic") || l.contains("failed") || l.contains("exception") {
+                if l.contains("error")
+                    || l.contains("fatal")
+                    || l.contains("panic")
+                    || l.contains("failed")
+                    || l.contains("exception")
+                {
                     error_sections.push(line);
                 }
             }
@@ -766,7 +775,12 @@ pub fn truncate_tool_output_smart(
             let half = max_chars / 2;
             let head = &content[..half];
             let tail = &content[content.len() - half..];
-            return format!("{}\n\n... [{} characters elided for context] ...\n\n{}", head, content.len() - max_chars, tail);
+            return format!(
+                "{}\n\n... [{} characters elided for context] ...\n\n{}",
+                head,
+                content.len() - max_chars,
+                tail
+            );
         }
         return content.to_string();
     }
@@ -829,7 +843,10 @@ pub fn deduplicate_tool_results_in_place(
                 continue;
             }
 
-            let tool_id = msg.tool_call_id.clone().unwrap_or_else(|| "call".to_string());
+            let tool_id = msg
+                .tool_call_id
+                .clone()
+                .unwrap_or_else(|| "call".to_string());
 
             if let Some((first_id, _first_idx)) = seen_outputs.get(content) {
                 if is_older {
@@ -1115,12 +1132,7 @@ impl ConversationPruner {
                                 msg.content.clone()
                             }
                         } else {
-                            truncate_tool_output_smart(
-                                &msg.content,
-                                tool_name,
-                                max_tokens,
-                                false,
-                            )
+                            truncate_tool_output_smart(&msg.content, tool_name, max_tokens, false)
                         };
 
                         let new_tokens = estimate_text_tokens(&truncated);
@@ -1155,8 +1167,11 @@ impl ConversationPruner {
                 for (idx, msg) in messages.iter_mut().enumerate() {
                     if msg.role == Role::Assistant && has_thinking_blocks(&msg.content) {
                         let old_tok = estimate_message_tokens(msg);
-                        let (cleaned, cnt, _) =
-                            strip_thinking_with_stats(&msg.content, None, &self.config.custom_thinking_tags);
+                        let (cleaned, cnt, _) = strip_thinking_with_stats(
+                            &msg.content,
+                            None,
+                            &self.config.custom_thinking_tags,
+                        );
                         if cnt > 0 {
                             msg.content = cleaned;
                             let new_tok = estimate_message_tokens(msg);
@@ -1186,12 +1201,8 @@ impl ConversationPruner {
                         if msg.role == Role::Tool {
                             let old_tok = estimate_text_tokens(&msg.content);
                             if old_tok > 100 {
-                                let truncated = truncate_tool_output_smart(
-                                    &msg.content,
-                                    None,
-                                    100,
-                                    true,
-                                );
+                                let truncated =
+                                    truncate_tool_output_smart(&msg.content, None, 100, true);
                                 let new_tok = estimate_text_tokens(&truncated);
                                 if new_tok < old_tok {
                                     let saved = old_tok - new_tok;
@@ -1221,7 +1232,10 @@ impl ConversationPruner {
         if self.config.drop_empty_assistant_messages {
             let before_count = messages.len();
             messages.retain(|m| {
-                if m.role == Role::Assistant && m.content.trim().is_empty() && m.tool_calls.as_ref().map_or(true, |tc| tc.is_empty()) {
+                if m.role == Role::Assistant
+                    && m.content.trim().is_empty()
+                    && m.tool_calls.as_ref().map_or(true, |tc| tc.is_empty())
+                {
                     false
                 } else {
                     true
@@ -1273,10 +1287,7 @@ pub fn prune_conversation(messages: &[Message]) -> (Vec<Message>, usize) {
 }
 
 /// Prunes a conversation with custom configuration.
-pub fn prune_conversation_with_config(
-    messages: &[Message],
-    config: &PrunerConfig,
-) -> PruneResult {
+pub fn prune_conversation_with_config(messages: &[Message], config: &PrunerConfig) -> PruneResult {
     let pruner = ConversationPruner::with_config(config.clone());
     pruner.prune(messages)
 }
@@ -1368,7 +1379,11 @@ pub fn prune_messages_with_line_threshold(
         preserve_system_messages: true,
         deduplicate_tools: true,
         drop_empty_assistant_messages: true,
-        target_token_budget: if budget == usize::MAX { None } else { Some(budget) },
+        target_token_budget: if budget == usize::MAX {
+            None
+        } else {
+            Some(budget)
+        },
         custom_thinking_tags: Vec::new(),
     };
 
@@ -1376,7 +1391,6 @@ pub fn prune_messages_with_line_threshold(
     let result = pruner.prune(&messages);
     (result.messages, result.tokens_saved)
 }
-
 
 // ============================================================================
 // Unit Tests
@@ -1446,7 +1460,8 @@ mod tests {
     #[test]
     fn test_strip_thinking_with_placeholder() {
         let text = "<think>Long complex chain of thought</think>Here is the plan.";
-        let (cleaned, count, saved) = strip_thinking_with_stats(text, Some("[reasoning omitted]"), &[]);
+        let (cleaned, count, saved) =
+            strip_thinking_with_stats(text, Some("[reasoning omitted]"), &[]);
         assert_eq!(count, 1);
         assert!(cleaned.starts_with("[reasoning omitted]"));
         assert!(cleaned.contains("Here is the plan."));
@@ -1455,10 +1470,14 @@ mod tests {
 
     #[test]
     fn test_is_error_tool_output() {
-        assert!(is_error_tool_output("error[E0432]: unresolved import `foo`"));
+        assert!(is_error_tool_output(
+            "error[E0432]: unresolved import `foo`"
+        ));
         assert!(is_error_tool_output("FATAL: database connection refused"));
         assert!(is_error_tool_output("Process exited with exit status: 1"));
-        assert!(!is_error_tool_output("File successfully saved to disk. 120 lines written."));
+        assert!(!is_error_tool_output(
+            "File successfully saved to disk. 120 lines written."
+        ));
     }
 
     #[test]
@@ -1472,7 +1491,12 @@ mod tests {
     #[test]
     fn test_truncate_tool_output_smart_long_text() {
         let long_text = (0..200)
-            .map(|i| format!("Line {}: Some detailed logging output from server process", i))
+            .map(|i| {
+                format!(
+                    "Line {}: Some detailed logging output from server process",
+                    i
+                )
+            })
             .collect::<Vec<_>>()
             .join("\n");
 
@@ -1527,7 +1551,9 @@ mod tests {
             Message::assistant("<think>Thinking about file 0</think>File 0 is good."),
             // Turn 3 (Recent turn - should preserve thinking and tools)
             Message::user("Now optimize file_0.rs."),
-            Message::assistant("<think>Thinking about optimization for file 0</think>Here is the optimized code."),
+            Message::assistant(
+                "<think>Thinking about optimization for file 0</think>Here is the optimized code.",
+            ),
         ];
 
         let pruner = ConversationPruner::new();
@@ -1543,7 +1569,9 @@ mod tests {
         assert_eq!(res.messages[2].content, "Running glob...");
 
         // Verify recent turn 3 assistant message PRESERVED its <think>
-        assert!(res.messages[8].content.contains("<think>Thinking about optimization for file 0</think>"));
+        assert!(res.messages[8]
+            .content
+            .contains("<think>Thinking about optimization for file 0</think>"));
     }
 
     #[test]
@@ -1590,7 +1618,9 @@ mod tests {
         let res = pruner.prune(&messages);
 
         assert!(res.duplicate_tools_collapsed >= 1);
-        assert!(res.messages[6].content.contains("Duplicate tool output identical to call `call_a`"));
+        assert!(res.messages[6]
+            .content
+            .contains("Duplicate tool output identical to call `call_a`"));
     }
 
     #[test]
@@ -1623,7 +1653,9 @@ mod tests {
     fn test_prune_session_in_place() {
         let mut session = Session::new("test-model");
         session.messages.push(Message::user("Hello"));
-        session.messages.push(Message::assistant("<think>Pondering</think>Hi there!"));
+        session
+            .messages
+            .push(Message::assistant("<think>Pondering</think>Hi there!"));
 
         let pruner = ConversationPruner::with_config(PrunerConfig {
             thinking_policy: ThinkingPrunePolicy::StripAll,

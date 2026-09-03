@@ -18,6 +18,7 @@ use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::Arc;
 use std::time::Duration;
 
+use crate::tools::types::{DynTool, Tool, ToolContext, ToolRegistry};
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
@@ -25,7 +26,6 @@ use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
 use tokio::process::{Child, Command};
 use tokio::sync::{mpsc, oneshot, Mutex, RwLock};
 use tracing::{debug, error, info, warn};
-use crate::tools::types::{DynTool, Tool, ToolContext, ToolRegistry};
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -546,7 +546,11 @@ pub fn format_tool_call_result(result: &McpCallToolResult) -> anyhow::Result<Str
                 if !output.is_empty() && !output.ends_with('\n') {
                     output.push('\n');
                 }
-                output.push_str(&format!("[Image: {}, {} bytes base64]", mime_type, data.len()));
+                output.push_str(&format!(
+                    "[Image: {}, {} bytes base64]",
+                    mime_type,
+                    data.len()
+                ));
             }
             McpContent::Resource { resource } => {
                 if !output.is_empty() && !output.ends_with('\n') {
@@ -696,11 +700,9 @@ impl McpClient {
                     Ok(val) => {
                         // Check if this is a response to a pending request
                         if let Some(id_val) = val.get("id") {
-                            let id_num = id_val.as_u64().or_else(|| {
-                                id_val
-                                    .as_str()
-                                    .and_then(|s| s.parse::<u64>().ok())
-                            });
+                            let id_num = id_val
+                                .as_u64()
+                                .or_else(|| id_val.as_str().and_then(|s| s.parse::<u64>().ok()));
 
                             if let Some(id) = id_num {
                                 let mut map = pending_clone.lock().await;
@@ -722,10 +724,8 @@ impl McpClient {
                                             }));
                                         }
                                     } else {
-                                        let result = val
-                                            .get("result")
-                                            .cloned()
-                                            .unwrap_or(Value::Null);
+                                        let result =
+                                            val.get("result").cloned().unwrap_or(Value::Null);
                                         let _ = sender.send(Ok(result));
                                     }
                                 }
@@ -981,19 +981,14 @@ impl McpClient {
                     return Err(McpError::ConnectionClosed);
                 }
 
-                let timeout_secs = self
-                    .config
-                    .timeout_secs
-                    .unwrap_or(DEFAULT_TIMEOUT_SECS);
+                let timeout_secs = self.config.timeout_secs.unwrap_or(DEFAULT_TIMEOUT_SECS);
                 let timeout_dur = Duration::from_secs(timeout_secs);
 
                 match tokio::time::timeout(timeout_dur, rx).await {
                     Ok(Ok(result)) => result,
-                    Ok(Err(_)) => {
-                        Err(McpError::ProcessExited(
-                            "Response channel closed unexpectedly".to_string(),
-                        ))
-                    }
+                    Ok(Err(_)) => Err(McpError::ProcessExited(
+                        "Response channel closed unexpectedly".to_string(),
+                    )),
                     Err(_) => {
                         let mut map = self.pending.lock().await;
                         map.remove(&req_id);
@@ -1091,7 +1086,10 @@ impl McpTool {
 
         let server_name = client.server_name().to_string();
         let description = definition.description.unwrap_or_else(|| {
-            format!("MCP tool '{}' provided by server '{}'", raw_name, server_name)
+            format!(
+                "MCP tool '{}' provided by server '{}'",
+                raw_name, server_name
+            )
         });
 
         let mut parameters = definition.input_schema;
@@ -1212,7 +1210,10 @@ impl McpManager {
 
             let mut tools_guard = self.tools.write().await;
             for tool in &created_tools {
-                tools_guard.insert(tool.name().to_string(), (server_name.clone(), Arc::clone(tool)));
+                tools_guard.insert(
+                    tool.name().to_string(),
+                    (server_name.clone(), Arc::clone(tool)),
+                );
             }
         }
 
@@ -1255,7 +1256,10 @@ impl McpManager {
     }
 
     /// Loads configurations from a file and connects to all active servers.
-    pub async fn load_from_config_file(&self, path: impl AsRef<Path>) -> anyhow::Result<Vec<DynTool>> {
+    pub async fn load_from_config_file(
+        &self,
+        path: impl AsRef<Path>,
+    ) -> anyhow::Result<Vec<DynTool>> {
         let configs = McpServersConfig::from_file(path)?;
         let mut all_tools = Vec::new();
 
@@ -1308,10 +1312,7 @@ impl McpManager {
         let mut statuses = Vec::new();
 
         for (name, client) in clients.iter() {
-            let tool_count = tools
-                .values()
-                .filter(|(s_name, _)| s_name == name)
-                .count();
+            let tool_count = tools.values().filter(|(s_name, _)| s_name == name).count();
 
             statuses.push(McpServerStatus {
                 name: name.clone(),
@@ -1402,7 +1403,8 @@ mod tests {
         assert!(resp.result.is_some());
         assert!(resp.error.is_none());
 
-        let err_json = r#"{"jsonrpc":"2.0","id":42,"error":{"code":-32601,"message":"Method not found"}}"#;
+        let err_json =
+            r#"{"jsonrpc":"2.0","id":42,"error":{"code":-32601,"message":"Method not found"}}"#;
         let err_resp: JsonRpcResponse = serde_json::from_str(err_json).unwrap();
         assert_eq!(err_resp.error.unwrap().code, -32601);
     }
@@ -1634,7 +1636,10 @@ mod tests {
 
         assert!(registry.contains("echo_text"));
         let ctx = ToolContext::default();
-        let output = registry.execute("echo_text", json!({}), &ctx).await.unwrap();
+        let output = registry
+            .execute("echo_text", json!({}), &ctx)
+            .await
+            .unwrap();
         assert_eq!(output, "echoed");
     }
 

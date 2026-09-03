@@ -177,14 +177,7 @@ impl LlmClient {
                 Some(base_url),
             );
             ollama_client
-                .stream_chat(
-                    model,
-                    temperature,
-                    max_tokens,
-                    api_key,
-                    messages,
-                    tools,
-                )
+                .stream_chat(model, temperature, max_tokens, api_key, messages, tools)
                 .await
         } else {
             self.stream_openai_compatible(
@@ -539,10 +532,7 @@ impl LlmClient {
         let url = construct_anthropic_url(base_url);
         let mut headers = HeaderMap::new();
         headers.insert(CONTENT_TYPE, HeaderValue::from_static("application/json"));
-        headers.insert(
-            "anthropic-version",
-            HeaderValue::from_static("2023-06-01"),
-        );
+        headers.insert("anthropic-version", HeaderValue::from_static("2023-06-01"));
 
         if let Some(key) = api_key {
             let key = key.trim();
@@ -603,9 +593,8 @@ impl LlmClient {
                                 "message_start" => {
                                     if let Some(msg) = val.get("message") {
                                         if let Some(usage) = msg.get("usage") {
-                                            if let Some(it) = usage
-                                                .get("input_tokens")
-                                                .and_then(|v| v.as_u64())
+                                            if let Some(it) =
+                                                usage.get("input_tokens").and_then(|v| v.as_u64())
                                             {
                                                 prompt_tokens = Some(it as u32);
                                             }
@@ -613,11 +602,9 @@ impl LlmClient {
                                     }
                                 }
                                 "content_block_start" => {
-                                    let index = val
-                                        .get("index")
-                                        .and_then(|v| v.as_u64())
-                                        .unwrap_or(0)
-                                        as usize;
+                                    let index =
+                                        val.get("index").and_then(|v| v.as_u64()).unwrap_or(0)
+                                            as usize;
                                     if let Some(cb) = val.get("content_block") {
                                         let cb_type = cb.get("type").and_then(|v| v.as_str());
                                         if cb_type == Some("tool_use") {
@@ -641,14 +628,11 @@ impl LlmClient {
                                     }
                                 }
                                 "content_block_delta" => {
-                                    let index = val
-                                        .get("index")
-                                        .and_then(|v| v.as_u64())
-                                        .unwrap_or(0)
-                                        as usize;
+                                    let index =
+                                        val.get("index").and_then(|v| v.as_u64()).unwrap_or(0)
+                                            as usize;
                                     if let Some(delta) = val.get("delta") {
-                                        let delta_type =
-                                            delta.get("type").and_then(|v| v.as_str());
+                                        let delta_type = delta.get("type").and_then(|v| v.as_str());
                                         match delta_type {
                                             Some("text_delta") => {
                                                 if let Some(text) =
@@ -664,9 +648,8 @@ impl LlmClient {
                                                 }
                                             }
                                             Some("thinking_delta") => {
-                                                if let Some(thinking) = delta
-                                                    .get("thinking")
-                                                    .and_then(|v| v.as_str())
+                                                if let Some(thinking) =
+                                                    delta.get("thinking").and_then(|v| v.as_str())
                                                 {
                                                     if !thinking.is_empty() {
                                                         let _ = tx
@@ -699,9 +682,8 @@ impl LlmClient {
                                 "content_block_stop" => {}
                                 "message_delta" => {
                                     if let Some(delta) = val.get("delta") {
-                                        if let Some(sr) = delta
-                                            .get("stop_reason")
-                                            .and_then(|v| v.as_str())
+                                        if let Some(sr) =
+                                            delta.get("stop_reason").and_then(|v| v.as_str())
                                         {
                                             finish_reason = Some(sr.to_string());
                                         }
@@ -732,9 +714,7 @@ impl LlmClient {
                                         .and_then(|e| e.get("message"))
                                         .and_then(|v| v.as_str())
                                         .unwrap_or("Unknown Anthropic error");
-                                    let _ = tx
-                                        .send(StreamChunk::Error(err_msg.to_string()))
-                                        .await;
+                                    let _ = tx.send(StreamChunk::Error(err_msg.to_string())).await;
                                 }
                                 _ => {}
                             }
@@ -835,10 +815,7 @@ pub fn build_openai_payload(
     let mut messages_json = Vec::new();
     for msg in messages {
         let is_tool_call_assistant = msg.role == Role::Assistant
-            && msg
-                .tool_calls
-                .as_ref()
-                .map_or(false, |tc| !tc.is_empty());
+            && msg.tool_calls.as_ref().map_or(false, |tc| !tc.is_empty());
 
         let mut item = if is_tool_call_assistant {
             json!({
@@ -1257,12 +1234,8 @@ mod tests {
             let _ = tx
                 .send(StreamChunk::ThinkingDelta("Thinking step 1...".into()))
                 .await;
-            let _ = tx
-                .send(StreamChunk::ContentDelta("Hello, ".into()))
-                .await;
-            let _ = tx
-                .send(StreamChunk::ContentDelta("world!".into()))
-                .await;
+            let _ = tx.send(StreamChunk::ContentDelta("Hello, ".into())).await;
+            let _ = tx.send(StreamChunk::ContentDelta("world!".into())).await;
             let _ = tx
                 .send(StreamChunk::ToolCallDelta {
                     index: 0,
@@ -1288,8 +1261,7 @@ mod tests {
                 .await;
         });
 
-        let (content, thinking, tool_calls) =
-            LlmClient::aggregate_stream(&mut rx).await.unwrap();
+        let (content, thinking, tool_calls) = LlmClient::aggregate_stream(&mut rx).await.unwrap();
 
         assert_eq!(content, "Hello, world!");
         assert_eq!(thinking, Some("Thinking step 1...".to_string()));

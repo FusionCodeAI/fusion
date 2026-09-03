@@ -985,7 +985,11 @@ fn render_full_ratatui(
         );
 
         let turn_badge = Span::styled(
-            format!(" [{} Turn{}] ", stats.turn_count, if stats.turn_count == 1 { "" } else { "s" }),
+            format!(
+                " [{} Turn{}] ",
+                stats.turn_count,
+                if stats.turn_count == 1 { "" } else { "s" }
+            ),
             Style::default().fg(theme.info),
         );
 
@@ -1043,28 +1047,41 @@ fn render_full_ratatui(
             x1,
             current_y,
             &tokens_str,
-            Style::default().fg(theme.primary).add_modifier(Modifier::BOLD),
+            Style::default()
+                .fg(theme.primary)
+                .add_modifier(Modifier::BOLD),
         );
         buf.set_string(
             x2,
             current_y,
             &cost_str,
-            Style::default().fg(theme.warning).add_modifier(Modifier::BOLD),
+            Style::default()
+                .fg(theme.warning)
+                .add_modifier(Modifier::BOLD),
         );
         buf.set_string(
             x3,
             current_y,
             &dur_str,
-            Style::default().fg(theme.accent).add_modifier(Modifier::BOLD),
+            Style::default()
+                .fg(theme.accent)
+                .add_modifier(Modifier::BOLD),
         );
         current_y += 1;
 
         // Line 2: Secondary subtitles / breakdowns
         if current_y < max_y && config.show_averages {
             let avg_tok = format!("~{}/turn", stats.avg_tokens_per_turn());
-            let tok_split = format!("P:{} C:{}", format_token_count(stats.prompt_tokens() as usize), format_token_count(stats.completion_tokens() as usize));
+            let tok_split = format!(
+                "P:{} C:{}",
+                format_token_count(stats.prompt_tokens() as usize),
+                format_token_count(stats.completion_tokens() as usize)
+            );
             let avg_cost = format!("~{}/t", format_usd(stats.avg_cost_per_turn()));
-            let avg_dur = format!("~{}/t", format_duration_pretty(stats.avg_duration_per_turn()));
+            let avg_dur = format!(
+                "~{}/t",
+                format_duration_pretty(stats.avg_duration_per_turn())
+            );
 
             buf.set_string(x0, current_y, avg_tok, Style::default().fg(theme.muted));
             buf.set_string(x1, current_y, tok_split, Style::default().fg(theme.muted));
@@ -1090,11 +1107,19 @@ fn render_full_ratatui(
         }
 
         if stats.cost_breakdown.cache_savings > 1e-5 {
-            breakdown_parts.push(format!("Saved: {}", format_usd(stats.cost_breakdown.cache_savings)));
+            breakdown_parts.push(format!(
+                "Saved: {}",
+                format_usd(stats.cost_breakdown.cache_savings)
+            ));
         }
 
         let breakdown_str = format!("  ↳ {}", breakdown_parts.join("  |  "));
-        buf.set_string(area.x, current_y, breakdown_str, Style::default().fg(theme.muted));
+        buf.set_string(
+            area.x,
+            current_y,
+            breakdown_str,
+            Style::default().fg(theme.muted),
+        );
         current_y += 1;
     }
 
@@ -1156,7 +1181,9 @@ fn render_full_ratatui(
             area.x,
             current_y,
             &name_str,
-            Style::default().fg(theme.primary).add_modifier(Modifier::BOLD),
+            Style::default()
+                .fg(theme.primary)
+                .add_modifier(Modifier::BOLD),
         );
 
         // Call count & Percentage
@@ -1184,10 +1211,20 @@ fn render_full_ratatui(
         let status_x = area.x + area.width.saturating_sub(14);
         if tool.failure_count > 0 {
             let fail_str = format!("✓{} ✗{}", tool.success_count, tool.failure_count);
-            buf.set_string(status_x, current_y, fail_str, Style::default().fg(theme.error));
+            buf.set_string(
+                status_x,
+                current_y,
+                fail_str,
+                Style::default().fg(theme.error),
+            );
         } else {
             let ok_str = format!("✓ {} ok", tool.success_count);
-            buf.set_string(status_x, current_y, ok_str, Style::default().fg(theme.success));
+            buf.set_string(
+                status_x,
+                current_y,
+                ok_str,
+                Style::default().fg(theme.success),
+            );
         }
 
         current_y += 1;
@@ -1196,7 +1233,11 @@ fn render_full_ratatui(
     // Remainder note if tools exceeded max_tools
     if stats.tool_stats.len() > max_tools && current_y < max_y {
         let remainder = stats.tool_stats.len() - max_tools;
-        let rem_str = format!("   ... and {} more tool type{}", remainder, if remainder == 1 { "" } else { "s" });
+        let rem_str = format!(
+            "   ... and {} more tool type{}",
+            remainder,
+            if remainder == 1 { "" } else { "s" }
+        );
         buf.set_string(area.x, current_y, rem_str, Style::default().fg(theme.muted));
     }
 }
@@ -1211,7 +1252,14 @@ fn render_compact_ratatui(stats: &SessionStats, theme: &Theme, area: Rect, buf: 
             "Model: {} | Turns: {} | msgs: {}",
             stats.model_name, stats.turn_count, stats.message_count
         );
-        buf.set_string(area.x, current_y, line1, Style::default().fg(theme.primary).add_modifier(Modifier::BOLD));
+        buf.set_string(
+            area.x,
+            current_y,
+            line1,
+            Style::default()
+                .fg(theme.primary)
+                .add_modifier(Modifier::BOLD),
+        );
         current_y += 1;
     }
 
@@ -1224,7 +1272,12 @@ fn render_compact_ratatui(stats: &SessionStats, theme: &Theme, area: Rect, buf: 
             stats.format_cost(),
             stats.format_duration()
         );
-        buf.set_string(area.x, current_y, line2, Style::default().fg(theme.foreground));
+        buf.set_string(
+            area.x,
+            current_y,
+            line2,
+            Style::default().fg(theme.foreground),
+        );
         current_y += 1;
     }
 
@@ -1234,8 +1287,18 @@ fn render_compact_ratatui(stats: &SessionStats, theme: &Theme, area: Rect, buf: 
             .iter()
             .map(|t| format!("{}:{}", t.name, t.call_count))
             .collect();
-        let line3 = format!("Tools ({}/{}): {}", stats.total_tool_calls, stats.unique_tools_count(), top_tools_summary.join(", "));
-        buf.set_string(area.x, current_y, line3, Style::default().fg(theme.secondary));
+        let line3 = format!(
+            "Tools ({}/{}): {}",
+            stats.total_tool_calls,
+            stats.unique_tools_count(),
+            top_tools_summary.join(", ")
+        );
+        buf.set_string(
+            area.x,
+            current_y,
+            line3,
+            Style::default().fg(theme.secondary),
+        );
     }
 }
 
@@ -1247,11 +1310,23 @@ fn render_metrics_only_ratatui(stats: &SessionStats, theme: &Theme, area: Rect, 
     let items = [
         ("Turns", stats.turn_count.to_string(), theme.info),
         ("Total Tokens", stats.format_tokens(), theme.primary),
-        ("Prompt Tokens", stats.prompt_tokens().to_string(), theme.muted),
-        ("Completion Tokens", stats.completion_tokens().to_string(), theme.muted),
+        (
+            "Prompt Tokens",
+            stats.prompt_tokens().to_string(),
+            theme.muted,
+        ),
+        (
+            "Completion Tokens",
+            stats.completion_tokens().to_string(),
+            theme.muted,
+        ),
         ("Cost (USD)", stats.format_cost(), theme.warning),
         ("Duration", stats.format_duration(), theme.accent),
-        ("Tool Calls", stats.total_tool_calls.to_string(), theme.secondary),
+        (
+            "Tool Calls",
+            stats.total_tool_calls.to_string(),
+            theme.secondary,
+        ),
     ];
 
     for (label, val, color) in items {
@@ -1276,8 +1351,19 @@ fn render_tools_only_ratatui(
     let max_y = area.y + area.height;
 
     if current_y < max_y {
-        let title = format!("Tools: {} total calls across {} types", stats.total_tool_calls, stats.unique_tools_count());
-        buf.set_string(area.x, current_y, title, Style::default().fg(theme.secondary).add_modifier(Modifier::BOLD));
+        let title = format!(
+            "Tools: {} total calls across {} types",
+            stats.total_tool_calls,
+            stats.unique_tools_count()
+        );
+        buf.set_string(
+            area.x,
+            current_y,
+            title,
+            Style::default()
+                .fg(theme.secondary)
+                .add_modifier(Modifier::BOLD),
+        );
         current_y += 1;
     }
 
@@ -1290,8 +1376,16 @@ fn render_tools_only_ratatui(
         } else {
             0.0
         };
-        let line = format!("  {:<12} {:>4} calls ({:>4.1}%) - ✓{} ✗{}", tool.name, tool.call_count, pct, tool.success_count, tool.failure_count);
-        buf.set_string(area.x, current_y, line, Style::default().fg(theme.foreground));
+        let line = format!(
+            "  {:<12} {:>4} calls ({:>4.1}%) - ✓{} ✗{}",
+            tool.name, tool.call_count, pct, tool.success_count, tool.failure_count
+        );
+        buf.set_string(
+            area.x,
+            current_y,
+            line,
+            Style::default().fg(theme.foreground),
+        );
         current_y += 1;
     }
 }
@@ -1302,7 +1396,10 @@ fn render_tools_only_ratatui(
 
 /// Renders a full statistics card into a beautifully styled ANSI terminal string.
 pub fn render_stats_card_ansi(stats: &SessionStats, config: &StatsCardConfig) -> String {
-    let target_width = config.width.unwrap_or(DEFAULT_CARD_WIDTH).max(MIN_CARD_WIDTH);
+    let target_width = config
+        .width
+        .unwrap_or(DEFAULT_CARD_WIDTH)
+        .max(MIN_CARD_WIDTH);
     let inner_width = target_width.saturating_sub(2);
 
     let (tl, tr, bl, br, h, v, sep_l, sep_r) = match config.border_style {
@@ -1318,7 +1415,10 @@ pub fn render_stats_card_ansi(stats: &SessionStats, config: &StatsCardConfig) ->
 
     // 1. Top border with title
     let raw_title = config.title.as_deref().unwrap_or("📊 Session Statistics");
-    let title_styled = format!(" {}{}{}{} ", ANSI_BOLD_CYAN, ANSI_BOLD, raw_title, ANSI_RESET);
+    let title_styled = format!(
+        " {}{}{}{} ",
+        ANSI_BOLD_CYAN, ANSI_BOLD, raw_title, ANSI_RESET
+    );
     let title_vis_len = visible_width(raw_title) + 2;
 
     let right_border_len = inner_width.saturating_sub(title_vis_len + 1);
@@ -1340,9 +1440,7 @@ pub fn render_stats_card_ansi(stats: &SessionStats, config: &StatsCardConfig) ->
     };
 
     // Helper closure for divider
-    let div_line = || -> String {
-        format!("{}{}{}\n", sep_l, h.repeat(inner_width), sep_r)
-    };
+    let div_line = || -> String { format!("{}{}{}\n", sep_l, h.repeat(inner_width), sep_r) };
 
     // 2. Model & Session Info Line
     let model_tag = format!(
@@ -1365,10 +1463,34 @@ pub fn render_stats_card_ansi(stats: &SessionStats, config: &StatsCardConfig) ->
 
     // 3. Core 4-Metric Grid
     // Line 1: Main Metric Values
-    let turns_fmt = format!("💬 {}Turns:{} {}{}{}", ANSI_DIM, ANSI_RESET, ANSI_BOLD_CYAN, stats.turn_count, ANSI_RESET);
-    let tokens_fmt = format!("🔤 {}Tokens:{} {}{}{}", ANSI_DIM, ANSI_RESET, ANSI_BOLD_GREEN, stats.format_tokens(), ANSI_RESET);
-    let cost_fmt = format!("💰 {}Cost:{} {}{}{}", ANSI_DIM, ANSI_RESET, ANSI_BOLD_YELLOW, stats.format_cost(), ANSI_RESET);
-    let dur_fmt = format!("⏱️ {}Duration:{} {}{}{}", ANSI_DIM, ANSI_RESET, ANSI_BOLD_MAGENTA, stats.format_duration(), ANSI_RESET);
+    let turns_fmt = format!(
+        "💬 {}Turns:{} {}{}{}",
+        ANSI_DIM, ANSI_RESET, ANSI_BOLD_CYAN, stats.turn_count, ANSI_RESET
+    );
+    let tokens_fmt = format!(
+        "🔤 {}Tokens:{} {}{}{}",
+        ANSI_DIM,
+        ANSI_RESET,
+        ANSI_BOLD_GREEN,
+        stats.format_tokens(),
+        ANSI_RESET
+    );
+    let cost_fmt = format!(
+        "💰 {}Cost:{} {}{}{}",
+        ANSI_DIM,
+        ANSI_RESET,
+        ANSI_BOLD_YELLOW,
+        stats.format_cost(),
+        ANSI_RESET
+    );
+    let dur_fmt = format!(
+        "⏱️ {}Duration:{} {}{}{}",
+        ANSI_DIM,
+        ANSI_RESET,
+        ANSI_BOLD_MAGENTA,
+        stats.format_duration(),
+        ANSI_RESET
+    );
 
     let quarter_width = inner_width / 4;
     let col0 = pad_ansi_right(&turns_fmt, quarter_width);
@@ -1380,19 +1502,39 @@ pub fn render_stats_card_ansi(stats: &SessionStats, config: &StatsCardConfig) ->
     // Line 2: Averages & Breakdown
     if config.show_averages {
         let avg_tok = format!("~{}/turn", stats.avg_tokens_per_turn());
-        let tok_split = format!("P:{} C:{}", format_token_count(stats.prompt_tokens() as usize), format_token_count(stats.completion_tokens() as usize));
+        let tok_split = format!(
+            "P:{} C:{}",
+            format_token_count(stats.prompt_tokens() as usize),
+            format_token_count(stats.completion_tokens() as usize)
+        );
         let avg_cost = format!("~{}/t", format_usd(stats.avg_cost_per_turn()));
-        let avg_dur = format!("~{}/t", format_duration_pretty(stats.avg_duration_per_turn()));
+        let avg_dur = format!(
+            "~{}/t",
+            format_duration_pretty(stats.avg_duration_per_turn())
+        );
 
-        let s0 = pad_ansi_right(&format!("  {}{}{}", ANSI_GRAY, avg_tok, ANSI_RESET), quarter_width);
-        let s1 = pad_ansi_right(&format!("{}{}{}", ANSI_GRAY, tok_split, ANSI_RESET), quarter_width);
-        let s2 = pad_ansi_right(&format!("{}{}{}", ANSI_GRAY, avg_cost, ANSI_RESET), quarter_width);
+        let s0 = pad_ansi_right(
+            &format!("  {}{}{}", ANSI_GRAY, avg_tok, ANSI_RESET),
+            quarter_width,
+        );
+        let s1 = pad_ansi_right(
+            &format!("{}{}{}", ANSI_GRAY, tok_split, ANSI_RESET),
+            quarter_width,
+        );
+        let s2 = pad_ansi_right(
+            &format!("{}{}{}", ANSI_GRAY, avg_cost, ANSI_RESET),
+            quarter_width,
+        );
         let s3 = format!("{}{}{}", ANSI_GRAY, avg_dur, ANSI_RESET);
         out.push_str(&box_line(&format!("{}{}{}{}", s0, s1, s2, s3)));
     }
 
     // Line 3: Cache / Cost Breakdown
-    if config.show_token_breakdown && (stats.cache_read_tokens() > 0 || stats.cache_write_tokens() > 0 || stats.cost_breakdown.cache_savings > 1e-5) {
+    if config.show_token_breakdown
+        && (stats.cache_read_tokens() > 0
+            || stats.cache_write_tokens() > 0
+            || stats.cost_breakdown.cache_savings > 1e-5)
+    {
         let mut cache_parts = Vec::new();
         if stats.cache_read_tokens() > 0 || stats.cache_write_tokens() > 0 {
             cache_parts.push(format!(
@@ -1403,9 +1545,17 @@ pub fn render_stats_card_ansi(stats: &SessionStats, config: &StatsCardConfig) ->
             ));
         }
         if stats.cost_breakdown.cache_savings > 1e-5 {
-            cache_parts.push(format!("Saved: {}", format_usd(stats.cost_breakdown.cache_savings)));
+            cache_parts.push(format!(
+                "Saved: {}",
+                format_usd(stats.cost_breakdown.cache_savings)
+            ));
         }
-        let cache_str = format!("  ↳ {}{}{}", ANSI_GRAY, cache_parts.join("  |  "), ANSI_RESET);
+        let cache_str = format!(
+            "  ↳ {}{}{}",
+            ANSI_GRAY,
+            cache_parts.join("  |  "),
+            ANSI_RESET
+        );
         out.push_str(&box_line(&cache_str));
     }
 
@@ -1422,7 +1572,10 @@ pub fn render_stats_card_ansi(stats: &SessionStats, config: &StatsCardConfig) ->
     out.push_str(&box_line(&tool_hdr));
 
     if stats.tool_stats.is_empty() {
-        out.push_str(&box_line(&format!("   {}No tool executions recorded.{}", ANSI_GRAY, ANSI_RESET)));
+        out.push_str(&box_line(&format!(
+            "   {}No tool executions recorded.{}",
+            ANSI_GRAY, ANSI_RESET
+        )));
     } else {
         let max_tools = config.max_tools.min(stats.tool_stats.len());
         let bar_width = 16.min(inner_width.saturating_sub(36));
@@ -1445,12 +1598,21 @@ pub fn render_stats_card_ansi(stats: &SessionStats, config: &StatsCardConfig) ->
             };
 
             let status_str = if tool.failure_count > 0 {
-                format!(" {}{}✓{} ✗{}{}", ANSI_RED, ANSI_BOLD, tool.success_count, tool.failure_count, ANSI_RESET)
+                format!(
+                    " {}{}✓{} ✗{}{}",
+                    ANSI_RED, ANSI_BOLD, tool.success_count, tool.failure_count, ANSI_RESET
+                )
             } else {
-                format!(" {}{}✓ {} ok{}", ANSI_GREEN, ANSI_DIM, tool.success_count, ANSI_RESET)
+                format!(
+                    " {}{}✓ {} ok{}",
+                    ANSI_GREEN, ANSI_DIM, tool.success_count, ANSI_RESET
+                )
             };
 
-            let line_content = format!("{} {} {}{}", name_colored, count_colored, bar_str, status_str);
+            let line_content = format!(
+                "{} {} {}{}",
+                name_colored, count_colored, bar_str, status_str
+            );
             out.push_str(&box_line(&line_content));
         }
 
@@ -1529,7 +1691,12 @@ pub fn render_stats_card_markdown(stats: &SessionStats) -> String {
             };
             md.push_str(&format!(
                 "| `{}` | {} | {:.1}% | {:.1}% (✓{} / ✗{}) |\n",
-                tool.name, tool.call_count, pct, tool.success_rate(), tool.success_count, tool.failure_count
+                tool.name,
+                tool.call_count,
+                pct,
+                tool.success_rate(),
+                tool.success_count,
+                tool.failure_count
             ));
         }
         md.push('\n');
@@ -1541,7 +1708,10 @@ pub fn render_stats_card_markdown(stats: &SessionStats) -> String {
 /// Renders a single-line high-density ANSI status string.
 pub fn render_stats_compact_ansi(stats: &SessionStats, theme: &Theme) -> String {
     let tools_part = if stats.total_tool_calls > 0 {
-        format!(" | Tools: {}{}{}", ANSI_BOLD_MAGENTA, stats.total_tool_calls, ANSI_RESET)
+        format!(
+            " | Tools: {}{}{}",
+            ANSI_BOLD_MAGENTA, stats.total_tool_calls, ANSI_RESET
+        )
     } else {
         String::new()
     };
@@ -1660,7 +1830,10 @@ mod tests {
         });
 
         messages.push(Message::tool_result("call_1", "src Cargo.toml target"));
-        messages.push(Message::tool_result("call_2", "[package]\nname = \"fusion\""));
+        messages.push(Message::tool_result(
+            "call_2",
+            "[package]\nname = \"fusion\"",
+        ));
 
         // Turn 2
         messages.push(Message::user("Now search for config."));
@@ -1744,7 +1917,10 @@ mod tests {
         assert_eq!(format_duration_pretty(Duration::from_secs(45)), "45s");
         assert_eq!(format_duration_pretty(Duration::from_secs(134)), "2m 14s");
         assert_eq!(format_duration_pretty(Duration::from_secs(3600)), "1h");
-        assert_eq!(format_duration_pretty(Duration::from_secs(3665)), "1h 01m 05s");
+        assert_eq!(
+            format_duration_pretty(Duration::from_secs(3665)),
+            "1h 01m 05s"
+        );
     }
 
     #[test]

@@ -149,7 +149,8 @@ impl ColorCapability {
                 return Self::TrueColor;
             } else if trimmed == "2" || trimmed == "256" {
                 return Self::Ansi256;
-            } else if trimmed == "1" || trimmed == "true" || trimmed == "yes" || !trimmed.is_empty() {
+            } else if trimmed == "1" || trimmed == "true" || trimmed == "yes" || !trimmed.is_empty()
+            {
                 // If force_color is "1", at least ANSI 16 is guaranteed, but let's check if COLORTERM/TERM allows higher
                 let detected = Self::detect_capabilities_without_force(&get_var);
                 return if detected > Self::Ansi16 {
@@ -230,8 +231,7 @@ impl ColorCapability {
             let lower = term_prog.trim().to_ascii_lowercase();
             match lower.as_str() {
                 "iterm.app" | "iterm" | "vscode" | "hyper" | "wezterm" | "ghostty"
-                | "warpterminal" | "warp" | "alacritty" | "kitty" | "rio" | "tabby"
-                | "contour" => {
+                | "warpterminal" | "warp" | "alacritty" | "kitty" | "rio" | "tabby" | "contour" => {
                     return Self::TrueColor;
                 }
                 "apple_terminal" => {

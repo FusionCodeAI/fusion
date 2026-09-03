@@ -1,5 +1,5 @@
-use std::collections::HashSet;
 use serde::{Deserialize, Serialize};
+use std::collections::HashSet;
 
 use crate::agent::session::Session;
 use crate::config::Config;
@@ -374,7 +374,8 @@ pub fn group_into_turns(messages: &[Message]) -> Vec<TurnGroup> {
         }
 
         // Assistant message with tool calls: gather it and ALL following Tool messages matching it
-        if msg.role == Role::Assistant && msg.tool_calls.as_ref().map_or(false, |tc| !tc.is_empty()) {
+        if msg.role == Role::Assistant && msg.tool_calls.as_ref().map_or(false, |tc| !tc.is_empty())
+        {
             let mut group_msgs = vec![msg.clone()];
             let mut turn_tokens = estimate_message_tokens(msg);
             let expected_ids: HashSet<String> = msg
@@ -443,7 +444,10 @@ pub fn truncate_tool_output(content: &str, max_tokens: usize) -> String {
             let half = max_chars / 2;
             let head = safe_char_head(content, half);
             let tail = safe_char_tail(content, half);
-            return format!("{}\n... [elided for context compaction] ...\n{}", head, tail);
+            return format!(
+                "{}\n... [elided for context compaction] ...\n{}",
+                head, tail
+            );
         }
         return content.to_string();
     }
@@ -492,7 +496,8 @@ pub fn prune_older_tool_outputs(
             if group_idx < older_group_limit && msg.role == Role::Tool {
                 let old_tokens = estimate_text_tokens(&messages[msg_idx].content);
                 if old_tokens > max_tool_tokens {
-                    let truncated = truncate_tool_output(&messages[msg_idx].content, max_tool_tokens);
+                    let truncated =
+                        truncate_tool_output(&messages[msg_idx].content, max_tool_tokens);
                     let new_tokens = estimate_text_tokens(&truncated);
                     if new_tokens < old_tokens {
                         tokens_saved += old_tokens - new_tokens;
@@ -538,14 +543,18 @@ pub fn generate_heuristic_summary(older_messages: &[Message]) -> String {
                 if let Some(tool_calls) = &msg.tool_calls {
                     for tc in tool_calls {
                         let name = &tc.name;
-                        let arg_snippet = if let Ok(parsed) = serde_json::from_str::<serde_json::Value>(&tc.arguments) {
+                        let arg_snippet = if let Ok(parsed) =
+                            serde_json::from_str::<serde_json::Value>(&tc.arguments)
+                        {
                             if let Some(path) = parsed.get("path").and_then(|p| p.as_str()) {
                                 files_referenced.insert(path.to_string());
                                 format!("path: `{}`", path)
-                            } else if let Some(cmd) = parsed.get("command").and_then(|c| c.as_str()) {
+                            } else if let Some(cmd) = parsed.get("command").and_then(|c| c.as_str())
+                            {
                                 let first_cmd = cmd.lines().next().unwrap_or(cmd);
                                 format!("cmd: `{}`", safe_char_head(first_cmd, 60))
-                            } else if let Some(pat) = parsed.get("pattern").and_then(|p| p.as_str()) {
+                            } else if let Some(pat) = parsed.get("pattern").and_then(|p| p.as_str())
+                            {
                                 format!("pattern: `{}`", safe_char_head(pat, 40))
                             } else {
                                 safe_char_head(&tc.arguments, 40).to_string()
@@ -574,8 +583,14 @@ pub fn generate_heuristic_summary(older_messages: &[Message]) -> String {
             Role::Tool => {
                 let lower = msg.content.to_lowercase();
                 if lower.contains("error") || lower.contains("failed") || lower.contains("fatal") {
-                    let first_line = msg.content.trim().lines().next().unwrap_or("Error in tool output");
-                    critical_findings.push(format!("Tool failure: {}", safe_char_head(first_line, 100)));
+                    let first_line = msg
+                        .content
+                        .trim()
+                        .lines()
+                        .next()
+                        .unwrap_or("Error in tool output");
+                    critical_findings
+                        .push(format!("Tool failure: {}", safe_char_head(first_line, 100)));
                 }
             }
             Role::System => {}
@@ -591,7 +606,10 @@ pub fn generate_heuristic_summary(older_messages: &[Message]) -> String {
             summary.push_str(&format!("- {}\n", req));
         }
         if user_requests.len() > 6 {
-            summary.push_str(&format!("- *(... plus {} earlier inquiries)*\n", user_requests.len() - 6));
+            summary.push_str(&format!(
+                "- *(... plus {} earlier inquiries)*\n",
+                user_requests.len() - 6
+            ));
         }
         summary.push('\n');
     }
@@ -604,7 +622,10 @@ pub fn generate_heuristic_summary(older_messages: &[Message]) -> String {
             summary.push_str(&format!("- `{}`\n", file));
         }
         if sorted_files.len() > 10 {
-            summary.push_str(&format!("- *(... plus {} additional files)*\n", sorted_files.len() - 10));
+            summary.push_str(&format!(
+                "- *(... plus {} additional files)*\n",
+                sorted_files.len() - 10
+            ));
         }
         summary.push('\n');
     }
@@ -615,7 +636,10 @@ pub fn generate_heuristic_summary(older_messages: &[Message]) -> String {
             summary.push_str(&format!("- {}\n", action));
         }
         if actions_taken.len() > 8 {
-            summary.push_str(&format!("- *(... plus {} additional operations)*\n", actions_taken.len() - 8));
+            summary.push_str(&format!(
+                "- *(... plus {} additional operations)*\n",
+                actions_taken.len() - 8
+            ));
         }
         summary.push('\n');
     }
@@ -636,7 +660,9 @@ pub fn generate_heuristic_summary(older_messages: &[Message]) -> String {
         summary.push('\n');
     }
 
-    summary.push_str("*(Resume conversation maintaining continuity with these previous actions and findings.)*");
+    summary.push_str(
+        "*(Resume conversation maintaining continuity with these previous actions and findings.)*",
+    );
     summary
 }
 
@@ -811,7 +837,9 @@ impl Compactor {
             let pruned_tokens = estimate_messages_tokens(&working_messages);
 
             // If pruning tool outputs brought us under target, we can return early!
-            if self.config.strategy == CompactionStrategy::PruneToolsOnly || pruned_tokens <= target_tokens {
+            if self.config.strategy == CompactionStrategy::PruneToolsOnly
+                || pruned_tokens <= target_tokens
+            {
                 let saved = original_tokens.saturating_sub(pruned_tokens);
                 return (
                     working_messages,
@@ -990,7 +1018,9 @@ impl Compactor {
         }
 
         // 4. Summarize unpinned older turns
-        let summary_text = if !older_messages.is_empty() && self.config.strategy != CompactionStrategy::SlidingWindow {
+        let summary_text = if !older_messages.is_empty()
+            && self.config.strategy != CompactionStrategy::SlidingWindow
+        {
             let summary = generate_heuristic_summary(&older_messages);
             final_messages.push(Message::user(format!(
                 "[Conversation Summary - Prior History]\n{}\n[End of Prior History Summary. Recent turns follow.]",
@@ -1055,7 +1085,10 @@ impl Compactor {
         let budget = (limit as f32 * self.config.threshold) as usize;
 
         if original_tokens < budget {
-            return Ok(CompactionResult::uncompacted(original_tokens, original_count));
+            return Ok(CompactionResult::uncompacted(
+                original_tokens,
+                original_count,
+            ));
         }
 
         let turn_groups = group_into_turns(session.messages());
@@ -1236,7 +1269,10 @@ mod tests {
         let compactor = Compactor::new(1000).with_threshold(0.80);
 
         let msg_small = vec![Message::user("Hello")];
-        assert_eq!(compactor.budget_status(&msg_small, "test"), ContextBudgetStatus::Healthy);
+        assert_eq!(
+            compactor.budget_status(&msg_small, "test"),
+            ContextBudgetStatus::Healthy
+        );
         assert!(compactor.context_utilization(&msg_small, "test") < 0.10);
 
         // Fill up to ~70%
@@ -1246,7 +1282,10 @@ mod tests {
             msg_med.push(Message::assistant("Medium turn response with tokens"));
         }
         let status = compactor.budget_status(&msg_med, "test");
-        assert!(matches!(status, ContextBudgetStatus::ApproachingThreshold | ContextBudgetStatus::CompactionRequired));
+        assert!(matches!(
+            status,
+            ContextBudgetStatus::ApproachingThreshold | ContextBudgetStatus::CompactionRequired
+        ));
 
         // Plan calculation
         let plan = compactor.calculate_compaction_plan(&msg_med, "test");
@@ -1273,7 +1312,8 @@ mod tests {
     #[test]
     fn test_truncate_tool_output_utf8_safety() {
         // Multi-byte unicode characters & emojis
-        let emoji_blob = "🚀 Rust Crab 🦀 — Special Unicode Characters: こんにちは世界 / 💻 🔥 ".repeat(50);
+        let emoji_blob =
+            "🚀 Rust Crab 🦀 — Special Unicode Characters: こんにちは世界 / 💻 🔥 ".repeat(50);
         let truncated = truncate_tool_output(&emoji_blob, 20);
         assert!(truncated.contains("elided for context compaction"));
         assert!(estimate_text_tokens(&truncated) < estimate_text_tokens(&emoji_blob));
@@ -1326,7 +1366,10 @@ mod tests {
                         arguments: "{\"command\":\"cargo build\"}".into(),
                     }],
                 ),
-                Message::tool_result("tc_fail", "error: could not compile `fusion` due to 1 previous error"),
+                Message::tool_result(
+                    "tc_fail",
+                    "error: could not compile `fusion` due to 1 previous error",
+                ),
             ],
             is_tool_call: true,
             estimated_tokens: 30,
@@ -1338,10 +1381,7 @@ mod tests {
 
     #[test]
     fn test_compaction_below_threshold_no_op() {
-        let messages = vec![
-            Message::user("Hello"),
-            Message::assistant("Hi there!"),
-        ];
+        let messages = vec![Message::user("Hello"), Message::assistant("Hi there!")];
         let compactor = Compactor::new(100_000).with_threshold(0.80);
         let (compacted_msgs, res) = compactor.compact(&messages, "gpt-4o");
 
@@ -1389,7 +1429,9 @@ mod tests {
         // System prompt preserved at start
         assert_eq!(compacted_msgs[0].role, Role::System);
         // Initial goal preserved
-        assert!(compacted_msgs.iter().any(|m| m.content.contains("Initial goal")));
+        assert!(compacted_msgs
+            .iter()
+            .any(|m| m.content.contains("Initial goal")));
         // Summary should be generated
         assert!(res.summary.is_some());
     }
@@ -1405,7 +1447,9 @@ mod tests {
             session.add_assistant_message(format!("Response {}", i));
         }
 
-        let compactor = Compactor::new(100).with_threshold(0.80).with_preserve_turns(2);
+        let compactor = Compactor::new(100)
+            .with_threshold(0.80)
+            .with_preserve_turns(2);
         let res = compactor.compact_session(&mut session);
 
         assert!(res.compacted);
@@ -1426,7 +1470,10 @@ mod tests {
             ),
             Message::tool_result(
                 "c1",
-                (0..80).map(|i| format!("Line {} content for testing tool pruning", i)).collect::<Vec<_>>().join("\n"),
+                (0..80)
+                    .map(|i| format!("Line {} content for testing tool pruning", i))
+                    .collect::<Vec<_>>()
+                    .join("\n"),
             ),
             Message::assistant("Done reading."),
             Message::user("Recent turn 1"),
@@ -1444,7 +1491,9 @@ mod tests {
         assert!(res.compacted);
         assert!(res.compacted_tokens < initial_tokens);
         assert_eq!(compacted_msgs.len(), messages.len()); // PruneToolsOnly keeps message count
-        assert!(compacted_msgs[2].content.contains("lines elided for context compaction"));
+        assert!(compacted_msgs[2]
+            .content
+            .contains("lines elided for context compaction"));
     }
 
     #[test]
@@ -1524,7 +1573,9 @@ mod tests {
     fn test_compaction_result_formatting() {
         let uncompacted = CompactionResult::uncompacted(1500, 5);
         assert!(!uncompacted.compacted);
-        assert!(uncompacted.format_summary().contains("No compaction needed"));
+        assert!(uncompacted
+            .format_summary()
+            .contains("No compaction needed"));
 
         let mut session = Session::new("gpt-4o");
         assert_eq!(session.estimate_tokens(), 0);

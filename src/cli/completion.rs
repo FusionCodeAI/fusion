@@ -38,11 +38,7 @@ pub fn generate_completion(
 }
 
 /// Generates shell completion script for the given shell and command as a String.
-pub fn generate_completion_string(
-    shell: Shell,
-    cmd: &mut Command,
-    bin_name: &str,
-) -> String {
+pub fn generate_completion_string(shell: Shell, cmd: &mut Command, bin_name: &str) -> String {
     let mut buf = Vec::new();
     generate(shell, cmd, bin_name, &mut buf);
     String::from_utf8_lossy(&buf).into_owned()
@@ -98,9 +94,7 @@ pub fn completions_command() -> Command {
 pub fn run_completions(args: &CompletionsArgs) -> Result<()> {
     let shell = parse_shell(&args.shell).map_err(|e| anyhow::anyhow!("{}", e))?;
     match &args.output {
-        Some(path) => {
-            write_completion_file(shell, path).map(|_| ())
-        }
+        Some(path) => write_completion_file(shell, path).map(|_| ()),
         None => {
             print_default_completion(shell);
             Ok(())
@@ -204,10 +198,7 @@ mod tests {
             script.contains("--provider"),
             "Script should contain --provider flag"
         );
-        assert!(
-            script.contains("--acp"),
-            "Script should contain --acp flag"
-        );
+        assert!(script.contains("--acp"), "Script should contain --acp flag");
     }
 
     #[test]
@@ -241,7 +232,10 @@ mod tests {
     #[test]
     fn test_generate_powershell_completion() {
         let script = generate_for_default_cli_string(Shell::PowerShell);
-        assert!(!script.is_empty(), "PowerShell completion should not be empty");
+        assert!(
+            !script.is_empty(),
+            "PowerShell completion should not be empty"
+        );
         assert!(
             script.contains("fusion"),
             "PowerShell completion script must reference 'fusion'"

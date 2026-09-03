@@ -177,10 +177,17 @@ mod tests {
         assert_eq!(cli_zsh.generate_completion, Some(clap_complete::Shell::Zsh));
 
         let cli_fish = Cli::try_parse_from(["fusion", "--generate-completion", "fish"]).unwrap();
-        assert_eq!(cli_fish.generate_completion, Some(clap_complete::Shell::Fish));
+        assert_eq!(
+            cli_fish.generate_completion,
+            Some(clap_complete::Shell::Fish)
+        );
 
-        let cli_pwsh = Cli::try_parse_from(["fusion", "--generate-completion", "powershell"]).unwrap();
-        assert_eq!(cli_pwsh.generate_completion, Some(clap_complete::Shell::PowerShell));
+        let cli_pwsh =
+            Cli::try_parse_from(["fusion", "--generate-completion", "powershell"]).unwrap();
+        assert_eq!(
+            cli_pwsh.generate_completion,
+            Some(clap_complete::Shell::PowerShell)
+        );
     }
 
     #[test]
@@ -189,7 +196,8 @@ mod tests {
         assert_eq!(cli.preset.as_deref(), Some("deep-reasoning"));
 
         let mut config = fusion::config::Config::default();
-        let preset = fusion::config::ConfigPreset::from_str_loose(cli.preset.as_deref().unwrap()).unwrap();
+        let preset =
+            fusion::config::ConfigPreset::from_str_loose(cli.preset.as_deref().unwrap()).unwrap();
         config.apply_preset(preset);
         assert_eq!(config.default_provider, "deepseek");
         assert_eq!(config.default_model, "deepseek-reasoner");

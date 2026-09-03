@@ -156,12 +156,13 @@ pub fn has_termux_api() -> bool {
 ///
 /// Uses `termux-clipboard-get`.
 pub fn get_clipboard() -> Result<String, TermuxError> {
-    let tool_path = find_termux_tool("termux-clipboard-get").ok_or_else(|| {
-        TermuxError::ToolNotFound {
+    let tool_path =
+        find_termux_tool("termux-clipboard-get").ok_or_else(|| TermuxError::ToolNotFound {
             tool: "termux-clipboard-get".to_string(),
-            suggestion: "Run 'pkg install termux-api' in Termux and ensure Termux:API app is installed.".to_string(),
-        }
-    })?;
+            suggestion:
+                "Run 'pkg install termux-api' in Termux and ensure Termux:API app is installed."
+                    .to_string(),
+        })?;
 
     let output = Command::new(tool_path)
         .stdin(Stdio::null())
@@ -186,12 +187,13 @@ pub fn get_clipboard() -> Result<String, TermuxError> {
 ///
 /// Uses `termux-clipboard-set`.
 pub fn set_clipboard(text: &str) -> Result<(), TermuxError> {
-    let tool_path = find_termux_tool("termux-clipboard-set").ok_or_else(|| {
-        TermuxError::ToolNotFound {
+    let tool_path =
+        find_termux_tool("termux-clipboard-set").ok_or_else(|| TermuxError::ToolNotFound {
             tool: "termux-clipboard-set".to_string(),
-            suggestion: "Run 'pkg install termux-api' in Termux and ensure Termux:API app is installed.".to_string(),
-        }
-    })?;
+            suggestion:
+                "Run 'pkg install termux-api' in Termux and ensure Termux:API app is installed."
+                    .to_string(),
+        })?;
 
     let mut child = Command::new(tool_path)
         .stdin(Stdio::piped())
@@ -220,12 +222,13 @@ pub fn set_clipboard(text: &str) -> Result<(), TermuxError> {
 
 /// Asynchronously reads the text content from the Android system clipboard via Termux API.
 pub async fn get_clipboard_async() -> Result<String, TermuxError> {
-    let tool_path = find_termux_tool("termux-clipboard-get").ok_or_else(|| {
-        TermuxError::ToolNotFound {
+    let tool_path =
+        find_termux_tool("termux-clipboard-get").ok_or_else(|| TermuxError::ToolNotFound {
             tool: "termux-clipboard-get".to_string(),
-            suggestion: "Run 'pkg install termux-api' in Termux and ensure Termux:API app is installed.".to_string(),
-        }
-    })?;
+            suggestion:
+                "Run 'pkg install termux-api' in Termux and ensure Termux:API app is installed."
+                    .to_string(),
+        })?;
 
     let output = tokio::process::Command::new(tool_path)
         .stdin(Stdio::null())
@@ -249,12 +252,13 @@ pub async fn get_clipboard_async() -> Result<String, TermuxError> {
 
 /// Asynchronously writes text to the Android system clipboard via Termux API.
 pub async fn set_clipboard_async(text: &str) -> Result<(), TermuxError> {
-    let tool_path = find_termux_tool("termux-clipboard-set").ok_or_else(|| {
-        TermuxError::ToolNotFound {
+    let tool_path =
+        find_termux_tool("termux-clipboard-set").ok_or_else(|| TermuxError::ToolNotFound {
             tool: "termux-clipboard-set".to_string(),
-            suggestion: "Run 'pkg install termux-api' in Termux and ensure Termux:API app is installed.".to_string(),
-        }
-    })?;
+            suggestion:
+                "Run 'pkg install termux-api' in Termux and ensure Termux:API app is installed."
+                    .to_string(),
+        })?;
 
     let mut child = tokio::process::Command::new(tool_path)
         .stdin(Stdio::piped())
@@ -477,12 +481,13 @@ impl HapticConfig {
 
 /// Synchronously triggers a Termux vibration with the given duration and force flag.
 pub fn vibrate(duration_ms: u32, force: bool) -> Result<(), TermuxError> {
-    let tool_path = find_termux_tool("termux-vibrate").ok_or_else(|| {
-        TermuxError::ToolNotFound {
+    let tool_path =
+        find_termux_tool("termux-vibrate").ok_or_else(|| TermuxError::ToolNotFound {
             tool: "termux-vibrate".to_string(),
-            suggestion: "Run 'pkg install termux-api' in Termux and ensure Termux:API app is installed.".to_string(),
-        }
-    })?;
+            suggestion:
+                "Run 'pkg install termux-api' in Termux and ensure Termux:API app is installed."
+                    .to_string(),
+        })?;
 
     let mut cmd = Command::new(tool_path);
     cmd.arg("-d").arg(duration_ms.to_string());
@@ -828,7 +833,8 @@ impl ExtraKeysLayout {
         }
 
         if self.rows.len() == 1 {
-            let row_json = serde_json::to_string(&self.rows[0]).unwrap_or_else(|_| "[]".to_string());
+            let row_json =
+                serde_json::to_string(&self.rows[0]).unwrap_or_else(|_| "[]".to_string());
             return format!("[{}]", row_json);
         }
 
@@ -999,11 +1005,7 @@ impl TermuxProperties {
     /// Returns the raw value of a property key if present.
     pub fn get_property(&self, key: &str) -> Option<&str> {
         for entry in &self.entries {
-            if let PropertyEntry::KeyValue {
-                key: k,
-                value: v,
-            } = entry
-            {
+            if let PropertyEntry::KeyValue { key: k, value: v } = entry {
                 if k == key {
                     return Some(v.as_str());
                 }
@@ -1017,11 +1019,7 @@ impl TermuxProperties {
     /// If the key exists, its value is updated in place. If not, it is appended to the end.
     pub fn set_property(&mut self, key: &str, value: &str) {
         for entry in &mut self.entries {
-            if let PropertyEntry::KeyValue {
-                key: k,
-                value: v,
-            } = entry
-            {
+            if let PropertyEntry::KeyValue { key: k, value: v } = entry {
                 if k == key {
                     *v = value.to_string();
                     return;
@@ -1186,11 +1184,11 @@ pub fn termux_toast(
     background_color: Option<&str>,
     text_color: Option<&str>,
 ) -> Result<(), TermuxError> {
-    let tool_path = find_termux_tool("termux-toast").ok_or_else(|| {
-        TermuxError::ToolNotFound {
-            tool: "termux-toast".to_string(),
-            suggestion: "Run 'pkg install termux-api' in Termux and ensure Termux:API app is installed.".to_string(),
-        }
+    let tool_path = find_termux_tool("termux-toast").ok_or_else(|| TermuxError::ToolNotFound {
+        tool: "termux-toast".to_string(),
+        suggestion:
+            "Run 'pkg install termux-api' in Termux and ensure Termux:API app is installed."
+                .to_string(),
     })?;
 
     let mut cmd = Command::new(tool_path);
@@ -1230,12 +1228,13 @@ pub fn termux_notification(
     id: Option<&str>,
     priority: Option<&str>,
 ) -> Result<(), TermuxError> {
-    let tool_path = find_termux_tool("termux-notification").ok_or_else(|| {
-        TermuxError::ToolNotFound {
+    let tool_path =
+        find_termux_tool("termux-notification").ok_or_else(|| TermuxError::ToolNotFound {
             tool: "termux-notification".to_string(),
-            suggestion: "Run 'pkg install termux-api' in Termux and ensure Termux:API app is installed.".to_string(),
-        }
-    })?;
+            suggestion:
+                "Run 'pkg install termux-api' in Termux and ensure Termux:API app is installed."
+                    .to_string(),
+        })?;
 
     let mut cmd = Command::new(tool_path);
     cmd.arg("--title").arg(title);
@@ -1302,12 +1301,13 @@ impl TermuxBatteryInfo {
 
 /// Synchronously queries Android battery state using `termux-battery-status`.
 pub fn termux_battery_status() -> Result<TermuxBatteryInfo, TermuxError> {
-    let tool_path = find_termux_tool("termux-battery-status").ok_or_else(|| {
-        TermuxError::ToolNotFound {
+    let tool_path =
+        find_termux_tool("termux-battery-status").ok_or_else(|| TermuxError::ToolNotFound {
             tool: "termux-battery-status".to_string(),
-            suggestion: "Run 'pkg install termux-api' in Termux and ensure Termux:API app is installed.".to_string(),
-        }
-    })?;
+            suggestion:
+                "Run 'pkg install termux-api' in Termux and ensure Termux:API app is installed."
+                    .to_string(),
+        })?;
 
     let output = Command::new(tool_path)
         .stdin(Stdio::null())
@@ -1459,10 +1459,7 @@ use-black-ui = true
         props.set_property("terminal-transcript-rows", "2000");
 
         assert_eq!(props.get_property("bell-character"), Some("vibrate"));
-        assert_eq!(
-            props.get_property("terminal-transcript-rows"),
-            Some("2000")
-        );
+        assert_eq!(props.get_property("terminal-transcript-rows"), Some("2000"));
 
         props.set_extra_keys(&ExtraKeysLayout::compact());
         let layout = props.get_extra_keys().unwrap();

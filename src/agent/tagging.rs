@@ -556,7 +556,9 @@ pub fn get_session_tag_names(session: &Session) -> Vec<String> {
 /// Checks if a session is tagged with the given tag name.
 pub fn has_tag(session: &Session, tag_name: &str) -> bool {
     if let Ok(normalized) = normalize_tag_name(tag_name) {
-        get_session_tags(session).iter().any(|t| t.name == normalized)
+        get_session_tags(session)
+            .iter()
+            .any(|t| t.name == normalized)
     } else {
         false
     }
@@ -568,8 +570,8 @@ pub fn set_session_tags(session: &mut Session, tags: &[SessionTag]) -> Result<()
         session.metadata.remove(TAGS_METADATA_KEY);
         session.metadata.remove(LEGACY_TAGS_KEY);
     } else {
-        let json_str = serde_json::to_string(tags)
-            .map_err(|e| TaggingError::Serialization(e.to_string()))?;
+        let json_str =
+            serde_json::to_string(tags).map_err(|e| TaggingError::Serialization(e.to_string()))?;
         session.set_metadata(TAGS_METADATA_KEY, json_str);
     }
     session.touch();
@@ -613,7 +615,10 @@ pub fn add_tag_with_details(
 }
 
 /// Adds multiple tags to a session in one batch. Skips duplicates.
-pub fn add_tags(session: &mut Session, tag_names: &[&str]) -> Result<Vec<SessionTag>, TaggingError> {
+pub fn add_tags(
+    session: &mut Session,
+    tag_names: &[&str],
+) -> Result<Vec<SessionTag>, TaggingError> {
     if tag_names.is_empty() {
         return Err(TaggingError::EmptyTags);
     }
@@ -778,8 +783,7 @@ impl SessionTagManager {
             anyhow::bail!("Session not found: {}", session_id);
         }
         let mut session = Session::load_from_path(&path)?;
-        let tag = add_tag(&mut session, tag_name)
-            .map_err(|e| anyhow::anyhow!("{}", e))?;
+        let tag = add_tag(&mut session, tag_name).map_err(|e| anyhow::anyhow!("{}", e))?;
         session.save_to_path(&path)?;
         Ok(tag)
     }
@@ -791,18 +795,15 @@ impl SessionTagManager {
             anyhow::bail!("Session not found: {}", session_id);
         }
         let mut session = Session::load_from_path(&path)?;
-        let removed = remove_tag(&mut session, tag_name)
-            .map_err(|e| anyhow::anyhow!("{}", e))?;
+        let removed = remove_tag(&mut session, tag_name).map_err(|e| anyhow::anyhow!("{}", e))?;
         session.save_to_path(&path)?;
         Ok(removed)
     }
 
     /// Renames a tag globally across all saved sessions in the directory.
     pub fn rename_tag_globally(&self, old_tag: &str, new_tag: &str) -> anyhow::Result<usize> {
-        let old_norm = normalize_tag_name(old_tag)
-            .map_err(|e| anyhow::anyhow!("{}", e))?;
-        let new_norm = normalize_tag_name(new_tag)
-            .map_err(|e| anyhow::anyhow!("{}", e))?;
+        let old_norm = normalize_tag_name(old_tag).map_err(|e| anyhow::anyhow!("{}", e))?;
+        let new_norm = normalize_tag_name(new_tag).map_err(|e| anyhow::anyhow!("{}", e))?;
 
         if !self.sessions_dir.exists() {
             return Ok(0);
@@ -840,8 +841,7 @@ impl SessionTagManager {
 
     /// Deletes a tag globally across all saved sessions in the directory.
     pub fn delete_tag_globally(&self, tag_name: &str) -> anyhow::Result<usize> {
-        let norm = normalize_tag_name(tag_name)
-            .map_err(|e| anyhow::anyhow!("{}", e))?;
+        let norm = normalize_tag_name(tag_name).map_err(|e| anyhow::anyhow!("{}", e))?;
 
         if !self.sessions_dir.exists() {
             return Ok(0);
@@ -872,7 +872,11 @@ impl SessionTagManager {
 
     /// Suggests tag names matching a prefix for autocompletion.
     pub fn suggest_tags(&self, prefix: &str, limit: usize) -> anyhow::Result<Vec<String>> {
-        let prefix_norm = prefix.trim().strip_prefix('#').unwrap_or(prefix).to_lowercase();
+        let prefix_norm = prefix
+            .trim()
+            .strip_prefix('#')
+            .unwrap_or(prefix)
+            .to_lowercase();
         let freqs = self.list_all_tags()?;
         let suggestions: Vec<String> = freqs
             .into_iter()
@@ -950,9 +954,12 @@ pub fn list_all_tags_in_dir(dir: &Path) -> anyhow::Result<Vec<TagFrequency>> {
             if let Ok(session) = Session::load_from_path(&path) {
                 let tags = get_session_tags(&session);
                 for tag in tags {
-                    let entry = tag_map
-                        .entry(tag.name)
-                        .or_insert((0, tag.color, Vec::new(), session.updated_at.clone()));
+                    let entry = tag_map.entry(tag.name).or_insert((
+                        0,
+                        tag.color,
+                        Vec::new(),
+                        session.updated_at.clone(),
+                    ));
                     entry.0 += 1;
                     entry.2.push(session.id);
                     if session.updated_at > entry.3 {
@@ -965,13 +972,15 @@ pub fn list_all_tags_in_dir(dir: &Path) -> anyhow::Result<Vec<TagFrequency>> {
 
     let mut result: Vec<TagFrequency> = tag_map
         .into_iter()
-        .map(|(tag, (count, color, session_ids, last_used))| TagFrequency {
-            tag,
-            count,
-            color,
-            session_ids,
-            last_used,
-        })
+        .map(
+            |(tag, (count, color, session_ids, last_used))| TagFrequency {
+                tag,
+                count,
+                color,
+                session_ids,
+                last_used,
+            },
+        )
         .collect();
 
     // Sort by count descending, then alphabetical
@@ -989,8 +998,7 @@ pub fn filter_sessions_in_dir(
     dir: &Path,
     tag_name: &str,
 ) -> anyhow::Result<Vec<TaggedSessionSummary>> {
-    let normalized = normalize_tag_name(tag_name)
-        .map_err(|e| anyhow::anyhow!("{}", e))?;
+    let normalized = normalize_tag_name(tag_name).map_err(|e| anyhow::anyhow!("{}", e))?;
 
     let query = TagFilterQuery::single(normalized);
     filter_sessions_multi(dir, &query)
@@ -1033,7 +1041,8 @@ pub fn filter_sessions_multi(
                             normalized_tags.iter().all(|req| tag_names.contains(req))
                         }
                         TagFilterMode::Exact => {
-                            let req_set: HashSet<String> = normalized_tags.iter().cloned().collect();
+                            let req_set: HashSet<String> =
+                                normalized_tags.iter().cloned().collect();
                             tag_names == req_set
                         }
                     }
@@ -1045,7 +1054,11 @@ pub fn filter_sessions_multi(
 
                 // Check model filter
                 if let Some(req_model) = &query.model {
-                    if !session.active_model.to_lowercase().contains(&req_model.to_lowercase()) {
+                    if !session
+                        .active_model
+                        .to_lowercase()
+                        .contains(&req_model.to_lowercase())
+                    {
                         continue;
                     }
                 }
@@ -1310,7 +1323,8 @@ pub fn handle_tag_command(args: &[String], session: &mut Session) -> String {
             }
 
             if filter_tags.is_empty() {
-                return "\x1b[1;31mError:\x1b[0m Please specify at least one tag to filter on.".to_string();
+                return "\x1b[1;31mError:\x1b[0m Please specify at least one tag to filter on."
+                    .to_string();
             }
 
             let mode = if match_all {
@@ -1338,7 +1352,10 @@ pub fn handle_tag_command(args: &[String], session: &mut Session) -> String {
 
         "clear" | "reset" => {
             let removed = clear_tags(session);
-            format!("\x1b[1;32mCleared {} tag(s) from active session.\x1b[0m", removed)
+            format!(
+                "\x1b[1;32mCleared {} tag(s) from active session.\x1b[0m",
+                removed
+            )
         }
 
         "set" => {
@@ -1357,10 +1374,7 @@ pub fn handle_tag_command(args: &[String], session: &mut Session) -> String {
             match set_session_tags(session, &new_tags) {
                 Ok(_) => {
                     let badges: Vec<String> = new_tags.iter().map(|t| t.display_badge()).collect();
-                    format!(
-                        "\x1b[1;32mSet session tags to:\x1b[0m {}",
-                        badges.join(" ")
-                    )
+                    format!("\x1b[1;32mSet session tags to:\x1b[0m {}", badges.join(" "))
                 }
                 Err(e) => format!("\x1b[1;31mFailed to set tags:\x1b[0m {}", e),
             }
@@ -1368,7 +1382,8 @@ pub fn handle_tag_command(args: &[String], session: &mut Session) -> String {
 
         "rename" | "mv" => {
             if args.len() < 3 {
-                return "\x1b[1;31mUsage:\x1b[0m /tag rename <old_name> <new_name> [--global]".to_string();
+                return "\x1b[1;31mUsage:\x1b[0m /tag rename <old_name> <new_name> [--global]"
+                    .to_string();
             }
 
             let old_name = &args[1];
@@ -1401,7 +1416,8 @@ pub fn handle_tag_command(args: &[String], session: &mut Session) -> String {
 
         "session" => {
             if args.len() < 4 {
-                return "\x1b[1;31mUsage:\x1b[0m /tag session <session_id> <add|rm> <tag>".to_string();
+                return "\x1b[1;31mUsage:\x1b[0m /tag session <session_id> <add|rm> <tag>"
+                    .to_string();
             }
             let session_id_str = &args[1];
             let action = args[2].to_lowercase();
@@ -1413,7 +1429,12 @@ pub fn handle_tag_command(args: &[String], session: &mut Session) -> String {
                     // Try prefix lookup
                     match Session::find_by_prefix(session_id_str) {
                         Ok(Some(s)) => s.id,
-                        _ => return format!("\x1b[1;31mInvalid session ID or prefix:\x1b[0m {}", session_id_str),
+                        _ => {
+                            return format!(
+                                "\x1b[1;31mInvalid session ID or prefix:\x1b[0m {}",
+                                session_id_str
+                            )
+                        }
                     }
                 }
             };
@@ -1428,13 +1449,15 @@ pub fn handle_tag_command(args: &[String], session: &mut Session) -> String {
                     ),
                     Err(e) => format!("\x1b[1;31mFailed to tag session:\x1b[0m {}", e),
                 },
-                "remove" | "rm" | "del" | "-" => match manager.untag_session(session_id, tag_name) {
-                    Ok(_) => format!(
-                        "\x1b[1;32mRemoved tag #{} from session {}\x1b[0m",
-                        tag_name, session_id
-                    ),
-                    Err(e) => format!("\x1b[1;31mFailed to untag session:\x1b[0m {}", e),
-                },
+                "remove" | "rm" | "del" | "-" => {
+                    match manager.untag_session(session_id, tag_name) {
+                        Ok(_) => format!(
+                            "\x1b[1;32mRemoved tag #{} from session {}\x1b[0m",
+                            tag_name, session_id
+                        ),
+                        Err(e) => format!("\x1b[1;31mFailed to untag session:\x1b[0m {}", e),
+                    }
+                }
                 _ => "\x1b[1;31mInvalid session action.\x1b[0m Use 'add' or 'rm'.".to_string(),
             }
         }
@@ -1485,7 +1508,9 @@ pub fn format_active_session_tags(session: &Session) -> String {
     ));
 
     if tags.is_empty() {
-        out.push_str("   \x1b[90m(No tags assigned yet. Use `/tag add <name>` to attach tags)\x1b[0m\n");
+        out.push_str(
+            "   \x1b[90m(No tags assigned yet. Use `/tag add <name>` to attach tags)\x1b[0m\n",
+        );
     } else {
         out.push_str("   Tags: ");
         let badges: Vec<String> = tags.iter().map(|t| t.display_badge()).collect();
@@ -1538,10 +1563,7 @@ pub fn format_global_tags_table(frequencies: &[TagFrequency]) -> String {
         "   {:<24} {:<10} {:<24}\n",
         "\x1b[1mTag\x1b[0m", "\x1b[1mSessions\x1b[0m", "\x1b[1mLast Active\x1b[0m"
     ));
-    out.push_str(&format!(
-        "   {:-<24} {:-<10} {:-<24}\n",
-        "", "", ""
-    ));
+    out.push_str(&format!("   {:-<24} {:-<10} {:-<24}\n", "", "", ""));
 
     for f in frequencies {
         let badge = format_tag_badge_str(&f.tag, f.color.as_deref());
@@ -1584,7 +1606,11 @@ pub fn format_tagged_sessions_table(
     for (idx, session) in sessions.iter().enumerate() {
         let short_id: String = session.id.to_string().chars().take(8).collect();
         let title = session.title.as_deref().unwrap_or("Untitled Session");
-        let date = session.updated_at.split('T').next().unwrap_or(&session.updated_at);
+        let date = session
+            .updated_at
+            .split('T')
+            .next()
+            .unwrap_or(&session.updated_at);
         let tag_badges: Vec<String> = session.tags.iter().map(|t| t.display_badge()).collect();
 
         out.push_str(&format!(
@@ -1658,14 +1684,22 @@ pub fn format_tag_stats_report(report: &TagStatsReport) -> String {
 pub fn format_tag_welcome_and_help() -> String {
     let mut out = String::new();
     out.push_str("\x1b[1;36m🏷️  Fusion Session Tagging System\x1b[0m\n\n");
-    out.push_str("Organize, categorize, and quickly retrieve conversational sessions using tags.\n\n");
+    out.push_str(
+        "Organize, categorize, and quickly retrieve conversational sessions using tags.\n\n",
+    );
     out.push_str("\x1b[1mQuick Start:\x1b[0m\n");
     out.push_str("   • \x1b[1m/tag add <name>\x1b[0m               Tag active session (e.g. `/tag add rust-backend`)\n");
-    out.push_str("   • \x1b[1m/tag add tag1 tag2 tag3\x1b[0m       Tag active session with multiple tags\n");
+    out.push_str(
+        "   • \x1b[1m/tag add tag1 tag2 tag3\x1b[0m       Tag active session with multiple tags\n",
+    );
     out.push_str("   • \x1b[1m/tag list\x1b[0m                     View tags attached to the active session\n");
     out.push_str("   • \x1b[1m/tag list --all\x1b[0m               View directory of all tags across saved sessions\n");
-    out.push_str("   • \x1b[1m/tag filter <name>\x1b[0m            Find all saved sessions with this tag\n");
-    out.push_str("   • \x1b[1m/tag rm <name>\x1b[0m                Remove a tag from the active session\n\n");
+    out.push_str(
+        "   • \x1b[1m/tag filter <name>\x1b[0m            Find all saved sessions with this tag\n",
+    );
+    out.push_str(
+        "   • \x1b[1m/tag rm <name>\x1b[0m                Remove a tag from the active session\n\n",
+    );
     out.push_str("\x1b[90mRun `/tag help` for the complete command reference.\x1b[0m\n");
     out.trim_end().to_string()
 }
@@ -1674,7 +1708,9 @@ pub fn format_tag_welcome_and_help() -> String {
 pub fn format_tag_help() -> String {
     let mut out = String::new();
     out.push_str("\x1b[1;36m🏷️  Session Tagging Subsystem - Command Reference\x1b[0m\n\n");
-    out.push_str("Organize, categorize, list, and filter conversational sessions by custom tags.\n\n");
+    out.push_str(
+        "Organize, categorize, list, and filter conversational sessions by custom tags.\n\n",
+    );
 
     out.push_str("\x1b[1mCOMMANDS:\x1b[0m\n");
     out.push_str("   \x1b[1m/tag add <name> [tag2...] [--color <color>] [--desc <text>]\x1b[0m\n");
@@ -1688,7 +1724,9 @@ pub fn format_tag_help() -> String {
 
     out.push_str("   \x1b[1m/tag filter <name> [tag2...] [--all]\x1b[0m (aliases: `/tag find`, `/tag search`)\n");
     out.push_str("       Find and display all saved sessions tagged with the given tag(s).\n");
-    out.push_str("       By default matches sessions having ANY tag; use `--all` to require ALL tags.\n\n");
+    out.push_str(
+        "       By default matches sessions having ANY tag; use `--all` to require ALL tags.\n\n",
+    );
 
     out.push_str("   \x1b[1m/tag remove <name> [tag2...]\x1b[0m (aliases: `/tag rm`, `/tag del`, `/tag untag`)\n");
     out.push_str("       Remove one or more tags from the currently active session.\n\n");
@@ -1699,7 +1737,9 @@ pub fn format_tag_help() -> String {
     out.push_str("   \x1b[1m/tag set <tag1> <tag2> ...\x1b[0m\n");
     out.push_str("       Replace all tags on the active session with the specified set.\n\n");
 
-    out.push_str("   \x1b[1m/tag rename <old_name> <new_name> [--global]\x1b[0m (alias: `/tag mv`)\n");
+    out.push_str(
+        "   \x1b[1m/tag rename <old_name> <new_name> [--global]\x1b[0m (alias: `/tag mv`)\n",
+    );
     out.push_str("       Rename a tag in the active session, or across all saved sessions on disk with `--global`.\n\n");
 
     out.push_str("   \x1b[1m/tag session <id> <add|rm> <tag>\x1b[0m\n");
@@ -1734,7 +1774,8 @@ mod tests {
         let mut session = Session::new("gpt-4o");
         session.set_title("Compiler Optimization Research");
         session.add_user_message("How do we optimize LLVM IR passes?");
-        session.add_assistant_message("By utilizing loop vectorization and inline threshold tuning.");
+        session
+            .add_assistant_message("By utilizing loop vectorization and inline threshold tuning.");
         session
     }
 
@@ -1886,17 +1927,20 @@ mod tests {
         let mut s1 = Session::new("gpt-4o");
         s1.set_title("Session One");
         add_tags(&mut s1, &["rust", "backend"]).unwrap();
-        s1.save_to_path(dir.join(format!("{}.json", s1.id))).unwrap();
+        s1.save_to_path(dir.join(format!("{}.json", s1.id)))
+            .unwrap();
 
         let mut s2 = Session::new("claude-3-5-sonnet");
         s2.set_title("Session Two");
         add_tags(&mut s2, &["rust", "frontend", "wasm"]).unwrap();
-        s2.save_to_path(dir.join(format!("{}.json", s2.id))).unwrap();
+        s2.save_to_path(dir.join(format!("{}.json", s2.id)))
+            .unwrap();
 
         let mut s3 = Session::new("gpt-4o");
         s3.set_title("Session Three");
         add_tags(&mut s3, &["python", "data"]).unwrap();
-        s3.save_to_path(dir.join(format!("{}.json", s3.id))).unwrap();
+        s3.save_to_path(dir.join(format!("{}.json", s3.id)))
+            .unwrap();
 
         // 1. List all tags
         let all_tags = manager.list_all_tags().unwrap();
@@ -1960,7 +2004,10 @@ mod tests {
 
         // 2. Initial empty list / welcome
         let initial = handle_tag_command(&[], &mut session);
-        assert!(initial.contains("Fusion Session Tagging System") || initial.contains("Active Session Tags"));
+        assert!(
+            initial.contains("Fusion Session Tagging System")
+                || initial.contains("Active Session Tags")
+        );
 
         // 3. /tag add
         let add_out = handle_tag_command(
@@ -1978,7 +2025,11 @@ mod tests {
 
         // 5. /tag rename
         let rename_out = handle_tag_command(
-            &["rename".to_string(), "backend".to_string(), "api".to_string()],
+            &[
+                "rename".to_string(),
+                "backend".to_string(),
+                "api".to_string(),
+            ],
             &mut session,
         );
         assert!(rename_out.contains("Renamed tag"));

@@ -72,7 +72,10 @@ pub async fn run_git_command(
     let output = match tokio::time::timeout(timeout_duration, child.wait_with_output()).await {
         Ok(Ok(out)) => out,
         Ok(Err(e)) => anyhow::bail!("Failed reading git output: {e}"),
-        Err(_) => anyhow::bail!("Git command timed out after {timeout_secs}s: git {}", args.join(" ")),
+        Err(_) => anyhow::bail!(
+            "Git command timed out after {timeout_secs}s: git {}",
+            args.join(" ")
+        ),
     };
 
     let stdout = String::from_utf8_lossy(&output.stdout).to_string();
@@ -296,7 +299,10 @@ pub fn format_status_report(report: &GitStatusReport) -> String {
     if let Some(upstream) = &report.upstream {
         let mut track_note = format!("Tracking: {upstream}");
         if report.ahead > 0 && report.behind > 0 {
-            track_note.push_str(&format!(" [ahead {}, behind {}]", report.ahead, report.behind));
+            track_note.push_str(&format!(
+                " [ahead {}, behind {}]",
+                report.ahead, report.behind
+            ));
         } else if report.ahead > 0 {
             track_note.push_str(&format!(" [ahead {}]", report.ahead));
         } else if report.behind > 0 {
@@ -594,7 +600,10 @@ impl Tool for GitDiffTool {
             )
         })?;
 
-        let staged = args.get("staged").and_then(|v| v.as_bool()).unwrap_or(false);
+        let staged = args
+            .get("staged")
+            .and_then(|v| v.as_bool())
+            .unwrap_or(false);
         let stat = args.get("stat").and_then(|v| v.as_bool()).unwrap_or(false);
         let name_only = args
             .get("name_only")
@@ -685,7 +694,10 @@ impl Tool for GitDiffTool {
                         let display_path = rel_path_string.as_deref().unwrap_or(path_str);
                         if stat {
                             let lines = content.lines().count();
-                            diff_text = format!(" {} | {} +++++++\n 1 file changed, {} insertions(+)\n", display_path, lines, lines);
+                            diff_text = format!(
+                                " {} | {} +++++++\n 1 file changed, {} insertions(+)\n",
+                                display_path, lines, lines
+                            );
                         } else if name_only {
                             diff_text = format!("{display_path}\n");
                         } else {
@@ -702,7 +714,10 @@ impl Tool for GitDiffTool {
         }
 
         if diff_text.trim().is_empty() {
-            return Ok("No differences found (working tree clean or no changes match the criteria).\n".to_string());
+            return Ok(
+                "No differences found (working tree clean or no changes match the criteria).\n"
+                    .to_string(),
+            );
         }
 
         if color && !stat && !name_only {
@@ -901,12 +916,18 @@ index 1234567..89abcdef 100644
         assert!(res_unstaged.contains("+Line 2 modified"));
 
         // Test stat
-        let res_stat = diff_tool.execute(json!({"stat": true}), &ctx).await.unwrap();
+        let res_stat = diff_tool
+            .execute(json!({"stat": true}), &ctx)
+            .await
+            .unwrap();
         assert!(res_stat.contains("test.txt"));
         assert!(res_stat.contains("changed"));
 
         // Test name_only
-        let res_names = diff_tool.execute(json!({"name_only": true}), &ctx).await.unwrap();
+        let res_names = diff_tool
+            .execute(json!({"name_only": true}), &ctx)
+            .await
+            .unwrap();
         assert_eq!(res_names.trim(), "test.txt");
 
         // Test staged diff
@@ -916,14 +937,20 @@ index 1234567..89abcdef 100644
             .status()
             .unwrap();
 
-        let res_staged = diff_tool.execute(json!({"staged": true}), &ctx).await.unwrap();
+        let res_staged = diff_tool
+            .execute(json!({"staged": true}), &ctx)
+            .await
+            .unwrap();
         assert!(res_staged.contains("+Line 2 modified"));
 
         // Test untracked file diff fallback
         let new_untracked = repo.path.join("new_file.txt");
         fs::write(&new_untracked, "Brand new file\n").unwrap();
 
-        let res_new = diff_tool.execute(json!({"path": "new_file.txt"}), &ctx).await.unwrap();
+        let res_new = diff_tool
+            .execute(json!({"path": "new_file.txt"}), &ctx)
+            .await
+            .unwrap();
         assert!(res_new.contains("+Brand new file"));
     }
 }

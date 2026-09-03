@@ -215,7 +215,12 @@ pub struct ProgressTreeNode {
 
 impl ProgressTreeNode {
     /// Creates a new progress tree node.
-    pub fn new(id: impl Into<String>, name: impl Into<String>, role: SubagentRole, task: impl Into<String>) -> Self {
+    pub fn new(
+        id: impl Into<String>,
+        name: impl Into<String>,
+        role: SubagentRole,
+        task: impl Into<String>,
+    ) -> Self {
         Self {
             id: id.into(),
             name: name.into(),
@@ -291,7 +296,9 @@ impl ProgressTreeNode {
     pub fn is_finished(&self) -> bool {
         matches!(
             self.status,
-            SubagentStatus::Completed { .. } | SubagentStatus::Failed { .. } | SubagentStatus::Cancelled
+            SubagentStatus::Completed { .. }
+                | SubagentStatus::Failed { .. }
+                | SubagentStatus::Cancelled
         )
     }
 
@@ -367,7 +374,9 @@ impl ProgressTreeNode {
         let elapsed_ms = self.elapsed().as_millis() as u64;
 
         match event {
-            SubagentProgress::Started { name, role, task, .. } => {
+            SubagentProgress::Started {
+                name, role, task, ..
+            } => {
                 self.name = name.clone();
                 self.role = role.clone();
                 self.task = task.clone();
@@ -383,7 +392,9 @@ impl ProgressTreeNode {
                     detail: Some(task.clone()),
                 });
             }
-            SubagentProgress::TurnStarted { turn, max_turns, .. } => {
+            SubagentProgress::TurnStarted {
+                turn, max_turns, ..
+            } => {
                 self.current_turn = *turn;
                 self.max_turns = *max_turns;
                 self.status = SubagentStatus::Running {
@@ -792,7 +803,10 @@ impl ProgressTreeState {
 
         if !self.nodes.contains_key(&id) {
             // Auto-register if not yet known
-            if let SubagentProgress::Started { name, role, task, .. } = event {
+            if let SubagentProgress::Started {
+                name, role, task, ..
+            } = event
+            {
                 self.register_subagent(id.clone(), name.clone(), role.clone(), task.clone(), None);
             } else {
                 self.register_subagent(id.clone(), id.clone(), SubagentRole::General, "", None);
@@ -821,7 +835,11 @@ impl ProgressTreeState {
         }
     }
 
-    fn set_depth_recursive(nodes: &mut HashMap<String, ProgressTreeNode>, current_id: &str, depth: usize) {
+    fn set_depth_recursive(
+        nodes: &mut HashMap<String, ProgressTreeNode>,
+        current_id: &str,
+        depth: usize,
+    ) {
         if let Some(node) = nodes.get_mut(current_id) {
             node.depth = depth;
             let children = node.children.clone();
@@ -858,7 +876,10 @@ impl ProgressTreeState {
 
     /// Aggregated estimated USD cost across all subagents.
     pub fn total_cost(&self) -> f64 {
-        self.nodes.values().map(|n| n.metrics.estimated_cost_usd).sum()
+        self.nodes
+            .values()
+            .map(|n| n.metrics.estimated_cost_usd)
+            .sum()
     }
 
     /// Overall progress percentage (0 to 100) across all registered nodes.
@@ -1246,14 +1267,24 @@ pub fn render_mini_bar(ratio: f32, width: usize, use_colors: bool) -> String {
         } else {
             "\x1b[33m" // Yellow
         };
-        format!("{}[{}{}]\x1b[0m {:>3}%", color, "█".repeat(filled), "░".repeat(empty), pct)
+        format!(
+            "{}[{}{}]\x1b[0m {:>3}%",
+            color,
+            "█".repeat(filled),
+            "░".repeat(empty),
+            pct
+        )
     } else {
         format!("[{}{}] {:>3}%", "#".repeat(filled), "-".repeat(empty), pct)
     }
 }
 
 /// Renders the complete progress tree into an ANSI-formatted string.
-pub fn render_progress_tree_ansi(state: &ProgressTreeState, options: &ProgressTreeOptions, theme: &Theme) -> String {
+pub fn render_progress_tree_ansi(
+    state: &ProgressTreeState,
+    options: &ProgressTreeOptions,
+    theme: &Theme,
+) -> String {
     let mut out = String::new();
     let visible = state.flatten_visible();
 
@@ -1302,7 +1333,10 @@ pub fn render_progress_tree_ansi(state: &ProgressTreeState, options: &ProgressTr
         let duration_str = format_duration(node.elapsed());
 
         let bar_str = if options.show_progress_bars {
-            format!(" {}", render_mini_bar(node.progress_ratio(), 6, options.use_colors))
+            format!(
+                " {}",
+                render_mini_bar(node.progress_ratio(), 6, options.use_colors)
+            )
         } else {
             String::new()
         };
@@ -1337,7 +1371,10 @@ pub fn render_progress_tree_ansi(state: &ProgressTreeState, options: &ProgressTr
             String::new()
         } else {
             let truncated = if node.task.len() > options.task_max_length {
-                format!("{}...", &node.task[..options.task_max_length.saturating_sub(3)])
+                format!(
+                    "{}...",
+                    &node.task[..options.task_max_length.saturating_sub(3)]
+                )
             } else {
                 node.task.clone()
             };
@@ -1350,11 +1387,11 @@ pub fn render_progress_tree_ansi(state: &ProgressTreeState, options: &ProgressTr
 
         if options.use_colors {
             let role_col = match &node.role {
-                SubagentRole::Scout => "\x1b[36m",       // Cyan
-                SubagentRole::Coder => "\x1b[32m",       // Green
-                SubagentRole::Tester => "\x1b[35m",      // Magenta
-                SubagentRole::Reviewer => "\x1b[34m",    // Blue
-                SubagentRole::General => "\x1b[37m",     // White
+                SubagentRole::Scout => "\x1b[36m",         // Cyan
+                SubagentRole::Coder => "\x1b[32m",         // Green
+                SubagentRole::Tester => "\x1b[35m",        // Magenta
+                SubagentRole::Reviewer => "\x1b[34m",      // Blue
+                SubagentRole::General => "\x1b[37m",       // White
                 SubagentRole::Custom { .. } => "\x1b[36m", // Cyan
             };
 
@@ -1366,7 +1403,11 @@ pub fn render_progress_tree_ansi(state: &ProgressTreeState, options: &ProgressTr
                 SubagentStatus::Cancelled => "\x1b[33m",
             };
 
-            let sel_indicator = if row.is_selected { "\x1b[1;33m❯\x1b[0m " } else { "  " };
+            let sel_indicator = if row.is_selected {
+                "\x1b[1;33m❯\x1b[0m "
+            } else {
+                "  "
+            };
 
             out.push_str(&format!(
                 "{}{}{}{}\x1b[0m \x1b[1m{}\x1b[0m {}{}\x1b[0m{}{}{}{} \x1b[2m({})\x1b[0m\n",
@@ -1404,7 +1445,9 @@ pub fn render_progress_tree_ansi(state: &ProgressTreeState, options: &ProgressTr
     // 3. Footer
     if options.show_header_footer {
         if options.use_colors {
-            out.push_str("\x1b[2m╰──────────────────────────────────────────────────────────\x1b[0m\n");
+            out.push_str(
+                "\x1b[2m╰──────────────────────────────────────────────────────────\x1b[0m\n",
+            );
         } else {
             out.push_str("----------------------------------------------------------\n");
         }
@@ -1414,7 +1457,10 @@ pub fn render_progress_tree_ansi(state: &ProgressTreeState, options: &ProgressTr
 }
 
 /// Renders the progress tree into clean plain text without ANSI escapes.
-pub fn render_progress_tree_plain(state: &ProgressTreeState, options: &ProgressTreeOptions) -> String {
+pub fn render_progress_tree_plain(
+    state: &ProgressTreeState,
+    options: &ProgressTreeOptions,
+) -> String {
     let mut plain_opts = options.clone();
     plain_opts.use_colors = false;
     render_progress_tree_ansi(state, &plain_opts, &Theme::auto())
@@ -1563,7 +1609,10 @@ impl<'a> ProgressTreeWidget<'a> {
             .borders(Borders::ALL)
             .border_type(BorderType::Rounded)
             .border_style(Style::default().fg(Color::Cyan))
-            .title(Span::styled(" 🤖 Subagent Progress ", Style::default().add_modifier(Modifier::BOLD)));
+            .title(Span::styled(
+                " 🤖 Subagent Progress ",
+                Style::default().add_modifier(Modifier::BOLD),
+            ));
 
         let inner = block.inner(area);
         block.render(area, buf);
@@ -1574,12 +1623,20 @@ impl<'a> ProgressTreeWidget<'a> {
 
         let line = Line::from(vec![
             Span::styled("Active: ", Style::default().fg(Color::DarkGray)),
-            Span::styled(format!("{} / {}  ", active, total), Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD)),
+            Span::styled(
+                format!("{} / {}  ", active, total),
+                Style::default()
+                    .fg(Color::Cyan)
+                    .add_modifier(Modifier::BOLD),
+            ),
             Span::styled("Progress: ", Style::default().fg(Color::DarkGray)),
             Span::raw(render_mini_bar(pct as f32 / 100.0, 10, false)),
             Span::styled(format!(" ({}%)  ", pct), Style::default().fg(Color::Green)),
             Span::styled("Elapsed: ", Style::default().fg(Color::DarkGray)),
-            Span::styled(format_duration(self.state.start_time.elapsed()), Style::default().fg(Color::Yellow)),
+            Span::styled(
+                format_duration(self.state.start_time.elapsed()),
+                Style::default().fg(Color::Yellow),
+            ),
         ]);
 
         let p = Paragraph::new(vec![line]).wrap(Wrap { trim: true });
@@ -1598,7 +1655,9 @@ impl<'a> ProgressTreeWidget<'a> {
 
         let title_span = Span::styled(
             " 🌿 Multi-Agent Streaming Progress Tree ",
-            Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD),
+            Style::default()
+                .fg(Color::Cyan)
+                .add_modifier(Modifier::BOLD),
         );
 
         let block = Block::default()
@@ -1612,19 +1671,46 @@ impl<'a> ProgressTreeWidget<'a> {
 
         let stats_line = Line::from(vec![
             Span::styled(" Active: ", Style::default().fg(Color::DarkGray)),
-            Span::styled(format!("{} ", active), Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD)),
+            Span::styled(
+                format!("{} ", active),
+                Style::default()
+                    .fg(Color::Cyan)
+                    .add_modifier(Modifier::BOLD),
+            ),
             Span::styled("│ Done: ", Style::default().fg(Color::DarkGray)),
-            Span::styled(format!("{} ", completed), Style::default().fg(Color::Green).add_modifier(Modifier::BOLD)),
+            Span::styled(
+                format!("{} ", completed),
+                Style::default()
+                    .fg(Color::Green)
+                    .add_modifier(Modifier::BOLD),
+            ),
             Span::styled("│ Failed: ", Style::default().fg(Color::DarkGray)),
-            Span::styled(format!("{} ", failed), Style::default().fg(if failed > 0 { Color::Red } else { Color::DarkGray }).add_modifier(Modifier::BOLD)),
+            Span::styled(
+                format!("{} ", failed),
+                Style::default()
+                    .fg(if failed > 0 {
+                        Color::Red
+                    } else {
+                        Color::DarkGray
+                    })
+                    .add_modifier(Modifier::BOLD),
+            ),
             Span::styled("│ Total: ", Style::default().fg(Color::DarkGray)),
             Span::styled(format!("{} ", total), Style::default().fg(Color::White)),
             Span::styled("│ Progress: ", Style::default().fg(Color::DarkGray)),
-            Span::styled(format!("{}% ", overall_pct), Style::default().fg(Color::Green).add_modifier(Modifier::BOLD)),
+            Span::styled(
+                format!("{}% ", overall_pct),
+                Style::default()
+                    .fg(Color::Green)
+                    .add_modifier(Modifier::BOLD),
+            ),
             Span::styled("│ Time: ", Style::default().fg(Color::DarkGray)),
             Span::styled(format!("{} ", elapsed), Style::default().fg(Color::Yellow)),
             Span::styled("│ Tokens: ", Style::default().fg(Color::DarkGray)),
-            Span::styled(format!("{} ", total_tok), Style::default().fg(Color::Magenta)),
+            Span::styled(
+                format!("{} ", total_tok),
+                Style::default().fg(Color::Magenta),
+            ),
         ]);
 
         let p = Paragraph::new(vec![stats_line]);
@@ -1637,20 +1723,31 @@ impl<'a> ProgressTreeWidget<'a> {
             .borders(Borders::ALL)
             .border_type(BorderType::Rounded)
             .border_style(Style::default().fg(Color::DarkGray))
-            .title(Span::styled(" Hierarchy & Tasks ", Style::default().fg(Color::White).add_modifier(Modifier::BOLD)));
+            .title(Span::styled(
+                " Hierarchy & Tasks ",
+                Style::default()
+                    .fg(Color::White)
+                    .add_modifier(Modifier::BOLD),
+            ));
 
         let inner = block.inner(area);
         block.render(area, buf);
 
         let visible = self.state.flatten_visible();
         if visible.is_empty() {
-            let p = Paragraph::new(Line::from(Span::styled("No active subagents to display.", Style::default().fg(Color::DarkGray))));
+            let p = Paragraph::new(Line::from(Span::styled(
+                "No active subagents to display.",
+                Style::default().fg(Color::DarkGray),
+            )));
             p.render(inner, buf);
             return;
         }
 
         let max_display = inner.height as usize;
-        let start = self.state.scroll_offset.min(visible.len().saturating_sub(1));
+        let start = self
+            .state
+            .scroll_offset
+            .min(visible.len().saturating_sub(1));
         let slice = &visible[start..(start + max_display).min(visible.len())];
 
         let mut lines = Vec::new();
@@ -1665,29 +1762,50 @@ impl<'a> ProgressTreeWidget<'a> {
 
             // Selection indicator
             if row.is_selected {
-                spans.push(Span::styled("❯ ", Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD)));
+                spans.push(Span::styled(
+                    "❯ ",
+                    Style::default()
+                        .fg(Color::Yellow)
+                        .add_modifier(Modifier::BOLD),
+                ));
             } else {
                 spans.push(Span::raw("  "));
             }
 
             // Tree prefix
-            spans.push(Span::styled(&row.prefix, Style::default().fg(Color::DarkGray)));
+            spans.push(Span::styled(
+                &row.prefix,
+                Style::default().fg(Color::DarkGray),
+            ));
 
             // Status icon / spinner
             let status_style = match &node.status {
                 SubagentStatus::Pending => Style::default().fg(Color::Yellow),
-                SubagentStatus::Running { .. } => Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD),
-                SubagentStatus::Completed { .. } => Style::default().fg(Color::Green).add_modifier(Modifier::BOLD),
-                SubagentStatus::Failed { .. } => Style::default().fg(Color::Red).add_modifier(Modifier::BOLD),
+                SubagentStatus::Running { .. } => Style::default()
+                    .fg(Color::Cyan)
+                    .add_modifier(Modifier::BOLD),
+                SubagentStatus::Completed { .. } => Style::default()
+                    .fg(Color::Green)
+                    .add_modifier(Modifier::BOLD),
+                SubagentStatus::Failed { .. } => {
+                    Style::default().fg(Color::Red).add_modifier(Modifier::BOLD)
+                }
                 SubagentStatus::Cancelled => Style::default().fg(Color::DarkGray),
             };
-            spans.push(Span::styled(format!("{} ", node.status_icon(self.state.spinner_tick)), status_style));
+            spans.push(Span::styled(
+                format!("{} ", node.status_icon(self.state.spinner_tick)),
+                status_style,
+            ));
 
             // Name
             let name_style = if row.is_selected {
-                Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD)
+                Style::default()
+                    .fg(Color::Yellow)
+                    .add_modifier(Modifier::BOLD)
             } else {
-                Style::default().fg(Color::White).add_modifier(Modifier::BOLD)
+                Style::default()
+                    .fg(Color::White)
+                    .add_modifier(Modifier::BOLD)
             };
             spans.push(Span::styled(format!("{} ", node.name), name_style));
 
@@ -1700,16 +1818,28 @@ impl<'a> ProgressTreeWidget<'a> {
                 SubagentRole::General => Color::White,
                 SubagentRole::Custom { .. } => Color::Cyan,
             };
-            spans.push(Span::styled(format!("{} ", node.role_badge()), Style::default().fg(role_color)));
+            spans.push(Span::styled(
+                format!("{} ", node.role_badge()),
+                Style::default().fg(role_color),
+            ));
 
             // Mini bar
-            spans.push(Span::raw(format!("{} ", render_mini_bar(node.progress_ratio(), 5, false))));
+            spans.push(Span::raw(format!(
+                "{} ",
+                render_mini_bar(node.progress_ratio(), 5, false)
+            )));
 
             // Active Tool / Thinking preview
             if let Some(tool) = &node.current_tool {
-                spans.push(Span::styled(format!("⚡{} ", tool), Style::default().fg(Color::Yellow)));
+                spans.push(Span::styled(
+                    format!("⚡{} ", tool),
+                    Style::default().fg(Color::Yellow),
+                ));
             } else if !node.thinking_preview.is_empty() && node.is_running() {
-                spans.push(Span::styled(format!("💭{} ", node.thinking_preview), Style::default().fg(Color::DarkGray)));
+                spans.push(Span::styled(
+                    format!("💭{} ", node.thinking_preview),
+                    Style::default().fg(Color::DarkGray),
+                ));
             }
 
             // Duration
@@ -1731,16 +1861,28 @@ impl<'a> ProgressTreeWidget<'a> {
             .borders(Borders::ALL)
             .border_type(BorderType::Rounded)
             .border_style(Style::default().fg(Color::DarkGray))
-            .title(Span::styled(" Subagent Inspector ", Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD)));
+            .title(Span::styled(
+                " Subagent Inspector ",
+                Style::default()
+                    .fg(Color::Cyan)
+                    .add_modifier(Modifier::BOLD),
+            ));
 
         let inner = block.inner(area);
         block.render(area, buf);
 
-        let selected = self.state.selected_id.as_ref().and_then(|id| self.state.nodes.get(id));
+        let selected = self
+            .state
+            .selected_id
+            .as_ref()
+            .and_then(|id| self.state.nodes.get(id));
         let node = match selected {
             Some(n) => n,
             None => {
-                let p = Paragraph::new(Line::from(Span::styled("Select a subagent to view details.", Style::default().fg(Color::DarkGray))));
+                let p = Paragraph::new(Line::from(Span::styled(
+                    "Select a subagent to view details.",
+                    Style::default().fg(Color::DarkGray),
+                )));
                 p.render(inner, buf);
                 return;
             }
@@ -1751,11 +1893,19 @@ impl<'a> ProgressTreeWidget<'a> {
         // Title & Role
         lines.push(Line::from(vec![
             Span::styled("Subagent: ", Style::default().fg(Color::DarkGray)),
-            Span::styled(&node.name, Style::default().fg(Color::White).add_modifier(Modifier::BOLD)),
+            Span::styled(
+                &node.name,
+                Style::default()
+                    .fg(Color::White)
+                    .add_modifier(Modifier::BOLD),
+            ),
             Span::raw("  "),
             Span::styled(node.role_badge(), Style::default().fg(Color::Cyan)),
             Span::raw("  "),
-            Span::styled(format!("(ID: {})", node.id), Style::default().fg(Color::DarkGray)),
+            Span::styled(
+                format!("(ID: {})", node.id),
+                Style::default().fg(Color::DarkGray),
+            ),
         ]));
 
         // Status & Turns
@@ -1764,40 +1914,72 @@ impl<'a> ProgressTreeWidget<'a> {
             Span::styled(node.status_summary(), Style::default().fg(Color::Green)),
             Span::raw("  │  "),
             Span::styled("Turn: ", Style::default().fg(Color::DarkGray)),
-            Span::styled(format!("{}/{}", node.current_turn, node.max_turns), Style::default().fg(Color::Yellow)),
+            Span::styled(
+                format!("{}/{}", node.current_turn, node.max_turns),
+                Style::default().fg(Color::Yellow),
+            ),
             Span::raw("  │  "),
             Span::styled("Duration: ", Style::default().fg(Color::DarkGray)),
-            Span::styled(format_duration(node.elapsed()), Style::default().fg(Color::Cyan)),
+            Span::styled(
+                format_duration(node.elapsed()),
+                Style::default().fg(Color::Cyan),
+            ),
         ]));
 
         // Metrics & Tokens
         lines.push(Line::from(vec![
             Span::styled("Tokens: ", Style::default().fg(Color::DarkGray)),
-            Span::styled(format!("{} total", node.metrics.format_total_tokens()), Style::default().fg(Color::Magenta)),
+            Span::styled(
+                format!("{} total", node.metrics.format_total_tokens()),
+                Style::default().fg(Color::Magenta),
+            ),
             Span::raw("  │  "),
             Span::styled("TPS: ", Style::default().fg(Color::DarkGray)),
-            Span::styled(format!("{:.1} tok/s", node.metrics.tokens_per_sec), Style::default().fg(Color::White)),
+            Span::styled(
+                format!("{:.1} tok/s", node.metrics.tokens_per_sec),
+                Style::default().fg(Color::White),
+            ),
             Span::raw("  │  "),
             Span::styled("Cost: ", Style::default().fg(Color::DarkGray)),
-            Span::styled(node.metrics.format_cost(), Style::default().fg(Color::Green)),
+            Span::styled(
+                node.metrics.format_cost(),
+                Style::default().fg(Color::Green),
+            ),
         ]));
 
-        lines.push(Line::from(Span::styled("─".repeat(inner.width as usize), Style::default().fg(Color::DarkGray))));
+        lines.push(Line::from(Span::styled(
+            "─".repeat(inner.width as usize),
+            Style::default().fg(Color::DarkGray),
+        )));
 
         // Task Directive
         lines.push(Line::from(vec![
-            Span::styled("Task: ", Style::default().fg(Color::DarkGray).add_modifier(Modifier::BOLD)),
+            Span::styled(
+                "Task: ",
+                Style::default()
+                    .fg(Color::DarkGray)
+                    .add_modifier(Modifier::BOLD),
+            ),
             Span::styled(&node.task, Style::default().fg(Color::White)),
         ]));
 
         // Live Reasoning / Thinking Stream
         if !node.thinking_full.is_empty() {
-            lines.push(Line::from(Span::styled("─".repeat(inner.width as usize), Style::default().fg(Color::DarkGray))));
-            lines.push(Line::from(vec![
-                Span::styled("Live Reasoning / Thoughts: ", Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD)),
-            ]));
+            lines.push(Line::from(Span::styled(
+                "─".repeat(inner.width as usize),
+                Style::default().fg(Color::DarkGray),
+            )));
+            lines.push(Line::from(vec![Span::styled(
+                "Live Reasoning / Thoughts: ",
+                Style::default()
+                    .fg(Color::Cyan)
+                    .add_modifier(Modifier::BOLD),
+            )]));
             let preview = if node.thinking_full.len() > 300 {
-                format!("...{}", &node.thinking_full[node.thinking_full.len() - 300..])
+                format!(
+                    "...{}",
+                    &node.thinking_full[node.thinking_full.len() - 300..]
+                )
             } else {
                 node.thinking_full.clone()
             };
@@ -1811,18 +1993,36 @@ impl<'a> ProgressTreeWidget<'a> {
 
         // Tool history summary
         if !node.tool_history.is_empty() {
-            lines.push(Line::from(Span::styled("─".repeat(inner.width as usize), Style::default().fg(Color::DarkGray))));
+            lines.push(Line::from(Span::styled(
+                "─".repeat(inner.width as usize),
+                Style::default().fg(Color::DarkGray),
+            )));
             lines.push(Line::from(vec![
-                Span::styled("Executed Tools: ", Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD)),
-                Span::styled(format!("({} calls)", node.tool_history.len()), Style::default().fg(Color::DarkGray)),
+                Span::styled(
+                    "Executed Tools: ",
+                    Style::default()
+                        .fg(Color::Yellow)
+                        .add_modifier(Modifier::BOLD),
+                ),
+                Span::styled(
+                    format!("({} calls)", node.tool_history.len()),
+                    Style::default().fg(Color::DarkGray),
+                ),
             ]));
             for tool_call in node.tool_history.iter().rev().take(3) {
                 let sym = if tool_call.success { "✓" } else { "✗" };
-                let col = if tool_call.success { Color::Green } else { Color::Red };
+                let col = if tool_call.success {
+                    Color::Green
+                } else {
+                    Color::Red
+                };
                 lines.push(Line::from(vec![
                     Span::styled(format!("  {} ", sym), Style::default().fg(col)),
                     Span::styled(&tool_call.tool, Style::default().fg(Color::White)),
-                    Span::styled(format!(" ({}ms)", tool_call.duration_ms), Style::default().fg(Color::DarkGray)),
+                    Span::styled(
+                        format!(" ({}ms)", tool_call.duration_ms),
+                        Style::default().fg(Color::DarkGray),
+                    ),
                 ]));
             }
         }
@@ -1837,16 +2037,28 @@ impl<'a> ProgressTreeWidget<'a> {
             .borders(Borders::ALL)
             .border_type(BorderType::Rounded)
             .border_style(Style::default().fg(Color::DarkGray))
-            .title(Span::styled(" Live Activity Stream ", Style::default().fg(Color::Green).add_modifier(Modifier::BOLD)));
+            .title(Span::styled(
+                " Live Activity Stream ",
+                Style::default()
+                    .fg(Color::Green)
+                    .add_modifier(Modifier::BOLD),
+            ));
 
         let inner = block.inner(area);
         block.render(area, buf);
 
-        let selected = self.state.selected_id.as_ref().and_then(|id| self.state.nodes.get(id));
+        let selected = self
+            .state
+            .selected_id
+            .as_ref()
+            .and_then(|id| self.state.nodes.get(id));
         let events = match selected {
             Some(n) => &n.log_events,
             None => {
-                let p = Paragraph::new(Line::from(Span::styled("No activity logs.", Style::default().fg(Color::DarkGray))));
+                let p = Paragraph::new(Line::from(Span::styled(
+                    "No activity logs.",
+                    Style::default().fg(Color::DarkGray),
+                )));
                 p.render(inner, buf);
                 return;
             }
@@ -1872,7 +2084,10 @@ impl<'a> ProgressTreeWidget<'a> {
             };
 
             lines.push(Line::from(vec![
-                Span::styled(format!("{} ", time_str), Style::default().fg(Color::DarkGray)),
+                Span::styled(
+                    format!("{} ", time_str),
+                    Style::default().fg(Color::DarkGray),
+                ),
                 Span::raw(format!("{} ", icon)),
                 Span::styled(&entry.message, Style::default().fg(col)),
             ]));
@@ -1885,19 +2100,52 @@ impl<'a> ProgressTreeWidget<'a> {
     /// Renders the bottom keyboard shortcuts bar.
     fn render_footer(&self, area: Rect, buf: &mut Buffer) {
         let keys = vec![
-            Span::styled(" ↑/↓", Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD)),
+            Span::styled(
+                " ↑/↓",
+                Style::default()
+                    .fg(Color::Cyan)
+                    .add_modifier(Modifier::BOLD),
+            ),
             Span::raw(" Nav  "),
-            Span::styled("Space", Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD)),
+            Span::styled(
+                "Space",
+                Style::default()
+                    .fg(Color::Cyan)
+                    .add_modifier(Modifier::BOLD),
+            ),
             Span::raw(" Toggle  "),
-            Span::styled("e/c", Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD)),
+            Span::styled(
+                "e/c",
+                Style::default()
+                    .fg(Color::Cyan)
+                    .add_modifier(Modifier::BOLD),
+            ),
             Span::raw(" Expand/Collapse  "),
-            Span::styled("Tab", Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD)),
+            Span::styled(
+                "Tab",
+                Style::default()
+                    .fg(Color::Cyan)
+                    .add_modifier(Modifier::BOLD),
+            ),
             Span::raw(" Layout  "),
-            Span::styled("f", Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD)),
+            Span::styled(
+                "f",
+                Style::default()
+                    .fg(Color::Cyan)
+                    .add_modifier(Modifier::BOLD),
+            ),
             Span::raw(" Filter  "),
-            Span::styled("x", Style::default().fg(Color::Red).add_modifier(Modifier::BOLD)),
+            Span::styled(
+                "x",
+                Style::default().fg(Color::Red).add_modifier(Modifier::BOLD),
+            ),
             Span::raw(" Cancel  "),
-            Span::styled("q", Style::default().fg(Color::DarkGray).add_modifier(Modifier::BOLD)),
+            Span::styled(
+                "q",
+                Style::default()
+                    .fg(Color::DarkGray)
+                    .add_modifier(Modifier::BOLD),
+            ),
             Span::raw(" Quit"),
         ];
 
@@ -1917,7 +2165,12 @@ mod tests {
 
     #[test]
     fn test_node_creation_and_basics() {
-        let node = ProgressTreeNode::new("sub_01", "ScoutAgent", SubagentRole::Scout, "Search repo for auth tokens");
+        let node = ProgressTreeNode::new(
+            "sub_01",
+            "ScoutAgent",
+            SubagentRole::Scout,
+            "Search repo for auth tokens",
+        );
         assert_eq!(node.id, "sub_01");
         assert_eq!(node.name, "ScoutAgent");
         assert_eq!(node.role, SubagentRole::Scout);
@@ -1929,7 +2182,13 @@ mod tests {
     #[test]
     fn test_streaming_event_ingestion() {
         let mut state = ProgressTreeState::new();
-        state.register_subagent("coder_1", "CodeAgent", SubagentRole::Coder, "Implement patch", None);
+        state.register_subagent(
+            "coder_1",
+            "CodeAgent",
+            SubagentRole::Coder,
+            "Implement patch",
+            None,
+        );
 
         // Turn 1 start
         state.handle_event(&SubagentProgress::TurnStarted {
@@ -1987,9 +2246,27 @@ mod tests {
     #[test]
     fn test_tree_hierarchy_flattening() {
         let mut state = ProgressTreeState::new();
-        state.register_subagent("root", "LeadCoordinator", SubagentRole::General, "Orchestrate feature", None);
-        state.register_subagent("scout", "RepoScout", SubagentRole::Scout, "Find files", Some("root".into()));
-        state.register_subagent("coder", "PatchCoder", SubagentRole::Coder, "Write patch", Some("root".into()));
+        state.register_subagent(
+            "root",
+            "LeadCoordinator",
+            SubagentRole::General,
+            "Orchestrate feature",
+            None,
+        );
+        state.register_subagent(
+            "scout",
+            "RepoScout",
+            SubagentRole::Scout,
+            "Find files",
+            Some("root".into()),
+        );
+        state.register_subagent(
+            "coder",
+            "PatchCoder",
+            SubagentRole::Coder,
+            "Write patch",
+            Some("root".into()),
+        );
 
         let visible = state.flatten_visible();
         assert_eq!(visible.len(), 3);
@@ -2012,10 +2289,23 @@ mod tests {
     #[test]
     fn test_ansi_and_plain_rendering() {
         let mut state = ProgressTreeState::new();
-        state.register_subagent("lead", "LeadAgent", SubagentRole::General, "Main task", None);
-        state.register_subagent("worker", "WorkerAgent", SubagentRole::Coder, "Sub task", Some("lead".into()));
+        state.register_subagent(
+            "lead",
+            "LeadAgent",
+            SubagentRole::General,
+            "Main task",
+            None,
+        );
+        state.register_subagent(
+            "worker",
+            "WorkerAgent",
+            SubagentRole::Coder,
+            "Sub task",
+            Some("lead".into()),
+        );
 
-        let ansi = render_progress_tree_ansi(&state, &ProgressTreeOptions::default(), &Theme::auto());
+        let ansi =
+            render_progress_tree_ansi(&state, &ProgressTreeOptions::default(), &Theme::auto());
         assert!(ansi.contains("LeadAgent"));
         assert!(ansi.contains("WorkerAgent"));
         assert!(ansi.contains("Subagent Progress Tree"));

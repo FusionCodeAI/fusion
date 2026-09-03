@@ -384,10 +384,7 @@ impl CrashReport {
             "  Phase:       \x1b[1;31m{}\x1b[0m\n",
             self.phase.display_name()
         ));
-        msg.push_str(&format!(
-            "  Last Active: {}\n",
-            self.updated_at
-        ));
+        msg.push_str(&format!("  Last Active: {}\n", self.updated_at));
 
         let prompt_preview = truncate_output(&self.user_input, 120);
         msg.push_str(&format!("  Prompt:      \"{}\"\n", prompt_preview));
@@ -406,8 +403,12 @@ impl CrashReport {
 
         msg.push_str("\n\x1b[1mRecovery Options:\x1b[0m\n");
         msg.push_str("  \x1b[1;32m[c]ontinue\x1b[0m - Resume turn preserving completed tool outputs (default)\n");
-        msg.push_str("  \x1b[1;34m[r]eplay\x1b[0m   - Re-run prompt from scratch against clean session\n");
-        msg.push_str("  \x1b[1;35m[s]ession\x1b[0m  - Restore session state without executing prompt\n");
+        msg.push_str(
+            "  \x1b[1;34m[r]eplay\x1b[0m   - Re-run prompt from scratch against clean session\n",
+        );
+        msg.push_str(
+            "  \x1b[1;35m[s]ession\x1b[0m  - Restore session state without executing prompt\n",
+        );
         msg.push_str("  \x1b[1;31m[d]iscard\x1b[0m  - Discard recovery state and start fresh\n\n");
         msg.push_str("Choose recovery action [c/r/s/d] (Enter = continue): ");
 
@@ -634,7 +635,10 @@ pub fn check_for_crash_at_path(path: &Path) -> Result<Option<CrashReport>, Recov
                     error: Some(format!("Corrupted recovery JSON: {}", e)),
                 },
                 active_model: "unknown".to_string(),
-                working_dir: path.parent().unwrap_or_else(|| Path::new(".")).to_path_buf(),
+                working_dir: path
+                    .parent()
+                    .unwrap_or_else(|| Path::new("."))
+                    .to_path_buf(),
                 started_at: Utc::now().to_rfc3339(),
                 updated_at: Utc::now().to_rfc3339(),
                 process_id: 0,
@@ -670,10 +674,7 @@ pub fn resume_session_from_recovery(
                     })
                     .collect();
 
-                let assistant_text = state
-                    .partial_assistant_response
-                    .clone()
-                    .unwrap_or_default();
+                let assistant_text = state.partial_assistant_response.clone().unwrap_or_default();
 
                 session.messages.push(Message {
                     role: Role::Assistant,
@@ -733,14 +734,12 @@ pub fn resume_session_from_recovery(
                 summary,
             })
         }
-        ResumeStrategy::Discard => {
-            Ok(ResumeResult {
-                session,
-                prompt_to_run: None,
-                strategy,
-                summary: "Discarded recovery state and initialized fresh session".to_string(),
-            })
-        }
+        ResumeStrategy::Discard => Ok(ResumeResult {
+            session,
+            prompt_to_run: None,
+            strategy,
+            summary: "Discarded recovery state and initialized fresh session".to_string(),
+        }),
     }
 }
 
@@ -772,10 +771,7 @@ impl RecoveryManager {
     }
 
     /// Creates a `RecoveryManager` with a custom recovery file path.
-    pub fn with_path(
-        recovery_path: impl Into<PathBuf>,
-        working_dir: impl Into<PathBuf>,
-    ) -> Self {
+    pub fn with_path(recovery_path: impl Into<PathBuf>, working_dir: impl Into<PathBuf>) -> Self {
         Self {
             recovery_path: recovery_path.into(),
             working_dir: working_dir.into(),
@@ -833,12 +829,7 @@ impl RecoveryManager {
             return Ok(self.recovery_path.clone());
         }
 
-        let state = RecoveryState::new_for_turn(
-            session,
-            user_input,
-            turn_index,
-            &self.working_dir,
-        );
+        let state = RecoveryState::new_for_turn(session, user_input, turn_index, &self.working_dir);
 
         save_recovery_state_atomic(&self.recovery_path, &state)
     }
@@ -921,9 +912,9 @@ impl RecoveryManager {
 
     /// Resumes an interrupted session using the specified strategy.
     pub fn resume(&self, strategy: ResumeStrategy) -> Result<ResumeResult, RecoveryError> {
-        let state = self.load_active_state()?.ok_or_else(|| {
-            RecoveryError::NotFound(self.recovery_path.clone())
-        })?;
+        let state = self
+            .load_active_state()?
+            .ok_or_else(|| RecoveryError::NotFound(self.recovery_path.clone()))?;
 
         let result = resume_session_from_recovery(&state, strategy)?;
 
@@ -1037,11 +1028,7 @@ pub fn format_crash_banner(report: &CrashReport) -> String {
 }
 
 /// Dispatches `/recover` slash commands.
-pub fn handle_recovery_command(
-    args: &str,
-    working_dir: &Path,
-    session: &mut Session,
-) -> String {
+pub fn handle_recovery_command(args: &str, working_dir: &Path, session: &mut Session) -> String {
     let mgr = RecoveryManager::new(working_dir.to_path_buf());
     let trimmed = args.trim();
 
@@ -1085,7 +1072,8 @@ pub fn handle_recovery_command(
             match mgr.resume(strategy) {
                 Ok(res) => {
                     *session = res.session;
-                    let mut out = format!("✓ Crash recovery executed successfully.\n{}", res.summary);
+                    let mut out =
+                        format!("✓ Crash recovery executed successfully.\n{}", res.summary);
                     if let Some(p) = res.prompt_to_run {
                         out.push_str(&format!("\nRe-queued prompt: \"{}\"", p));
                     }
@@ -1123,15 +1111,13 @@ pub fn handle_recovery_command(
             Ok(None) => "No recovery state available for diff inspection.".to_string(),
             Err(e) => format!("Error loading recovery state: {}", e),
         },
-        "help" | _ => {
-            r#"### `/recover` Crash Recovery Commands
+        "help" | _ => r#"### `/recover` Crash Recovery Commands
 - `/recover` or `/recover status` - Display active recovery status and diagnostics.
 - `/recover resume [continue|replay|restore]` - Resume interrupted session.
 - `/recover diff` - Inspect completed tool outputs and turn modifications.
 - `/recover discard` - Delete recovery state and clear recovery file.
 "#
-            .to_string()
-        }
+        .to_string(),
     }
 }
 
@@ -1198,9 +1184,7 @@ pub enum ErrorClass {
         status_code: Option<u16>,
     },
     /// Unclassified or unknown error string.
-    Unknown {
-        raw: String,
-    },
+    Unknown { raw: String },
 }
 
 impl ErrorClass {
@@ -1213,7 +1197,10 @@ impl ErrorClass {
         if let Ok(val) = serde_json::from_str::<serde_json::Value>(trimmed) {
             if let Some(error_obj) = val.get("error") {
                 let code = error_obj.get("code").and_then(|c| c.as_str()).unwrap_or("");
-                let msg = error_obj.get("message").and_then(|m| m.as_str()).unwrap_or("");
+                let msg = error_obj
+                    .get("message")
+                    .and_then(|m| m.as_str())
+                    .unwrap_or("");
                 let error_type = error_obj.get("type").and_then(|t| t.as_str()).unwrap_or("");
 
                 if code.contains("context_length_exceeded")
@@ -1296,7 +1283,11 @@ impl ErrorClass {
             // Attempt to extract numeric seconds if present, e.g. "retry after 5s"
             if let Some(idx) = lower.find("retry after") {
                 let rest = &lower[idx + 11..];
-                let num_str: String = rest.chars().skip_while(|c| !c.is_numeric()).take_while(|c| c.is_numeric()).collect();
+                let num_str: String = rest
+                    .chars()
+                    .skip_while(|c| !c.is_numeric())
+                    .take_while(|c| c.is_numeric())
+                    .collect();
                 if let Ok(secs) = num_str.parse::<u64>() {
                     retry_after = Some(Duration::from_secs(secs));
                 }
@@ -1431,7 +1422,11 @@ impl ErrorClass {
                     let b_lower = b.to_lowercase();
                     if let Some(idx) = b_lower.find("retry-after") {
                         let rest = &b_lower[idx + 11..];
-                        let num: String = rest.chars().skip_while(|c| !c.is_numeric()).take_while(|c| c.is_numeric()).collect();
+                        let num: String = rest
+                            .chars()
+                            .skip_while(|c| !c.is_numeric())
+                            .take_while(|c| c.is_numeric())
+                            .collect();
                         if let Ok(s) = num.parse::<u64>() {
                             retry_after = Some(Duration::from_secs(s));
                         }
@@ -1472,7 +1467,9 @@ impl ErrorClass {
                 status_code: Some(500),
             },
             502 | 503 | 504 => Self::TransientNetwork {
-                reason: body.unwrap_or("HTTP Gateway/Service Unavailable").to_string(),
+                reason: body
+                    .unwrap_or("HTTP Gateway/Service Unavailable")
+                    .to_string(),
                 status_code: Some(status),
                 retryable: true,
             },
@@ -1565,32 +1562,67 @@ impl ErrorClass {
     /// Formats a diagnostic description of the error class.
     pub fn description(&self) -> String {
         match self {
-            Self::TransientNetwork { reason, status_code, .. } => {
-                format!("Transient network glitch (status: {:?}): {}", status_code, reason)
+            Self::TransientNetwork {
+                reason,
+                status_code,
+                ..
+            } => {
+                format!(
+                    "Transient network glitch (status: {:?}): {}",
+                    status_code, reason
+                )
             }
-            Self::RateLimit { retry_after, limit_type, .. } => {
+            Self::RateLimit {
+                retry_after,
+                limit_type,
+                ..
+            } => {
                 format!(
                     "Rate limit reached (type: {:?}, retry_after: {:?})",
                     limit_type, retry_after
                 )
             }
-            Self::ContextLengthExceeded { requested_tokens, max_context_tokens, model } => {
+            Self::ContextLengthExceeded {
+                requested_tokens,
+                max_context_tokens,
+                model,
+            } => {
                 format!(
                     "Context length exceeded for model {:?} (requested: {:?}, max: {:?})",
                     model, requested_tokens, max_context_tokens
                 )
             }
-            Self::ToolExecutionFailure { tool_name, error_message, .. } => {
+            Self::ToolExecutionFailure {
+                tool_name,
+                error_message,
+                ..
+            } => {
                 format!("Tool '{}' execution failed: {}", tool_name, error_message)
             }
-            Self::InvalidModelOutput { reason, raw_snippet, .. } => {
-                format!("Malformed model output: {} (snippet: {:?})", reason, raw_snippet)
+            Self::InvalidModelOutput {
+                reason,
+                raw_snippet,
+                ..
+            } => {
+                format!(
+                    "Malformed model output: {} (snippet: {:?})",
+                    reason, raw_snippet
+                )
             }
-            Self::AuthenticationOrQuota { reason, status_code } => {
+            Self::AuthenticationOrQuota {
+                reason,
+                status_code,
+            } => {
                 format!("Auth/Quota error (status: {:?}): {}", status_code, reason)
             }
-            Self::InternalServerError { message, status_code } => {
-                format!("Internal upstream error (status: {:?}): {}", status_code, message)
+            Self::InternalServerError {
+                message,
+                status_code,
+            } => {
+                format!(
+                    "Internal upstream error (status: {:?}): {}",
+                    status_code, message
+                )
             }
             Self::Unknown { raw } => format!("Unknown fault: {}", raw),
         }
@@ -1908,7 +1940,8 @@ impl BackoffPolicy {
         if self.jitter_factor > 0.0 {
             // Compute deterministic pseudo-random jitter in range [1.0 - jitter_factor, 1.0 + jitter_factor]
             let normalized_rand = ((seed % 1000) as f64) / 1000.0;
-            let jitter_multiplier = (1.0 - self.jitter_factor) + (2.0 * self.jitter_factor * normalized_rand);
+            let jitter_multiplier =
+                (1.0 - self.jitter_factor) + (2.0 * self.jitter_factor * normalized_rand);
             let final_millis = (clamped_millis * jitter_multiplier).max(1.0);
             Duration::from_millis(final_millis as u64)
         } else {
@@ -2396,7 +2429,9 @@ impl RecoveryHistory {
         let mut rem_dist = HashMap::new();
 
         for rec in &self.records {
-            *fault_dist.entry(rec.error_class.name().to_string()).or_insert(0) += 1;
+            *fault_dist
+                .entry(rec.error_class.name().to_string())
+                .or_insert(0) += 1;
 
             let action_name = match rec.remediation {
                 RemediationAction::RetryWithBackoff { .. } => "RetryWithBackoff",
@@ -2589,9 +2624,14 @@ impl FaultToleranceEngine {
                             preserve_system_prompt: true,
                         },
                         false,
-                        "Pruning session context window using adaptive composite pruning.".to_string(),
+                        "Pruning session context window using adaptive composite pruning."
+                            .to_string(),
                     )
-                } else if let Some(fallback) = self.config.fallback_router.get_fallback(current_model, tried_models) {
+                } else if let Some(fallback) = self
+                    .config
+                    .fallback_router
+                    .get_fallback(current_model, tried_models)
+                {
                     (
                         RemediationAction::SwitchFallbackModel {
                             primary_model: current_model.to_string(),
@@ -2604,7 +2644,8 @@ impl FaultToleranceEngine {
                 } else {
                     (
                         RemediationAction::EscalateToUser {
-                            reason: "Context length exceeded and auto-pruning disabled.".to_string(),
+                            reason: "Context length exceeded and auto-pruning disabled."
+                                .to_string(),
                             diagnostic_report: error_msg.to_string(),
                         },
                         true,
@@ -2615,7 +2656,9 @@ impl FaultToleranceEngine {
             ErrorClass::RateLimit { retry_after, .. } => {
                 if attempt_count < self.config.max_remediation_retries {
                     let delay = retry_after.unwrap_or_else(|| {
-                        self.config.backoff_policy.calculate_delay(attempt_count + 1)
+                        self.config
+                            .backoff_policy
+                            .calculate_delay(attempt_count + 1)
                     });
                     (
                         RemediationAction::RetryWithBackoff {
@@ -2625,9 +2668,16 @@ impl FaultToleranceEngine {
                             jitter: true,
                         },
                         false,
-                        format!("Rate limit encountered. Retrying in {:?} with backoff.", delay),
+                        format!(
+                            "Rate limit encountered. Retrying in {:?} with backoff.",
+                            delay
+                        ),
                     )
-                } else if let Some(fallback) = self.config.fallback_router.get_fallback(current_model, tried_models) {
+                } else if let Some(fallback) = self
+                    .config
+                    .fallback_router
+                    .get_fallback(current_model, tried_models)
+                {
                     (
                         RemediationAction::SwitchFallbackModel {
                             primary_model: current_model.to_string(),
@@ -2640,17 +2690,22 @@ impl FaultToleranceEngine {
                 } else {
                     (
                         RemediationAction::EscalateToUser {
-                            reason: "Rate limit exhausted and all fallback models attempted.".to_string(),
+                            reason: "Rate limit exhausted and all fallback models attempted."
+                                .to_string(),
                             diagnostic_report: error_msg.to_string(),
                         },
                         true,
-                        "Persistent rate limit exhausted all retries and fallback models.".to_string(),
+                        "Persistent rate limit exhausted all retries and fallback models."
+                            .to_string(),
                     )
                 }
             }
             ErrorClass::TransientNetwork { .. } => {
                 if attempt_count < self.config.max_remediation_retries {
-                    let delay = self.config.backoff_policy.calculate_delay(attempt_count + 1);
+                    let delay = self
+                        .config
+                        .backoff_policy
+                        .calculate_delay(attempt_count + 1);
                     (
                         RemediationAction::RetryWithBackoff {
                             delay,
@@ -2659,22 +2714,37 @@ impl FaultToleranceEngine {
                             jitter: true,
                         },
                         false,
-                        format!("Transient network glitch. Retrying in {:?} (attempt {}/{}).", delay, attempt_count + 1, self.config.max_remediation_retries),
+                        format!(
+                            "Transient network glitch. Retrying in {:?} (attempt {}/{}).",
+                            delay,
+                            attempt_count + 1,
+                            self.config.max_remediation_retries
+                        ),
                     )
-                } else if let Some(fallback) = self.config.fallback_router.get_fallback(current_model, tried_models) {
+                } else if let Some(fallback) = self
+                    .config
+                    .fallback_router
+                    .get_fallback(current_model, tried_models)
+                {
                     (
                         RemediationAction::SwitchFallbackModel {
                             primary_model: current_model.to_string(),
                             fallback_model: fallback.clone(),
-                            reason: "Network connection persistently failing for primary model.".to_string(),
+                            reason: "Network connection persistently failing for primary model."
+                                .to_string(),
                         },
                         false,
-                        format!("Network retries exhausted. Switching to fallback model '{}'.", fallback),
+                        format!(
+                            "Network retries exhausted. Switching to fallback model '{}'.",
+                            fallback
+                        ),
                     )
                 } else {
                     (
                         RemediationAction::EscalateToUser {
-                            reason: "Network connection persistently failed across all retry attempts.".to_string(),
+                            reason:
+                                "Network connection persistently failed across all retry attempts."
+                                    .to_string(),
                             diagnostic_report: error_msg.to_string(),
                         },
                         true,
@@ -2682,7 +2752,11 @@ impl FaultToleranceEngine {
                     )
                 }
             }
-            ErrorClass::InvalidModelOutput { reason, raw_snippet, .. } => {
+            ErrorClass::InvalidModelOutput {
+                reason,
+                raw_snippet,
+                ..
+            } => {
                 if attempt_count < 2 {
                     let repair_instructions = format!(
                         "Your previous response had formatting issues: {}. Please return strictly valid JSON conforming to the requested schema.",
@@ -2694,9 +2768,14 @@ impl FaultToleranceEngine {
                             repair_instructions,
                         },
                         false,
-                        "Injecting formatting correction prompt for malformed output self-repair.".to_string(),
+                        "Injecting formatting correction prompt for malformed output self-repair."
+                            .to_string(),
                     )
-                } else if let Some(fallback) = self.config.fallback_router.get_fallback(current_model, tried_models) {
+                } else if let Some(fallback) = self
+                    .config
+                    .fallback_router
+                    .get_fallback(current_model, tried_models)
+                {
                     (
                         RemediationAction::SwitchFallbackModel {
                             primary_model: current_model.to_string(),
@@ -2704,20 +2783,32 @@ impl FaultToleranceEngine {
                             reason: "Model repeatedly produced invalid output schemas.".to_string(),
                         },
                         false,
-                        format!("Model produced unparseable output. Switching to fallback model '{}'.", fallback),
+                        format!(
+                            "Model produced unparseable output. Switching to fallback model '{}'.",
+                            fallback
+                        ),
                     )
                 } else {
                     (
                         RemediationAction::EscalateToUser {
-                            reason: format!("Model generated unfixable malformed output: {}", reason),
-                            diagnostic_report: raw_snippet.clone().unwrap_or_else(|| error_msg.to_string()),
+                            reason: format!(
+                                "Model generated unfixable malformed output: {}",
+                                reason
+                            ),
+                            diagnostic_report: raw_snippet
+                                .clone()
+                                .unwrap_or_else(|| error_msg.to_string()),
                         },
                         true,
                         "Malformed output recovery attempts exhausted.".to_string(),
                     )
                 }
             }
-            ErrorClass::ToolExecutionFailure { tool_name, error_message, is_recoverable } => {
+            ErrorClass::ToolExecutionFailure {
+                tool_name,
+                error_message,
+                is_recoverable,
+            } => {
                 if *is_recoverable && attempt_count < self.config.max_remediation_retries {
                     (
                         RemediationAction::RetryWithBackoff {
@@ -2736,12 +2827,19 @@ impl FaultToleranceEngine {
                             alternative_tool: None,
                         },
                         false,
-                        format!("Tool '{}' failed persistently: {}. Disabling tool.", tool_name, error_message),
+                        format!(
+                            "Tool '{}' failed persistently: {}. Disabling tool.",
+                            tool_name, error_message
+                        ),
                     )
                 }
             }
             ErrorClass::AuthenticationOrQuota { reason, .. } => {
-                if let Some(fallback) = self.config.fallback_router.get_fallback(current_model, tried_models) {
+                if let Some(fallback) = self
+                    .config
+                    .fallback_router
+                    .get_fallback(current_model, tried_models)
+                {
                     (
                         RemediationAction::SwitchFallbackModel {
                             primary_model: current_model.to_string(),
@@ -2749,7 +2847,10 @@ impl FaultToleranceEngine {
                             reason: format!("Authentication/quota error: {}", reason),
                         },
                         false,
-                        format!("Auth/quota error on primary model. Switching to fallback '{}'.", fallback),
+                        format!(
+                            "Auth/quota error on primary model. Switching to fallback '{}'.",
+                            fallback
+                        ),
                     )
                 } else {
                     (
@@ -2775,7 +2876,11 @@ impl FaultToleranceEngine {
                         false,
                         format!("Upstream 500 error. Retrying in {:?}.", delay),
                     )
-                } else if let Some(fallback) = self.config.fallback_router.get_fallback(current_model, tried_models) {
+                } else if let Some(fallback) = self
+                    .config
+                    .fallback_router
+                    .get_fallback(current_model, tried_models)
+                {
                     (
                         RemediationAction::SwitchFallbackModel {
                             primary_model: current_model.to_string(),
@@ -2783,7 +2888,10 @@ impl FaultToleranceEngine {
                             reason: format!("Internal server error: {}", message),
                         },
                         false,
-                        format!("Upstream error persists. Switching to fallback model '{}'.", fallback),
+                        format!(
+                            "Upstream error persists. Switching to fallback model '{}'.",
+                            fallback
+                        ),
                     )
                 } else {
                     (
@@ -2846,27 +2954,37 @@ impl FaultToleranceEngine {
         session: &mut Session,
     ) -> Result<RemediationExecutionResult, RecoveryError> {
         match &decision.remediation {
-            RemediationAction::RetryWithBackoff { delay, .. } => {
-                Ok(RemediationExecutionResult {
-                    action_taken: format!("Backoff pause for {:?}", delay),
-                    model_changed: None,
-                    context_pruned: None,
-                    retry_delay: Some(*delay),
-                    instructions_injected: None,
-                })
-            }
-            RemediationAction::SwitchFallbackModel { primary_model, fallback_model, .. } => {
+            RemediationAction::RetryWithBackoff { delay, .. } => Ok(RemediationExecutionResult {
+                action_taken: format!("Backoff pause for {:?}", delay),
+                model_changed: None,
+                context_pruned: None,
+                retry_delay: Some(*delay),
+                instructions_injected: None,
+            }),
+            RemediationAction::SwitchFallbackModel {
+                primary_model,
+                fallback_model,
+                ..
+            } => {
                 session.active_model = fallback_model.clone();
                 Ok(RemediationExecutionResult {
-                    action_taken: format!("Switched model from {} to {}", primary_model, fallback_model),
+                    action_taken: format!(
+                        "Switched model from {} to {}",
+                        primary_model, fallback_model
+                    ),
                     model_changed: Some((primary_model.clone(), fallback_model.clone())),
                     context_pruned: None,
                     retry_delay: None,
                     instructions_injected: None,
                 })
             }
-            RemediationAction::PruneContext { target_reduction_tokens, strategy, .. } => {
-                let report = prune_session_context(session, *target_reduction_tokens, strategy.clone());
+            RemediationAction::PruneContext {
+                target_reduction_tokens,
+                strategy,
+                ..
+            } => {
+                let report =
+                    prune_session_context(session, *target_reduction_tokens, strategy.clone());
                 Ok(RemediationExecutionResult {
                     action_taken: report.summary.clone(),
                     model_changed: None,
@@ -2875,8 +2993,13 @@ impl FaultToleranceEngine {
                     instructions_injected: None,
                 })
             }
-            RemediationAction::FixMalformedOutput { repair_instructions, .. } => {
-                session.messages.push(Message::user(repair_instructions.clone()));
+            RemediationAction::FixMalformedOutput {
+                repair_instructions,
+                ..
+            } => {
+                session
+                    .messages
+                    .push(Message::user(repair_instructions.clone()));
                 Ok(RemediationExecutionResult {
                     action_taken: "Injected repair prompt into session messages.".to_string(),
                     model_changed: None,
@@ -2885,42 +3008,49 @@ impl FaultToleranceEngine {
                     instructions_injected: Some(repair_instructions.clone()),
                 })
             }
-            RemediationAction::FailoverProvider { from_provider, to_provider } => {
-                Ok(RemediationExecutionResult {
-                    action_taken: format!("Failover from provider {} to {}", from_provider, to_provider),
-                    model_changed: None,
-                    context_pruned: None,
-                    retry_delay: None,
-                    instructions_injected: None,
-                })
-            }
-            RemediationAction::DisableTool { tool_name, .. } => {
-                Ok(RemediationExecutionResult {
-                    action_taken: format!("Disabled tool '{}' for subsequent turn attempts.", tool_name),
-                    model_changed: None,
-                    context_pruned: None,
-                    retry_delay: None,
-                    instructions_injected: None,
-                })
-            }
-            RemediationAction::EscalateToUser { reason, diagnostic_report } => {
-                Ok(RemediationExecutionResult {
-                    action_taken: format!("Escalated to user: {} (diagnostic: {})", reason, diagnostic_report),
-                    model_changed: None,
-                    context_pruned: None,
-                    retry_delay: None,
-                    instructions_injected: None,
-                })
-            }
-            RemediationAction::NoAction => {
-                Ok(RemediationExecutionResult {
-                    action_taken: "No action performed.".to_string(),
-                    model_changed: None,
-                    context_pruned: None,
-                    retry_delay: None,
-                    instructions_injected: None,
-                })
-            }
+            RemediationAction::FailoverProvider {
+                from_provider,
+                to_provider,
+            } => Ok(RemediationExecutionResult {
+                action_taken: format!(
+                    "Failover from provider {} to {}",
+                    from_provider, to_provider
+                ),
+                model_changed: None,
+                context_pruned: None,
+                retry_delay: None,
+                instructions_injected: None,
+            }),
+            RemediationAction::DisableTool { tool_name, .. } => Ok(RemediationExecutionResult {
+                action_taken: format!(
+                    "Disabled tool '{}' for subsequent turn attempts.",
+                    tool_name
+                ),
+                model_changed: None,
+                context_pruned: None,
+                retry_delay: None,
+                instructions_injected: None,
+            }),
+            RemediationAction::EscalateToUser {
+                reason,
+                diagnostic_report,
+            } => Ok(RemediationExecutionResult {
+                action_taken: format!(
+                    "Escalated to user: {} (diagnostic: {})",
+                    reason, diagnostic_report
+                ),
+                model_changed: None,
+                context_pruned: None,
+                retry_delay: None,
+                instructions_injected: None,
+            }),
+            RemediationAction::NoAction => Ok(RemediationExecutionResult {
+                action_taken: "No action performed.".to_string(),
+                model_changed: None,
+                context_pruned: None,
+                retry_delay: None,
+                instructions_injected: None,
+            }),
         }
     }
 
@@ -2982,7 +3112,11 @@ fn truncate_output(s: &str, max_chars: usize) -> String {
         while boundary > 0 && !s.is_char_boundary(boundary) {
             boundary -= 1;
         }
-        format!("{}... [truncated {} chars]", &s[..boundary], s.len().saturating_sub(boundary))
+        format!(
+            "{}... [truncated {} chars]",
+            &s[..boundary],
+            s.len().saturating_sub(boundary)
+        )
     }
 }
 
@@ -3073,7 +3207,8 @@ mod tests {
         let mgr = RecoveryManager::new(&wd);
 
         let session = Session::new("deepseek-chat");
-        mgr.on_turn_start(&session, "Deploy cloudflare worker", 1).unwrap();
+        mgr.on_turn_start(&session, "Deploy cloudflare worker", 1)
+            .unwrap();
 
         let crash = mgr.detect_crash();
         assert!(crash.is_some());
@@ -3101,7 +3236,9 @@ mod tests {
 
         let state = mgr.load_active_state().unwrap().unwrap();
         match state.phase {
-            TurnPhase::ToolExecuting { tool_name, call_id, .. } => {
+            TurnPhase::ToolExecuting {
+                tool_name, call_id, ..
+            } => {
                 assert_eq!(tool_name, "bash");
                 assert_eq!(call_id, "call_123");
             }
@@ -3395,13 +3532,20 @@ mod tests {
     #[test]
     fn test_error_classification_json_payloads() {
         let openai_json = r#"{"error": {"code": "context_length_exceeded", "message": "Maximum context length exceeded"}}"#;
-        assert_eq!(ErrorClass::classify(openai_json).name(), "ContextLengthExceeded");
+        assert_eq!(
+            ErrorClass::classify(openai_json).name(),
+            "ContextLengthExceeded"
+        );
 
         let rate_json = r#"{"error": {"code": "rate_limit_exceeded", "type": "rate_limit_error", "message": "RPM exceeded"}}"#;
         assert_eq!(ErrorClass::classify(rate_json).name(), "RateLimit");
 
-        let auth_json = r#"{"error": {"code": "invalid_api_key", "message": "Incorrect API key provided"}}"#;
-        assert_eq!(ErrorClass::classify(auth_json).name(), "AuthenticationOrQuota");
+        let auth_json =
+            r#"{"error": {"code": "invalid_api_key", "message": "Incorrect API key provided"}}"#;
+        assert_eq!(
+            ErrorClass::classify(auth_json).name(),
+            "AuthenticationOrQuota"
+        );
     }
 
     // ------------------------------------------------------------------------
@@ -3418,10 +3562,22 @@ mod tests {
             5,
         );
 
-        assert_eq!(policy.calculate_delay_with_seed(1, 0), Duration::from_millis(100));
-        assert_eq!(policy.calculate_delay_with_seed(2, 0), Duration::from_millis(200));
-        assert_eq!(policy.calculate_delay_with_seed(3, 0), Duration::from_millis(400));
-        assert_eq!(policy.calculate_delay_with_seed(4, 0), Duration::from_millis(800));
+        assert_eq!(
+            policy.calculate_delay_with_seed(1, 0),
+            Duration::from_millis(100)
+        );
+        assert_eq!(
+            policy.calculate_delay_with_seed(2, 0),
+            Duration::from_millis(200)
+        );
+        assert_eq!(
+            policy.calculate_delay_with_seed(3, 0),
+            Duration::from_millis(400)
+        );
+        assert_eq!(
+            policy.calculate_delay_with_seed(4, 0),
+            Duration::from_millis(800)
+        );
 
         // Test jitter variance within bounds
         let jitter_policy = BackoffPolicy::new(
@@ -3454,7 +3610,10 @@ mod tests {
 
         // Add custom route
         router.add_route("custom-llm", vec!["fallback-a".into(), "fallback-b".into()]);
-        assert_eq!(router.get_fallback("custom-llm", &[]), Some("fallback-a".to_string()));
+        assert_eq!(
+            router.get_fallback("custom-llm", &[]),
+            Some("fallback-a".to_string())
+        );
         assert_eq!(
             router.get_fallback("custom-llm", &["fallback-a".into()]),
             Some("fallback-b".to_string())
@@ -3476,13 +3635,17 @@ mod tests {
     fn test_context_pruning_truncate_tool_outputs() {
         let mut session = Session::new("gpt-4o");
         session.messages.push(Message::user("Run command"));
-        session.messages.push(Message::tool_result("call_1", "X".repeat(5000)));
+        session
+            .messages
+            .push(Message::tool_result("call_1", "X".repeat(5000)));
 
         let initial = estimate_session_tokens(&session);
         let report = prune_session_context(
             &mut session,
             500,
-            ContextPruningStrategy::TruncateLargeToolOutputs { max_output_chars: 500 },
+            ContextPruningStrategy::TruncateLargeToolOutputs {
+                max_output_chars: 500,
+            },
         );
 
         let after = estimate_session_tokens(&session);
@@ -3495,9 +3658,15 @@ mod tests {
     fn test_context_pruning_drop_intermediate_tools() {
         let mut session = Session::new("gpt-4o");
         session.messages.push(Message::user("Task 1"));
-        session.messages.push(Message::tool_result("call_1", "Output 1: ".to_string() + &"A".repeat(500)));
+        session.messages.push(Message::tool_result(
+            "call_1",
+            "Output 1: ".to_string() + &"A".repeat(500),
+        ));
         session.messages.push(Message::user("Task 2"));
-        session.messages.push(Message::tool_result("call_2", "Output 2: ".to_string() + &"B".repeat(500)));
+        session.messages.push(Message::tool_result(
+            "call_2",
+            "Output 2: ".to_string() + &"B".repeat(500),
+        ));
 
         let report = prune_session_context(
             &mut session,
@@ -3506,21 +3675,29 @@ mod tests {
         );
 
         assert!(report.tool_outputs_truncated >= 1);
-        assert!(session.messages[1].content.contains("pruned to fit context"));
+        assert!(session.messages[1]
+            .content
+            .contains("pruned to fit context"));
     }
 
     #[test]
     fn test_context_pruning_summarize_turns() {
         let mut session = Session::new("gpt-4o");
         for i in 1..=10 {
-            session.messages.push(Message::user(format!("Question {}", i)));
-            session.messages.push(Message::assistant(format!("Answer {}", i)));
+            session
+                .messages
+                .push(Message::user(format!("Question {}", i)));
+            session
+                .messages
+                .push(Message::assistant(format!("Answer {}", i)));
         }
 
         let report = prune_session_context(
             &mut session,
             500,
-            ContextPruningStrategy::SummarizeOldestTurns { keep_recent_turns: 2 },
+            ContextPruningStrategy::SummarizeOldestTurns {
+                keep_recent_turns: 2,
+            },
         );
 
         assert!(report.messages_removed > 0);
@@ -3693,14 +3870,8 @@ mod tests {
         let mut engine = FaultToleranceEngine::default();
         let mut session = Session::new("gpt-4o");
 
-        let decision = engine.evaluate_fault(
-            "HTTP 502 Bad Gateway",
-            "gpt-4o",
-            1,
-            Some(&session),
-            0,
-            &[],
-        );
+        let decision =
+            engine.evaluate_fault("HTTP 502 Bad Gateway", "gpt-4o", 1, Some(&session), 0, &[]);
 
         assert_eq!(decision.error_class.name(), "TransientNetwork");
         assert!(!decision.is_terminal);
@@ -3718,7 +3889,9 @@ mod tests {
         let mut engine = FaultToleranceEngine::default();
         let mut session = Session::new("gpt-4o");
         session.messages.push(Message::user("Hello"));
-        session.messages.push(Message::tool_result("call_1", "L".repeat(5000)));
+        session
+            .messages
+            .push(Message::tool_result("call_1", "L".repeat(5000)));
 
         let decision = engine.evaluate_fault(
             "maximum context length exceeded: please reduce tokens",
@@ -3792,7 +3965,12 @@ mod tests {
 
         let res = engine.apply_remediation(&decision, &mut session).unwrap();
         assert!(res.instructions_injected.is_some());
-        assert!(session.messages.last().unwrap().content.contains("formatting issues"));
+        assert!(session
+            .messages
+            .last()
+            .unwrap()
+            .content
+            .contains("formatting issues"));
     }
 
     #[test]
@@ -3807,7 +3985,13 @@ mod tests {
             1,
             Some(&session),
             0,
-            &["gpt-4o".into(), "claude-3-5-sonnet".into(), "deepseek-chat".into(), "gpt-4o-mini".into(), "gemini-1.5-pro".into()],
+            &[
+                "gpt-4o".into(),
+                "claude-3-5-sonnet".into(),
+                "deepseek-chat".into(),
+                "gpt-4o-mini".into(),
+                "gemini-1.5-pro".into(),
+            ],
         );
 
         assert_eq!(decision.error_class.name(), "AuthenticationOrQuota");

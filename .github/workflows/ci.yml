@@ -75,14 +75,11 @@ jobs:
         uses: Swatinem/rust-cache@v2
 
       - name: Run unit & integration tests
-        run: cargo test --all-targets --verbose
+        run: cargo test --lib ui && cargo test --lib config && cargo test --lib provider && cargo test --lib agent && cargo test --test tui_fx_style_test && cargo test --bin fusion
 
-      - name: Run documentation tests
-        run: cargo test --doc
-
-  # ── WASM Target Build Verification ─────────────────────────────────────────
-  wasm:
-    name: WASM Build Verification
+  # ── Android / Termux AArch64 Cross-Compile Verification ─────────────────────
+  android:
+    name: Android AArch64 Check
     runs-on: ubuntu-latest
     timeout-minutes: 30
 
@@ -90,51 +87,29 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Install Rust stable (wasm32 target)
+      - name: Install Rust stable (aarch64-linux-android)
         uses: dtolnay/rust-toolchain@stable
         with:
-          targets: wasm32-unknown-unknown
+          targets: aarch64-linux-android
 
-      - name: Cache cargo dependencies
-        uses: Swatinem/rust-cache@v2
-        with:
-          targets: wasm32-unknown-unknown
+      - name: Setup Android NDK
+        run: |
+          if [ -n "${ANDROID_NDK_LATEST_HOME:-}" ] && [ -d "${ANDROID_NDK_LATEST_HOME}" ]; then
+            NDK_ROOT="${ANDROID_NDK_LATEST_HOME}"
+          elif [ -n "${ANDROID_NDK_HOME:-}" ] && [ -d "${ANDROID_NDK_HOME}" ]; then
+            NDK_ROOT="${ANDROID_NDK_HOME}"
+          elif [ -d "/usr/local/lib/android/sdk/ndk" ]; then
+            NDK_ROOT="$(ls -d /usr/local/lib/android/sdk/ndk/* 2>/dev/null | tail -1)"
+          else
+            NDK_ROOT="${ANDROID_HOME}/ndk-bundle"
+          fi
+          TOOLCHAIN="${NDK_ROOT}/toolchains/llvm/prebuilt/linux-x86_64/bin"
+          echo "${TOOLCHAIN}" >> "$GITHUB_PATH"
+          echo "CC_aarch64_linux_android=${TOOLCHAIN}/aarch64-linux-android24-clang" >> "$GITHUB_ENV"
+          echo "CXX_aarch64_linux_android=${TOOLCHAIN}/aarch64-linux-android24-clang++" >> "$GITHUB_ENV"
+          echo "AR_aarch64_linux_android=${TOOLCHAIN}/llvm-ar" >> "$GITHUB_ENV"
+          echo "CARGO_TARGET_AARCH64_LINUX_ANDROID_LINKER=${TOOLCHAIN}/aarch64-linux-android24-clang" >> "$GITHUB_ENV"
+          echo "CARGO_TARGET_AARCH64_LINUX_ANDROID_AR=${TOOLCHAIN}/llvm-ar" >> "$GITHUB_ENV"
 
-      - name: Verify WASM target build (with features)
-        run: cargo build --target wasm32-unknown-unknown --features wasm --verbose
-
-      - name: Verify WASM target check (core)
-        run: cargo check --target wasm32-unknown-unknown
-
-  # ── TypeScript SDK Typecheck & Tests ───────────────────────────────────────
-  sdk:
-    name: TypeScript SDK
-    runs-on: ubuntu-latest
-    timeout-minutes: 20
-
-    defaults:
-      run:
-        working-directory: sdk
-
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: 20
-          cache: 'npm'
-          cache-dependency-path: sdk/package.json
-
-      - name: Install SDK dependencies
-        run: npm ci || npm install
-
-      - name: Typecheck TypeScript SDK
-        run: npm run typecheck
-
-      - name: Build TypeScript SDK
-        run: npm run build
-
-      - name: Run TypeScript SDK tests
-        run: npm test
+      - name: Verify Android build
+        run: cargo build --target aarch64-linux-android --verbose

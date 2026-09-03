@@ -327,7 +327,9 @@ impl ConventionalCommit {
 
         if let Some(scope) = &self.scope {
             if scope.contains(' ') {
-                errors.push("Scope should not contain spaces (use hyphens or underscores)".to_string());
+                errors.push(
+                    "Scope should not contain spaces (use hyphens or underscores)".to_string(),
+                );
             }
         }
 
@@ -599,7 +601,8 @@ impl ConventionalCommitBuilder {
 
     pub fn breaking_change(mut self, explanation: impl Into<String>) -> Self {
         self.is_breaking = true;
-        self.footers.push(CommitFooter::breaking_change(explanation));
+        self.footers
+            .push(CommitFooter::breaking_change(explanation));
         self
     }
 
@@ -680,7 +683,10 @@ impl FileDiffSummary {
     /// Returns `true` if this file is a test file.
     pub fn is_test(&self) -> bool {
         let p = self.path.to_lowercase();
-        p.contains("test") || p.contains("spec") || p.ends_with("_test.rs") || p.ends_with(".test.ts")
+        p.contains("test")
+            || p.contains("spec")
+            || p.ends_with("_test.rs")
+            || p.ends_with(".test.ts")
     }
 
     /// Returns `true` if this file is a documentation file.
@@ -801,10 +807,7 @@ impl DiffAnalysis {
             ));
 
             if !f.detected_symbols.is_empty() {
-                out.push_str(&format!(
-                    "  - Symbols: {}\n",
-                    f.detected_symbols.join(", ")
-                ));
+                out.push_str(&format!("  - Symbols: {}\n", f.detected_symbols.join(", ")));
             }
         }
 
@@ -944,7 +947,10 @@ impl CommitGenerator {
             + 2; // ": "
 
         if type_and_scope_len + description.len() > self.config.max_subject_length {
-            let max_desc_len = self.config.max_subject_length.saturating_sub(type_and_scope_len);
+            let max_desc_len = self
+                .config
+                .max_subject_length
+                .saturating_sub(type_and_scope_len);
             if max_desc_len > 10 && description.len() > max_desc_len {
                 description.truncate(max_desc_len.saturating_sub(3));
                 description.push_str("...");
@@ -1011,7 +1017,8 @@ impl CommitGenerator {
 
         let mut candidate_2 = primary.clone();
         candidate_2.commit_type = secondary_type;
-        candidate_2.description = synthesize_alternate_description(&analysis, &candidate_2.commit_type);
+        candidate_2.description =
+            synthesize_alternate_description(&analysis, &candidate_2.commit_type);
         if !candidates.contains(&candidate_2) {
             candidates.push(candidate_2);
         }
@@ -1020,11 +1027,15 @@ impl CommitGenerator {
         if candidates.len() < count && !analysis.files.is_empty() {
             if let Some(first_file) = analysis.files.first() {
                 let mut candidate_3 = primary.clone();
-                let file_scope = first_file.suggested_scope.clone().or_else(|| primary.scope.clone());
+                let file_scope = first_file
+                    .suggested_scope
+                    .clone()
+                    .or_else(|| primary.scope.clone());
                 candidate_3.scope = file_scope;
 
                 if let Some(first_symbol) = first_file.detected_symbols.first() {
-                    candidate_3.description = format!("update {} in {}", first_symbol, first_file.path);
+                    candidate_3.description =
+                        format!("update {} in {}", first_symbol, first_file.path);
                 } else {
                     candidate_3.description = format!("update {}", first_file.path);
                 }
@@ -1075,7 +1086,10 @@ impl CommitGenerator {
     }
 
     /// Fetch the active git diff from a repository directory and generate a commit message.
-    pub async fn generate_from_repo(repo_path: &Path, cached: bool) -> anyhow::Result<ConventionalCommit> {
+    pub async fn generate_from_repo(
+        repo_path: &Path,
+        cached: bool,
+    ) -> anyhow::Result<ConventionalCommit> {
         let diff_text = get_repo_git_diff(repo_path, cached).await?;
         let generator = CommitGenerator::default();
         Ok(generator.generate(&diff_text))
@@ -1287,7 +1301,12 @@ pub fn infer_scope_from_path(path: &str) -> Option<String> {
     let clean = path.replace('\\', "/");
     let parts: Vec<&str> = clean.split('/').collect();
 
-    if clean == "Cargo.toml" || clean == "Cargo.lock" || clean == "package.json" || clean == "pnpm-lock.yaml" || clean == "yarn.lock" {
+    if clean == "Cargo.toml"
+        || clean == "Cargo.lock"
+        || clean == "package.json"
+        || clean == "pnpm-lock.yaml"
+        || clean == "yarn.lock"
+    {
         return Some("deps".to_string());
     }
 
@@ -1308,7 +1327,13 @@ pub fn infer_scope_from_path(path: &str) -> Option<String> {
     }
 
     // Monorepo support: `crates/fusion-cli/src/...` or `packages/sdk/src/...`
-    if (parts.len() >= 3) && (parts[0] == "crates" || parts[0] == "packages" || parts[0] == "apps" || parts[0] == "services" || parts[0] == "libs") {
+    if (parts.len() >= 3)
+        && (parts[0] == "crates"
+            || parts[0] == "packages"
+            || parts[0] == "apps"
+            || parts[0] == "services"
+            || parts[0] == "libs")
+    {
         return Some(parts[1].to_string());
     }
 
@@ -1355,7 +1380,11 @@ fn extract_symbol_signature(line: &str) -> Option<String> {
 
     // Rust: `pub fn foo(...)`, `fn foo(...)`, `pub async fn foo(...)`, `async fn foo(...)`
     if let Some(idx) = trimmed.find("fn ") {
-        if idx == 0 || trimmed.starts_with("pub ") || trimmed.starts_with("async ") || trimmed.starts_with("pub async ") {
+        if idx == 0
+            || trimmed.starts_with("pub ")
+            || trimmed.starts_with("async ")
+            || trimmed.starts_with("pub async ")
+        {
             let after_fn = trimmed[idx + 3..].trim();
             if let Some(paren) = after_fn.find('(') {
                 let name = after_fn[..paren].trim();
@@ -1370,7 +1399,10 @@ fn extract_symbol_signature(line: &str) -> Option<String> {
     if let Some(idx) = trimmed.find("struct ") {
         if idx == 0 || trimmed.starts_with("pub ") {
             let after = trimmed[idx + 7..].trim();
-            let name = after.split(|c: char| !c.is_alphanumeric() && c != '_').next().unwrap_or("");
+            let name = after
+                .split(|c: char| !c.is_alphanumeric() && c != '_')
+                .next()
+                .unwrap_or("");
             if is_valid_identifier(name) {
                 return Some(name.to_string());
             }
@@ -1381,7 +1413,10 @@ fn extract_symbol_signature(line: &str) -> Option<String> {
     if let Some(idx) = trimmed.find("enum ") {
         if idx == 0 || trimmed.starts_with("pub ") {
             let after = trimmed[idx + 5..].trim();
-            let name = after.split(|c: char| !c.is_alphanumeric() && c != '_').next().unwrap_or("");
+            let name = after
+                .split(|c: char| !c.is_alphanumeric() && c != '_')
+                .next()
+                .unwrap_or("");
             if is_valid_identifier(name) {
                 return Some(name.to_string());
             }
@@ -1392,7 +1427,10 @@ fn extract_symbol_signature(line: &str) -> Option<String> {
     if let Some(idx) = trimmed.find("trait ") {
         if idx == 0 || trimmed.starts_with("pub ") {
             let after = trimmed[idx + 6..].trim();
-            let name = after.split(|c: char| !c.is_alphanumeric() && c != '_').next().unwrap_or("");
+            let name = after
+                .split(|c: char| !c.is_alphanumeric() && c != '_')
+                .next()
+                .unwrap_or("");
             if is_valid_identifier(name) {
                 return Some(name.to_string());
             }
@@ -1401,7 +1439,9 @@ fn extract_symbol_signature(line: &str) -> Option<String> {
 
     // TypeScript/JS: `export function foo`, `function foo`
     if trimmed.starts_with("export function ") || trimmed.starts_with("function ") {
-        let after = trimmed.strip_prefix("export function ").unwrap_or_else(|| trimmed.strip_prefix("function ").unwrap_or(""));
+        let after = trimmed
+            .strip_prefix("export function ")
+            .unwrap_or_else(|| trimmed.strip_prefix("function ").unwrap_or(""));
         if let Some(paren) = after.find('(') {
             let name = after[..paren].trim();
             if is_valid_identifier(name) {
@@ -1412,8 +1452,13 @@ fn extract_symbol_signature(line: &str) -> Option<String> {
 
     // TypeScript/JS: `export class Foo`, `class Foo`
     if trimmed.starts_with("export class ") || trimmed.starts_with("class ") {
-        let after = trimmed.strip_prefix("export class ").unwrap_or_else(|| trimmed.strip_prefix("class ").unwrap_or(""));
-        let name = after.split(|c: char| !c.is_alphanumeric() && c != '_').next().unwrap_or("");
+        let after = trimmed
+            .strip_prefix("export class ")
+            .unwrap_or_else(|| trimmed.strip_prefix("class ").unwrap_or(""));
+        let name = after
+            .split(|c: char| !c.is_alphanumeric() && c != '_')
+            .next()
+            .unwrap_or("");
         if is_valid_identifier(name) {
             return Some(name.to_string());
         }
@@ -1421,8 +1466,13 @@ fn extract_symbol_signature(line: &str) -> Option<String> {
 
     // TypeScript: `export interface Foo`, `interface Foo`
     if trimmed.starts_with("export interface ") || trimmed.starts_with("interface ") {
-        let after = trimmed.strip_prefix("export interface ").unwrap_or_else(|| trimmed.strip_prefix("interface ").unwrap_or(""));
-        let name = after.split(|c: char| !c.is_alphanumeric() && c != '_').next().unwrap_or("");
+        let after = trimmed
+            .strip_prefix("export interface ")
+            .unwrap_or_else(|| trimmed.strip_prefix("interface ").unwrap_or(""));
+        let name = after
+            .split(|c: char| !c.is_alphanumeric() && c != '_')
+            .next()
+            .unwrap_or("");
         if is_valid_identifier(name) {
             return Some(name.to_string());
         }
@@ -1430,8 +1480,13 @@ fn extract_symbol_signature(line: &str) -> Option<String> {
 
     // TypeScript: `export type Foo =`
     if trimmed.starts_with("export type ") || trimmed.starts_with("type ") {
-        let after = trimmed.strip_prefix("export type ").unwrap_or_else(|| trimmed.strip_prefix("type ").unwrap_or(""));
-        let name = after.split(|c: char| !c.is_alphanumeric() && c != '_').next().unwrap_or("");
+        let after = trimmed
+            .strip_prefix("export type ")
+            .unwrap_or_else(|| trimmed.strip_prefix("type ").unwrap_or(""));
+        let name = after
+            .split(|c: char| !c.is_alphanumeric() && c != '_')
+            .next()
+            .unwrap_or("");
         if is_valid_identifier(name) {
             return Some(name.to_string());
         }
@@ -1459,7 +1514,10 @@ fn extract_symbol_signature(line: &str) -> Option<String> {
 
     // Python: `def foo(...):` or `class Foo:`
     if trimmed.starts_with("def ") || trimmed.starts_with("async def ") {
-        let after = trimmed.strip_prefix("async def ").unwrap_or_else(|| trimmed.strip_prefix("def ").unwrap_or("")).trim();
+        let after = trimmed
+            .strip_prefix("async def ")
+            .unwrap_or_else(|| trimmed.strip_prefix("def ").unwrap_or(""))
+            .trim();
         if let Some(paren) = after.find('(') {
             let name = after[..paren].trim();
             if is_valid_identifier(name) {
@@ -1470,7 +1528,10 @@ fn extract_symbol_signature(line: &str) -> Option<String> {
 
     if trimmed.starts_with("class ") {
         let after = trimmed["class ".len()..].trim();
-        let name = after.split(|c: char| !c.is_alphanumeric() && c != '_').next().unwrap_or("");
+        let name = after
+            .split(|c: char| !c.is_alphanumeric() && c != '_')
+            .next()
+            .unwrap_or("");
         if is_valid_identifier(name) {
             return Some(name.to_string());
         }
@@ -1595,13 +1656,25 @@ fn infer_file_commit_type(file: &FileDiffSummary) -> CommitType {
 
     for line in &file.added_lines {
         let lower = line.to_lowercase();
-        if lower.contains("fix") || lower.contains("bug") || lower.contains("patch") || lower.contains("error") {
+        if lower.contains("fix")
+            || lower.contains("bug")
+            || lower.contains("patch")
+            || lower.contains("error")
+        {
             fix_score += 2;
         }
-        if lower.contains("pub fn ") || lower.contains("struct ") || lower.contains("enum ") || lower.contains("feature") {
+        if lower.contains("pub fn ")
+            || lower.contains("struct ")
+            || lower.contains("enum ")
+            || lower.contains("feature")
+        {
             feat_score += 3;
         }
-        if lower.contains("perf") || lower.contains("cache") || lower.contains("optimize") || lower.contains("speed") {
+        if lower.contains("perf")
+            || lower.contains("cache")
+            || lower.contains("optimize")
+            || lower.contains("speed")
+        {
             perf_score += 3;
         }
         if lower.contains("refactor") || lower.contains("rename") || lower.contains("cleanup") {
@@ -1677,10 +1750,7 @@ fn synthesize_subject_description(analysis: &DiffAnalysis, commit_type: &CommitT
     }
 
     // 3. Fallback based on commit type and scope
-    let component_desc = analysis
-        .inferred_scope
-        .as_deref()
-        .unwrap_or("codebase");
+    let component_desc = analysis.inferred_scope.as_deref().unwrap_or("codebase");
 
     match commit_type {
         CommitType::Feat => format!("add support for {}", component_desc),
@@ -1703,7 +1773,10 @@ fn synthesize_alternate_description(analysis: &DiffAnalysis, commit_type: &Commi
     let file_count = analysis.files.len();
     if file_count == 1 {
         let file = &analysis.files[0];
-        return format!("update `{}` (+{} -{})", file.path, file.additions, file.deletions);
+        return format!(
+            "update `{}` (+{} -{})",
+            file.path, file.additions, file.deletions
+        );
     }
 
     format!(
@@ -1732,7 +1805,9 @@ fn synthesize_commit_body(analysis: &DiffAnalysis, include_stats: bool) -> Optio
             FileChangeKind::Added => added_files.push(f.path.as_str()),
             FileChangeKind::Modified => modified_files.push(f.path.as_str()),
             FileChangeKind::Deleted => deleted_files.push(f.path.as_str()),
-            FileChangeKind::Renamed { from } => renamed_files.push((from.as_str(), f.path.as_str())),
+            FileChangeKind::Renamed { from } => {
+                renamed_files.push((from.as_str(), f.path.as_str()))
+            }
             _ => modified_files.push(f.path.as_str()),
         }
     }
@@ -1798,7 +1873,10 @@ mod tests {
             commit.format_summary(),
             "feat(agent): add conventional commit generator"
         );
-        assert_eq!(commit.format(), "feat(agent): add conventional commit generator");
+        assert_eq!(
+            commit.format(),
+            "feat(agent): add conventional commit generator"
+        );
     }
 
     #[test]
@@ -1812,7 +1890,10 @@ mod tests {
             footers: vec![CommitFooter::breaking_change("v1 endpoints removed")],
         };
 
-        assert_eq!(commit.format_summary(), "feat(api)!: drop legacy v1 endpoints");
+        assert_eq!(
+            commit.format_summary(),
+            "feat(api)!: drop legacy v1 endpoints"
+        );
         let formatted = commit.format();
         assert!(formatted.starts_with("feat(api)!: drop legacy v1 endpoints\n\n"));
         assert!(formatted.contains("Remove deprecated endpoints"));
@@ -1828,14 +1909,24 @@ mod tests {
         assert_eq!(parsed.scope, Some("parser".to_string()));
         assert!(parsed.is_breaking);
         assert_eq!(parsed.description, "handle malformed json tokens");
-        assert!(parsed.body.as_ref().map(|b| b.contains("Correct edge case")).unwrap_or(false));
+        assert!(parsed
+            .body
+            .as_ref()
+            .map(|b| b.contains("Correct edge case"))
+            .unwrap_or(false));
         assert_eq!(parsed.footers.len(), 2);
     }
 
     #[test]
     fn test_conventional_commit_parse_errors() {
-        assert!(matches!(ConventionalCommit::parse(""), Err(CommitParseError::EmptyInput)));
-        assert!(matches!(ConventionalCommit::parse("   "), Err(CommitParseError::EmptyInput)));
+        assert!(matches!(
+            ConventionalCommit::parse(""),
+            Err(CommitParseError::EmptyInput)
+        ));
+        assert!(matches!(
+            ConventionalCommit::parse("   "),
+            Err(CommitParseError::EmptyInput)
+        ));
         assert!(matches!(
             ConventionalCommit::parse("feat missing colon"),
             Err(CommitParseError::InvalidHeaderFormat(_))
@@ -1925,7 +2016,10 @@ index 0000000..1234567
 
         assert_eq!(commit.commit_type, CommitType::Feat);
         assert_eq!(commit.scope.as_deref(), Some("commit_gen"));
-        assert!(commit.description.contains("CommitGenerator") || commit.description.contains("generate_commit"));
+        assert!(
+            commit.description.contains("CommitGenerator")
+                || commit.description.contains("generate_commit")
+        );
     }
 
     #[test]
@@ -2136,7 +2230,11 @@ index 1234567..0000000
         let generator = CommitGenerator::default();
         let commit = generator.generate(diff);
 
-        assert!(commit.description.contains("remove `src/deprecated.rs`") || commit.commit_type == CommitType::Refactor || commit.commit_type == CommitType::Feat);
+        assert!(
+            commit.description.contains("remove `src/deprecated.rs`")
+                || commit.commit_type == CommitType::Refactor
+                || commit.commit_type == CommitType::Feat
+        );
     }
 
     #[test]
@@ -2166,14 +2264,38 @@ Binary files /dev/null and b/assets/logo.png differ
 
     #[test]
     fn test_scope_inference_various_paths() {
-        assert_eq!(infer_scope_from_path("src/agent/commit_gen.rs"), Some("commit_gen".to_string()));
-        assert_eq!(infer_scope_from_path("src/tools/git.rs"), Some("git".to_string()));
-        assert_eq!(infer_scope_from_path("src/ui/slash.rs"), Some("slash".to_string()));
-        assert_eq!(infer_scope_from_path("Cargo.toml"), Some("deps".to_string()));
-        assert_eq!(infer_scope_from_path(".github/workflows/ci.yml"), Some("ci".to_string()));
-        assert_eq!(infer_scope_from_path("benches/bench.rs"), Some("bench".to_string()));
-        assert_eq!(infer_scope_from_path("crates/fusion-cli/src/main.rs"), Some("fusion-cli".to_string()));
-        assert_eq!(infer_scope_from_path("packages/sdk/src/index.ts"), Some("sdk".to_string()));
+        assert_eq!(
+            infer_scope_from_path("src/agent/commit_gen.rs"),
+            Some("commit_gen".to_string())
+        );
+        assert_eq!(
+            infer_scope_from_path("src/tools/git.rs"),
+            Some("git".to_string())
+        );
+        assert_eq!(
+            infer_scope_from_path("src/ui/slash.rs"),
+            Some("slash".to_string())
+        );
+        assert_eq!(
+            infer_scope_from_path("Cargo.toml"),
+            Some("deps".to_string())
+        );
+        assert_eq!(
+            infer_scope_from_path(".github/workflows/ci.yml"),
+            Some("ci".to_string())
+        );
+        assert_eq!(
+            infer_scope_from_path("benches/bench.rs"),
+            Some("bench".to_string())
+        );
+        assert_eq!(
+            infer_scope_from_path("crates/fusion-cli/src/main.rs"),
+            Some("fusion-cli".to_string())
+        );
+        assert_eq!(
+            infer_scope_from_path("packages/sdk/src/index.ts"),
+            Some("sdk".to_string())
+        );
     }
 
     #[test]
@@ -2224,7 +2346,10 @@ index 1234567..89abcdef 100644
             body: None,
             footers: Vec::new(),
         };
-        assert_eq!(commit.format_with_emoji(), "✨ feat(agent): add commit generator");
+        assert_eq!(
+            commit.format_with_emoji(),
+            "✨ feat(agent): add commit generator"
+        );
     }
 
     #[test]
@@ -2256,6 +2381,9 @@ index 1234567..89abcdef 100644
         assert!(commit.body.is_none());
         assert_eq!(commit.footers.len(), 2);
         assert_eq!(commit.footers[0].format(), "Closes: #123");
-        assert_eq!(commit.footers[1].format(), "Co-authored-by: Alice <alice@example.com>");
+        assert_eq!(
+            commit.footers[1].format(),
+            "Co-authored-by: Alice <alice@example.com>"
+        );
     }
 }

@@ -581,7 +581,10 @@ impl JsonlExporter {
     }
 
     /// Exports multiple sessions to a single JSONL formatted string.
-    pub fn export_sessions(&self, sessions: &[Session]) -> Result<(String, ExportStats), JsonlExportError> {
+    pub fn export_sessions(
+        &self,
+        sessions: &[Session],
+    ) -> Result<(String, ExportStats), JsonlExportError> {
         let mut all_lines = Vec::new();
         let mut stats = ExportStats {
             total_sessions: sessions.len(),
@@ -639,7 +642,10 @@ impl JsonlExporter {
     }
 
     /// Internal session processor that generates JSONL lines and local statistics.
-    fn process_session(&self, session: &Session) -> Result<(Vec<String>, ExportStats), JsonlExportError> {
+    fn process_session(
+        &self,
+        session: &Session,
+    ) -> Result<(Vec<String>, ExportStats), JsonlExportError> {
         let mut raw_messages = self.prepare_session_messages(session);
         if raw_messages.is_empty() {
             return Ok((Vec::new(), ExportStats::default()));
@@ -657,7 +663,9 @@ impl JsonlExporter {
 
         match self.options.split_strategy {
             TurnSplitStrategy::FullSession => {
-                if let Some(sample_json) = self.format_messages_to_sample(session, &raw_messages, None)? {
+                if let Some(sample_json) =
+                    self.format_messages_to_sample(session, &raw_messages, None)?
+                {
                     session_stats.total_messages += raw_messages.len();
                     session_stats.total_estimated_tokens += estimate_token_count(&sample_json);
                     session_stats.total_tool_calls += count_tool_calls(&raw_messages);
@@ -671,7 +679,9 @@ impl JsonlExporter {
                 for msg in &raw_messages {
                     current_history.push(msg.clone());
                     if msg.role == Role::Assistant {
-                        if msg.content.trim().len() < self.options.min_assistant_chars && msg.tool_calls.is_none() {
+                        if msg.content.trim().len() < self.options.min_assistant_chars
+                            && msg.tool_calls.is_none()
+                        {
                             session_stats.skipped_turns += 1;
                             continue;
                         }
@@ -679,7 +689,8 @@ impl JsonlExporter {
                             self.format_messages_to_sample(session, &current_history, None)?
                         {
                             session_stats.total_messages += current_history.len();
-                            session_stats.total_estimated_tokens += estimate_token_count(&sample_json);
+                            session_stats.total_estimated_tokens +=
+                                estimate_token_count(&sample_json);
                             session_stats.total_tool_calls += count_tool_calls(&current_history);
                             lines.push(sample_json);
                         } else {
@@ -733,7 +744,9 @@ impl JsonlExporter {
                             if let Some(user_msg) = pending_user.take() {
                                 let mut pair = Vec::new();
                                 if self.options.include_system_messages {
-                                    if let Some(sys) = raw_messages.iter().find(|m| m.role == Role::System) {
+                                    if let Some(sys) =
+                                        raw_messages.iter().find(|m| m.role == Role::System)
+                                    {
                                         pair.push(sys.clone());
                                     }
                                 }
@@ -743,7 +756,8 @@ impl JsonlExporter {
                                     self.format_messages_to_sample(session, &pair, None)?
                                 {
                                     session_stats.total_messages += pair.len();
-                                    session_stats.total_estimated_tokens += estimate_token_count(&sample_json);
+                                    session_stats.total_estimated_tokens +=
+                                        estimate_token_count(&sample_json);
                                     session_stats.total_tool_calls += count_tool_calls(&pair);
                                     lines.push(sample_json);
                                 }
@@ -883,7 +897,9 @@ impl JsonlExporter {
 
                 for msg in messages {
                     let mut content = msg.content.clone();
-                    if msg.role == Role::Assistant && self.options.thought_handling == ThoughtHandling::ExtractToField {
+                    if msg.role == Role::Assistant
+                        && self.options.thought_handling == ThoughtHandling::ExtractToField
+                    {
                         if let Some((clean_content, reasoning)) = extract_thought_blocks(&content) {
                             content = clean_content;
                             extracted_reasoning = Some(reasoning);
@@ -907,7 +923,9 @@ impl JsonlExporter {
                         }
                     }
 
-                    let tool_calls = if !self.options.flatten_tool_calls_to_text && self.options.include_tool_calls {
+                    let tool_calls = if !self.options.flatten_tool_calls_to_text
+                        && self.options.include_tool_calls
+                    {
                         msg.tool_calls.as_ref().map(|calls| {
                             calls
                                 .iter()
@@ -925,18 +943,21 @@ impl JsonlExporter {
                         None
                     };
 
-                    let role_str = if self.options.flatten_tool_calls_to_text && msg.role == Role::Tool {
-                        "user"
-                    } else {
-                        role_to_str(msg.role)
-                    };
+                    let role_str =
+                        if self.options.flatten_tool_calls_to_text && msg.role == Role::Tool {
+                            "user"
+                        } else {
+                            role_to_str(msg.role)
+                        };
 
                     openai_messages.push(OpenAiExportMessage {
                         role: role_str.to_string(),
                         content,
                         name: msg.name.clone(),
                         tool_calls,
-                        tool_call_id: if !self.options.flatten_tool_calls_to_text && self.options.include_tool_calls {
+                        tool_call_id: if !self.options.flatten_tool_calls_to_text
+                            && self.options.include_tool_calls
+                        {
                             msg.tool_call_id.clone()
                         } else {
                             None
@@ -1019,7 +1040,10 @@ impl JsonlExporter {
             }
 
             JsonlFormat::Alpaca => {
-                let system = messages.iter().find(|m| m.role == Role::System).map(|m| m.content.clone());
+                let system = messages
+                    .iter()
+                    .find(|m| m.role == Role::System)
+                    .map(|m| m.content.clone());
                 let user_msg = messages.iter().rfind(|m| m.role == Role::User);
                 let assistant_msg = messages.iter().rfind(|m| m.role == Role::Assistant);
 
@@ -1039,7 +1063,10 @@ impl JsonlExporter {
             }
 
             JsonlFormat::Anthropic => {
-                let system = messages.iter().find(|m| m.role == Role::System).map(|m| m.content.clone());
+                let system = messages
+                    .iter()
+                    .find(|m| m.role == Role::System)
+                    .map(|m| m.content.clone());
                 let mut anthropic_messages = Vec::new();
 
                 for msg in messages {
@@ -1204,7 +1231,11 @@ impl Default for DatasetSplitter {
 
 impl DatasetSplitter {
     /// Creates a new `DatasetSplitter` with the specified ratios (must sum to ~1.0).
-    pub fn new(train_ratio: f64, val_ratio: f64, test_ratio: f64) -> Result<Self, JsonlExportError> {
+    pub fn new(
+        train_ratio: f64,
+        val_ratio: f64,
+        test_ratio: f64,
+    ) -> Result<Self, JsonlExportError> {
         let sum = train_ratio + val_ratio + test_ratio;
         if (sum - 1.0).abs() > 0.001 {
             return Err(JsonlExportError::InvalidConfiguration(format!(
@@ -1355,7 +1386,9 @@ pub fn validate_jsonl_string(jsonl: &str, format: JsonlFormat) -> ValidationRepo
                     Ok(sample) => {
                         if let Err(err) = validate_openai_chat_sample(&sample) {
                             report.invalid_lines += 1;
-                            report.errors.push(format!("Line {}: {}", line_idx + 1, err));
+                            report
+                                .errors
+                                .push(format!("Line {}: {}", line_idx + 1, err));
                         } else {
                             report.valid_lines += 1;
                             let tokens = estimate_token_count(trimmed);
@@ -1379,63 +1412,79 @@ pub fn validate_jsonl_string(jsonl: &str, format: JsonlFormat) -> ValidationRepo
                     }
                 }
             }
-            JsonlFormat::ShareGpt => {
-                match serde_json::from_str::<ShareGptSample>(trimmed) {
-                    Ok(sample) => {
-                        if sample.conversations.is_empty() {
-                            report.invalid_lines += 1;
-                            report.errors.push(format!("Line {}: empty conversations array", line_idx + 1));
-                        } else {
-                            report.valid_lines += 1;
-                            report.total_tokens += estimate_token_count(trimmed);
-                        }
-                    }
-                    Err(err) => {
+            JsonlFormat::ShareGpt => match serde_json::from_str::<ShareGptSample>(trimmed) {
+                Ok(sample) => {
+                    if sample.conversations.is_empty() {
                         report.invalid_lines += 1;
-                        report.errors.push(format!("Line {} is not valid ShareGPT JSON: {}", line_idx + 1, err));
+                        report
+                            .errors
+                            .push(format!("Line {}: empty conversations array", line_idx + 1));
+                    } else {
+                        report.valid_lines += 1;
+                        report.total_tokens += estimate_token_count(trimmed);
                     }
                 }
-            }
-            JsonlFormat::Alpaca => {
-                match serde_json::from_str::<AlpacaSample>(trimmed) {
-                    Ok(sample) => {
-                        if sample.instruction.trim().is_empty() || sample.output.trim().is_empty() {
-                            report.invalid_lines += 1;
-                            report.errors.push(format!("Line {}: instruction or output is empty", line_idx + 1));
-                        } else {
-                            report.valid_lines += 1;
-                            report.total_tokens += estimate_token_count(trimmed);
-                        }
-                    }
-                    Err(err) => {
+                Err(err) => {
+                    report.invalid_lines += 1;
+                    report.errors.push(format!(
+                        "Line {} is not valid ShareGPT JSON: {}",
+                        line_idx + 1,
+                        err
+                    ));
+                }
+            },
+            JsonlFormat::Alpaca => match serde_json::from_str::<AlpacaSample>(trimmed) {
+                Ok(sample) => {
+                    if sample.instruction.trim().is_empty() || sample.output.trim().is_empty() {
                         report.invalid_lines += 1;
-                        report.errors.push(format!("Line {} is not valid Alpaca JSON: {}", line_idx + 1, err));
+                        report.errors.push(format!(
+                            "Line {}: instruction or output is empty",
+                            line_idx + 1
+                        ));
+                    } else {
+                        report.valid_lines += 1;
+                        report.total_tokens += estimate_token_count(trimmed);
                     }
                 }
-            }
-            JsonlFormat::Anthropic => {
-                match serde_json::from_str::<AnthropicSample>(trimmed) {
-                    Ok(sample) => {
-                        if sample.messages.is_empty() {
-                            report.invalid_lines += 1;
-                            report.errors.push(format!("Line {}: empty messages array", line_idx + 1));
-                        } else {
-                            report.valid_lines += 1;
-                            report.total_tokens += estimate_token_count(trimmed);
-                        }
-                    }
-                    Err(err) => {
+                Err(err) => {
+                    report.invalid_lines += 1;
+                    report.errors.push(format!(
+                        "Line {} is not valid Alpaca JSON: {}",
+                        line_idx + 1,
+                        err
+                    ));
+                }
+            },
+            JsonlFormat::Anthropic => match serde_json::from_str::<AnthropicSample>(trimmed) {
+                Ok(sample) => {
+                    if sample.messages.is_empty() {
                         report.invalid_lines += 1;
-                        report.errors.push(format!("Line {} is not valid Anthropic JSON: {}", line_idx + 1, err));
+                        report
+                            .errors
+                            .push(format!("Line {}: empty messages array", line_idx + 1));
+                    } else {
+                        report.valid_lines += 1;
+                        report.total_tokens += estimate_token_count(trimmed);
                     }
                 }
-            }
+                Err(err) => {
+                    report.invalid_lines += 1;
+                    report.errors.push(format!(
+                        "Line {} is not valid Anthropic JSON: {}",
+                        line_idx + 1,
+                        err
+                    ));
+                }
+            },
             JsonlFormat::PromptCompletion => {
                 match serde_json::from_str::<PromptCompletionSample>(trimmed) {
                     Ok(sample) => {
                         if sample.prompt.trim().is_empty() || sample.completion.trim().is_empty() {
                             report.invalid_lines += 1;
-                            report.errors.push(format!("Line {}: prompt or completion is empty", line_idx + 1));
+                            report.errors.push(format!(
+                                "Line {}: prompt or completion is empty",
+                                line_idx + 1
+                            ));
                         } else {
                             report.valid_lines += 1;
                             report.total_tokens += estimate_token_count(trimmed);
@@ -1443,7 +1492,11 @@ pub fn validate_jsonl_string(jsonl: &str, format: JsonlFormat) -> ValidationRepo
                     }
                     Err(err) => {
                         report.invalid_lines += 1;
-                        report.errors.push(format!("Line {} is not valid Prompt-Completion JSON: {}", line_idx + 1, err));
+                        report.errors.push(format!(
+                            "Line {} is not valid Prompt-Completion JSON: {}",
+                            line_idx + 1,
+                            err
+                        ));
                     }
                 }
             }
@@ -1452,7 +1505,10 @@ pub fn validate_jsonl_string(jsonl: &str, format: JsonlFormat) -> ValidationRepo
                     Ok(sample) => {
                         if sample.prompt.trim().is_empty() || sample.chosen.trim().is_empty() {
                             report.invalid_lines += 1;
-                            report.errors.push(format!("Line {}: prompt or chosen response is empty", line_idx + 1));
+                            report.errors.push(format!(
+                                "Line {}: prompt or chosen response is empty",
+                                line_idx + 1
+                            ));
                         } else {
                             report.valid_lines += 1;
                             report.total_tokens += estimate_token_count(trimmed);
@@ -1460,7 +1516,11 @@ pub fn validate_jsonl_string(jsonl: &str, format: JsonlFormat) -> ValidationRepo
                     }
                     Err(err) => {
                         report.invalid_lines += 1;
-                        report.errors.push(format!("Line {} is not valid DPO JSON: {}", line_idx + 1, err));
+                        report.errors.push(format!(
+                            "Line {} is not valid DPO JSON: {}",
+                            line_idx + 1,
+                            err
+                        ));
                     }
                 }
             }
@@ -1469,7 +1529,10 @@ pub fn validate_jsonl_string(jsonl: &str, format: JsonlFormat) -> ValidationRepo
                     Ok(sample) => {
                         if sample.id.is_empty() || sample.expected_response.is_empty() {
                             report.invalid_lines += 1;
-                            report.errors.push(format!("Line {}: missing id or expected_response", line_idx + 1));
+                            report.errors.push(format!(
+                                "Line {}: missing id or expected_response",
+                                line_idx + 1
+                            ));
                         } else {
                             report.valid_lines += 1;
                             report.total_tokens += estimate_token_count(trimmed);
@@ -1477,22 +1540,28 @@ pub fn validate_jsonl_string(jsonl: &str, format: JsonlFormat) -> ValidationRepo
                     }
                     Err(err) => {
                         report.invalid_lines += 1;
-                        report.errors.push(format!("Line {} is not valid LLM Evaluation JSON: {}", line_idx + 1, err));
+                        report.errors.push(format!(
+                            "Line {} is not valid LLM Evaluation JSON: {}",
+                            line_idx + 1,
+                            err
+                        ));
                     }
                 }
             }
-            JsonlFormat::RawTurns => {
-                match serde_json::from_str::<RawTurnSample>(trimmed) {
-                    Ok(_) => {
-                        report.valid_lines += 1;
-                        report.total_tokens += estimate_token_count(trimmed);
-                    }
-                    Err(err) => {
-                        report.invalid_lines += 1;
-                        report.errors.push(format!("Line {} is not valid RawTurn JSON: {}", line_idx + 1, err));
-                    }
+            JsonlFormat::RawTurns => match serde_json::from_str::<RawTurnSample>(trimmed) {
+                Ok(_) => {
+                    report.valid_lines += 1;
+                    report.total_tokens += estimate_token_count(trimmed);
                 }
-            }
+                Err(err) => {
+                    report.invalid_lines += 1;
+                    report.errors.push(format!(
+                        "Line {} is not valid RawTurn JSON: {}",
+                        line_idx + 1,
+                        err
+                    ));
+                }
+            },
         }
     }
 
@@ -1500,7 +1569,10 @@ pub fn validate_jsonl_string(jsonl: &str, format: JsonlFormat) -> ValidationRepo
 }
 
 /// Validates a JSONL file on disk.
-pub fn validate_jsonl_file(path: impl AsRef<Path>, format: JsonlFormat) -> Result<ValidationReport, JsonlExportError> {
+pub fn validate_jsonl_file(
+    path: impl AsRef<Path>,
+    format: JsonlFormat,
+) -> Result<ValidationReport, JsonlExportError> {
     let file = fs::File::open(path)?;
     let reader = BufReader::new(file);
     let mut content = String::new();
@@ -1577,7 +1649,10 @@ fn validate_openai_chat_sample(sample: &OpenAiChatSample) -> Result<(), JsonlExp
 // ============================================================================
 
 /// Exports a single session to a JSONL string with default options.
-pub fn export_session_to_jsonl(session: &Session, options: &JsonlExportOptions) -> Result<String, JsonlExportError> {
+pub fn export_session_to_jsonl(
+    session: &Session,
+    options: &JsonlExportOptions,
+) -> Result<String, JsonlExportError> {
     JsonlExporter::with_options(options.clone()).export_session(session)
 }
 
@@ -1680,23 +1755,35 @@ pub fn mask_sensitive_credentials(text: &str) -> String {
 
     // Mask OpenAI keys
     let openai_re = Regex::new(r"sk-[a-zA-Z0-9]{20,}").unwrap();
-    result = openai_re.replace_all(&result, "sk-[REDACTED_API_KEY]").to_string();
+    result = openai_re
+        .replace_all(&result, "sk-[REDACTED_API_KEY]")
+        .to_string();
 
     // Mask Anthropic keys
     let anthropic_re = Regex::new(r"sk-ant-[a-zA-Z0-9_\-]{20,}").unwrap();
-    result = anthropic_re.replace_all(&result, "sk-ant-[REDACTED_API_KEY]").to_string();
+    result = anthropic_re
+        .replace_all(&result, "sk-ant-[REDACTED_API_KEY]")
+        .to_string();
 
     // Mask GitHub tokens
     let github_re = Regex::new(r"gh[pousr]_[a-zA-Z0-9]{20,}").unwrap();
-    result = github_re.replace_all(&result, "ghp_[REDACTED_TOKEN]").to_string();
+    result = github_re
+        .replace_all(&result, "ghp_[REDACTED_TOKEN]")
+        .to_string();
 
     // Mask Bearer tokens
     let bearer_re = Regex::new(r"(?i)Bearer\s+[a-zA-Z0-9_\-\.]{20,}").unwrap();
-    result = bearer_re.replace_all(&result, "Bearer [REDACTED_TOKEN]").to_string();
+    result = bearer_re
+        .replace_all(&result, "Bearer [REDACTED_TOKEN]")
+        .to_string();
 
     // Mask generic secret/key assignments
-    let secret_re = Regex::new(r#"(?i)(api[_-]?key|secret|password|auth_token)\s*[:=]\s*["']([^"']{8,})["']"#).unwrap();
-    result = secret_re.replace_all(&result, "$1=\"[REDACTED]\"").to_string();
+    let secret_re =
+        Regex::new(r#"(?i)(api[_-]?key|secret|password|auth_token)\s*[:=]\s*["']([^"']{8,})["']"#)
+            .unwrap();
+    result = secret_re
+        .replace_all(&result, "$1=\"[REDACTED]\"")
+        .to_string();
 
     result
 }
@@ -1730,11 +1817,15 @@ mod tests {
         let mut session = Session::new("gpt-4o");
         session.set_title("Code Refactoring Task");
         session.system_prompt = Some("You are an expert Rust programming assistant.".to_string());
-        session.messages.push(Message::user("How do I parse JSON in Rust?"));
+        session
+            .messages
+            .push(Message::user("How do I parse JSON in Rust?"));
         session.messages.push(Message::assistant(
             "<think>The user is asking about JSON parsing in Rust. Serde JSON is the standard.</think>Use `serde_json::from_str` with a struct implementing `Deserialize`.",
         ));
-        session.messages.push(Message::user("Can you show a code example?"));
+        session
+            .messages
+            .push(Message::user("Can you show a code example?"));
         session.messages.push(Message::assistant(
             "```rust\nuse serde::Deserialize;\n\n#[derive(Deserialize)]\nstruct Person {\n    name: String,\n}\n```",
         ));
@@ -1743,7 +1834,9 @@ mod tests {
 
     fn create_tool_session() -> Session {
         let mut session = Session::new("gpt-4o");
-        session.messages.push(Message::user("Check the weather in Tokyo."));
+        session
+            .messages
+            .push(Message::user("Check the weather in Tokyo."));
         session.messages.push(Message::assistant_with_tools(
             "Checking weather now...",
             vec![ToolCall {
@@ -1756,7 +1849,9 @@ mod tests {
             "call_tokyo_123",
             r#"{"temp_c": 22, "condition": "Sunny"}"#,
         ));
-        session.messages.push(Message::assistant("The weather in Tokyo is currently sunny and 22°C."));
+        session.messages.push(Message::assistant(
+            "The weather in Tokyo is currently sunny and 22°C.",
+        ));
         session
     }
 
@@ -1795,7 +1890,10 @@ mod tests {
 
         let parsed: OpenAiChatSample = serde_json::from_str(&jsonl).expect("Failed to parse JSON");
         assert!(parsed.reasoning.is_some());
-        assert!(parsed.reasoning.unwrap().contains("Serde JSON is the standard"));
+        assert!(parsed
+            .reasoning
+            .unwrap()
+            .contains("Serde JSON is the standard"));
     }
 
     #[test]
@@ -1804,7 +1902,8 @@ mod tests {
         let options = JsonlExportOptions::new(JsonlFormat::ShareGpt);
         let jsonl = export_session_to_jsonl(&session, &options).expect("Export failed");
 
-        let parsed: ShareGptSample = serde_json::from_str(&jsonl).expect("Failed to parse ShareGPT JSON");
+        let parsed: ShareGptSample =
+            serde_json::from_str(&jsonl).expect("Failed to parse ShareGPT JSON");
         assert_eq!(parsed.conversations.len(), 5);
         assert_eq!(parsed.conversations[0].from, "system");
         assert_eq!(parsed.conversations[1].from, "human");
@@ -1817,7 +1916,8 @@ mod tests {
         let options = JsonlExportOptions::new(JsonlFormat::Alpaca);
         let jsonl = export_session_to_jsonl(&session, &options).expect("Export failed");
 
-        let parsed: AlpacaSample = serde_json::from_str(&jsonl).expect("Failed to parse Alpaca JSON");
+        let parsed: AlpacaSample =
+            serde_json::from_str(&jsonl).expect("Failed to parse Alpaca JSON");
         assert_eq!(parsed.instruction, "Can you show a code example?");
         assert!(parsed.output.contains("struct Person"));
         assert!(parsed.system.is_some());
@@ -1829,7 +1929,8 @@ mod tests {
         let options = JsonlExportOptions::new(JsonlFormat::Anthropic);
         let jsonl = export_session_to_jsonl(&session, &options).expect("Export failed");
 
-        let parsed: AnthropicSample = serde_json::from_str(&jsonl).expect("Failed to parse Anthropic JSON");
+        let parsed: AnthropicSample =
+            serde_json::from_str(&jsonl).expect("Failed to parse Anthropic JSON");
         assert!(parsed.system.is_some());
         assert_eq!(parsed.messages.len(), 4);
     }
@@ -1842,7 +1943,9 @@ mod tests {
 
         let parsed: PromptCompletionSample =
             serde_json::from_str(&jsonl).expect("Failed to parse PromptCompletion JSON");
-        assert!(parsed.prompt.contains("### Human:\nHow do I parse JSON in Rust?"));
+        assert!(parsed
+            .prompt
+            .contains("### Human:\nHow do I parse JSON in Rust?"));
         assert!(parsed.completion.contains("struct Person"));
     }
 
@@ -1888,7 +1991,10 @@ mod tests {
         let tc = &asst_tool.tool_calls.as_ref().unwrap()[0];
         assert_eq!(tc.function.name, "get_weather");
         assert_eq!(parsed.messages[2].role, "tool");
-        assert_eq!(parsed.messages[2].tool_call_id.as_deref(), Some("call_tokyo_123"));
+        assert_eq!(
+            parsed.messages[2].tool_call_id.as_deref(),
+            Some("call_tokyo_123")
+        );
     }
 
     #[test]
@@ -1898,8 +2004,12 @@ mod tests {
         let jsonl = export_session_to_jsonl(&session, &options).expect("Export failed");
 
         let parsed: OpenAiChatSample = serde_json::from_str(&jsonl).expect("Failed to parse JSON");
-        assert!(parsed.messages[1].content.contains("<tool_call>{\"name\": \"get_weather\""));
-        assert!(parsed.messages[2].content.contains("<tool_result id=\"call_tokyo_123\">"));
+        assert!(parsed.messages[1]
+            .content
+            .contains("<tool_call>{\"name\": \"get_weather\""));
+        assert!(parsed.messages[2]
+            .content
+            .contains("<tool_result id=\"call_tokyo_123\">"));
         assert_eq!(parsed.messages[2].role, "user");
     }
 
@@ -1922,8 +2032,7 @@ mod tests {
         let options = JsonlExportOptions::new(JsonlFormat::PreferenceDpo);
         let jsonl = export_session_to_jsonl(&session, &options).expect("Export failed");
 
-        let parsed: DpoPreferenceSample =
-            serde_json::from_str(&jsonl).expect("Parse DPO failed");
+        let parsed: DpoPreferenceSample = serde_json::from_str(&jsonl).expect("Parse DPO failed");
         assert!(parsed.prompt.contains("How do I parse JSON in Rust?"));
         assert!(parsed.chosen.contains("struct Person"));
     }
@@ -1931,8 +2040,7 @@ mod tests {
     #[test]
     fn test_role_filtering() {
         let session = create_sample_session();
-        let options = JsonlExportOptions::new(JsonlFormat::OpenAiChat)
-            .with_system_messages(false);
+        let options = JsonlExportOptions::new(JsonlFormat::OpenAiChat).with_system_messages(false);
         let jsonl = export_session_to_jsonl(&session, &options).expect("Export failed");
 
         let parsed: OpenAiChatSample = serde_json::from_str(&jsonl).expect("Parse failed");
@@ -2001,8 +2109,8 @@ mod tests {
         assert_eq!(stats.exported_samples, 1);
         assert!(export_path.exists());
 
-        let validation = validate_jsonl_file(&export_path, JsonlFormat::OpenAiChat)
-            .expect("Validation failed");
+        let validation =
+            validate_jsonl_file(&export_path, JsonlFormat::OpenAiChat).expect("Validation failed");
         assert!(validation.is_valid());
     }
 }

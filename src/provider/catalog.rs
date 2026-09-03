@@ -85,7 +85,10 @@ impl ModelPricing {
 
     /// Formats the pricing as a compact human-readable string (e.g. `"$3.00 / $15.00 per 1M"`).
     pub fn formatted(&self) -> String {
-        format!("${:.2} / ${:.2} per 1M", self.input_per_m, self.output_per_m)
+        format!(
+            "${:.2} / ${:.2} per 1M",
+            self.input_per_m, self.output_per_m
+        )
     }
 }
 
@@ -246,9 +249,7 @@ impl CatalogModel {
     /// Formats the combined input/output pricing (e.g. `"$3.00 / $15.00 per 1M"`), or `-` when unknown.
     pub fn formatted_pricing(&self) -> String {
         match (self.input_cost_per_m, self.output_cost_per_m) {
-            (Some(in_cost), Some(out_cost)) => {
-                ModelPricing::new(in_cost, out_cost).formatted()
-            }
+            (Some(in_cost), Some(out_cost)) => ModelPricing::new(in_cost, out_cost).formatted(),
             _ => "-".to_string(),
         }
     }
@@ -338,7 +339,11 @@ pub struct ModelCatalog {
 }
 
 impl ModelCatalog {
-    pub fn new(models: Vec<CatalogModel>, last_updated: Option<u64>, source: CatalogSource) -> Self {
+    pub fn new(
+        models: Vec<CatalogModel>,
+        last_updated: Option<u64>,
+        source: CatalogSource,
+    ) -> Self {
         Self {
             models,
             last_updated,
@@ -386,7 +391,6 @@ impl ModelCatalog {
             .iter()
             .find(|m| m.id.eq_ignore_ascii_case(&lower))
     }
-
 
     /// Finds a model using fuzzy resolution.
     ///
@@ -480,8 +484,7 @@ impl ModelCatalog {
     /// Adds a model or updates an existing one matching the same ID and provider.
     pub fn add_or_update(&mut self, model: CatalogModel) {
         if let Some(pos) = self.models.iter().position(|m| {
-            m.id.eq_ignore_ascii_case(&model.id)
-                && m.provider.eq_ignore_ascii_case(&model.provider)
+            m.id.eq_ignore_ascii_case(&model.id) && m.provider.eq_ignore_ascii_case(&model.provider)
         }) {
             self.models[pos] = model;
         } else {
@@ -692,7 +695,9 @@ impl CatalogFetcher {
             None => return Err("No OpenAI API key available".to_string()),
         };
 
-        let base = base_url.unwrap_or(DEFAULT_OPENAI_BASE_URL).trim_end_matches('/');
+        let base = base_url
+            .unwrap_or(DEFAULT_OPENAI_BASE_URL)
+            .trim_end_matches('/');
         let url = if base.ends_with("/models") {
             base.to_string()
         } else {
@@ -755,7 +760,9 @@ impl CatalogFetcher {
             None => return Err("No DeepSeek API key available".to_string()),
         };
 
-        let base = base_url.unwrap_or(DEFAULT_DEEPSEEK_BASE_URL).trim_end_matches('/');
+        let base = base_url
+            .unwrap_or(DEFAULT_DEEPSEEK_BASE_URL)
+            .trim_end_matches('/');
         let url = if base.ends_with("/models") {
             base.to_string()
         } else if base.ends_with("/v1") {
@@ -801,7 +808,9 @@ impl CatalogFetcher {
         base_url: Option<&str>,
         api_key: Option<&str>,
     ) -> Result<Vec<CatalogModel>, String> {
-        let base = base_url.unwrap_or(DEFAULT_OPENROUTER_BASE_URL).trim_end_matches('/');
+        let base = base_url
+            .unwrap_or(DEFAULT_OPENROUTER_BASE_URL)
+            .trim_end_matches('/');
         let url = if base.ends_with("/models") {
             base.to_string()
         } else {
@@ -831,10 +840,7 @@ impl CatalogFetcher {
         if let Some(arr) = body.get("data").and_then(|d| d.as_array()) {
             for item in arr {
                 if let Some(id) = item.get("id").and_then(|i| i.as_str()) {
-                    let display_name = item
-                        .get("name")
-                        .and_then(|n| n.as_str())
-                        .unwrap_or(id);
+                    let display_name = item.get("name").and_then(|n| n.as_str()).unwrap_or(id);
                     let description = item.get("description").and_then(|d| d.as_str());
                     let context_length = item.get("context_length").and_then(|c| c.as_u64());
                     let max_completion = item
@@ -873,7 +879,9 @@ impl CatalogFetcher {
             None => return Err("No Groq API key available".to_string()),
         };
 
-        let base = base_url.unwrap_or(DEFAULT_GROQ_BASE_URL).trim_end_matches('/');
+        let base = base_url
+            .unwrap_or(DEFAULT_GROQ_BASE_URL)
+            .trim_end_matches('/');
         let url = if base.ends_with("/models") {
             base.to_string()
         } else {
@@ -1007,7 +1015,9 @@ impl CatalogFetcher {
             None => return Err("No Anthropic API key available".to_string()),
         };
 
-        let base = base_url.unwrap_or(DEFAULT_ANTHROPIC_BASE_URL).trim_end_matches('/');
+        let base = base_url
+            .unwrap_or(DEFAULT_ANTHROPIC_BASE_URL)
+            .trim_end_matches('/');
         let url = if base.ends_with("/models") {
             base.to_string()
         } else {
@@ -1061,7 +1071,9 @@ impl CatalogFetcher {
             None => return Err("No xAI API key available".to_string()),
         };
 
-        let base = base_url.unwrap_or(DEFAULT_XAI_BASE_URL).trim_end_matches('/');
+        let base = base_url
+            .unwrap_or(DEFAULT_XAI_BASE_URL)
+            .trim_end_matches('/');
         let url = if base.ends_with("/models") {
             base.to_string()
         } else {
@@ -1179,7 +1191,10 @@ pub async fn sync_catalog(config: &Config, force: bool) -> ModelCatalog {
     let path = cache_path();
     if !force && is_cache_fresh(&path, DEFAULT_CATALOG_TTL_SECS) {
         if let Some(cached) = load_cached_catalog() {
-            debug!("Using fresh cached model catalog ({} models)", cached.count());
+            debug!(
+                "Using fresh cached model catalog ({} models)",
+                cached.count()
+            );
             return cached;
         }
     }
@@ -1335,39 +1350,38 @@ pub fn enrich_model_metadata(model: &mut CatalogModel) {
 
     // Pricing (USD per 1M tokens)
     if model.input_cost_per_m.is_none() || model.output_cost_per_m.is_none() {
-        let (input_per_m, output_per_m): (f64, f64) = if lower.contains("claude-3-7-sonnet")
-            || lower.contains("claude-3.7-sonnet")
-        {
-            (3.0, 15.0)
-        } else if lower.contains("claude-3-5-sonnet") || lower.contains("claude-3.5-sonnet") {
-            (3.0, 15.0)
-        } else if lower.contains("claude-3-5-haiku") || lower.contains("claude-3.5-haiku") {
-            (0.8, 4.0)
-        } else if lower.contains("claude-3-opus") {
-            (15.0, 75.0)
-        } else if lower == "gpt-4o" {
-            (2.5, 10.0)
-        } else if lower == "gpt-4o-mini" {
-            (0.15, 0.6)
-        } else if lower == "gpt-4-turbo" {
-            (10.0, 30.0)
-        } else if lower == "o1" {
-            (15.0, 60.0)
-        } else if lower == "o1-mini" {
-            (1.1, 4.4)
-        } else if lower == "o3-mini" {
-            (1.1, 4.4)
-        } else if lower.contains("gpt-4") {
-            (30.0, 60.0)
-        } else if lower.contains("gpt-3.5") {
-            (0.5, 1.5)
-        } else if lower.contains("deepseek") || lower.contains("r1") {
-            (0.27, 1.1)
-        } else if lower.contains("grok") {
-            (2.0, 10.0)
-        } else {
-            (0.0, 0.0)
-        };
+        let (input_per_m, output_per_m): (f64, f64) =
+            if lower.contains("claude-3-7-sonnet") || lower.contains("claude-3.7-sonnet") {
+                (3.0, 15.0)
+            } else if lower.contains("claude-3-5-sonnet") || lower.contains("claude-3.5-sonnet") {
+                (3.0, 15.0)
+            } else if lower.contains("claude-3-5-haiku") || lower.contains("claude-3.5-haiku") {
+                (0.8, 4.0)
+            } else if lower.contains("claude-3-opus") {
+                (15.0, 75.0)
+            } else if lower == "gpt-4o" {
+                (2.5, 10.0)
+            } else if lower == "gpt-4o-mini" {
+                (0.15, 0.6)
+            } else if lower == "gpt-4-turbo" {
+                (10.0, 30.0)
+            } else if lower == "o1" {
+                (15.0, 60.0)
+            } else if lower == "o1-mini" {
+                (1.1, 4.4)
+            } else if lower == "o3-mini" {
+                (1.1, 4.4)
+            } else if lower.contains("gpt-4") {
+                (30.0, 60.0)
+            } else if lower.contains("gpt-3.5") {
+                (0.5, 1.5)
+            } else if lower.contains("deepseek") || lower.contains("r1") {
+                (0.27, 1.1)
+            } else if lower.contains("grok") {
+                (2.0, 10.0)
+            } else {
+                (0.0, 0.0)
+            };
         let known = input_per_m > 0.0 || output_per_m > 0.0;
         if known {
             if model.input_cost_per_m.is_none() {
@@ -1444,7 +1458,11 @@ pub fn enrich_model_metadata(model: &mut CatalogModel) {
     }
 
     // Badge classification heuristics
-    if lower.contains("vision") || lower.contains("4o") || lower.contains("sonnet") || lower.contains("opus") {
+    if lower.contains("vision")
+        || lower.contains("4o")
+        || lower.contains("sonnet")
+        || lower.contains("opus")
+    {
         add_badge_if_missing(model, "Vision");
     }
 
@@ -1461,7 +1479,11 @@ pub fn enrich_model_metadata(model: &mut CatalogModel) {
         add_badge_if_missing(model, "Coding");
     }
 
-    if lower.contains("llama") || lower.contains("qwen") || lower.contains("mistral") || lower.contains("deepseek") {
+    if lower.contains("llama")
+        || lower.contains("qwen")
+        || lower.contains("mistral")
+        || lower.contains("deepseek")
+    {
         if model.provider != "openai" && model.provider != "anthropic" {
             add_badge_if_missing(model, "Open-Weights");
         }
@@ -1488,8 +1510,12 @@ fn format_display_name(id: &str) -> String {
         "o1-mini" => "OpenAI o1-mini".to_string(),
         "o3-mini" => "OpenAI o3-mini".to_string(),
         "gpt-4-turbo" => "GPT-4 Turbo".to_string(),
-        "claude-3-7-sonnet-20250219" | "claude-3-7-sonnet-latest" => "Claude 3.7 Sonnet".to_string(),
-        "claude-3-5-sonnet-20241022" | "claude-3-5-sonnet-latest" => "Claude 3.5 Sonnet".to_string(),
+        "claude-3-7-sonnet-20250219" | "claude-3-7-sonnet-latest" => {
+            "Claude 3.7 Sonnet".to_string()
+        }
+        "claude-3-5-sonnet-20241022" | "claude-3-5-sonnet-latest" => {
+            "Claude 3.5 Sonnet".to_string()
+        }
         "claude-3-5-haiku-20241022" | "claude-3-5-haiku-latest" => "Claude 3.5 Haiku".to_string(),
         "claude-3-opus-20240229" | "claude-3-opus-latest" => "Claude 3 Opus".to_string(),
         "grok-2-latest" | "grok-2" => "Grok 2".to_string(),
@@ -1511,7 +1537,9 @@ fn format_display_name(id: &str) -> String {
                     } else {
                         let mut chars = s.chars();
                         match chars.next() {
-                            Some(first) => first.to_uppercase().collect::<String>() + chars.as_str(),
+                            Some(first) => {
+                                first.to_uppercase().collect::<String>() + chars.as_str()
+                            }
                             None => String::new(),
                         }
                     }
@@ -1530,18 +1558,20 @@ fn format_display_name(id: &str) -> String {
 pub fn static_model_list() -> Vec<CatalogModel> {
     vec![
         // Fusion
-        CatalogModel::new("deepseek-ai/DeepSeek-V4-Flash-0731", "DeepSeek V4 Flash", "fusion")
-            .with_context(1_048_576)
-            .with_max_output(8_192)
-            .with_badges(["Fast", "Default"])
-            .with_description("Fusion gateway high-speed 1M context flash model"),
-
+        CatalogModel::new(
+            "deepseek-ai/DeepSeek-V4-Flash-0731",
+            "DeepSeek V4 Flash",
+            "fusion",
+        )
+        .with_context(1_048_576)
+        .with_max_output(8_192)
+        .with_badges(["Fast", "Default"])
+        .with_description("Fusion gateway high-speed 1M context flash model"),
         CatalogModel::new("MiniMaxAI/MiniMax-M2.7", "MiniMax M2.7", "fusion")
             .with_context(204_800)
             .with_max_output(8_192)
             .with_badges(["Reasoning"])
             .with_description("MiniMax M2.7 frontier coding and reasoning model"),
-
         CatalogModel::new("moonshotai/Kimi-K2.6", "Kimi K2.6", "fusion")
             .with_context(204_800)
             .with_max_output(8_192)
@@ -1641,7 +1671,8 @@ mod tests {
 
     #[test]
     fn test_cache_serialization_and_freshness() {
-        let tmp_dir = std::env::temp_dir().join(format!("fusion_test_cat_{}", uuid::Uuid::new_v4()));
+        let tmp_dir =
+            std::env::temp_dir().join(format!("fusion_test_cat_{}", uuid::Uuid::new_v4()));
         std::fs::create_dir_all(&tmp_dir).unwrap();
         let cache_file = tmp_dir.join("models.json");
 

@@ -264,9 +264,7 @@ impl ConfigPreset {
             | "local-ollama" => Some(Self::OfflineOllama),
 
             // Fusion Default
-            "fusion-default" | "fusiondefault" | "fusion" | "default" => {
-                Some(Self::FusionDefault)
-            }
+            "fusion-default" | "fusiondefault" | "fusion" | "default" => Some(Self::FusionDefault),
 
             // Termux Mobile
             "termux-mobile" | "termuxmobile" | "termux" | "mobile" | "android" | "phone"
@@ -320,10 +318,12 @@ impl ConfigPreset {
     /// Loads configuration from a specific file path, applies this preset, and writes back.
     pub fn apply_to_file(path: &Path, preset: ConfigPreset) -> Result<Config, PresetError> {
         let mut cfg = if path.exists() {
-            let content = std::fs::read_to_string(path)
-                .map_err(|e| PresetError::IoError(format!("Cannot read {}: {}", path.display(), e)))?;
-            Config::from_json(&content)
-                .map_err(|e| PresetError::ParseError(format!("Cannot parse {}: {}", path.display(), e)))?
+            let content = std::fs::read_to_string(path).map_err(|e| {
+                PresetError::IoError(format!("Cannot read {}: {}", path.display(), e))
+            })?;
+            Config::from_json(&content).map_err(|e| {
+                PresetError::ParseError(format!("Cannot parse {}: {}", path.display(), e))
+            })?
         } else {
             Config::default()
         };
@@ -597,8 +597,8 @@ impl ModelPreset {
         let clean = s.trim().to_lowercase().replace('_', "-");
         match clean.as_str() {
             // DeepSeek Fast
-            "deepseek-fast" | "deepseekfast" | "ds-fast" | "dsfast" | "deepseek" | "deepseek-chat"
-            | "ds" => Some(Self::DeepseekFast),
+            "deepseek-fast" | "deepseekfast" | "ds-fast" | "dsfast" | "deepseek"
+            | "deepseek-chat" | "ds" => Some(Self::DeepseekFast),
 
             // DeepSeek Reasoning
             "deepseek-reasoning" | "deepseekreasoning" | "ds-reasoning" | "ds-reasoner"
@@ -610,7 +610,9 @@ impl ModelPreset {
             }
 
             // Claude Haiku
-            "claude-haiku" | "claudehaiku" | "haiku" | "claude-3-5-haiku" => Some(Self::ClaudeHaiku),
+            "claude-haiku" | "claudehaiku" | "haiku" | "claude-3-5-haiku" => {
+                Some(Self::ClaudeHaiku)
+            }
 
             // GPT-4o
             "gpt-4o" | "gpt4o" | "4o" | "openai" => Some(Self::Gpt4o),
@@ -619,9 +621,7 @@ impl ModelPreset {
             "grok" | "grok-2" | "grok2" | "xai" => Some(Self::Grok),
 
             // Fusion Default
-            "fusion-default" | "fusiondefault" | "fusion" | "default" => {
-                Some(Self::FusionDefault)
-            }
+            "fusion-default" | "fusiondefault" | "fusion" | "default" => Some(Self::FusionDefault),
 
             // OpenRouter Default
             "openrouter-default" | "openrouterdefault" | "openrouter" | "open-router" => {
@@ -801,7 +801,10 @@ pub struct PresetInfo {
 /// Errors occurring during preset lookup, parsing, or application.
 #[derive(Debug, thiserror::Error, Clone, PartialEq, Eq)]
 pub enum PresetError {
-    #[error("Unknown configuration preset '{name}'.\nHint: Available presets are: {}", available_presets_list())]
+    #[error(
+        "Unknown configuration preset '{name}'.\nHint: Available presets are: {}",
+        available_presets_list()
+    )]
     UnknownPreset { name: String },
 
     #[error("I/O error during preset operation: {0}")]
@@ -1061,10 +1064,7 @@ mod tests {
         assert_eq!(cfg.default_provider, "deepseek");
         assert_eq!(cfg.default_model, "deepseek-reasoner");
         assert_eq!(cfg.openai_api_key.as_deref(), Some("sk-test-openai"));
-        assert_eq!(
-            cfg.anthropic_api_key.as_deref(),
-            Some("sk-test-anthropic")
-        );
+        assert_eq!(cfg.anthropic_api_key.as_deref(), Some("sk-test-anthropic"));
         assert_eq!(cfg.deepseek_api_key.as_deref(), Some("sk-test-deepseek"));
     }
 
@@ -1085,8 +1085,7 @@ mod tests {
         .unwrap();
 
         // Apply preset
-        let updated =
-            ConfigPreset::apply_to_file(&config_file, ConfigPreset::Cheap).unwrap();
+        let updated = ConfigPreset::apply_to_file(&config_file, ConfigPreset::Cheap).unwrap();
         assert_eq!(updated.default_provider, "deepseek");
         assert_eq!(updated.default_model, "deepseek-chat");
         assert_eq!(updated.max_tokens, Some(4096));
@@ -1137,16 +1136,28 @@ mod tests {
         for preset in ModelPreset::all() {
             assert_eq!(ModelPreset::lookup(preset.id()), Some(*preset));
         }
-        assert_eq!(ModelPreset::lookup("deepseek-fast"), Some(ModelPreset::DeepseekFast));
+        assert_eq!(
+            ModelPreset::lookup("deepseek-fast"),
+            Some(ModelPreset::DeepseekFast)
+        );
         assert_eq!(
             ModelPreset::lookup("deepseek-reasoning"),
             Some(ModelPreset::DeepseekReasoning)
         );
-        assert_eq!(ModelPreset::lookup("claude-sonnet"), Some(ModelPreset::ClaudeSonnet));
-        assert_eq!(ModelPreset::lookup("claude-haiku"), Some(ModelPreset::ClaudeHaiku));
+        assert_eq!(
+            ModelPreset::lookup("claude-sonnet"),
+            Some(ModelPreset::ClaudeSonnet)
+        );
+        assert_eq!(
+            ModelPreset::lookup("claude-haiku"),
+            Some(ModelPreset::ClaudeHaiku)
+        );
         assert_eq!(ModelPreset::lookup("gpt-4o"), Some(ModelPreset::Gpt4o));
         assert_eq!(ModelPreset::lookup("grok"), Some(ModelPreset::Grok));
-        assert_eq!(ModelPreset::lookup("fusion-default"), Some(ModelPreset::FusionDefault));
+        assert_eq!(
+            ModelPreset::lookup("fusion-default"),
+            Some(ModelPreset::FusionDefault)
+        );
         assert_eq!(
             ModelPreset::lookup("openrouter-default"),
             Some(ModelPreset::OpenrouterDefault)
@@ -1164,28 +1175,46 @@ mod tests {
             ModelPreset::from_str_loose("deepseek_fast"),
             Some(ModelPreset::DeepseekFast)
         );
-        assert_eq!(ModelPreset::from_str_loose("deepseek"), Some(ModelPreset::DeepseekFast));
+        assert_eq!(
+            ModelPreset::from_str_loose("deepseek"),
+            Some(ModelPreset::DeepseekFast)
+        );
 
         assert_eq!(
             ModelPreset::from_str_loose("deepseek-reasoning"),
             Some(ModelPreset::DeepseekReasoning)
         );
-        assert_eq!(ModelPreset::from_str_loose("r1"), Some(ModelPreset::DeepseekReasoning));
+        assert_eq!(
+            ModelPreset::from_str_loose("r1"),
+            Some(ModelPreset::DeepseekReasoning)
+        );
 
         assert_eq!(
             ModelPreset::from_str_loose("claude-sonnet"),
             Some(ModelPreset::ClaudeSonnet)
         );
-        assert_eq!(ModelPreset::from_str_loose("sonnet"), Some(ModelPreset::ClaudeSonnet));
+        assert_eq!(
+            ModelPreset::from_str_loose("sonnet"),
+            Some(ModelPreset::ClaudeSonnet)
+        );
 
         assert_eq!(
             ModelPreset::from_str_loose("claude-haiku"),
             Some(ModelPreset::ClaudeHaiku)
         );
-        assert_eq!(ModelPreset::from_str_loose("haiku"), Some(ModelPreset::ClaudeHaiku));
+        assert_eq!(
+            ModelPreset::from_str_loose("haiku"),
+            Some(ModelPreset::ClaudeHaiku)
+        );
 
-        assert_eq!(ModelPreset::from_str_loose("gpt-4o"), Some(ModelPreset::Gpt4o));
-        assert_eq!(ModelPreset::from_str_loose("gpt4o"), Some(ModelPreset::Gpt4o));
+        assert_eq!(
+            ModelPreset::from_str_loose("gpt-4o"),
+            Some(ModelPreset::Gpt4o)
+        );
+        assert_eq!(
+            ModelPreset::from_str_loose("gpt4o"),
+            Some(ModelPreset::Gpt4o)
+        );
 
         assert_eq!(ModelPreset::from_str_loose("grok"), Some(ModelPreset::Grok));
         assert_eq!(ModelPreset::from_str_loose("xai"), Some(ModelPreset::Grok));
@@ -1194,7 +1223,10 @@ mod tests {
             ModelPreset::from_str_loose("ollama-local"),
             Some(ModelPreset::FusionDefault)
         );
-        assert_eq!(ModelPreset::from_str_loose("fusion"), Some(ModelPreset::FusionDefault));
+        assert_eq!(
+            ModelPreset::from_str_loose("fusion"),
+            Some(ModelPreset::FusionDefault)
+        );
 
         assert_eq!(
             ModelPreset::from_str_loose("openrouter-default"),
@@ -1264,7 +1296,10 @@ mod tests {
         assert_eq!(cfg.default_temperature, Some(0.2));
         assert_eq!(cfg.max_tokens, Some(8192));
         assert!(cfg.advisors_enabled);
-        assert_eq!(cfg.advisor_model.as_deref(), Some("claude-3-5-haiku-20241022"));
+        assert_eq!(
+            cfg.advisor_model.as_deref(),
+            Some("claude-3-5-haiku-20241022")
+        );
     }
 
     #[test]
@@ -1371,9 +1406,15 @@ mod tests {
         assert_eq!(cfg.default_provider, "anthropic");
         assert_eq!(cfg.default_model, "claude-3-5-sonnet-20241022");
         assert_eq!(cfg.openai_api_key.as_deref(), Some("sk-persisted-openai"));
-        assert_eq!(cfg.anthropic_api_key.as_deref(), Some("sk-persisted-anthropic"));
+        assert_eq!(
+            cfg.anthropic_api_key.as_deref(),
+            Some("sk-persisted-anthropic")
+        );
         // Custom Ollama base URL must not be overwritten by a non-Ollama preset.
-        assert_eq!(cfg.ollama_base_url.as_deref(), Some("http://custom-host:11434"));
+        assert_eq!(
+            cfg.ollama_base_url.as_deref(),
+            Some("http://custom-host:11434")
+        );
     }
 
     #[test]
@@ -1383,7 +1424,10 @@ mod tests {
 
         ModelPreset::FusionDefault.apply_to(&mut cfg);
 
-        assert_eq!(cfg.ollama_base_url.as_deref(), Some("http://localhost:11434"));
+        assert_eq!(
+            cfg.ollama_base_url.as_deref(),
+            Some("http://localhost:11434")
+        );
     }
 
     #[test]
@@ -1459,5 +1503,4 @@ mod tests {
             }
         }
     }
-
 }

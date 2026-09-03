@@ -46,7 +46,10 @@ pub fn parse_read_window(args: &Value) -> ReadWindow {
         .unwrap_or(1)
         .max(1) as usize;
 
-    let limit = args.get("limit").and_then(Value::as_u64).map(|l| l as usize);
+    let limit = args
+        .get("limit")
+        .and_then(Value::as_u64)
+        .map(|l| l as usize);
 
     let line_numbers = args
         .get("line_numbers")
@@ -132,15 +135,15 @@ pub async fn atomic_write(path: &Path, contents: &[u8]) -> anyhow::Result<()> {
 }
 
 async fn write_tmp_and_rename(tmp_path: &Path, dest: &Path, contents: &[u8]) -> anyhow::Result<()> {
-    let mut file = tokio::fs::File::create(tmp_path).await.map_err(|e| {
-        anyhow::anyhow!("Failed to create temp file '{}': {e}", tmp_path.display())
-    })?;
-    file.write_all(contents).await.map_err(|e| {
-        anyhow::anyhow!("Failed to write temp file '{}': {e}", tmp_path.display())
-    })?;
-    file.sync_all().await.map_err(|e| {
-        anyhow::anyhow!("Failed to flush temp file '{}': {e}", tmp_path.display())
-    })?;
+    let mut file = tokio::fs::File::create(tmp_path)
+        .await
+        .map_err(|e| anyhow::anyhow!("Failed to create temp file '{}': {e}", tmp_path.display()))?;
+    file.write_all(contents)
+        .await
+        .map_err(|e| anyhow::anyhow!("Failed to write temp file '{}': {e}", tmp_path.display()))?;
+    file.sync_all()
+        .await
+        .map_err(|e| anyhow::anyhow!("Failed to flush temp file '{}': {e}", tmp_path.display()))?;
     drop(file);
 
     tokio::fs::rename(tmp_path, dest)
@@ -232,10 +235,9 @@ impl Tool for ReadFileTool {
 
         loop {
             buf.clear();
-            let n = reader
-                .read_until(b'\n', &mut buf)
-                .await
-                .map_err(|e| anyhow::anyhow!("Failed to read file '{}': {e}", full_path.display()))?;
+            let n = reader.read_until(b'\n', &mut buf).await.map_err(|e| {
+                anyhow::anyhow!("Failed to read file '{}': {e}", full_path.display())
+            })?;
             if n == 0 {
                 break;
             }
@@ -445,7 +447,12 @@ mod tests {
 
     fn temp_test_dir() -> PathBuf {
         let count = COUNTER.fetch_add(1, Ordering::SeqCst);
-        let dir = std::env::temp_dir().join(format!("fusion_file_test_{}_{}_{}", std::process::id(), chrono::Utc::now().timestamp_nanos_opt().unwrap_or(0), count));
+        let dir = std::env::temp_dir().join(format!(
+            "fusion_file_test_{}_{}_{}",
+            std::process::id(),
+            chrono::Utc::now().timestamp_nanos_opt().unwrap_or(0),
+            count
+        ));
         std::fs::create_dir_all(&dir).unwrap();
         dir
     }
@@ -453,9 +460,15 @@ mod tests {
     #[tokio::test]
     async fn test_resolve_path() {
         let cwd = PathBuf::from("/workspace/fusion");
-        assert_eq!(resolve_path("src/main.rs", &cwd), PathBuf::from("/workspace/fusion/src/main.rs"));
+        assert_eq!(
+            resolve_path("src/main.rs", &cwd),
+            PathBuf::from("/workspace/fusion/src/main.rs")
+        );
         #[cfg(unix)]
-        assert_eq!(resolve_path("/etc/hosts", &cwd), PathBuf::from("/etc/hosts"));
+        assert_eq!(
+            resolve_path("/etc/hosts", &cwd),
+            PathBuf::from("/etc/hosts")
+        );
     }
 
     #[tokio::test]
@@ -470,10 +483,15 @@ mod tests {
         let read_tool = ReadFileTool::new();
 
         // 1. Write file with parent dir creation
-        let write_res = write_tool.execute(json!({
-            "path": "nested/sub/dir/test.txt",
-            "content": "Line 1\nLine 2\nLine 3\nLine 4\nLine 5\n"
-        }), &ctx).await;
+        let write_res = write_tool
+            .execute(
+                json!({
+                    "path": "nested/sub/dir/test.txt",
+                    "content": "Line 1\nLine 2\nLine 3\nLine 4\nLine 5\n"
+                }),
+                &ctx,
+            )
+            .await;
         assert!(write_res.is_ok());
         assert!(write_res.unwrap().contains("Successfully wrote"));
 
@@ -482,26 +500,44 @@ mod tests {
         assert!(file_path.exists());
 
         // 2. Read whole file with line numbers
-        let read_res = read_tool.execute(json!({
-            "path": "nested/sub/dir/test.txt"
-        }), &ctx).await.unwrap();
+        let read_res = read_tool
+            .execute(
+                json!({
+                    "path": "nested/sub/dir/test.txt"
+                }),
+                &ctx,
+            )
+            .await
+            .unwrap();
         assert!(read_res.contains("     1 | Line 1"));
         assert!(read_res.contains("     5 | Line 5"));
 
         // 3. Read without line numbers
-        let raw_read = read_tool.execute(json!({
-            "path": "nested/sub/dir/test.txt",
-            "line_numbers": false
-        }), &ctx).await.unwrap();
+        let raw_read = read_tool
+            .execute(
+                json!({
+                    "path": "nested/sub/dir/test.txt",
+                    "line_numbers": false
+                }),
+                &ctx,
+            )
+            .await
+            .unwrap();
         assert_eq!(raw_read, "Line 1\nLine 2\nLine 3\nLine 4\nLine 5\n");
 
         // 4. Read with offset and limit
-        let slice_read = read_tool.execute(json!({
-            "path": "nested/sub/dir/test.txt",
-            "offset": 2,
-            "limit": 2,
-            "line_numbers": true
-        }), &ctx).await.unwrap();
+        let slice_read = read_tool
+            .execute(
+                json!({
+                    "path": "nested/sub/dir/test.txt",
+                    "offset": 2,
+                    "limit": 2,
+                    "line_numbers": true
+                }),
+                &ctx,
+            )
+            .await
+            .unwrap();
         assert!(slice_read.contains("     2 | Line 2"));
         assert!(slice_read.contains("     3 | Line 3"));
         assert!(!slice_read.contains("     1 | Line 1"));
@@ -522,37 +558,55 @@ mod tests {
         let read_tool = ReadFileTool::new();
 
         // File not found
-        let err = read_tool.execute(json!({ "path": "nonexistent.txt" }), &ctx).await.unwrap_err();
+        let err = read_tool
+            .execute(json!({ "path": "nonexistent.txt" }), &ctx)
+            .await
+            .unwrap_err();
         assert!(err.to_string().contains("File not found"));
 
         // Path is a directory
         let sub_dir = dir.join("some_dir");
         std::fs::create_dir_all(&sub_dir).unwrap();
-        let err = read_tool.execute(json!({ "path": "some_dir" }), &ctx).await.unwrap_err();
+        let err = read_tool
+            .execute(json!({ "path": "some_dir" }), &ctx)
+            .await
+            .unwrap_err();
         assert!(err.to_string().contains("is a directory"));
 
         // Binary file
         let bin_path = dir.join("binary.bin");
         std::fs::write(&bin_path, &[0x00, 0x01, 0x02, 0xFF]).unwrap();
-        let err = read_tool.execute(json!({ "path": "binary.bin" }), &ctx).await.unwrap_err();
+        let err = read_tool
+            .execute(json!({ "path": "binary.bin" }), &ctx)
+            .await
+            .unwrap_err();
         assert!(err.to_string().contains("Cannot read binary file"));
 
         // Invalid UTF-8 (without null bytes)
         let non_utf8_path = dir.join("invalid_utf8.txt");
         std::fs::write(&non_utf8_path, &[0x80, 0x81, 0x82, 0x83]).unwrap();
-        let err = read_tool.execute(json!({ "path": "invalid_utf8.txt" }), &ctx).await.unwrap_err();
+        let err = read_tool
+            .execute(json!({ "path": "invalid_utf8.txt" }), &ctx)
+            .await
+            .unwrap_err();
         assert!(err.to_string().contains("not valid UTF-8"));
 
         // Offset beyond total lines
         let text_path = dir.join("short.txt");
         std::fs::write(&text_path, "one\ntwo\n").unwrap();
-        let err = read_tool.execute(json!({ "path": "short.txt", "offset": 10 }), &ctx).await.unwrap_err();
+        let err = read_tool
+            .execute(json!({ "path": "short.txt", "offset": 10 }), &ctx)
+            .await
+            .unwrap_err();
         assert!(err.to_string().contains("beyond total lines"));
 
         // Empty file
         let empty_path = dir.join("empty.txt");
         std::fs::write(&empty_path, "").unwrap();
-        let empty_res = read_tool.execute(json!({ "path": "empty.txt" }), &ctx).await.unwrap();
+        let empty_res = read_tool
+            .execute(json!({ "path": "empty.txt" }), &ctx)
+            .await
+            .unwrap();
         assert_eq!(empty_res, "(empty file)");
 
         // Cleanup
@@ -708,7 +762,11 @@ mod tests {
             .unwrap();
         assert!(res.contains(&format!("{:6} | L1\n", 1)));
         assert!(res.contains("more lines in file"));
-        assert!(!res.contains(&format!("{:6} | L{}\n", DEFAULT_READ_LIMIT + 1, DEFAULT_READ_LIMIT + 1)));
+        assert!(!res.contains(&format!(
+            "{:6} | L{}\n",
+            DEFAULT_READ_LIMIT + 1,
+            DEFAULT_READ_LIMIT + 1
+        )));
 
         let _ = std::fs::remove_dir_all(&dir);
     }

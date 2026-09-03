@@ -233,7 +233,11 @@ fn trigram_similarity(a: &[char], b: &[char]) -> f64 {
         .map(|(g, ca)| std::cmp::min(*ca, *tb.get(g).unwrap_or(&0)))
         .sum();
     let total: usize = ta.values().sum::<usize>().max(tb.values().sum::<usize>());
-    if total == 0 { 0.0 } else { common as f64 / total as f64 }
+    if total == 0 {
+        0.0
+    } else {
+        common as f64 / total as f64
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -340,10 +344,7 @@ impl Tool for EditFileTool {
         } else {
             Ok(format!(
                 "Successfully edited '{}' (+{} -{} lines):\n\n```diff\n{}```",
-                path_str,
-                stats.additions,
-                stats.deletions,
-                unified_diff
+                path_str, stats.additions, stats.deletions, unified_diff
             ))
         }
     }
@@ -423,10 +424,8 @@ mod tests {
 
     #[tokio::test]
     async fn test_edit_tool_uses_atomic_write() {
-        let temp_dir = std::env::temp_dir().join(format!(
-            "fusion_edit_atomic_test_{}",
-            uuid::Uuid::new_v4()
-        ));
+        let temp_dir =
+            std::env::temp_dir().join(format!("fusion_edit_atomic_test_{}", uuid::Uuid::new_v4()));
         tokio::fs::create_dir_all(&temp_dir).await.unwrap();
 
         let file_path = temp_dir.join("atomic.txt");
@@ -498,11 +497,14 @@ mod tests {
 
     #[tokio::test]
     async fn test_edit_tool_execute() {
-        let temp_dir = std::env::temp_dir().join(format!("fusion_edit_test_{}", uuid::Uuid::new_v4()));
+        let temp_dir =
+            std::env::temp_dir().join(format!("fusion_edit_test_{}", uuid::Uuid::new_v4()));
         tokio::fs::create_dir_all(&temp_dir).await.unwrap();
 
         let file_path = temp_dir.join("test.txt");
-        tokio::fs::write(&file_path, "apple\nbanana\ncherry\n").await.unwrap();
+        tokio::fs::write(&file_path, "apple\nbanana\ncherry\n")
+            .await
+            .unwrap();
 
         let tool = EditFileTool::new();
         let ctx = ToolContext {

@@ -12,12 +12,12 @@
 //! Notifications are dispatched asynchronously in background threads by default to ensure
 //! zero latency impact on interactive REPL and agent execution pipelines.
 
+use serde::{Deserialize, Serialize};
 use std::fmt;
 use std::io::{stderr, IsTerminal, Write};
 use std::path::Path;
 use std::process::{Command, Stdio};
 use std::time::{Duration, Instant};
-use serde::{Deserialize, Serialize};
 
 /// Default application name shown in notification headers.
 pub const DEFAULT_APP_NAME: &str = "Fusion";
@@ -193,14 +193,21 @@ impl NotificationBackend {
             return Self::Windows;
         }
 
-        #[cfg(any(target_os = "linux", target_os = "freebsd", target_os = "openbsd", target_os = "netbsd"))]
+        #[cfg(any(
+            target_os = "linux",
+            target_os = "freebsd",
+            target_os = "openbsd",
+            target_os = "netbsd"
+        ))]
         {
             if is_executable_in_path("notify-send") || is_executable_in_path("kdialog") {
                 return Self::Linux;
             }
             // Check for WSL with Windows PowerShell or wsl-notify-send available
             if is_wsl() {
-                if is_executable_in_path("wsl-notify-send.exe") || is_executable_in_path("powershell.exe") {
+                if is_executable_in_path("wsl-notify-send.exe")
+                    || is_executable_in_path("powershell.exe")
+                {
                     return Self::Windows;
                 }
             }
@@ -236,7 +243,11 @@ impl NotificationBackend {
             Self::Auto => true,
             Self::MacOS => cfg!(target_os = "macos") || is_executable_in_path("osascript"),
             Self::Linux => is_executable_in_path("notify-send") || is_executable_in_path("kdialog"),
-            Self::Windows => cfg!(target_os = "windows") || is_executable_in_path("powershell.exe") || is_executable_in_path("powershell"),
+            Self::Windows => {
+                cfg!(target_os = "windows")
+                    || is_executable_in_path("powershell.exe")
+                    || is_executable_in_path("powershell")
+            }
             Self::Termux => is_termux() || is_executable_in_path("termux-notification"),
             Self::TerminalOsc => true,
             Self::Custom(cmd) => {
@@ -394,7 +405,9 @@ impl NotificationConfig {
     pub fn from_env() -> Self {
         let mut cfg = Self::default();
 
-        if let Some(val) = first_non_empty_env(&["FUSION_NOTIFY", "FUSION_NOTIFICATIONS", "NOTIFY_ENABLED"]) {
+        if let Some(val) =
+            first_non_empty_env(&["FUSION_NOTIFY", "FUSION_NOTIFICATIONS", "NOTIFY_ENABLED"])
+        {
             let lower = val.to_lowercase();
             if lower == "0" || lower == "false" || lower == "no" || lower == "off" {
                 cfg.enabled = false;
@@ -437,7 +450,9 @@ impl NotificationConfig {
             }
         }
 
-        if let Some(val) = first_non_empty_env(&["FUSION_NOTIFY_MIN_DURATION", "NOTIFY_MIN_DURATION"]) {
+        if let Some(val) =
+            first_non_empty_env(&["FUSION_NOTIFY_MIN_DURATION", "NOTIFY_MIN_DURATION"])
+        {
             if let Ok(secs) = val.parse::<f64>() {
                 if secs >= 0.0 {
                     cfg.min_duration_secs = Some(secs);
@@ -448,7 +463,9 @@ impl NotificationConfig {
         if let Some(val) = first_non_empty_env(&["FUSION_NOTIFY_BACKEND", "NOTIFY_BACKEND"]) {
             match val.to_lowercase().as_str() {
                 "macos" | "apple" | "osascript" => cfg.backend = Some(NotificationBackend::MacOS),
-                "linux" | "notify-send" | "kdialog" => cfg.backend = Some(NotificationBackend::Linux),
+                "linux" | "notify-send" | "kdialog" => {
+                    cfg.backend = Some(NotificationBackend::Linux)
+                }
                 "windows" | "powershell" => cfg.backend = Some(NotificationBackend::Windows),
                 "termux" | "android" => cfg.backend = Some(NotificationBackend::Termux),
                 "osc" | "terminal" => cfg.backend = Some(NotificationBackend::TerminalOsc),
@@ -660,7 +677,11 @@ impl Notification {
     }
 
     /// Convenience constructor for subagent execution completion notifications.
-    pub fn subagent_complete(agent_name: &str, task_desc: &str, duration_secs: Option<f64>) -> Self {
+    pub fn subagent_complete(
+        agent_name: &str,
+        task_desc: &str,
+        duration_secs: Option<f64>,
+    ) -> Self {
         let body = match duration_secs {
             Some(secs) => format!(
                 "Subagent '{agent_name}' finished task: {task_desc} ({})",
@@ -699,7 +720,10 @@ impl Notification {
     /// Convenience constructor for agent turn completion.
     pub fn turn_complete(task_name: &str, model: &str, duration_secs: Option<f64>) -> Self {
         let body = match duration_secs {
-            Some(secs) => format!("Turn completed via {model} in {}", format_duration_secs(secs)),
+            Some(secs) => format!(
+                "Turn completed via {model} in {}",
+                format_duration_secs(secs)
+            ),
             None => format!("Turn completed via {model}"),
         };
 
@@ -800,7 +824,9 @@ impl Notification {
             NotificationBackend::Windows => Some(self.render_windows_command()),
             NotificationBackend::Termux => Some(self.render_termux_command()),
             NotificationBackend::Custom(cmd) => Some(self.render_custom_command(&cmd)),
-            NotificationBackend::TerminalOsc | NotificationBackend::Disabled | NotificationBackend::Auto => None,
+            NotificationBackend::TerminalOsc
+            | NotificationBackend::Disabled
+            | NotificationBackend::Auto => None,
         }
     }
 
@@ -829,7 +855,11 @@ end run"#;
             self.title.clone(),
             self.body.clone(),
             self.subtitle.clone().unwrap_or_default(),
-            if self.sound { "true".to_string() } else { "false".to_string() },
+            if self.sound {
+                "true".to_string()
+            } else {
+                "false".to_string()
+            },
         ];
 
         ("osascript".to_string(), args)
@@ -888,10 +918,7 @@ end run"#;
 
     /// Renders Android / Termux `termux-notification` command and arguments.
     pub fn render_termux_command(&self) -> (String, Vec<String>) {
-        let mut args = vec![
-            "-t".to_string(),
-            self.title.clone(),
-        ];
+        let mut args = vec!["-t".to_string(), self.title.clone()];
 
         let content = match &self.subtitle {
             Some(sub) if !sub.is_empty() => format!("{sub}: {}", self.body),
@@ -900,10 +927,7 @@ end run"#;
         args.push("-c".to_string());
         args.push(content);
 
-        let id = format!(
-            "fusion_{}",
-            self.category.as_deref().unwrap_or("general")
-        );
+        let id = format!("fusion_{}", self.category.as_deref().unwrap_or("general"));
         args.push("--id".to_string());
         args.push(id);
 
@@ -1011,7 +1035,9 @@ end run"#;
             }
             TerminalOscProtocol::Osc99 => {
                 // OSC 99;i=1:d=0;title ST OSC 99;i=1:d=1:p=body;body ST
-                format!("\x1b]99;i=1:d=0;{clean_title}\x1b\\\x1b]99;i=1:d=1:p=body;{clean_body}\x1b\\")
+                format!(
+                    "\x1b]99;i=1:d=0;{clean_title}\x1b\\\x1b]99;i=1:d=1:p=body;{clean_body}\x1b\\"
+                )
             }
             TerminalOscProtocol::All => {
                 // Combined multi-protocol emission for seamless terminal support across Kitty, iTerm2, WezTerm, Ghostty, Alacritty, Foot
@@ -1079,7 +1105,10 @@ end run"#;
 
         // 2. Desktop OS notification
         if config.desktop_enabled {
-            let backend = config.backend.clone().unwrap_or_else(NotificationBackend::detect);
+            let backend = config
+                .backend
+                .clone()
+                .unwrap_or_else(NotificationBackend::detect);
             match self.send_desktop(backend) {
                 Ok(()) => {
                     outcome.desktop_sent = true;
@@ -1180,9 +1209,9 @@ fn execute_process_with_timeout(
     cmd.stdout(Stdio::null());
     cmd.stderr(Stdio::null());
 
-    let mut child = cmd.spawn().map_err(|e| {
-        NotificationError::SpawnError(format!("Failed to spawn '{bin}': {e}"))
-    })?;
+    let mut child = cmd
+        .spawn()
+        .map_err(|e| NotificationError::SpawnError(format!("Failed to spawn '{bin}': {e}")))?;
 
     let timeout = Duration::from_millis(timeout_ms.unwrap_or(DEFAULT_TIMEOUT_MS) as u64);
     let start = Instant::now();
@@ -1354,7 +1383,10 @@ pub fn find_terminal_notifier() -> Option<String> {
     if is_executable_in_path("terminal-notifier") {
         return Some("terminal-notifier".to_string());
     }
-    for candidate in &["/opt/homebrew/bin/terminal-notifier", "/usr/local/bin/terminal-notifier"] {
+    for candidate in &[
+        "/opt/homebrew/bin/terminal-notifier",
+        "/usr/local/bin/terminal-notifier",
+    ] {
         if std::path::Path::new(candidate).exists() {
             return Some((*candidate).to_string());
         }
@@ -1368,8 +1400,7 @@ pub fn find_terminal_notifier() -> Option<String> {
 
 /// Escapes single quotes for PowerShell single-quoted string literals (`'` -> `''`).
 pub fn escape_powershell(s: &str) -> String {
-    s.replace('\'', "''")
-        .replace('\0', "")
+    s.replace('\'', "''").replace('\0', "")
 }
 
 /// Sanitizes text for terminal OSC escape sequences by stripping control characters.
@@ -1478,7 +1509,8 @@ pub fn notify_subagent_complete_with_config(
         return false;
     }
     let notif_cfg = config.notification_config();
-    Notification::subagent_complete(agent_name, task_desc, duration_secs).send_with_config(&notif_cfg);
+    Notification::subagent_complete(agent_name, task_desc, duration_secs)
+        .send_with_config(&notif_cfg);
     true
 }
 
@@ -1493,7 +1525,8 @@ pub fn notify_subagent_failed_with_config(
         return false;
     }
     let notif_cfg = config.notification_config();
-    Notification::subagent_failed(agent_name, error_msg, duration_secs).send_with_config(&notif_cfg);
+    Notification::subagent_failed(agent_name, error_msg, duration_secs)
+        .send_with_config(&notif_cfg);
     true
 }
 
@@ -1513,11 +1546,7 @@ pub fn notify_turn_complete(
 }
 
 /// Convenience helper for error notifications integrating application `Config`.
-pub fn notify_error(
-    config: &crate::config::Config,
-    title: &str,
-    error_message: &str,
-) -> bool {
+pub fn notify_error(config: &crate::config::Config, title: &str, error_message: &str) -> bool {
     if !config.notify_enabled || !config.notify_on_error {
         return false;
     }
@@ -1534,7 +1563,11 @@ pub fn emit_terminal_notification(title: &str, body: &str) -> bool {
 }
 
 /// Emits an inline terminal OSC notification to an arbitrary writer.
-pub fn emit_terminal_osc_to<W: Write>(title: &str, body: &str, writer: &mut W) -> std::io::Result<()> {
+pub fn emit_terminal_osc_to<W: Write>(
+    title: &str,
+    body: &str,
+    writer: &mut W,
+) -> std::io::Result<()> {
     let notif = Notification::new(title, body);
     notif.send_terminal_osc(writer)?;
     Ok(())
@@ -1556,7 +1589,10 @@ mod tests {
 
         assert_eq!(NotificationUrgency::Low.notify_send_urgency(), "low");
         assert_eq!(NotificationUrgency::Normal.notify_send_urgency(), "normal");
-        assert_eq!(NotificationUrgency::Critical.notify_send_urgency(), "critical");
+        assert_eq!(
+            NotificationUrgency::Critical.notify_send_urgency(),
+            "critical"
+        );
 
         assert_eq!(NotificationUrgency::Low.termux_priority(), "low");
         assert_eq!(NotificationUrgency::Normal.termux_priority(), "default");
@@ -1570,19 +1606,52 @@ mod tests {
         assert_eq!(NotificationPriority::Warning.as_str(), "warning");
         assert_eq!(NotificationPriority::Error.as_str(), "error");
 
-        assert_eq!(NotificationPriority::Info.to_urgency(), NotificationUrgency::Low);
-        assert_eq!(NotificationPriority::Success.to_urgency(), NotificationUrgency::Normal);
-        assert_eq!(NotificationPriority::Warning.to_urgency(), NotificationUrgency::Normal);
-        assert_eq!(NotificationPriority::Error.to_urgency(), NotificationUrgency::Critical);
+        assert_eq!(
+            NotificationPriority::Info.to_urgency(),
+            NotificationUrgency::Low
+        );
+        assert_eq!(
+            NotificationPriority::Success.to_urgency(),
+            NotificationUrgency::Normal
+        );
+        assert_eq!(
+            NotificationPriority::Warning.to_urgency(),
+            NotificationUrgency::Normal
+        );
+        assert_eq!(
+            NotificationPriority::Error.to_urgency(),
+            NotificationUrgency::Critical
+        );
 
-        assert_eq!(NotificationUrgency::from(NotificationPriority::Info), NotificationUrgency::Low);
-        assert_eq!(NotificationUrgency::from(NotificationPriority::Success), NotificationUrgency::Normal);
-        assert_eq!(NotificationUrgency::from(NotificationPriority::Warning), NotificationUrgency::Normal);
-        assert_eq!(NotificationUrgency::from(NotificationPriority::Error), NotificationUrgency::Critical);
+        assert_eq!(
+            NotificationUrgency::from(NotificationPriority::Info),
+            NotificationUrgency::Low
+        );
+        assert_eq!(
+            NotificationUrgency::from(NotificationPriority::Success),
+            NotificationUrgency::Normal
+        );
+        assert_eq!(
+            NotificationUrgency::from(NotificationPriority::Warning),
+            NotificationUrgency::Normal
+        );
+        assert_eq!(
+            NotificationUrgency::from(NotificationPriority::Error),
+            NotificationUrgency::Critical
+        );
 
-        assert_eq!(NotificationPriority::from(NotificationUrgency::Low), NotificationPriority::Info);
-        assert_eq!(NotificationPriority::from(NotificationUrgency::Normal), NotificationPriority::Success);
-        assert_eq!(NotificationPriority::from(NotificationUrgency::Critical), NotificationPriority::Error);
+        assert_eq!(
+            NotificationPriority::from(NotificationUrgency::Low),
+            NotificationPriority::Info
+        );
+        assert_eq!(
+            NotificationPriority::from(NotificationUrgency::Normal),
+            NotificationPriority::Success
+        );
+        assert_eq!(
+            NotificationPriority::from(NotificationUrgency::Critical),
+            NotificationPriority::Error
+        );
     }
 
     #[test]
@@ -1667,7 +1736,8 @@ mod tests {
 
     #[test]
     fn test_subagent_failed_builder() {
-        let notif = Notification::subagent_failed("CodeReviewer", "Syntax validation failed", Some(1.2));
+        let notif =
+            Notification::subagent_failed("CodeReviewer", "Syntax validation failed", Some(1.2));
         assert_eq!(notif.title, "Subagent Failed: CodeReviewer");
         assert!(notif.body.contains("Syntax validation failed"));
         assert!(notif.body.contains("1.2s"));
@@ -1828,14 +1898,13 @@ mod tests {
             "notify-tool --title {title} --msg {body} --sub {subtitle} --urg {urgency} --prio {priority} --app {app}",
         );
         assert_eq!(bin, "notify-tool");
-        assert_eq!(args, vec![
-            "--title", "Title1",
-            "--msg", "Body1",
-            "--sub", "Sub1",
-            "--urg", "normal",
-            "--prio", "warning",
-            "--app", "MyApp",
-        ]);
+        assert_eq!(
+            args,
+            vec![
+                "--title", "Title1", "--msg", "Body1", "--sub", "Sub1", "--urg", "normal",
+                "--prio", "warning", "--app", "MyApp",
+            ]
+        );
     }
 
     #[test]
@@ -1975,7 +2044,10 @@ mod tests {
         assert_eq!(NotificationBackend::MacOS.name(), "macos (osascript)");
         assert_eq!(NotificationBackend::Linux.name(), "linux (notify-send)");
         assert_eq!(NotificationBackend::Windows.name(), "windows (powershell)");
-        assert_eq!(NotificationBackend::Termux.name(), "termux (termux-notification)");
+        assert_eq!(
+            NotificationBackend::Termux.name(),
+            "termux (termux-notification)"
+        );
         assert_eq!(NotificationBackend::TerminalOsc.name(), "terminal (osc)");
         assert_eq!(NotificationBackend::Disabled.name(), "disabled");
 

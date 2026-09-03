@@ -308,7 +308,6 @@ impl Prompt {
         &mut self.key_handler
     }
 
-
     /// Returns a slice of recorded history entries.
     pub fn history(&self) -> &[String] {
         &self.history
@@ -394,7 +393,13 @@ impl Prompt {
         let cursor_pos = self.cursor_pos;
         let mut last_lines = self.last_rendered_lines;
         let mut last_row = self.last_cursor_row;
-        self.render_to(&mut out, &buffer, cursor_pos, &mut last_lines, &mut last_row)?;
+        self.render_to(
+            &mut out,
+            &buffer,
+            cursor_pos,
+            &mut last_lines,
+            &mut last_row,
+        )?;
         self.last_rendered_lines = last_lines;
         self.last_cursor_row = last_row;
         Ok(())
@@ -406,7 +411,11 @@ impl Prompt {
         if self.last_cursor_row > 0 {
             execute!(out, cursor::MoveUp(self.last_cursor_row as u16))?;
         }
-        execute!(out, cursor::MoveToColumn(0), terminal::Clear(ClearType::FromCursorDown))?;
+        execute!(
+            out,
+            cursor::MoveToColumn(0),
+            terminal::Clear(ClearType::FromCursorDown)
+        )?;
         out.flush()?;
         self.last_rendered_lines = 0;
         self.last_cursor_row = 0;
@@ -489,7 +498,8 @@ impl Prompt {
                             return Ok(None);
                         }
                         KeyCode::Enter => {
-                            let effort = EFFORT_OPTIONS[self.effort_selection.min(EFFORT_OPTIONS.len() - 1)];
+                            let effort =
+                                EFFORT_OPTIONS[self.effort_selection.min(EFFORT_OPTIONS.len() - 1)];
                             let cmd = if effort == "default" {
                                 format!("/model {}", self.pending_model_id)
                             } else {
@@ -530,8 +540,7 @@ impl Prompt {
                     match key.code {
                         KeyCode::Tab | KeyCode::Down => {
                             if !filtered.is_empty() {
-                                self.model_selection =
-                                    (self.model_selection + 1) % filtered.len();
+                                self.model_selection = (self.model_selection + 1) % filtered.len();
                             }
                             self.render_current()?;
                             return Ok(None);
@@ -540,7 +549,7 @@ impl Prompt {
                             if !filtered.is_empty() {
                                 self.model_selection = if self.model_selection == 0 {
                                     filtered.len() - 1
-                                 } else {
+                                } else {
                                     self.model_selection - 1
                                 };
                             }
@@ -593,8 +602,7 @@ impl Prompt {
                     if !matches.is_empty() {
                         match key.code {
                             KeyCode::Tab | KeyCode::Down => {
-                                self.slash_selection =
-                                    (self.slash_selection + 1) % matches.len();
+                                self.slash_selection = (self.slash_selection + 1) % matches.len();
                                 self.render_current()?;
                                 return Ok(None);
                             }
@@ -658,7 +666,10 @@ impl Prompt {
                             return Ok(None);
                         }
                         self.clear_frame()?;
-                        if !self.is_running && self.running_status.is_none() && self.queued_count == 0 {
+                        if !self.is_running
+                            && self.running_status.is_none()
+                            && self.queued_count == 0
+                        {
                             let mut out = stdout();
                             let lines: Vec<&str> = text.split('\n').collect();
                             for line in &lines {
@@ -698,7 +709,8 @@ impl Prompt {
                 }
             }
             Event::Paste(text) => {
-                self.key_handler.snapshot_undo(&self.buffer, self.cursor_pos);
+                self.key_handler
+                    .snapshot_undo(&self.buffer, self.cursor_pos);
                 let normalized = text.replace("\r\n", "\n").replace('\r', "\n");
                 for c in normalized.chars() {
                     self.buffer.insert(self.cursor_pos, c);
@@ -773,8 +785,7 @@ impl Prompt {
                 self.models
                     .iter()
                     .filter(|(id, name)| {
-                        id.to_lowercase().contains(&query)
-                            || name.to_lowercase().contains(&query)
+                        id.to_lowercase().contains(&query) || name.to_lowercase().contains(&query)
                     })
                     .collect()
             };
@@ -782,7 +793,10 @@ impl Prompt {
 
         // Check for slash suggestions
         let first_line = lines.first().copied().unwrap_or("");
-        let slash_suggestions = if !self.model_picker_active && !self.effort_picker_active && first_line.starts_with('/') {
+        let slash_suggestions = if !self.model_picker_active
+            && !self.effort_picker_active
+            && first_line.starts_with('/')
+        {
             slash_matches(first_line)
         } else {
             Vec::new()
@@ -792,7 +806,11 @@ impl Prompt {
         if *last_cursor_row > 0 {
             execute!(out, cursor::MoveUp(*last_cursor_row as u16))?;
         }
-        execute!(out, cursor::MoveToColumn(0), terminal::Clear(ClearType::FromCursorDown))?;
+        execute!(
+            out,
+            cursor::MoveToColumn(0),
+            terminal::Clear(ClearType::FromCursorDown)
+        )?;
 
         let mut total_lines = 0;
 
@@ -866,13 +884,17 @@ impl Prompt {
             } else {
                 crate::ui::repl::format_model_label(&self.active_model)
             };
-            let current_effort = EFFORT_OPTIONS[self.effort_selection.min(EFFORT_OPTIONS.len() - 1)];
+            let current_effort =
+                EFFORT_OPTIONS[self.effort_selection.min(EFFORT_OPTIONS.len() - 1)];
             let mut status_body = format!("auto · {}", model_label);
             if current_effort != "default" {
                 status_body.push_str(&format!(" · {}", current_effort));
             }
             let status_text = if self.queued_count > 0 {
-                format!("queued {} · enter queue · {}", self.queued_count, status_body)
+                format!(
+                    "queued {} · enter queue · {}",
+                    self.queued_count, status_body
+                )
             } else if self.running_status.is_some() || self.is_running {
                 format!("enter queue · {}", status_body)
             } else {
@@ -898,7 +920,8 @@ impl Prompt {
             let sel = if filtered_models.is_empty() {
                 0
             } else {
-                self.model_selection.min(filtered_models.len().saturating_sub(1))
+                self.model_selection
+                    .min(filtered_models.len().saturating_sub(1))
             };
             let window_start = if sel >= 6 { sel - 5 } else { 0 };
             let visible_models: Vec<_> = filtered_models
@@ -924,7 +947,13 @@ impl Prompt {
                 format!("{}-{}", window_start + 1, window_end)
             };
             let gap = term_cols.saturating_sub(left.len() + right.len());
-            write!(out, "\x1b[2;37m{}{}{}\x1b[0m\r\n", left, " ".repeat(gap), right)?;
+            write!(
+                out,
+                "\x1b[2;37m{}{}{}\x1b[0m\r\n",
+                left,
+                " ".repeat(gap),
+                right
+            )?;
             total_lines += 1;
 
             write!(out, "\r\n")?;
@@ -950,7 +979,12 @@ impl Prompt {
                     write!(
                         out,
                         "\x1b[2;37m{:<c1$} {:<c2$} {:>c3$}\x1b[0m\r\n",
-                        col1, col2, cat, c1 = col1_w, c2 = col2_w, c3 = col3_w
+                        col1,
+                        col2,
+                        cat,
+                        c1 = col1_w,
+                        c2 = col2_w,
+                        c3 = col3_w
                     )?;
                 }
                 total_lines += 1;
@@ -959,7 +993,10 @@ impl Prompt {
             write!(out, "\x1b[38;5;240m{}\x1b[0m\r\n", divider)?;
             total_lines += 1;
 
-            write!(out, "\x1b[2;37m↑↓ Navigate     Enter Use     Esc Close\x1b[0m")?;
+            write!(
+                out,
+                "\x1b[2;37m↑↓ Navigate     Enter Use     Esc Close\x1b[0m"
+            )?;
             total_lines += 1;
 
             let lines_up = (lines.len() - 1 - target_row) + visible_count + 5;
@@ -976,7 +1013,9 @@ impl Prompt {
             *last_rendered_lines = total_lines;
             *last_cursor_row = header_lines + target_row;
         } else if !slash_suggestions.is_empty() {
-            let sel = self.slash_selection.min(slash_suggestions.len().saturating_sub(1));
+            let sel = self
+                .slash_selection
+                .min(slash_suggestions.len().saturating_sub(1));
             let window_start = if sel >= 6 { sel - 5 } else { 0 };
             let visible_items: Vec<_> = slash_suggestions
                 .iter()
@@ -990,7 +1029,11 @@ impl Prompt {
             write!(out, "\x1b[38;5;240m{}\x1b[0m\r\n", divider)?;
             total_lines += 1;
 
-            let noun = if first_line == "/" { "Commands" } else { "Results" };
+            let noun = if first_line == "/" {
+                "Commands"
+            } else {
+                "Results"
+            };
             let left = if first_line == "/" {
                 format!("{} {} · Type to filter", noun, slash_suggestions.len())
             } else {
@@ -998,7 +1041,13 @@ impl Prompt {
             };
             let right = format!("{}-{}", window_start + 1, window_end);
             let gap = term_cols.saturating_sub(left.len() + right.len());
-            write!(out, "\x1b[2;37m{}{}{}\x1b[0m\r\n", left, " ".repeat(gap), right)?;
+            write!(
+                out,
+                "\x1b[2;37m{}{}{}\x1b[0m\r\n",
+                left,
+                " ".repeat(gap),
+                right
+            )?;
             total_lines += 1;
 
             write!(out, "\r\n")?;
@@ -1024,7 +1073,12 @@ impl Prompt {
                     write!(
                         out,
                         "\x1b[2;37m{:<c1$} {:<c2$} {:>c3$}\x1b[0m\r\n",
-                        col1, col2, cat, c1 = col1_w, c2 = col2_w, c3 = col3_w
+                        col1,
+                        col2,
+                        cat,
+                        c1 = col1_w,
+                        c2 = col2_w,
+                        c3 = col3_w
                     )?;
                 }
                 total_lines += 1;
@@ -1033,7 +1087,10 @@ impl Prompt {
             write!(out, "\x1b[38;5;240m{}\x1b[0m\r\n", divider)?;
             total_lines += 1;
 
-            write!(out, "\x1b[2;37m↑↓ Navigate     Enter Use     Esc Close\x1b[0m")?;
+            write!(
+                out,
+                "\x1b[2;37m↑↓ Navigate     Enter Use     Esc Close\x1b[0m"
+            )?;
             total_lines += 1;
 
             let lines_up = (lines.len() - 1 - target_row) + visible_count + 5;
@@ -1059,7 +1116,10 @@ impl Prompt {
                 status_body.push_str(&format!(" · {}", effort));
             }
             let status_text = if self.queued_count > 0 {
-                format!("queued {} · enter queue · {}", self.queued_count, status_body)
+                format!(
+                    "queued {} · enter queue · {}",
+                    self.queued_count, status_body
+                )
             } else if self.running_status.is_some() || self.is_running {
                 format!("enter queue · {}", status_body)
             } else {
@@ -1090,7 +1150,10 @@ impl Prompt {
     }
 
     /// Render a submitted user input prompt to a generic writer.
-    pub fn render_submitted_prompt_to<W: std::io::Write>(out: &mut W, text: &str) -> std::io::Result<()> {
+    pub fn render_submitted_prompt_to<W: std::io::Write>(
+        out: &mut W,
+        text: &str,
+    ) -> std::io::Result<()> {
         let lines: Vec<&str> = text.split('\n').collect();
         for line in &lines {
             write!(out, "\x1b[1m┃ {}\x1b[0m\r\n", line)?;
@@ -1139,7 +1202,6 @@ fn model_category_label(id: &str, name: &str) -> &'static str {
     }
 }
 
-
 /// Match slash commands whose name or aliases start with the typed prefix.
 fn slash_matches(typed: &str) -> Vec<&'static crate::ui::slash::CommandDescriptor> {
     let query = typed.trim_start().to_lowercase();
@@ -1147,7 +1209,9 @@ fn slash_matches(typed: &str) -> Vec<&'static crate::ui::slash::CommandDescripto
         .iter()
         .filter(|d| {
             d.name.to_lowercase().starts_with(&query)
-                || d.aliases.iter().any(|a| a.to_lowercase().starts_with(&query))
+                || d.aliases
+                    .iter()
+                    .any(|a| a.to_lowercase().starts_with(&query))
         })
         .take(8)
         .collect()
@@ -1379,8 +1443,14 @@ mod tests {
     #[test]
     fn test_render_model_picker_menu() {
         let models = vec![
-            ("deepseek-ai/DeepSeek-V4-Flash-0731".to_string(), "DeepSeek V4 Flash".to_string()),
-            ("MiniMaxAI/MiniMax-M2.7".to_string(), "MiniMax M2.7".to_string()),
+            (
+                "deepseek-ai/DeepSeek-V4-Flash-0731".to_string(),
+                "DeepSeek V4 Flash".to_string(),
+            ),
+            (
+                "MiniMaxAI/MiniMax-M2.7".to_string(),
+                "MiniMax M2.7".to_string(),
+            ),
             ("moonshotai/Kimi-K2.6".to_string(), "Kimi K2.6".to_string()),
         ];
         let prompt = Prompt::new()
@@ -1398,10 +1468,18 @@ mod tests {
 
         let raw = String::from_utf8_lossy(&buf);
         // Header row
-        assert!(raw.contains("Models 3 · Type to filter"), "Missing header in:\n{}", raw);
+        assert!(
+            raw.contains("Models 3 · Type to filter"),
+            "Missing header in:\n{}",
+            raw
+        );
         assert!(raw.contains("1-3"), "Missing range indicator in:\n{}", raw);
         // Top and bottom divider color
-        assert!(raw.contains("\x1b[38;5;240m"), "Missing divider color in:\n{}", raw);
+        assert!(
+            raw.contains("\x1b[38;5;240m"),
+            "Missing divider color in:\n{}",
+            raw
+        );
         // Footer hints
         assert!(
             raw.contains("↑↓ Navigate     Enter Use     Esc Close"),
@@ -1409,17 +1487,31 @@ mod tests {
             raw
         );
         // Selected item bold
-        assert!(raw.contains("\x1b[1;37m"), "Missing selected bold item in:\n{}", raw);
+        assert!(
+            raw.contains("\x1b[1;37m"),
+            "Missing selected bold item in:\n{}",
+            raw
+        );
         // Categories
         assert!(raw.contains("Fast"), "Missing Fast category in:\n{}", raw);
-        assert!(raw.contains("Reasoning"), "Missing Reasoning category in:\n{}", raw);
+        assert!(
+            raw.contains("Reasoning"),
+            "Missing Reasoning category in:\n{}",
+            raw
+        );
     }
 
     #[test]
     fn test_render_model_picker_with_filter() {
         let models = vec![
-            ("deepseek-ai/DeepSeek-V4-Flash-0731".to_string(), "DeepSeek V4 Flash".to_string()),
-            ("MiniMaxAI/MiniMax-M2.7".to_string(), "MiniMax M2.7".to_string()),
+            (
+                "deepseek-ai/DeepSeek-V4-Flash-0731".to_string(),
+                "DeepSeek V4 Flash".to_string(),
+            ),
+            (
+                "MiniMaxAI/MiniMax-M2.7".to_string(),
+                "MiniMax M2.7".to_string(),
+            ),
         ];
         let prompt = Prompt::new()
             .with_models(models)
@@ -1453,8 +1545,16 @@ mod tests {
             .expect("render_to slash suggestions failed");
 
         let raw = String::from_utf8_lossy(&buf);
-        assert!(raw.contains("Commands"), "Missing Commands header in:\n{}", raw);
-        assert!(raw.contains("Type to filter"), "Missing filter hint in:\n{}", raw);
+        assert!(
+            raw.contains("Commands"),
+            "Missing Commands header in:\n{}",
+            raw
+        );
+        assert!(
+            raw.contains("Type to filter"),
+            "Missing filter hint in:\n{}",
+            raw
+        );
         assert!(raw.contains("↑↓ Navigate     Enter Use     Esc Close"));
         assert!(raw.contains("/help") || raw.contains("/model") || raw.contains("/clear"));
     }
@@ -1462,11 +1562,26 @@ mod tests {
     #[test]
     fn test_model_category_labels() {
         assert_eq!(model_category_label("gpt-4o-fast", "Fast GPT"), "Fast");
-        assert_eq!(model_category_label("deepseek-ai/DeepSeek-V4-Flash-0731", "DeepSeek V4 Flash"), "Fast");
-        assert_eq!(model_category_label("moonshotai/Kimi-K2.6", "Kimi K2.6"), "Reasoning");
-        assert_eq!(model_category_label("MiniMaxAI/MiniMax-M2.7", "MiniMax M2.7"), "Reasoning");
-        assert_eq!(model_category_label("qwen/qwen-coder-32b", "Qwen Coder"), "Coding");
-        assert_eq!(model_category_label("custom-model", "Custom Model"), "Model");
+        assert_eq!(
+            model_category_label("deepseek-ai/DeepSeek-V4-Flash-0731", "DeepSeek V4 Flash"),
+            "Fast"
+        );
+        assert_eq!(
+            model_category_label("moonshotai/Kimi-K2.6", "Kimi K2.6"),
+            "Reasoning"
+        );
+        assert_eq!(
+            model_category_label("MiniMaxAI/MiniMax-M2.7", "MiniMax M2.7"),
+            "Reasoning"
+        );
+        assert_eq!(
+            model_category_label("qwen/qwen-coder-32b", "Qwen Coder"),
+            "Coding"
+        );
+        assert_eq!(
+            model_category_label("custom-model", "Custom Model"),
+            "Model"
+        );
     }
 
     #[test]
@@ -1478,27 +1593,56 @@ mod tests {
             .with_effort_selection(0);
 
         let mut buf = Vec::new();
-        let buffer: Vec<char> = "/model deepseek-ai/DeepSeek-V4-Flash-0731 ".chars().collect();
+        let buffer: Vec<char> = "/model deepseek-ai/DeepSeek-V4-Flash-0731 "
+            .chars()
+            .collect();
         let mut last_lines = 0;
         let mut last_cursor = 0;
 
         prompt
-            .render_to(&mut buf, &buffer, buffer.len(), &mut last_lines, &mut last_cursor)
+            .render_to(
+                &mut buf,
+                &buffer,
+                buffer.len(),
+                &mut last_lines,
+                &mut last_cursor,
+            )
             .expect("render_to effort picker failed");
 
         let raw = String::from_utf8_lossy(&buf);
         // Dividers
-        assert!(raw.contains("\x1b[38;5;240m"), "Missing divider color in:\n{}", raw);
+        assert!(
+            raw.contains("\x1b[38;5;240m"),
+            "Missing divider color in:\n{}",
+            raw
+        );
         // 5 options
         for opt in EFFORT_OPTIONS {
-            assert!(raw.contains(opt), "Missing effort option {} in:\n{}", opt, raw);
+            assert!(
+                raw.contains(opt),
+                "Missing effort option {} in:\n{}",
+                opt,
+                raw
+            );
         }
         // Selected item 0 (default) bold white
-        assert!(raw.contains("\x1b[1;37mdefault\x1b[0m"), "Selected item not bold white in:\n{}", raw);
+        assert!(
+            raw.contains("\x1b[1;37mdefault\x1b[0m"),
+            "Selected item not bold white in:\n{}",
+            raw
+        );
         // Unselected item (xhigh) dim
-        assert!(raw.contains("\x1b[2;37mxhigh\x1b[0m"), "Unselected item not dim in:\n{}", raw);
+        assert!(
+            raw.contains("\x1b[2;37mxhigh\x1b[0m"),
+            "Unselected item not dim in:\n{}",
+            raw
+        );
         // Status line for default effort
-        assert!(raw.contains("auto · DeepSeek V4 Flash"), "Missing status line in:\n{}", raw);
+        assert!(
+            raw.contains("auto · DeepSeek V4 Flash"),
+            "Missing status line in:\n{}",
+            raw
+        );
     }
 
     #[test]
@@ -1514,16 +1658,34 @@ mod tests {
         let mut last_cursor = 0;
 
         prompt
-            .render_to(&mut buf, &buffer, buffer.len(), &mut last_lines, &mut last_cursor)
+            .render_to(
+                &mut buf,
+                &buffer,
+                buffer.len(),
+                &mut last_lines,
+                &mut last_cursor,
+            )
             .expect("render_to effort picker failed");
 
         let raw = String::from_utf8_lossy(&buf);
         // Selected item 1 (xhigh) bold white
-        assert!(raw.contains("\x1b[1;37mxhigh\x1b[0m"), "Selected xhigh not bold white in:\n{}", raw);
+        assert!(
+            raw.contains("\x1b[1;37mxhigh\x1b[0m"),
+            "Selected xhigh not bold white in:\n{}",
+            raw
+        );
         // Unselected default dim
-        assert!(raw.contains("\x1b[2;37mdefault\x1b[0m"), "Unselected default not dim in:\n{}", raw);
+        assert!(
+            raw.contains("\x1b[2;37mdefault\x1b[0m"),
+            "Unselected default not dim in:\n{}",
+            raw
+        );
         // Status line dynamically shows effort
-        assert!(raw.contains("auto · Kimi K2.6 · xhigh"), "Missing dynamic status line in:\n{}", raw);
+        assert!(
+            raw.contains("auto · Kimi K2.6 · xhigh"),
+            "Missing dynamic status line in:\n{}",
+            raw
+        );
     }
 
     #[test]
@@ -1542,47 +1704,73 @@ mod tests {
             .expect("render_to status line with effort failed");
 
         let raw = String::from_utf8_lossy(&buf);
-        assert!(raw.contains("auto · MiniMax M2.7 · high"), "Status line missing effort in:\n{}", raw);
+        assert!(
+            raw.contains("auto · MiniMax M2.7 · high"),
+            "Status line missing effort in:\n{}",
+            raw
+        );
     }
 
     #[test]
     fn test_effort_picker_handle_event_navigation_and_submit() {
         use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 
-        let models = vec![
-            ("deepseek-ai/DeepSeek-V4-Flash-0731".to_string(), "DeepSeek V4 Flash".to_string()),
-        ];
+        let models = vec![(
+            "deepseek-ai/DeepSeek-V4-Flash-0731".to_string(),
+            "DeepSeek V4 Flash".to_string(),
+        )];
         let mut prompt = Prompt::new()
             .with_models(models)
             .with_model_picker_active(true);
 
         // 1. Enter on model picker -> enters effort picker
-        let res = prompt.handle_event(Event::Key(KeyEvent::new(KeyCode::Enter, KeyModifiers::NONE))).unwrap();
+        let res = prompt
+            .handle_event(Event::Key(KeyEvent::new(
+                KeyCode::Enter,
+                KeyModifiers::NONE,
+            )))
+            .unwrap();
         assert_eq!(res, None);
         assert!(!prompt.model_picker_active());
         assert!(prompt.effort_picker_active());
-        assert_eq!(prompt.pending_model_id(), "deepseek-ai/DeepSeek-V4-Flash-0731");
+        assert_eq!(
+            prompt.pending_model_id(),
+            "deepseek-ai/DeepSeek-V4-Flash-0731"
+        );
         assert_eq!(prompt.effort_selection(), 0);
         let buf_str: String = prompt.buffer.iter().collect();
         assert_eq!(buf_str, "/model deepseek-ai/DeepSeek-V4-Flash-0731 ");
 
         // 2. Down -> selects xhigh (idx 1)
-        prompt.handle_event(Event::Key(KeyEvent::new(KeyCode::Down, KeyModifiers::NONE))).unwrap();
+        prompt
+            .handle_event(Event::Key(KeyEvent::new(KeyCode::Down, KeyModifiers::NONE)))
+            .unwrap();
         assert_eq!(prompt.effort_selection(), 1);
 
         // 3. Down -> selects high (idx 2)
-        prompt.handle_event(Event::Key(KeyEvent::new(KeyCode::Down, KeyModifiers::NONE))).unwrap();
+        prompt
+            .handle_event(Event::Key(KeyEvent::new(KeyCode::Down, KeyModifiers::NONE)))
+            .unwrap();
         assert_eq!(prompt.effort_selection(), 2);
 
         // 4. Up -> selects xhigh (idx 1)
-        prompt.handle_event(Event::Key(KeyEvent::new(KeyCode::Up, KeyModifiers::NONE))).unwrap();
+        prompt
+            .handle_event(Event::Key(KeyEvent::new(KeyCode::Up, KeyModifiers::NONE)))
+            .unwrap();
         assert_eq!(prompt.effort_selection(), 1);
 
         // 5. Enter -> submits command with effort
-        let res = prompt.handle_event(Event::Key(KeyEvent::new(KeyCode::Enter, KeyModifiers::NONE))).unwrap();
+        let res = prompt
+            .handle_event(Event::Key(KeyEvent::new(
+                KeyCode::Enter,
+                KeyModifiers::NONE,
+            )))
+            .unwrap();
         assert_eq!(
             res,
-            Some(PromptResult::Submit("/model deepseek-ai/DeepSeek-V4-Flash-0731 xhigh".to_string()))
+            Some(PromptResult::Submit(
+                "/model deepseek-ai/DeepSeek-V4-Flash-0731 xhigh".to_string()
+            ))
         );
         assert!(!prompt.effort_picker_active());
         assert_eq!(prompt.selected_effort(), Some("xhigh"));
@@ -1597,7 +1785,12 @@ mod tests {
             .with_effort_picker_active(true)
             .with_effort_selection(0);
 
-        let res = prompt.handle_event(Event::Key(KeyEvent::new(KeyCode::Enter, KeyModifiers::NONE))).unwrap();
+        let res = prompt
+            .handle_event(Event::Key(KeyEvent::new(
+                KeyCode::Enter,
+                KeyModifiers::NONE,
+            )))
+            .unwrap();
         assert_eq!(res, Some(PromptResult::Submit("/model gpt-4o".to_string())));
         assert!(!prompt.effort_picker_active());
         assert_eq!(prompt.selected_effort(), None);
@@ -1614,7 +1807,9 @@ mod tests {
         prompt.buffer = "/model gpt-4o ".chars().collect();
         prompt.cursor_pos = prompt.buffer.len();
 
-        let res = prompt.handle_event(Event::Key(KeyEvent::new(KeyCode::Esc, KeyModifiers::NONE))).unwrap();
+        let res = prompt
+            .handle_event(Event::Key(KeyEvent::new(KeyCode::Esc, KeyModifiers::NONE)))
+            .unwrap();
         assert_eq!(res, None);
         assert!(!prompt.effort_picker_active());
         assert_eq!(prompt.effort_selection(), 0);
@@ -1641,9 +1836,7 @@ mod tests {
 
     #[test]
     fn test_render_single_queued_message_banner() {
-        let prompt = Prompt::new()
-            .with_model("grok-4.6")
-            .with_queued_count(1);
+        let prompt = Prompt::new().with_model("grok-4.6").with_queued_count(1);
 
         let mut buf = Vec::new();
         let buffer: Vec<char> = Vec::new();
@@ -1655,9 +1848,20 @@ mod tests {
             .expect("render_to single queue banner failed");
 
         let raw = String::from_utf8_lossy(&buf);
-        assert!(raw.contains("1 queued message · ↑ to edit"), "Missing single queue banner in:\n{}", raw);
-        assert!(raw.contains("queued 1 · enter queue · auto · grok-4.6"), "Missing queued status line in:\n{}", raw);
-        assert_eq!(last_cursor, 2, "last_cursor_row should be 2 (0 running + 2 queue banner + 0 target_row)");
+        assert!(
+            raw.contains("1 queued message · ↑ to edit"),
+            "Missing single queue banner in:\n{}",
+            raw
+        );
+        assert!(
+            raw.contains("queued 1 · enter queue · auto · grok-4.6"),
+            "Missing queued status line in:\n{}",
+            raw
+        );
+        assert_eq!(
+            last_cursor, 2,
+            "last_cursor_row should be 2 (0 running + 2 queue banner + 0 target_row)"
+        );
     }
 
     #[test]
@@ -1677,10 +1881,25 @@ mod tests {
             .expect("render_to multi queue banner + running status failed");
 
         let raw = String::from_utf8_lossy(&buf);
-        assert!(raw.contains("Thinking (3s) (↑1 ↓0)"), "Missing thinking status in:\n{}", raw);
-        assert!(raw.contains("2 queued messages · ↑ to edit"), "Missing plural queue banner in:\n{}", raw);
-        assert!(raw.contains("queued 2 · enter queue · auto · grok-4.6"), "Missing queued 2 status line in:\n{}", raw);
-        assert_eq!(last_cursor, 4, "last_cursor_row should be 4 (2 running + 2 queue banner + 0 target_row)");
+        assert!(
+            raw.contains("Thinking (3s) (↑1 ↓0)"),
+            "Missing thinking status in:\n{}",
+            raw
+        );
+        assert!(
+            raw.contains("2 queued messages · ↑ to edit"),
+            "Missing plural queue banner in:\n{}",
+            raw
+        );
+        assert!(
+            raw.contains("queued 2 · enter queue · auto · grok-4.6"),
+            "Missing queued 2 status line in:\n{}",
+            raw
+        );
+        assert_eq!(
+            last_cursor, 4,
+            "last_cursor_row should be 4 (2 running + 2 queue banner + 0 target_row)"
+        );
     }
 
     #[test]
@@ -1698,10 +1917,24 @@ mod tests {
             .expect("render_to running status failed");
 
         let raw = String::from_utf8_lossy(&buf);
-        assert!(raw.contains("Thinking (1s)"), "Missing thinking status in:\n{}", raw);
-        assert!(!raw.contains("queued message"), "Should not have queue banner");
-        assert!(raw.contains("enter queue · auto · grok-4.6"), "Missing enter queue status in:\n{}", raw);
-        assert_eq!(last_cursor, 2, "last_cursor_row should be 2 (2 running + 0 queue banner + 0 target_row)");
+        assert!(
+            raw.contains("Thinking (1s)"),
+            "Missing thinking status in:\n{}",
+            raw
+        );
+        assert!(
+            !raw.contains("queued message"),
+            "Should not have queue banner"
+        );
+        assert!(
+            raw.contains("enter queue · auto · grok-4.6"),
+            "Missing enter queue status in:\n{}",
+            raw
+        );
+        assert_eq!(
+            last_cursor, 2,
+            "last_cursor_row should be 2 (2 running + 0 queue banner + 0 target_row)"
+        );
     }
 
     #[test]
@@ -1718,9 +1951,19 @@ mod tests {
             .expect("render_to idle failed");
 
         let raw = String::from_utf8_lossy(&buf);
-        assert!(!raw.contains("enter queue"), "Idle status should not contain enter queue");
-        assert!(raw.contains("auto · grok-4.6"), "Missing auto status in:\n{}", raw);
-        assert_eq!(last_cursor, 0, "last_cursor_row should be 0 (0 running + 0 queue banner + 0 target_row)");
+        assert!(
+            !raw.contains("enter queue"),
+            "Idle status should not contain enter queue"
+        );
+        assert!(
+            raw.contains("auto · grok-4.6"),
+            "Missing auto status in:\n{}",
+            raw
+        );
+        assert_eq!(
+            last_cursor, 0,
+            "last_cursor_row should be 0 (0 running + 0 queue banner + 0 target_row)"
+        );
     }
 
     #[test]
@@ -1741,8 +1984,15 @@ mod tests {
             .expect("render_to running flag status failed");
 
         let raw = String::from_utf8_lossy(&buf);
-        assert!(raw.contains("enter queue · auto · grok-4.6"), "Missing enter queue status in:\n{}", raw);
-        assert!(!raw.contains("queued message"), "Should not have queue banner");
+        assert!(
+            raw.contains("enter queue · auto · grok-4.6"),
+            "Missing enter queue status in:\n{}",
+            raw
+        );
+        assert!(
+            !raw.contains("queued message"),
+            "Should not have queue banner"
+        );
 
         prompt.reset_input();
         assert!(!prompt.is_running());
@@ -1758,9 +2008,15 @@ mod tests {
         prompt.cursor_pos = prompt.buffer.len();
 
         let res = prompt
-            .handle_event(Event::Key(KeyEvent::new(KeyCode::Enter, KeyModifiers::NONE)))
+            .handle_event(Event::Key(KeyEvent::new(
+                KeyCode::Enter,
+                KeyModifiers::NONE,
+            )))
             .unwrap();
-        assert_eq!(res, Some(PromptResult::Submit("queued question".to_string())));
+        assert_eq!(
+            res,
+            Some(PromptResult::Submit("queued question".to_string()))
+        );
         assert!(prompt.buffer.is_empty());
         assert_eq!(prompt.cursor_pos, 0);
     }

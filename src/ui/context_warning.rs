@@ -31,7 +31,6 @@
 //! - **Pure ANSI Output**:
 //!   Zero-dependency ANSI string formatters for standard terminal output, CLI commands, and REPLs.
 
-use std::fmt;
 use ratatui::{
     buffer::Buffer,
     layout::{Alignment, Constraint, Direction, Layout, Rect},
@@ -41,11 +40,12 @@ use ratatui::{
     Frame,
 };
 use serde::{Deserialize, Serialize};
+use std::fmt;
 
 use crate::agent::session::Session;
 use crate::agent::tokens::{
-    format_token_count, model_context_limit, ContextBudget,
-    DEFAULT_RESERVED_COMPLETION, DEFAULT_SAFETY_MARGIN,
+    format_token_count, model_context_limit, ContextBudget, DEFAULT_RESERVED_COMPLETION,
+    DEFAULT_SAFETY_MARGIN,
 };
 use crate::ui::theme::Theme;
 
@@ -158,7 +158,10 @@ impl ContextAlertSeverity {
     /// Returns `true` if this severity warrants showing a visible warning alert.
     #[inline]
     pub fn is_alert(&self) -> bool {
-        matches!(self, Self::Notice | Self::Warning | Self::Critical | Self::Overflow)
+        matches!(
+            self,
+            Self::Notice | Self::Warning | Self::Critical | Self::Overflow
+        )
     }
 
     /// Returns `true` if at warning level or higher (>= 80%).
@@ -250,7 +253,9 @@ impl ContextAlertSeverity {
         match self {
             Self::Safe => Style::default().fg(Color::Green),
             Self::Notice => Style::default().fg(Color::Cyan),
-            Self::Warning => Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD),
+            Self::Warning => Style::default()
+                .fg(Color::Yellow)
+                .add_modifier(Modifier::BOLD),
             Self::Critical => Style::default().fg(Color::Red).add_modifier(Modifier::BOLD),
             Self::Overflow => Style::default()
                 .fg(Color::White)
@@ -315,7 +320,8 @@ pub fn render_progress_bar_text(utilization: f32, width: usize, style: ProgressB
     match style {
         ProgressBarStyle::UnicodeSubBlock => {
             let total_steps = width * 8;
-            let active_steps = ((clamped_util * total_steps as f32).round() as usize).min(total_steps);
+            let active_steps =
+                ((clamped_util * total_steps as f32).round() as usize).min(total_steps);
             let full_blocks = active_steps / 8;
             let remainder = active_steps % 8;
 
@@ -416,14 +422,7 @@ pub fn render_progress_bar_ansi(
     if show_percentage {
         format!(
             "{}{}[{}]{}{} {}{}{}",
-            ANSI_GRAY,
-            color,
-            bar_str,
-            ANSI_RESET,
-            ANSI_GRAY,
-            color,
-            pct_str,
-            ANSI_RESET
+            ANSI_GRAY, color, bar_str, ANSI_RESET, ANSI_GRAY, color, pct_str, ANSI_RESET
         )
     } else {
         format!("{}{}[{}]{}", color, ANSI_BOLD, bar_str, ANSI_RESET)
@@ -717,7 +716,11 @@ impl ContextLimitAlert {
             system_tokens: None,
             messages_tokens: None,
             tools_tokens: None,
-            estimated_remaining_turns: Some((effective / 1500).max(if remaining > 0 { 1 } else { 0 })),
+            estimated_remaining_turns: Some((effective / 1500).max(if remaining > 0 {
+                1
+            } else {
+                0
+            })),
             cost_estimate_usd: None,
             severity,
             utilization,
@@ -883,10 +886,16 @@ impl ContextLimitAlert {
             ContextAlertSeverity::Safe => "Context Window: Optimal Margin".to_string(),
             ContextAlertSeverity::Notice => "Context Window: Headroom Notice".to_string(),
             ContextAlertSeverity::Warning => {
-                format!("Context Window Warning ({} Capacity)", self.percentage_str())
+                format!(
+                    "Context Window Warning ({} Capacity)",
+                    self.percentage_str()
+                )
             }
             ContextAlertSeverity::Critical => {
-                format!("🚨 Critical Context Limit Approaching ({})", self.percentage_str())
+                format!(
+                    "🚨 Critical Context Limit Approaching ({})",
+                    self.percentage_str()
+                )
             }
             ContextAlertSeverity::Overflow => {
                 format!("⛔ Context Window Overflow ({})", self.percentage_str())
@@ -1028,8 +1037,8 @@ impl ContextWarningTracker {
         };
         let is_significant_growth = delta_ratio >= self.hysteresis_ratio;
 
-        let should_trigger = (is_escalation || is_significant_growth)
-            && (!self.dismissed || is_escalation);
+        let should_trigger =
+            (is_escalation || is_significant_growth) && (!self.dismissed || is_escalation);
 
         if should_trigger {
             self.last_severity = current_severity;
@@ -1054,7 +1063,12 @@ impl ContextWarningTracker {
     }
 
     /// Evaluates without mutating tracker state.
-    pub fn check_peek(&self, used_tokens: usize, max_tokens: usize, model: &str) -> ContextLimitAlert {
+    pub fn check_peek(
+        &self,
+        used_tokens: usize,
+        max_tokens: usize,
+        model: &str,
+    ) -> ContextLimitAlert {
         ContextLimitAlert::new(used_tokens, max_tokens, model)
     }
 
@@ -1132,7 +1146,10 @@ pub fn render_warning_banner_ansi(
     out.push('\n');
 
     // 2. Headline & Model Line
-    let model_tag = format!("{}Model: {}{}{}", ANSI_GRAY, ANSI_BOLD_CYAN, alert.model, ANSI_RESET);
+    let model_tag = format!(
+        "{}Model: {}{}{}",
+        ANSI_GRAY, ANSI_BOLD_CYAN, alert.model, ANSI_RESET
+    );
     let headline_str = format!("{}{}{}", ANSI_BOLD, alert.headline(), ANSI_RESET);
     out.push_str(&render_row(&headline_str));
     out.push_str(&render_row(&model_tag));
@@ -1168,7 +1185,11 @@ pub fn render_warning_banner_ansi(
     out.push_str(&render_row(&metrics_line));
 
     // 5. Granular Breakdown if available
-    if let (Some(sys), Some(msgs), Some(tools)) = (alert.system_tokens, alert.messages_tokens, alert.tools_tokens) {
+    if let (Some(sys), Some(msgs), Some(tools)) = (
+        alert.system_tokens,
+        alert.messages_tokens,
+        alert.tools_tokens,
+    ) {
         let breakdown_line = format!(
             "{}Breakdown: Sys: {}  │  Msgs: {}  │  Tools: {}{}",
             ANSI_GRAY,
@@ -1183,9 +1204,15 @@ pub fn render_warning_banner_ansi(
     // 6. Turns remaining estimate
     if let Some(turns) = alert.estimated_remaining_turns {
         let turns_line = if turns > 0 {
-            format!("{}Est. Turns Left: ~{} turns before limit{}", ANSI_GRAY, turns, ANSI_RESET)
+            format!(
+                "{}Est. Turns Left: ~{} turns before limit{}",
+                ANSI_GRAY, turns, ANSI_RESET
+            )
         } else {
-            format!("{}Est. Turns Left: 0 turns (Limit exceeded){}", ANSI_BOLD_RED, ANSI_RESET)
+            format!(
+                "{}Est. Turns Left: 0 turns (Limit exceeded){}",
+                ANSI_BOLD_RED, ANSI_RESET
+            )
         };
         out.push_str(&render_row(&turns_line));
     }
@@ -1281,7 +1308,12 @@ pub fn strip_ansi(s: &str) -> String {
                 chars.next(); // consume '['
                 while let Some(&next) = chars.peek() {
                     chars.next();
-                    if next.is_ascii_alphabetic() || next == 'm' || next == 'K' || next == 'H' || next == 'J' {
+                    if next.is_ascii_alphabetic()
+                        || next == 'm'
+                        || next == 'K'
+                        || next == 'H'
+                        || next == 'J'
+                    {
                         break;
                     }
                 }
@@ -1395,10 +1427,9 @@ impl<'a> ContextWarningWidget<'a> {
         let alert_color = self.alert.severity.ratatui_color();
         let border_type = self.border_style.to_ratatui_border_type();
 
-        let title_text = self
-            .custom_title
-            .clone()
-            .unwrap_or_else(|| format!(" {} {} ", self.alert.severity.icon(), self.alert.headline()));
+        let title_text = self.custom_title.clone().unwrap_or_else(|| {
+            format!(" {} {} ", self.alert.severity.icon(), self.alert.headline())
+        });
 
         let block = Block::default()
             .borders(Borders::ALL)
@@ -1406,7 +1437,9 @@ impl<'a> ContextWarningWidget<'a> {
             .border_style(Style::default().fg(alert_color))
             .title(Span::styled(
                 title_text,
-                Style::default().fg(alert_color).add_modifier(Modifier::BOLD),
+                Style::default()
+                    .fg(alert_color)
+                    .add_modifier(Modifier::BOLD),
             ));
 
         let inner = block.inner(area);
@@ -1421,12 +1454,19 @@ impl<'a> ContextWarningWidget<'a> {
         // 1. Model and Status row
         lines.push(Line::from(vec![
             Span::styled("Model: ", Style::default().fg(Color::DarkGray)),
-            Span::styled(&self.alert.model, Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD)),
+            Span::styled(
+                &self.alert.model,
+                Style::default()
+                    .fg(Color::Cyan)
+                    .add_modifier(Modifier::BOLD),
+            ),
             Span::raw("  │  "),
             Span::styled("Capacity: ", Style::default().fg(Color::DarkGray)),
             Span::styled(
                 self.alert.percentage_str(),
-                Style::default().fg(alert_color).add_modifier(Modifier::BOLD),
+                Style::default()
+                    .fg(alert_color)
+                    .add_modifier(Modifier::BOLD),
             ),
         ]));
 
@@ -1443,14 +1483,20 @@ impl<'a> ContextWarningWidget<'a> {
             Span::styled(bar_str, Style::default().fg(alert_color)),
             Span::styled("] ", Style::default().fg(Color::DarkGray)),
             Span::styled(
-                format!("{}/{}", self.alert.formatted_used(), self.alert.formatted_max()),
+                format!(
+                    "{}/{}",
+                    self.alert.formatted_used(),
+                    self.alert.formatted_max()
+                ),
                 Style::default().fg(Color::White),
             ),
         ]));
 
         // 3. Remaining Tokens & Turns Row
         let remaining_style = if self.alert.remaining_tokens >= 0 {
-            Style::default().fg(Color::Green).add_modifier(Modifier::BOLD)
+            Style::default()
+                .fg(Color::Green)
+                .add_modifier(Modifier::BOLD)
         } else {
             Style::default().fg(Color::Red).add_modifier(Modifier::BOLD)
         };
@@ -1466,7 +1512,10 @@ impl<'a> ContextWarningWidget<'a> {
         if self.show_turns_estimate {
             if let Some(turns) = self.alert.estimated_remaining_turns {
                 rem_spans.push(Span::raw("  │  "));
-                rem_spans.push(Span::styled("Est. Turns: ", Style::default().fg(Color::DarkGray)));
+                rem_spans.push(Span::styled(
+                    "Est. Turns: ",
+                    Style::default().fg(Color::DarkGray),
+                ));
                 rem_spans.push(Span::styled(
                     format!("~{}", turns),
                     Style::default().fg(Color::Yellow),
@@ -1490,7 +1539,10 @@ impl<'a> ContextWarningWidget<'a> {
                     Span::styled(format_token_count(msgs), Style::default().fg(Color::Cyan)),
                     Span::raw(" │ "),
                     Span::styled("Tools: ", Style::default().fg(Color::DarkGray)),
-                    Span::styled(format_token_count(tools), Style::default().fg(Color::Magenta)),
+                    Span::styled(
+                        format_token_count(tools),
+                        Style::default().fg(Color::Magenta),
+                    ),
                 ]));
             }
         }
@@ -1501,7 +1553,9 @@ impl<'a> ContextWarningWidget<'a> {
                 Span::styled("Action: ", Style::default().fg(Color::DarkGray)),
                 Span::styled(
                     self.alert.primary_action(),
-                    Style::default().fg(Color::White).add_modifier(Modifier::ITALIC),
+                    Style::default()
+                        .fg(Color::White)
+                        .add_modifier(Modifier::ITALIC),
                 ),
             ]));
         }
@@ -1530,14 +1584,27 @@ impl<'a> ContextWarningWidget<'a> {
         );
 
         let line = Line::from(vec![
-            Span::styled(format!("{} ", icon), Style::default().fg(alert_color).add_modifier(Modifier::BOLD)),
+            Span::styled(
+                format!("{} ", icon),
+                Style::default()
+                    .fg(alert_color)
+                    .add_modifier(Modifier::BOLD),
+            ),
             Span::styled(&self.alert.model, Style::default().fg(Color::Cyan)),
             Span::raw(" ["),
             Span::styled(bar_str, Style::default().fg(alert_color)),
             Span::raw("] "),
-            Span::styled(format!("{}/{} ({})", used, max, pct), Style::default().fg(alert_color)),
+            Span::styled(
+                format!("{}/{} ({})", used, max, pct),
+                Style::default().fg(alert_color),
+            ),
             Span::raw(" │ Rem: "),
-            Span::styled(remaining, Style::default().fg(Color::White).add_modifier(Modifier::BOLD)),
+            Span::styled(
+                remaining,
+                Style::default()
+                    .fg(Color::White)
+                    .add_modifier(Modifier::BOLD),
+            ),
         ]);
 
         let paragraph = Paragraph::new(line);
@@ -1556,10 +1623,23 @@ impl<'a> ContextWarningWidget<'a> {
 
         let line = Line::from(vec![
             Span::styled("[", Style::default().fg(Color::DarkGray)),
-            Span::styled(format!("{} ", icon), Style::default().fg(alert_color).add_modifier(Modifier::BOLD)),
-            Span::styled(pct, Style::default().fg(alert_color).add_modifier(Modifier::BOLD)),
+            Span::styled(
+                format!("{} ", icon),
+                Style::default()
+                    .fg(alert_color)
+                    .add_modifier(Modifier::BOLD),
+            ),
+            Span::styled(
+                pct,
+                Style::default()
+                    .fg(alert_color)
+                    .add_modifier(Modifier::BOLD),
+            ),
             Span::styled(" │ ", Style::default().fg(Color::DarkGray)),
-            Span::styled(format!("{} rem", remaining), Style::default().fg(Color::White)),
+            Span::styled(
+                format!("{} rem", remaining),
+                Style::default().fg(Color::White),
+            ),
             Span::styled("]", Style::default().fg(Color::DarkGray)),
         ]);
 
@@ -1571,8 +1651,12 @@ impl<'a> ContextWarningWidget<'a> {
 impl<'a> Widget for ContextWarningWidget<'a> {
     fn render(self, area: Rect, buf: &mut Buffer) {
         match self.style_mode {
-            ContextWarningStyle::Banner | ContextWarningStyle::Card => self.render_banner(area, buf),
-            ContextWarningStyle::Compact | ContextWarningStyle::MiniBar => self.render_compact(area, buf),
+            ContextWarningStyle::Banner | ContextWarningStyle::Card => {
+                self.render_banner(area, buf)
+            }
+            ContextWarningStyle::Compact | ContextWarningStyle::MiniBar => {
+                self.render_compact(area, buf)
+            }
             ContextWarningStyle::Pill => self.render_pill(area, buf),
         }
     }
@@ -1581,8 +1665,12 @@ impl<'a> Widget for ContextWarningWidget<'a> {
 impl<'a> Widget for &ContextWarningWidget<'a> {
     fn render(self, area: Rect, buf: &mut Buffer) {
         match self.style_mode {
-            ContextWarningStyle::Banner | ContextWarningStyle::Card => self.render_banner(area, buf),
-            ContextWarningStyle::Compact | ContextWarningStyle::MiniBar => self.render_compact(area, buf),
+            ContextWarningStyle::Banner | ContextWarningStyle::Card => {
+                self.render_banner(area, buf)
+            }
+            ContextWarningStyle::Compact | ContextWarningStyle::MiniBar => {
+                self.render_compact(area, buf)
+            }
             ContextWarningStyle::Pill => self.render_pill(area, buf),
         }
     }
@@ -1632,14 +1720,20 @@ impl Widget for ContextProgressBarWidget {
 
         let alert_color = self.severity.ratatui_color();
         let bar_width = (area.width as usize).saturating_sub(
-            self.label.as_ref().map(|l| l.chars().count() + 1).unwrap_or(0),
+            self.label
+                .as_ref()
+                .map(|l| l.chars().count() + 1)
+                .unwrap_or(0),
         );
 
         let bar_str = render_progress_bar_text(self.utilization, bar_width, self.style);
 
         let mut spans = Vec::new();
         if let Some(lbl) = self.label {
-            spans.push(Span::styled(format!("{} ", lbl), Style::default().fg(Color::DarkGray)));
+            spans.push(Span::styled(
+                format!("{} ", lbl),
+                Style::default().fg(Color::DarkGray),
+            ));
         }
         spans.push(Span::styled(bar_str, Style::default().fg(alert_color)));
 
@@ -1675,16 +1769,46 @@ mod tests {
 
     #[test]
     fn test_severity_classification() {
-        assert_eq!(ContextAlertSeverity::from_utilization(0.50), ContextAlertSeverity::Safe);
-        assert_eq!(ContextAlertSeverity::from_utilization(0.69), ContextAlertSeverity::Safe);
-        assert_eq!(ContextAlertSeverity::from_utilization(0.70), ContextAlertSeverity::Notice);
-        assert_eq!(ContextAlertSeverity::from_utilization(0.79), ContextAlertSeverity::Notice);
-        assert_eq!(ContextAlertSeverity::from_utilization(0.80), ContextAlertSeverity::Warning);
-        assert_eq!(ContextAlertSeverity::from_utilization(0.89), ContextAlertSeverity::Warning);
-        assert_eq!(ContextAlertSeverity::from_utilization(0.90), ContextAlertSeverity::Critical);
-        assert_eq!(ContextAlertSeverity::from_utilization(0.99), ContextAlertSeverity::Critical);
-        assert_eq!(ContextAlertSeverity::from_utilization(1.00), ContextAlertSeverity::Overflow);
-        assert_eq!(ContextAlertSeverity::from_utilization(1.20), ContextAlertSeverity::Overflow);
+        assert_eq!(
+            ContextAlertSeverity::from_utilization(0.50),
+            ContextAlertSeverity::Safe
+        );
+        assert_eq!(
+            ContextAlertSeverity::from_utilization(0.69),
+            ContextAlertSeverity::Safe
+        );
+        assert_eq!(
+            ContextAlertSeverity::from_utilization(0.70),
+            ContextAlertSeverity::Notice
+        );
+        assert_eq!(
+            ContextAlertSeverity::from_utilization(0.79),
+            ContextAlertSeverity::Notice
+        );
+        assert_eq!(
+            ContextAlertSeverity::from_utilization(0.80),
+            ContextAlertSeverity::Warning
+        );
+        assert_eq!(
+            ContextAlertSeverity::from_utilization(0.89),
+            ContextAlertSeverity::Warning
+        );
+        assert_eq!(
+            ContextAlertSeverity::from_utilization(0.90),
+            ContextAlertSeverity::Critical
+        );
+        assert_eq!(
+            ContextAlertSeverity::from_utilization(0.99),
+            ContextAlertSeverity::Critical
+        );
+        assert_eq!(
+            ContextAlertSeverity::from_utilization(1.00),
+            ContextAlertSeverity::Overflow
+        );
+        assert_eq!(
+            ContextAlertSeverity::from_utilization(1.20),
+            ContextAlertSeverity::Overflow
+        );
     }
 
     #[test]

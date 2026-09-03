@@ -915,23 +915,12 @@ impl HeartbeatMonitor {
         progress: f32,
         current_step: Option<String>,
     ) -> bool {
-        self.record_heartbeat(
-            subagent_id,
-            None,
-            Some(progress),
-            current_step,
-            None,
-            None,
-        )
-        .await
+        self.record_heartbeat(subagent_id, None, Some(progress), current_step, None, None)
+            .await
     }
 
     /// Marks a subagent as successfully completed.
-    pub async fn mark_completed(
-        &self,
-        subagent_id: &str,
-        result_summary: Option<String>,
-    ) -> bool {
+    pub async fn mark_completed(&self, subagent_id: &str, result_summary: Option<String>) -> bool {
         let now = Utc::now();
         let mut map = self.subagents.write().await;
         let subagent = match map.get_mut(subagent_id) {
@@ -1076,7 +1065,9 @@ impl HeartbeatMonitor {
                             thresh.hang_threshold.as_secs_f64()
                         );
                         steps.push("Send cancellation request to subagent.".to_string());
-                        steps.push("Consider automatic retry if restart policy is enabled.".to_string());
+                        steps.push(
+                            "Consider automatic retry if restart policy is enabled.".to_string(),
+                        );
                     } else if elapsed_hb >= thresh.stall_threshold {
                         current_health = HealthStatus::Stalled;
                         hang_reason = Some(HangReason::MissedHeartbeats);
@@ -1086,7 +1077,8 @@ impl HeartbeatMonitor {
                             elapsed_hb.as_secs_f64(),
                             thresh.stall_threshold.as_secs_f64()
                         );
-                        steps.push("Issue ping probe to check subagent responsiveness.".to_string());
+                        steps
+                            .push("Issue ping probe to check subagent responsiveness.".to_string());
                     } else if elapsed_hb >= thresh.warning_threshold {
                         current_health = HealthStatus::Degraded;
                         hang_reason = Some(HangReason::MissedHeartbeats);
@@ -1101,7 +1093,9 @@ impl HeartbeatMonitor {
                 }
 
                 // 3. Check stuck operational phase (even if heartbeats are arriving)
-                if current_health == HealthStatus::Healthy || current_health == HealthStatus::Degraded {
+                if current_health == HealthStatus::Healthy
+                    || current_health == HealthStatus::Degraded
+                {
                     let phase_timeout = thresh.timeout_for_phase(&subagent.current_phase);
                     if elapsed_phase >= phase_timeout {
                         let is_severe = elapsed_phase >= phase_timeout * 2;
@@ -1211,7 +1205,10 @@ impl HeartbeatMonitor {
                         elapsed_progress.as_secs_f64(),
                         subagent.current_phase
                     );
-                    steps.push("Check if subagent is repeatedly issuing failing edits or queries.".to_string());
+                    steps.push(
+                        "Check if subagent is repeatedly issuing failing edits or queries."
+                            .to_string(),
+                    );
                 }
 
                 // Update subagent status & health
@@ -1244,7 +1241,8 @@ impl HeartbeatMonitor {
 
                     diagnoses.push(diagnosis.clone());
 
-                    if current_health == HealthStatus::Hung || current_health == HealthStatus::Dead {
+                    if current_health == HealthStatus::Hung || current_health == HealthStatus::Dead
+                    {
                         events_to_emit.push(HeartbeatEvent::HangDetected {
                             id: id.clone(),
                             diagnosis: diagnosis.clone(),
@@ -1322,7 +1320,10 @@ impl HeartbeatMonitor {
                 RecoveryAction::Cancel | RecoveryAction::ForceKill => {
                     self.mark_cancelled(
                         &d.subagent_id,
-                        format!("Automated hang detector cancellation: {}", d.diagnosis_summary),
+                        format!(
+                            "Automated hang detector cancellation: {}",
+                            d.diagnosis_summary
+                        ),
                     )
                     .await;
 
@@ -1427,10 +1428,7 @@ impl HeartbeatMonitor {
     /// Retrieves only active, stalled, or hung subagents (excludes finished ones).
     pub async fn get_active_subagents(&self) -> Vec<MonitoredSubagent> {
         let map = self.subagents.read().await;
-        map.values()
-            .filter(|s| !s.is_finished())
-            .cloned()
-            .collect()
+        map.values().filter(|s| !s.is_finished()).cloned().collect()
     }
 
     /// Retrieves currently stalled or hung subagents.
@@ -1824,17 +1822,23 @@ impl Tool for SubagentHeartbeatTool {
                 let subagent_id = args
                     .get("subagent_id")
                     .and_then(|v| v.as_str())
-                    .ok_or_else(|| anyhow::anyhow!("'subagent_id' is required for 'inspect' action"))?;
+                    .ok_or_else(|| {
+                        anyhow::anyhow!("'subagent_id' is required for 'inspect' action")
+                    })?;
 
                 match self.monitor.get_subagent(subagent_id).await {
                     Some(s) => Ok(serde_json::to_string_pretty(&s)?),
-                    None => Ok(format!("Subagent '{subagent_id}' not found in heartbeat monitor.")),
+                    None => Ok(format!(
+                        "Subagent '{subagent_id}' not found in heartbeat monitor."
+                    )),
                 }
             }
             "recover" => {
                 let diagnoses = self.monitor.scan().await;
                 if diagnoses.is_empty() {
-                    return Ok("No stalled or hung subagents detected. No recovery needed.".to_string());
+                    return Ok(
+                        "No stalled or hung subagents detected. No recovery needed.".to_string()
+                    );
                 }
                 let results = self.monitor.auto_recover(&diagnoses).await;
                 Ok(format!(
@@ -1847,17 +1851,24 @@ impl Tool for SubagentHeartbeatTool {
                 let subagent_id = args
                     .get("subagent_id")
                     .and_then(|v| v.as_str())
-                    .ok_or_else(|| anyhow::anyhow!("'subagent_id' is required for 'cancel' action"))?;
+                    .ok_or_else(|| {
+                        anyhow::anyhow!("'subagent_id' is required for 'cancel' action")
+                    })?;
                 let reason = args
                     .get("reason")
                     .and_then(|v| v.as_str())
                     .unwrap_or("Cancelled via heartbeat monitor tool");
 
-                let ok = self.monitor.mark_cancelled(subagent_id, reason.to_string()).await;
+                let ok = self
+                    .monitor
+                    .mark_cancelled(subagent_id, reason.to_string())
+                    .await;
                 if ok {
                     Ok(format!("Subagent '{subagent_id}' successfully cancelled."))
                 } else {
-                    Ok(format!("Subagent '{subagent_id}' not found or already finished."))
+                    Ok(format!(
+                        "Subagent '{subagent_id}' not found or already finished."
+                    ))
                 }
             }
             other => Err(anyhow::anyhow!("Unknown action '{other}'")),
@@ -1950,20 +1961,14 @@ mod tests {
         let stall_diagnoses = monitor.scan().await;
         assert_eq!(stall_diagnoses.len(), 1);
         assert_eq!(stall_diagnoses[0].health, HealthStatus::Stalled);
-        assert_eq!(
-            stall_diagnoses[0].recommended_action,
-            RecoveryAction::Ping
-        );
+        assert_eq!(stall_diagnoses[0].recommended_action, RecoveryAction::Ping);
 
         // Wait beyond hang threshold
         sleep(Duration::from_millis(50)).await;
         let hang_diagnoses = monitor.scan().await;
         assert_eq!(hang_diagnoses.len(), 1);
         assert_eq!(hang_diagnoses[0].health, HealthStatus::Hung);
-        assert_eq!(
-            hang_diagnoses[0].recommended_action,
-            RecoveryAction::Cancel
-        );
+        assert_eq!(hang_diagnoses[0].recommended_action, RecoveryAction::Cancel);
     }
 
     #[tokio::test]
@@ -2048,7 +2053,11 @@ mod tests {
             .await;
 
         assert!(handle1.complete(Some("All files found".to_string())).await);
-        assert!(handle2.fail("Compilation error in main.rs".to_string()).await);
+        assert!(
+            handle2
+                .fail("Compilation error in main.rs".to_string())
+                .await
+        );
 
         let s1 = monitor.get_subagent("sub-c1").await.unwrap();
         assert_eq!(s1.status, HeartbeatStatus::Completed);

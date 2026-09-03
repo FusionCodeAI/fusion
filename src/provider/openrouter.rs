@@ -174,8 +174,16 @@ impl OpenRouterModel {
             return true;
         }
         if let Some(pricing) = &self.pricing {
-            let p_zero = pricing.prompt.as_deref().map(|s| s == "0" || s == "0.0").unwrap_or(false);
-            let c_zero = pricing.completion.as_deref().map(|s| s == "0" || s == "0.0").unwrap_or(false);
+            let p_zero = pricing
+                .prompt
+                .as_deref()
+                .map(|s| s == "0" || s == "0.0")
+                .unwrap_or(false);
+            let c_zero = pricing
+                .completion
+                .as_deref()
+                .map(|s| s == "0" || s == "0.0")
+                .unwrap_or(false);
             if p_zero && c_zero {
                 return true;
             }
@@ -485,7 +493,10 @@ impl OpenRouterClient {
     }
 
     /// Query generation stats and actual cost for a generation ID (`GET /generation?id=...`).
-    pub async fn get_generation_stats(&self, generation_id: &str) -> anyhow::Result<OpenRouterGenerationData> {
+    pub async fn get_generation_stats(
+        &self,
+        generation_id: &str,
+    ) -> anyhow::Result<OpenRouterGenerationData> {
         let base = self.base_url.trim_end_matches('/');
         let root = if base.ends_with("/api/v1") {
             base
@@ -699,11 +710,7 @@ impl OpenRouterClient {
         let status = res.status();
         if !status.is_success() {
             let error_text = res.text().await.unwrap_or_default();
-            anyhow::bail!(
-                "OpenRouter API returned HTTP {}: {}",
-                status,
-                error_text
-            );
+            anyhow::bail!("OpenRouter API returned HTTP {}: {}", status, error_text);
         }
 
         let mut stream = res.bytes_stream().eventsource();
@@ -1223,7 +1230,10 @@ mod tests {
 
         let response: OpenRouterGenerationResponse = serde_json::from_str(sample_json).unwrap();
         assert_eq!(response.data.id.as_deref(), Some("gen-12345678"));
-        assert_eq!(response.data.model.as_deref(), Some("anthropic/claude-3.5-sonnet"));
+        assert_eq!(
+            response.data.model.as_deref(),
+            Some("anthropic/claude-3.5-sonnet")
+        );
         assert_eq!(response.data.tokens_prompt, Some(120));
         assert_eq!(response.data.tokens_completion, Some(450));
         assert_eq!(response.data.total_cost, Some(0.00711));

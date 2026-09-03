@@ -2,13 +2,13 @@
 //! Linux (`wl-copy`/`wl-paste`, `xclip`, `xsel`), Windows (`clip.exe`, PowerShell),
 //! and graceful in-memory fallback.
 
+use async_trait::async_trait;
+use serde::{Deserialize, Serialize};
+use serde_json::{json, Value};
 use std::path::Path;
 use std::process::Stdio;
 use std::sync::Arc;
 use std::time::Duration;
-use async_trait::async_trait;
-use serde::{Deserialize, Serialize};
-use serde_json::{json, Value};
 use tokio::io::AsyncWriteExt;
 use tokio::sync::RwLock;
 use tokio::time::timeout;
@@ -153,7 +153,10 @@ impl ClipboardManager {
     pub fn detect_backend() -> ClipboardBackendKind {
         // 1. Android / Termux environment check
         if is_termux_environment() {
-            if has_binary_or_path("termux-clipboard-get", &["/data/data/com.termux/files/usr/bin/termux-clipboard-get"]) {
+            if has_binary_or_path(
+                "termux-clipboard-get",
+                &["/data/data/com.termux/files/usr/bin/termux-clipboard-get"],
+            ) {
                 return ClipboardBackendKind::Termux;
             }
         }
@@ -176,12 +179,16 @@ impl ClipboardManager {
         #[cfg(not(any(target_os = "macos", target_os = "windows")))]
         {
             // Wayland priority when WAYLAND_DISPLAY is set
-            if std::env::var_os("WAYLAND_DISPLAY").is_some() && has_binary("wl-copy") && has_binary("wl-paste") {
+            if std::env::var_os("WAYLAND_DISPLAY").is_some()
+                && has_binary("wl-copy")
+                && has_binary("wl-paste")
+            {
                 return ClipboardBackendKind::Wayland;
             }
 
             // X11 with xclip
-            if (std::env::var_os("DISPLAY").is_some() || has_binary("xclip")) && has_binary("xclip") {
+            if (std::env::var_os("DISPLAY").is_some() || has_binary("xclip")) && has_binary("xclip")
+            {
                 return ClipboardBackendKind::XClip;
             }
 
@@ -227,7 +234,10 @@ impl ClipboardManager {
                         if !buf.is_empty() {
                             Ok(buf.clone())
                         } else {
-                            Err(anyhow::anyhow!("macOS pbpaste failed: {}. In-memory clipboard is empty.", e))
+                            Err(anyhow::anyhow!(
+                                "macOS pbpaste failed: {}. In-memory clipboard is empty.",
+                                e
+                            ))
                         }
                     }
                 }
@@ -244,7 +254,10 @@ impl ClipboardManager {
                         if !buf.is_empty() {
                             Ok(buf.clone())
                         } else {
-                            Err(anyhow::anyhow!("Termux clipboard get failed: {}. In-memory clipboard is empty.", e))
+                            Err(anyhow::anyhow!(
+                                "Termux clipboard get failed: {}. In-memory clipboard is empty.",
+                                e
+                            ))
                         }
                     }
                 }
@@ -275,7 +288,10 @@ impl ClipboardManager {
                 }
             }
             ClipboardBackendKind::XClip => {
-                match self.run_read_command("xclip", &["-selection", "clipboard", "-out"]).await {
+                match self
+                    .run_read_command("xclip", &["-selection", "clipboard", "-out"])
+                    .await
+                {
                     Ok(text) => {
                         *self.in_memory_buffer.write().await = text.clone();
                         Ok(text)
@@ -285,13 +301,19 @@ impl ClipboardManager {
                         if !buf.is_empty() {
                             Ok(buf.clone())
                         } else {
-                            Err(anyhow::anyhow!("xclip read failed: {}. In-memory clipboard is empty.", e))
+                            Err(anyhow::anyhow!(
+                                "xclip read failed: {}. In-memory clipboard is empty.",
+                                e
+                            ))
                         }
                     }
                 }
             }
             ClipboardBackendKind::XSel => {
-                match self.run_read_command("xsel", &["--clipboard", "--output"]).await {
+                match self
+                    .run_read_command("xsel", &["--clipboard", "--output"])
+                    .await
+                {
                     Ok(text) => {
                         *self.in_memory_buffer.write().await = text.clone();
                         Ok(text)
@@ -301,7 +323,10 @@ impl ClipboardManager {
                         if !buf.is_empty() {
                             Ok(buf.clone())
                         } else {
-                            Err(anyhow::anyhow!("xsel read failed: {}. In-memory clipboard is empty.", e))
+                            Err(anyhow::anyhow!(
+                                "xsel read failed: {}. In-memory clipboard is empty.",
+                                e
+                            ))
                         }
                     }
                 }
@@ -340,7 +365,10 @@ impl ClipboardManager {
                         if !buf.is_empty() {
                             Ok(buf.clone())
                         } else {
-                            Err(anyhow::anyhow!("Windows clipboard read failed: {}. In-memory clipboard is empty.", e))
+                            Err(anyhow::anyhow!(
+                                "Windows clipboard read failed: {}. In-memory clipboard is empty.",
+                                e
+                            ))
                         }
                     }
                 }
@@ -353,7 +381,11 @@ impl ClipboardManager {
                             *self.in_memory_buffer.write().await = text.clone();
                             Ok(text)
                         }
-                        Err(e) => Err(anyhow::anyhow!("Custom read command '{}' failed: {}", cmd, e)),
+                        Err(e) => Err(anyhow::anyhow!(
+                            "Custom read command '{}' failed: {}",
+                            cmd,
+                            e
+                        )),
                     }
                 } else {
                     let buf = self.in_memory_buffer.read().await;
@@ -372,21 +404,19 @@ impl ClipboardManager {
 
         match self.backend {
             ClipboardBackendKind::InMemory => Ok(()),
-            ClipboardBackendKind::MacOS => {
-                self.run_write_command("pbcopy", &[], text).await
-            }
+            ClipboardBackendKind::MacOS => self.run_write_command("pbcopy", &[], text).await,
             ClipboardBackendKind::Termux => {
                 let bin = get_termux_path("termux-clipboard-set");
                 self.run_write_command(&bin, &[], text).await
             }
-            ClipboardBackendKind::Wayland => {
-                self.run_write_command("wl-copy", &[], text).await
-            }
+            ClipboardBackendKind::Wayland => self.run_write_command("wl-copy", &[], text).await,
             ClipboardBackendKind::XClip => {
-                self.run_write_command("xclip", &["-selection", "clipboard", "-in"], text).await
+                self.run_write_command("xclip", &["-selection", "clipboard", "-in"], text)
+                    .await
             }
             ClipboardBackendKind::XSel => {
-                self.run_write_command("xsel", &["--clipboard", "--input"], text).await
+                self.run_write_command("xsel", &["--clipboard", "--input"], text)
+                    .await
             }
             ClipboardBackendKind::Windows => {
                 // Try clip.exe first (fastest and built into all Windows versions)
@@ -469,22 +499,37 @@ impl ClipboardManager {
         }
 
         let fut = async {
-            let child = cmd.spawn().map_err(|e| anyhow::anyhow!("Failed to spawn '{}': {}", prog, e))?;
-            let output = child.wait_with_output().await.map_err(|e| anyhow::anyhow!("Failed waiting for '{}': {}", prog, e))?;
-            
+            let child = cmd
+                .spawn()
+                .map_err(|e| anyhow::anyhow!("Failed to spawn '{}': {}", prog, e))?;
+            let output = child
+                .wait_with_output()
+                .await
+                .map_err(|e| anyhow::anyhow!("Failed waiting for '{}': {}", prog, e))?;
+
             if !output.status.success() {
                 let err_msg = String::from_utf8_lossy(&output.stderr);
-                return Err(anyhow::anyhow!("'{}' exited with error ({}): {}", prog, output.status, err_msg.trim()));
+                return Err(anyhow::anyhow!(
+                    "'{}' exited with error ({}): {}",
+                    prog,
+                    output.status,
+                    err_msg.trim()
+                ));
             }
 
-            let text = String::from_utf8(output.stdout)
-                .map_err(|e| anyhow::anyhow!("Non-UTF-8 clipboard content from '{}': {}", prog, e))?;
+            let text = String::from_utf8(output.stdout).map_err(|e| {
+                anyhow::anyhow!("Non-UTF-8 clipboard content from '{}': {}", prog, e)
+            })?;
             Ok(text)
         };
 
         match timeout(self.timeout_duration, fut).await {
             Ok(res) => res,
-            Err(_) => Err(anyhow::anyhow!("Clipboard read command '{}' timed out after {:?}", prog, self.timeout_duration)),
+            Err(_) => Err(anyhow::anyhow!(
+                "Clipboard read command '{}' timed out after {:?}",
+                prog,
+                self.timeout_duration
+            )),
         }
     }
 
@@ -506,19 +551,34 @@ impl ClipboardManager {
         let prog_str = prog.to_string();
 
         let fut = async {
-            let mut child = cmd.spawn().map_err(|e| anyhow::anyhow!("Failed to spawn '{}': {}", prog_str, e))?;
-            
+            let mut child = cmd
+                .spawn()
+                .map_err(|e| anyhow::anyhow!("Failed to spawn '{}': {}", prog_str, e))?;
+
             if let Some(mut stdin) = child.stdin.take() {
-                stdin.write_all(&bytes).await.map_err(|e| anyhow::anyhow!("Failed writing to '{}' stdin: {}", prog_str, e))?;
-                stdin.flush().await.map_err(|e| anyhow::anyhow!("Failed flushing '{}' stdin: {}", prog_str, e))?;
+                stdin.write_all(&bytes).await.map_err(|e| {
+                    anyhow::anyhow!("Failed writing to '{}' stdin: {}", prog_str, e)
+                })?;
+                stdin
+                    .flush()
+                    .await
+                    .map_err(|e| anyhow::anyhow!("Failed flushing '{}' stdin: {}", prog_str, e))?;
                 drop(stdin); // Signal EOF
             }
 
-            let output = child.wait_with_output().await.map_err(|e| anyhow::anyhow!("Failed waiting for '{}': {}", prog_str, e))?;
-            
+            let output = child
+                .wait_with_output()
+                .await
+                .map_err(|e| anyhow::anyhow!("Failed waiting for '{}': {}", prog_str, e))?;
+
             if !output.status.success() {
                 let err_msg = String::from_utf8_lossy(&output.stderr);
-                return Err(anyhow::anyhow!("'{}' write exited with error ({}): {}", prog_str, output.status, err_msg.trim()));
+                return Err(anyhow::anyhow!(
+                    "'{}' write exited with error ({}): {}",
+                    prog_str,
+                    output.status,
+                    err_msg.trim()
+                ));
             }
 
             Ok(())
@@ -526,7 +586,11 @@ impl ClipboardManager {
 
         match timeout(self.timeout_duration, fut).await {
             Ok(res) => res,
-            Err(_) => Err(anyhow::anyhow!("Clipboard write command '{}' timed out after {:?}", prog, self.timeout_duration)),
+            Err(_) => Err(anyhow::anyhow!(
+                "Clipboard write command '{}' timed out after {:?}",
+                prog,
+                self.timeout_duration
+            )),
         }
     }
 }
@@ -575,7 +639,10 @@ fn has_binary_or_path(bin_name: &str, extra_paths: &[&str]) -> bool {
 fn has_binary(bin_name: &str) -> bool {
     #[cfg(windows)]
     {
-        let name_with_ext = if bin_name.ends_with(".exe") || bin_name.ends_with(".cmd") || bin_name.ends_with(".bat") {
+        let name_with_ext = if bin_name.ends_with(".exe")
+            || bin_name.ends_with(".cmd")
+            || bin_name.ends_with(".bat")
+        {
             bin_name.to_string()
         } else {
             format!("{}.exe", bin_name)
@@ -735,7 +802,10 @@ impl Tool for ClipboardTool {
             });
 
         let trim = args.get("trim").and_then(|v| v.as_bool()).unwrap_or(false);
-        let limit = args.get("limit").and_then(|v| v.as_u64()).map(|n| n as usize);
+        let limit = args
+            .get("limit")
+            .and_then(|v| v.as_u64())
+            .map(|n| n as usize);
 
         match action_str.as_str() {
             "read" | "paste" | "get" => {
@@ -761,7 +831,7 @@ impl Tool for ClipboardTool {
                 })?;
                 let text = if trim { text_to_write.trim() } else { text_to_write };
                 self.manager.write_text(text).await?;
-                
+
                 let char_count = text.chars().count();
                 let line_count = text.lines().count();
                 let backend_name = self.manager.backend_kind().display_name();
@@ -923,7 +993,10 @@ mod tests {
         let ctx = ToolContext::default();
 
         // 1. Initial empty read
-        let initial = tool.execute(json!({ "action": "read" }), &ctx).await.unwrap();
+        let initial = tool
+            .execute(json!({ "action": "read" }), &ctx)
+            .await
+            .unwrap();
         assert_eq!(initial, "(clipboard is empty)");
 
         // 2. Write text
@@ -941,7 +1014,10 @@ mod tests {
         assert!(write_res.contains("In-Memory Fallback"));
 
         // 3. Read back text
-        let read_res = tool.execute(json!({ "action": "read" }), &ctx).await.unwrap();
+        let read_res = tool
+            .execute(json!({ "action": "read" }), &ctx)
+            .await
+            .unwrap();
         assert_eq!(read_res, "Hello World from Fusion!");
 
         // 4. Read with trimming
@@ -961,10 +1037,16 @@ mod tests {
         assert!(limit_res.contains("truncated"));
 
         // 6. Clear clipboard
-        let clear_res = tool.execute(json!({ "action": "clear" }), &ctx).await.unwrap();
+        let clear_res = tool
+            .execute(json!({ "action": "clear" }), &ctx)
+            .await
+            .unwrap();
         assert!(clear_res.contains("cleared successfully"));
 
-        let after_clear = tool.execute(json!({ "action": "read" }), &ctx).await.unwrap();
+        let after_clear = tool
+            .execute(json!({ "action": "read" }), &ctx)
+            .await
+            .unwrap();
         assert_eq!(after_clear, "(clipboard is empty)");
     }
 
@@ -996,7 +1078,10 @@ mod tests {
         assert_eq!(tool.read().await.unwrap(), "Aliased copy");
 
         // Action "paste"
-        let pasted = tool.execute(json!({ "action": "paste" }), &ctx).await.unwrap();
+        let pasted = tool
+            .execute(json!({ "action": "paste" }), &ctx)
+            .await
+            .unwrap();
         assert_eq!(pasted, "Aliased copy");
 
         // Action "set"
@@ -1006,7 +1091,10 @@ mod tests {
         assert_eq!(tool.read().await.unwrap(), "Set value");
 
         // Action "get"
-        let got = tool.execute(json!({ "action": "get" }), &ctx).await.unwrap();
+        let got = tool
+            .execute(json!({ "action": "get" }), &ctx)
+            .await
+            .unwrap();
         assert_eq!(got, "Set value");
     }
 
@@ -1017,7 +1105,10 @@ mod tests {
 
         tool.write("Status test string").await.unwrap();
 
-        let status_res = tool.execute(json!({ "action": "status" }), &ctx).await.unwrap();
+        let status_res = tool
+            .execute(json!({ "action": "status" }), &ctx)
+            .await
+            .unwrap();
         let parsed: Value = serde_json::from_str(&status_res).unwrap();
 
         assert_eq!(parsed["backend"], "in_memory");
@@ -1076,13 +1167,28 @@ mod tests {
 
     #[tokio::test]
     async fn test_backend_kind_properties() {
-        assert_eq!(ClipboardBackendKind::Termux.display_name(), "Termux (termux-clipboard-get/set)");
-        assert_eq!(ClipboardBackendKind::MacOS.display_name(), "macOS (pbcopy/pbpaste)");
-        assert_eq!(ClipboardBackendKind::Wayland.display_name(), "Wayland (wl-copy/wl-paste)");
+        assert_eq!(
+            ClipboardBackendKind::Termux.display_name(),
+            "Termux (termux-clipboard-get/set)"
+        );
+        assert_eq!(
+            ClipboardBackendKind::MacOS.display_name(),
+            "macOS (pbcopy/pbpaste)"
+        );
+        assert_eq!(
+            ClipboardBackendKind::Wayland.display_name(),
+            "Wayland (wl-copy/wl-paste)"
+        );
         assert_eq!(ClipboardBackendKind::XClip.display_name(), "X11 (xclip)");
         assert_eq!(ClipboardBackendKind::XSel.display_name(), "X11 (xsel)");
-        assert_eq!(ClipboardBackendKind::Windows.display_name(), "Windows (clip.exe / PowerShell)");
-        assert_eq!(ClipboardBackendKind::InMemory.display_name(), "In-Memory Fallback");
+        assert_eq!(
+            ClipboardBackendKind::Windows.display_name(),
+            "Windows (clip.exe / PowerShell)"
+        );
+        assert_eq!(
+            ClipboardBackendKind::InMemory.display_name(),
+            "In-Memory Fallback"
+        );
 
         assert!(ClipboardBackendKind::Termux.is_system_backend());
         assert!(ClipboardBackendKind::MacOS.is_system_backend());
@@ -1099,8 +1205,14 @@ mod tests {
         #[cfg(not(windows))]
         {
             let manager = ClipboardManager::with_custom_commands(
-                ("sh".to_string(), vec!["-c".to_string(), "echo 'from custom'".to_string()]),
-                ("sh".to_string(), vec!["-c".to_string(), "cat > /dev/null".to_string()]),
+                (
+                    "sh".to_string(),
+                    vec!["-c".to_string(), "echo 'from custom'".to_string()],
+                ),
+                (
+                    "sh".to_string(),
+                    vec!["-c".to_string(), "cat > /dev/null".to_string()],
+                ),
             );
 
             let tool = ClipboardTool::with_manager(manager);

@@ -434,7 +434,8 @@ static SENSITIVE_VALUE_PATTERNS: LazyLock<Vec<ValuePattern>> = LazyLock::new(|| 
         },
         ValuePattern {
             name: "OpenAI API Key",
-            regex: Regex::new(r"\bsk-(?:proj-|admin-|org-)?[A-Za-z0-9_-]{20,}\b").expect("valid regex"),
+            regex: Regex::new(r"\bsk-(?:proj-|admin-|org-)?[A-Za-z0-9_-]{20,}\b")
+                .expect("valid regex"),
         },
         ValuePattern {
             name: "GitHub Token",
@@ -463,7 +464,8 @@ static SENSITIVE_VALUE_PATTERNS: LazyLock<Vec<ValuePattern>> = LazyLock::new(|| 
         },
         ValuePattern {
             name: "Private Key Header",
-            regex: Regex::new(r"-----BEGIN (?:[A-Z0-9_ ]+ )?PRIVATE KEY-----").expect("valid regex"),
+            regex: Regex::new(r"-----BEGIN (?:[A-Z0-9_ ]+ )?PRIVATE KEY-----")
+                .expect("valid regex"),
         },
         ValuePattern {
             name: "Bearer Token",
@@ -471,10 +473,8 @@ static SENSITIVE_VALUE_PATTERNS: LazyLock<Vec<ValuePattern>> = LazyLock::new(|| 
         },
         ValuePattern {
             name: "JSON Web Token",
-            regex: Regex::new(
-                r"\beyJ[A-Za-z0-9_-]{8,}\.eyJ[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\b",
-            )
-            .expect("valid regex"),
+            regex: Regex::new(r"\beyJ[A-Za-z0-9_-]{8,}\.eyJ[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\b")
+                .expect("valid regex"),
         },
         ValuePattern {
             name: "Hugging Face Token",
@@ -490,7 +490,8 @@ static SENSITIVE_VALUE_PATTERNS: LazyLock<Vec<ValuePattern>> = LazyLock::new(|| 
         },
         ValuePattern {
             name: "SendGrid API Key",
-            regex: Regex::new(r"\bSG\.[A-Za-z0-9_-]{22}\.[A-Za-z0-9_-]{43}\b").expect("valid regex"),
+            regex: Regex::new(r"\bSG\.[A-Za-z0-9_-]{22}\.[A-Za-z0-9_-]{43}\b")
+                .expect("valid regex"),
         },
         ValuePattern {
             name: "Twilio Key",
@@ -561,60 +562,53 @@ static DB_URI_RE: LazyLock<Regex> = LazyLock::new(|| {
         .expect("valid regex")
 });
 
-static BEARER_RE: LazyLock<Regex> = LazyLock::new(|| {
-    Regex::new(r"(?i)\bBearer\s+([A-Za-z0-9\-._~+/]+=*)").expect("valid regex")
-});
+static BEARER_RE: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r"(?i)\bBearer\s+([A-Za-z0-9\-._~+/]+=*)").expect("valid regex"));
 
 static JWT_RE: LazyLock<Regex> = LazyLock::new(|| {
     Regex::new(r"\beyJ[A-Za-z0-9_-]{8,}\.eyJ[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\b")
         .expect("valid regex")
 });
 
-static ANTHROPIC_RE: LazyLock<Regex> = LazyLock::new(|| {
-    Regex::new(r"\bsk-ant-[A-Za-z0-9_-]{20,}\b").expect("valid regex")
-});
+static ANTHROPIC_RE: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r"\bsk-ant-[A-Za-z0-9_-]{20,}\b").expect("valid regex"));
 
 static OPENAI_RE: LazyLock<Regex> = LazyLock::new(|| {
     Regex::new(r"\bsk-(?:proj-|admin-|org-)?[A-Za-z0-9_-]{20,}\b").expect("valid regex")
 });
 
-static GOOGLE_KEY_RE: LazyLock<Regex> = LazyLock::new(|| {
-    Regex::new(r"\bAIza[0-9A-Za-z_-]{30,45}\b").expect("valid regex")
-});
+static GOOGLE_KEY_RE: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r"\bAIza[0-9A-Za-z_-]{30,45}\b").expect("valid regex"));
 
 static GITHUB_TOKEN_RE: LazyLock<Regex> = LazyLock::new(|| {
     Regex::new(r"\b(?:gh[pousr]_[A-Za-z0-9_]{36,}|github_pat_[A-Za-z0-9_]{50,})\b")
         .expect("valid regex")
 });
 
-static GITLAB_TOKEN_RE: LazyLock<Regex> = LazyLock::new(|| {
-    Regex::new(r"\bglpat-[0-9a-zA-Z_\-]{20,}\b").expect("valid regex")
-});
+static GITLAB_TOKEN_RE: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r"\bglpat-[0-9a-zA-Z_\-]{20,}\b").expect("valid regex"));
 
-static AWS_KEY_RE: LazyLock<Regex> = LazyLock::new(|| {
-    Regex::new(r"\b(?:AKIA|ASIA|AROA)[A-Z0-9]{16}\b").expect("valid regex")
-});
+static AWS_KEY_RE: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r"\b(?:AKIA|ASIA|AROA)[A-Z0-9]{16}\b").expect("valid regex"));
 
 static AWS_SECRET_RE: LazyLock<Regex> = LazyLock::new(|| {
-    Regex::new(r#"(?i)\b(aws_secret_access_key|aws_secret_key)\s*([:=])\s*['"]?([A-Za-z0-9/+=]{40})['"]?"#)
-        .expect("valid regex")
+    Regex::new(
+        r#"(?i)\b(aws_secret_access_key|aws_secret_key)\s*([:=])\s*['"]?([A-Za-z0-9/+=]{40})['"]?"#,
+    )
+    .expect("valid regex")
 });
 
-static SLACK_TOKEN_RE: LazyLock<Regex> = LazyLock::new(|| {
-    Regex::new(r"\bxox[baprs]-[0-9a-zA-Z-]{10,}\b").expect("valid regex")
-});
+static SLACK_TOKEN_RE: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r"\bxox[baprs]-[0-9a-zA-Z-]{10,}\b").expect("valid regex"));
 
-static STRIPE_KEY_RE: LazyLock<Regex> = LazyLock::new(|| {
-    Regex::new(r"\b[sr]k_(?:test|live)_[0-9a-zA-Z]{24,}\b").expect("valid regex")
-});
+static STRIPE_KEY_RE: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r"\b[sr]k_(?:test|live)_[0-9a-zA-Z]{24,}\b").expect("valid regex"));
 
-static HF_TOKEN_RE: LazyLock<Regex> = LazyLock::new(|| {
-    Regex::new(r"\bhf_[a-zA-Z0-9]{30,}\b").expect("valid regex")
-});
+static HF_TOKEN_RE: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r"\bhf_[a-zA-Z0-9]{30,}\b").expect("valid regex"));
 
-static NPM_TOKEN_RE: LazyLock<Regex> = LazyLock::new(|| {
-    Regex::new(r"\bnpm_[a-zA-Z0-9]{30,}\b").expect("valid regex")
-});
+static NPM_TOKEN_RE: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r"\bnpm_[a-zA-Z0-9]{30,}\b").expect("valid regex"));
 
 static PYPI_TOKEN_RE: LazyLock<Regex> = LazyLock::new(|| {
     Regex::new(r"\bpypi-AgEIcHlwaS5vcmc[A-Za-z0-9_-]{30,}\b").expect("valid regex")
@@ -624,9 +618,8 @@ static SENDGRID_KEY_RE: LazyLock<Regex> = LazyLock::new(|| {
     Regex::new(r"\bSG\.[A-Za-z0-9_-]{22}\.[A-Za-z0-9_-]{43}\b").expect("valid regex")
 });
 
-static TWILIO_KEY_RE: LazyLock<Regex> = LazyLock::new(|| {
-    Regex::new(r"\bSK[0-9a-fA-F]{32}\b").expect("valid regex")
-});
+static TWILIO_KEY_RE: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r"\bSK[0-9a-fA-F]{32}\b").expect("valid regex"));
 
 static PASSWORD_ASSIGN_RE: LazyLock<Regex> = LazyLock::new(|| {
     Regex::new(r#"(?i)\b(password|passwd|pwd|db_pass|secret_key|client_secret)\s*([:=])\s*['"]?([^'"\s\n,;]{4,})['"]?"#)
@@ -755,8 +748,16 @@ impl SecretScrubber {
             }
         };
 
-        check_rule(SecretKind::PrivateKey, "Private Key Block", &PRIV_KEY_BLOCK_RE);
-        check_rule(SecretKind::AnthropicApiKey, "Anthropic API Key", &ANTHROPIC_RE);
+        check_rule(
+            SecretKind::PrivateKey,
+            "Private Key Block",
+            &PRIV_KEY_BLOCK_RE,
+        );
+        check_rule(
+            SecretKind::AnthropicApiKey,
+            "Anthropic API Key",
+            &ANTHROPIC_RE,
+        );
         check_rule(SecretKind::OpenAiApiKey, "OpenAI API Key", &OPENAI_RE);
         check_rule(SecretKind::GoogleApiKey, "Google API Key", &GOOGLE_KEY_RE);
         check_rule(SecretKind::GitHubToken, "GitHub Token", &GITHUB_TOKEN_RE);
@@ -767,12 +768,24 @@ impl SecretScrubber {
         check_rule(SecretKind::BearerToken, "Bearer Token", &BEARER_RE);
         check_rule(SecretKind::Jwt, "JSON Web Token", &JWT_RE);
         check_rule(SecretKind::DatabaseUrl, "Database URI Password", &DB_URI_RE);
-        check_rule(SecretKind::HuggingFaceToken, "Hugging Face Token", &HF_TOKEN_RE);
+        check_rule(
+            SecretKind::HuggingFaceToken,
+            "Hugging Face Token",
+            &HF_TOKEN_RE,
+        );
         check_rule(SecretKind::NpmToken, "NPM Token", &NPM_TOKEN_RE);
         check_rule(SecretKind::PyPiToken, "PyPI Token", &PYPI_TOKEN_RE);
-        check_rule(SecretKind::SendGridApiKey, "SendGrid API Key", &SENDGRID_KEY_RE);
+        check_rule(
+            SecretKind::SendGridApiKey,
+            "SendGrid API Key",
+            &SENDGRID_KEY_RE,
+        );
         check_rule(SecretKind::TwilioKey, "Twilio Key", &TWILIO_KEY_RE);
-        check_rule(SecretKind::Password, "Password Assignment", &PASSWORD_ASSIGN_RE);
+        check_rule(
+            SecretKind::Password,
+            "Password Assignment",
+            &PASSWORD_ASSIGN_RE,
+        );
 
         // Custom user rules
         for custom in &self.custom_rules {
@@ -977,11 +990,14 @@ impl SecretScrubber {
                             Value::String(s) => {
                                 clean_map.insert(
                                     k.clone(),
-                                    Value::String(self.resolve_placeholder(SecretKind::GenericApiKey, s)),
+                                    Value::String(
+                                        self.resolve_placeholder(SecretKind::GenericApiKey, s),
+                                    ),
                                 );
                             }
                             _ => {
-                                clean_map.insert(k.clone(), Value::String("[REDACTED]".to_string()));
+                                clean_map
+                                    .insert(k.clone(), Value::String("[REDACTED]".to_string()));
                             }
                         }
                     } else {
@@ -1076,7 +1092,9 @@ impl SanitizationResult {
 
     /// Returns true if the specified key was stripped (case-insensitive).
     pub fn has_stripped(&self, key: &str) -> bool {
-        self.stripped.iter().any(|r| r.key.eq_ignore_ascii_case(key))
+        self.stripped
+            .iter()
+            .any(|r| r.key.eq_ignore_ascii_case(key))
     }
 }
 
@@ -1339,13 +1357,18 @@ impl EnvCleaner {
 
         #[cfg(windows)]
         {
-            let has_sysroot = clean_env.keys().any(|k| k.eq_ignore_ascii_case("SYSTEMROOT"));
+            let has_sysroot = clean_env
+                .keys()
+                .any(|k| k.eq_ignore_ascii_case("SYSTEMROOT"));
             if !has_sysroot {
                 clean_env.insert("SYSTEMROOT".to_string(), "C:\\Windows".to_string());
             }
             let has_comspec = clean_env.keys().any(|k| k.eq_ignore_ascii_case("COMSPEC"));
             if !has_comspec {
-                clean_env.insert("COMSPEC".to_string(), "C:\\Windows\\system32\\cmd.exe".to_string());
+                clean_env.insert(
+                    "COMSPEC".to_string(),
+                    "C:\\Windows\\system32\\cmd.exe".to_string(),
+                );
             }
         }
     }
@@ -1841,10 +1864,7 @@ impl Tool for EnvCleanerTool {
             }
 
             "check_key" => {
-                let key = args
-                    .get("key")
-                    .and_then(|v| v.as_str())
-                    .unwrap_or_default();
+                let key = args.get("key").and_then(|v| v.as_str()).unwrap_or_default();
 
                 let reason = cleaner.check_key_sensitivity(key);
                 let is_sensitive = reason.is_some();
@@ -1922,13 +1942,34 @@ mod tests {
         let cleaner = EnvCleaner::new();
 
         let mut env = HashMap::new();
-        env.insert("OPENAI_API_KEY".to_string(), "sk-12345678901234567890".to_string());
-        env.insert("ANTHROPIC_API_KEY".to_string(), "sk-ant-12345678901234567890".to_string());
-        env.insert("GEMINI_API_KEY".to_string(), "AIzaSyD-12345678901234567890".to_string());
-        env.insert("AWS_SECRET_ACCESS_KEY".to_string(), "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY".to_string());
-        env.insert("AWS_ACCESS_KEY_ID".to_string(), "AKIAIOSFODNN7EXAMPLE".to_string());
-        env.insert("GITHUB_TOKEN".to_string(), "ghp_123456789012345678901234567890123456".to_string());
-        env.insert("DATABASE_URL".to_string(), "postgres://user:pass@localhost:5432/db".to_string());
+        env.insert(
+            "OPENAI_API_KEY".to_string(),
+            "sk-12345678901234567890".to_string(),
+        );
+        env.insert(
+            "ANTHROPIC_API_KEY".to_string(),
+            "sk-ant-12345678901234567890".to_string(),
+        );
+        env.insert(
+            "GEMINI_API_KEY".to_string(),
+            "AIzaSyD-12345678901234567890".to_string(),
+        );
+        env.insert(
+            "AWS_SECRET_ACCESS_KEY".to_string(),
+            "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY".to_string(),
+        );
+        env.insert(
+            "AWS_ACCESS_KEY_ID".to_string(),
+            "AKIAIOSFODNN7EXAMPLE".to_string(),
+        );
+        env.insert(
+            "GITHUB_TOKEN".to_string(),
+            "ghp_123456789012345678901234567890123456".to_string(),
+        );
+        env.insert(
+            "DATABASE_URL".to_string(),
+            "postgres://user:pass@localhost:5432/db".to_string(),
+        );
         env.insert("PATH".to_string(), "/usr/bin:/bin".to_string());
         env.insert("USER".to_string(), "developer".to_string());
         env.insert("HOME".to_string(), "/home/developer".to_string());
@@ -1944,9 +1985,15 @@ mod tests {
         assert!(result.has_stripped("GITHUB_TOKEN"));
         assert!(result.has_stripped("DATABASE_URL"));
 
-        assert_eq!(result.clean_env.get("PATH"), Some(&"/usr/bin:/bin".to_string()));
+        assert_eq!(
+            result.clean_env.get("PATH"),
+            Some(&"/usr/bin:/bin".to_string())
+        );
         assert_eq!(result.clean_env.get("USER"), Some(&"developer".to_string()));
-        assert_eq!(result.clean_env.get("HOME"), Some(&"/home/developer".to_string()));
+        assert_eq!(
+            result.clean_env.get("HOME"),
+            Some(&"/home/developer".to_string())
+        );
     }
 
     #[test]
@@ -1954,7 +2001,10 @@ mod tests {
         let cleaner = EnvCleaner::new();
 
         let mut env = HashMap::new();
-        env.insert("openai_api_key".to_string(), "sk-12345678901234567890".to_string());
+        env.insert(
+            "openai_api_key".to_string(),
+            "sk-12345678901234567890".to_string(),
+        );
         env.insert("Anthropic_Api_Key".to_string(), "secret".to_string());
         env.insert("GITHUB_token".to_string(), "token".to_string());
 
@@ -1979,7 +2029,10 @@ mod tests {
 
         let result = cleaner.sanitize_map(&env);
         assert_eq!(result.stripped_count(), 5);
-        assert_eq!(result.clean_env.get("SAFE_CONFIG_NAME"), Some(&"app-v1".to_string()));
+        assert_eq!(
+            result.clean_env.get("SAFE_CONFIG_NAME"),
+            Some(&"app-v1".to_string())
+        );
     }
 
     #[test]
@@ -1992,18 +2045,42 @@ mod tests {
         env.insert("TERM".to_string(), "xterm-256color".to_string());
         env.insert("LANG".to_string(), "en_US.UTF-8".to_string());
         env.insert("SHELL".to_string(), "/bin/bash".to_string());
-        env.insert("SSL_CERT_FILE".to_string(), "/etc/ssl/certs/ca-certificates.crt".to_string());
+        env.insert(
+            "SSL_CERT_FILE".to_string(),
+            "/etc/ssl/certs/ca-certificates.crt".to_string(),
+        );
         env.insert("PATH".to_string(), "/usr/bin:/bin".to_string());
 
         let result = cleaner.sanitize_map(&env);
         assert_eq!(result.stripped_count(), 0);
-        assert_eq!(result.clean_env.get("PWD"), Some(&"/workspace/project".to_string()));
-        assert_eq!(result.clean_env.get("OLDPWD"), Some(&"/workspace".to_string()));
-        assert_eq!(result.clean_env.get("TERM"), Some(&"xterm-256color".to_string()));
-        assert_eq!(result.clean_env.get("LANG"), Some(&"en_US.UTF-8".to_string()));
-        assert_eq!(result.clean_env.get("SHELL"), Some(&"/bin/bash".to_string()));
-        assert_eq!(result.clean_env.get("SSL_CERT_FILE"), Some(&"/etc/ssl/certs/ca-certificates.crt".to_string()));
-        assert_eq!(result.clean_env.get("PATH"), Some(&"/usr/bin:/bin".to_string()));
+        assert_eq!(
+            result.clean_env.get("PWD"),
+            Some(&"/workspace/project".to_string())
+        );
+        assert_eq!(
+            result.clean_env.get("OLDPWD"),
+            Some(&"/workspace".to_string())
+        );
+        assert_eq!(
+            result.clean_env.get("TERM"),
+            Some(&"xterm-256color".to_string())
+        );
+        assert_eq!(
+            result.clean_env.get("LANG"),
+            Some(&"en_US.UTF-8".to_string())
+        );
+        assert_eq!(
+            result.clean_env.get("SHELL"),
+            Some(&"/bin/bash".to_string())
+        );
+        assert_eq!(
+            result.clean_env.get("SSL_CERT_FILE"),
+            Some(&"/etc/ssl/certs/ca-certificates.crt".to_string())
+        );
+        assert_eq!(
+            result.clean_env.get("PATH"),
+            Some(&"/usr/bin:/bin".to_string())
+        );
     }
 
     #[test]
@@ -2011,10 +2088,19 @@ mod tests {
         let cleaner = EnvCleaner::new();
 
         let mut env = HashMap::new();
-        env.insert("INLINE_CONFIG".to_string(), "sk-proj-abc12345678901234567890".to_string());
-        env.insert("MY_VAR".to_string(), "ghp_123456789012345678901234567890123456".to_string());
+        env.insert(
+            "INLINE_CONFIG".to_string(),
+            "sk-proj-abc12345678901234567890".to_string(),
+        );
+        env.insert(
+            "MY_VAR".to_string(),
+            "ghp_123456789012345678901234567890123456".to_string(),
+        );
         env.insert("AWS_VAR".to_string(), "AKIAIOSFODNN7EXAMPLE".to_string());
-        env.insert("PEM_CERT".to_string(), "-----BEGIN RSA PRIVATE KEY-----\nMIIE...".to_string());
+        env.insert(
+            "PEM_CERT".to_string(),
+            "-----BEGIN RSA PRIVATE KEY-----\nMIIE...".to_string(),
+        );
         env.insert("INNOCENT_VAL".to_string(), "regular-text-value".to_string());
 
         let result = cleaner.sanitize_map(&env);
@@ -2023,7 +2109,10 @@ mod tests {
         assert!(result.has_stripped("MY_VAR"));
         assert!(result.has_stripped("AWS_VAR"));
         assert!(result.has_stripped("PEM_CERT"));
-        assert_eq!(result.clean_env.get("INNOCENT_VAL"), Some(&"regular-text-value".to_string()));
+        assert_eq!(
+            result.clean_env.get("INNOCENT_VAL"),
+            Some(&"regular-text-value".to_string())
+        );
     }
 
     #[test]
@@ -2046,7 +2135,10 @@ mod tests {
         let result = cleaner.sanitize_map(&env);
         assert_eq!(result.stripped_count(), 1);
         assert!(result.has_stripped("CUSTOM_SECRET"));
-        assert_eq!(result.clean_env.get("OPENAI_API_KEY"), Some(&"override-value".to_string()));
+        assert_eq!(
+            result.clean_env.get("OPENAI_API_KEY"),
+            Some(&"override-value".to_string())
+        );
     }
 
     #[test]
@@ -2062,7 +2154,10 @@ mod tests {
         assert_eq!(result.stripped_count(), 1);
         assert!(result.has_stripped("RANDOM_VARIABLE"));
         assert_eq!(result.clean_env.get("PATH"), Some(&"/usr/bin".to_string()));
-        assert_eq!(result.clean_env.get("CUSTOM_ALLOWED"), Some(&"custom".to_string()));
+        assert_eq!(
+            result.clean_env.get("CUSTOM_ALLOWED"),
+            Some(&"custom".to_string())
+        );
     }
 
     #[tokio::test]
@@ -2071,7 +2166,10 @@ mod tests {
         let mut cmd = tokio::process::Command::new("echo");
 
         let mut env = HashMap::new();
-        env.insert("OPENAI_API_KEY".to_string(), "sk-secret123456789012345".to_string());
+        env.insert(
+            "OPENAI_API_KEY".to_string(),
+            "sk-secret123456789012345".to_string(),
+        );
         env.insert("SAFE_VAR".to_string(), "safe-value".to_string());
 
         let result = cleaner.apply_exact_to_tokio_command(&mut cmd, &env);
@@ -2084,14 +2182,31 @@ mod tests {
     fn test_all_ai_providers_blocked() {
         let cleaner = EnvCleaner::new();
         let keys = [
-            "OPENAI_API_KEY", "OPENAI_ORG_ID", "OPENAI_PROJECT_ID",
-            "ANTHROPIC_API_KEY", "CLAUDE_API_KEY",
-            "GEMINI_API_KEY", "GOOGLE_API_KEY", "GOOGLE_APPLICATION_CREDENTIALS",
-            "MISTRAL_API_KEY", "GROQ_API_KEY", "COHERE_API_KEY", "COHERE_TOKEN",
-            "TOGETHER_API_KEY", "FIREWORKS_API_KEY", "DEEPSEEK_API_KEY",
-            "PERPLEXITY_API_KEY", "PPLX_API_KEY", "VOYAGE_API_KEY",
-            "OPENROUTER_API_KEY", "AI21_API_KEY", "REPLICATE_API_TOKEN",
-            "HF_TOKEN", "HUGGINGFACE_TOKEN", "OLLAMA_API_KEY", "XAI_API_KEY",
+            "OPENAI_API_KEY",
+            "OPENAI_ORG_ID",
+            "OPENAI_PROJECT_ID",
+            "ANTHROPIC_API_KEY",
+            "CLAUDE_API_KEY",
+            "GEMINI_API_KEY",
+            "GOOGLE_API_KEY",
+            "GOOGLE_APPLICATION_CREDENTIALS",
+            "MISTRAL_API_KEY",
+            "GROQ_API_KEY",
+            "COHERE_API_KEY",
+            "COHERE_TOKEN",
+            "TOGETHER_API_KEY",
+            "FIREWORKS_API_KEY",
+            "DEEPSEEK_API_KEY",
+            "PERPLEXITY_API_KEY",
+            "PPLX_API_KEY",
+            "VOYAGE_API_KEY",
+            "OPENROUTER_API_KEY",
+            "AI21_API_KEY",
+            "REPLICATE_API_TOKEN",
+            "HF_TOKEN",
+            "HUGGINGFACE_TOKEN",
+            "OLLAMA_API_KEY",
+            "XAI_API_KEY",
         ];
 
         for &key in &keys {
@@ -2107,12 +2222,26 @@ mod tests {
     fn test_cloud_and_vcs_keys_blocked() {
         let cleaner = EnvCleaner::new();
         let keys = [
-            "AWS_ACCESS_KEY_ID", "AWS_SECRET_ACCESS_KEY", "AWS_SESSION_TOKEN",
-            "AZURE_OPENAI_API_KEY", "AZURE_API_KEY", "AZURE_CLIENT_SECRET",
-            "DIGITALOCEAN_ACCESS_TOKEN", "CLOUDFLARE_API_TOKEN", "CF_API_TOKEN",
-            "VERCEL_TOKEN", "NETLIFY_AUTH_TOKEN", "HEROKU_API_KEY", "FLY_API_TOKEN",
-            "GITHUB_TOKEN", "GH_TOKEN", "GITHUB_PAT", "GITLAB_TOKEN", "BITBUCKET_TOKEN",
-            "GIT_PASSWORD", "GIT_ASKPASS",
+            "AWS_ACCESS_KEY_ID",
+            "AWS_SECRET_ACCESS_KEY",
+            "AWS_SESSION_TOKEN",
+            "AZURE_OPENAI_API_KEY",
+            "AZURE_API_KEY",
+            "AZURE_CLIENT_SECRET",
+            "DIGITALOCEAN_ACCESS_TOKEN",
+            "CLOUDFLARE_API_TOKEN",
+            "CF_API_TOKEN",
+            "VERCEL_TOKEN",
+            "NETLIFY_AUTH_TOKEN",
+            "HEROKU_API_KEY",
+            "FLY_API_TOKEN",
+            "GITHUB_TOKEN",
+            "GH_TOKEN",
+            "GITHUB_PAT",
+            "GITLAB_TOKEN",
+            "BITBUCKET_TOKEN",
+            "GIT_PASSWORD",
+            "GIT_ASKPASS",
         ];
 
         for &key in &keys {
@@ -2128,11 +2257,25 @@ mod tests {
     fn test_databases_and_secrets_managers_blocked() {
         let cleaner = EnvCleaner::new();
         let keys = [
-            "DATABASE_URL", "DATABASE_PASSWORD", "DB_PASSWORD",
-            "POSTGRES_PASSWORD", "PGPASSWORD", "MYSQL_PWD", "MYSQL_ROOT_PASSWORD",
-            "REDIS_PASSWORD", "REDIS_AUTH", "MONGO_URI", "MONGODB_URI",
-            "VAULT_TOKEN", "BW_SESSION", "OP_SERVICE_ACCOUNT_TOKEN", "ONEPASSWORD_TOKEN",
-            "STRIPE_SECRET_KEY", "STRIPE_API_KEY", "SENDGRID_API_KEY", "TWILIO_AUTH_TOKEN",
+            "DATABASE_URL",
+            "DATABASE_PASSWORD",
+            "DB_PASSWORD",
+            "POSTGRES_PASSWORD",
+            "PGPASSWORD",
+            "MYSQL_PWD",
+            "MYSQL_ROOT_PASSWORD",
+            "REDIS_PASSWORD",
+            "REDIS_AUTH",
+            "MONGO_URI",
+            "MONGODB_URI",
+            "VAULT_TOKEN",
+            "BW_SESSION",
+            "OP_SERVICE_ACCOUNT_TOKEN",
+            "ONEPASSWORD_TOKEN",
+            "STRIPE_SECRET_KEY",
+            "STRIPE_API_KEY",
+            "SENDGRID_API_KEY",
+            "TWILIO_AUTH_TOKEN",
         ];
 
         for &key in &keys {
@@ -2156,7 +2299,10 @@ mod tests {
             "SESSION_JWT".to_string(),
             "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIn0.SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV_adQssw5c".to_string(),
         );
-        let slack_tok = format!("xoxb-{}-{}", "123456789012-1234567890123", "abcdefghijklmnopqrstuvwx");
+        let slack_tok = format!(
+            "xoxb-{}-{}",
+            "123456789012-1234567890123", "abcdefghijklmnopqrstuvwx"
+        );
         let stripe_tok = format!("sk_live_{}", "51Abcdefghijklmnopqrstuvwx");
         env.insert("SLACK_KEY".to_string(), slack_tok);
         env.insert("STRIPE_KEY".to_string(), stripe_tok);
@@ -2171,7 +2317,8 @@ mod tests {
 
     #[test]
     fn test_custom_blocked_pattern_regex() {
-        let cleaner = EnvCleaner::new().with_blocked_pattern(Regex::new(r"(?i)^INTERNAL_SECRET_.*").unwrap());
+        let cleaner =
+            EnvCleaner::new().with_blocked_pattern(Regex::new(r"(?i)^INTERNAL_SECRET_.*").unwrap());
         let mut env = HashMap::new();
         env.insert("INTERNAL_SECRET_FOO".to_string(), "val1".to_string());
         env.insert("internal_secret_bar".to_string(), "val2".to_string());
@@ -2181,7 +2328,10 @@ mod tests {
         assert_eq!(result.stripped_count(), 2);
         assert!(result.has_stripped("INTERNAL_SECRET_FOO"));
         assert!(result.has_stripped("internal_secret_bar"));
-        assert_eq!(result.clean_env.get("INTERNAL_PUBLIC_BAZ"), Some(&"val3".to_string()));
+        assert_eq!(
+            result.clean_env.get("INTERNAL_PUBLIC_BAZ"),
+            Some(&"val3".to_string())
+        );
     }
 
     #[test]
@@ -2203,7 +2353,10 @@ mod tests {
         assert_eq!(res1.stripped_count(), 0);
         assert!(!res1.has_stripped("SAFE"));
 
-        env.insert("OPENAI_API_KEY".to_string(), "sk-12345678901234567890".to_string());
+        env.insert(
+            "OPENAI_API_KEY".to_string(),
+            "sk-12345678901234567890".to_string(),
+        );
         let res2 = EnvCleaner::new().sanitize_map(&env);
         assert!(!res2.is_clean());
         assert_eq!(res2.stripped_count(), 1);
@@ -2218,7 +2371,8 @@ mod tests {
     fn test_redact_openai_and_anthropic_api_keys() {
         let scrubber = SecretScrubber::new();
 
-        let text = "OpenAI key: sk-proj-12345678901234567890, Anthropic key: sk-ant-12345678901234567890.";
+        let text =
+            "OpenAI key: sk-proj-12345678901234567890, Anthropic key: sk-ant-12345678901234567890.";
         let redacted = scrubber.redact_text(text);
 
         assert_eq!(
@@ -2419,7 +2573,10 @@ mod tests {
             "text": "Log error: failed to authenticate with OpenAI API key sk-proj-12345678901234567890."
         });
 
-        let output_str = tool.execute(args, &ctx).await.expect("tool execution failed");
+        let output_str = tool
+            .execute(args, &ctx)
+            .await
+            .expect("tool execution failed");
         let parsed: Value = serde_json::from_str(&output_str).expect("valid JSON response");
 
         assert_eq!(parsed["action"], "redact_text");
@@ -2441,7 +2598,10 @@ mod tests {
             "text": "Credentials:\nAWS: AKIAIOSFODNN7EXAMPLE\nGitHub: ghp_123456789012345678901234567890123456"
         });
 
-        let output_str = tool.execute(args, &ctx).await.expect("tool execution failed");
+        let output_str = tool
+            .execute(args, &ctx)
+            .await
+            .expect("tool execution failed");
         let parsed: Value = serde_json::from_str(&output_str).expect("valid JSON response");
 
         assert_eq!(parsed["action"], "scan_secrets");
@@ -2463,7 +2623,10 @@ mod tests {
             }
         });
 
-        let output_str = tool.execute(args, &ctx).await.expect("tool execution failed");
+        let output_str = tool
+            .execute(args, &ctx)
+            .await
+            .expect("tool execution failed");
         let parsed: Value = serde_json::from_str(&output_str).expect("valid JSON response");
 
         assert_eq!(parsed["action"], "sanitize_env");
@@ -2481,7 +2644,10 @@ mod tests {
             "action": "check_key",
             "key": "ANTHROPIC_API_KEY"
         });
-        let out_key = tool.execute(check_key_args, &ctx).await.expect("check_key failed");
+        let out_key = tool
+            .execute(check_key_args, &ctx)
+            .await
+            .expect("check_key failed");
         let parsed_key: Value = serde_json::from_str(&out_key).unwrap();
         assert_eq!(parsed_key["is_sensitive"], true);
 
@@ -2489,7 +2655,10 @@ mod tests {
             "action": "check_value",
             "value": "sk-ant-12345678901234567890"
         });
-        let out_val = tool.execute(check_val_args, &ctx).await.expect("check_value failed");
+        let out_val = tool
+            .execute(check_val_args, &ctx)
+            .await
+            .expect("check_value failed");
         let parsed_val: Value = serde_json::from_str(&out_val).unwrap();
         assert_eq!(parsed_val["is_sensitive"], true);
     }

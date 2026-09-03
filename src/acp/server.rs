@@ -216,7 +216,9 @@ impl AcpServer {
             if let Some(id) = request.id {
                 let error_resp = JsonRpcResponse::error(
                     id,
-                    JsonRpcError::invalid_request("Missing or invalid 'jsonrpc' version; must be '2.0'"),
+                    JsonRpcError::invalid_request(
+                        "Missing or invalid 'jsonrpc' version; must be '2.0'",
+                    ),
                 );
                 if let Ok(json_str) = serde_json::to_string(&error_resp) {
                     let _ = out_tx.send(json_str);
@@ -229,7 +231,10 @@ impl AcpServer {
         let maybe_id = request.id.clone();
         let method = request.method.as_str();
 
-        match self.dispatch_method(method, request.params, out_tx.clone()).await {
+        match self
+            .dispatch_method(method, request.params, out_tx.clone())
+            .await
+        {
             Ok(maybe_result) => {
                 if !is_notification {
                     if let Some(id) = maybe_id {
@@ -327,21 +332,17 @@ impl AcpServer {
         };
 
         let cfg = self.config.read().await;
-        let active_model = req
-            .model
-            .unwrap_or_else(|| cfg.default_model.clone());
+        let active_model = req.model.unwrap_or_else(|| cfg.default_model.clone());
 
         let session = Session::new(&active_model);
         let session_id = session.id.to_string();
 
-        let models = vec![
-            ModelInfo {
-                id: cfg.default_model.clone(),
-                name: cfg.default_model.clone(),
-                provider: cfg.default_provider.clone(),
-                is_default: true,
-            },
-        ];
+        let models = vec![ModelInfo {
+            id: cfg.default_model.clone(),
+            name: cfg.default_model.clone(),
+            provider: cfg.default_provider.clone(),
+            is_default: true,
+        }];
 
         self.sessions
             .write()
@@ -387,8 +388,8 @@ impl AcpServer {
         let uuid = uuid::Uuid::parse_str(&req.session_id)
             .map_err(|_| JsonRpcError::session_not_found(&req.session_id))?;
 
-        let loaded = Session::load(uuid)
-            .map_err(|_| JsonRpcError::session_not_found(&req.session_id))?;
+        let loaded =
+            Session::load(uuid).map_err(|_| JsonRpcError::session_not_found(&req.session_id))?;
 
         let result = LoadSessionResult {
             session_id: loaded.id.to_string(),
@@ -538,7 +539,9 @@ impl AcpServer {
 
         let user_prompt = req.prompt.to_text();
         if user_prompt.trim().is_empty() {
-            return Err(JsonRpcError::invalid_params("Prompt content cannot be empty"));
+            return Err(JsonRpcError::invalid_params(
+                "Prompt content cannot be empty",
+            ));
         }
 
         // Get or create session
@@ -652,7 +655,10 @@ mod tests {
         let (out_tx, mut out_rx) = unbounded_channel();
 
         server
-            .process_raw_message(&json!({ "jsonrpc": "2.0", "id": 7, "method": "ping" }).to_string(), out_tx)
+            .process_raw_message(
+                &json!({ "jsonrpc": "2.0", "id": 7, "method": "ping" }).to_string(),
+                out_tx,
+            )
             .await;
 
         let resp = next_response(&mut out_rx).await;
@@ -727,7 +733,10 @@ mod tests {
         let (out_tx, mut out_rx) = unbounded_channel();
 
         server
-            .process_raw_message(&json!({ "jsonrpc": "2.0", "method": "ping" }).to_string(), out_tx)
+            .process_raw_message(
+                &json!({ "jsonrpc": "2.0", "method": "ping" }).to_string(),
+                out_tx,
+            )
             .await;
 
         assert!(
@@ -761,7 +770,9 @@ mod tests {
         let server = test_server();
         let (out_tx, mut out_rx) = unbounded_channel();
 
-        server.process_raw_message(&json!([]).to_string(), out_tx).await;
+        server
+            .process_raw_message(&json!([]).to_string(), out_tx)
+            .await;
 
         let resp = next_response(&mut out_rx).await;
         assert_eq!(resp.id, RequestId::Null);
@@ -788,7 +799,10 @@ mod tests {
         let (out_tx, mut out_rx) = unbounded_channel();
 
         server
-            .process_raw_message(&json!({ "jsonrpc": "2.0", "id": 1, "method": "initialize" }).to_string(), out_tx)
+            .process_raw_message(
+                &json!({ "jsonrpc": "2.0", "id": 1, "method": "initialize" }).to_string(),
+                out_tx,
+            )
             .await;
 
         let resp = next_response(&mut out_rx).await;

@@ -445,7 +445,11 @@ pub fn infer_cache_rates(provider: &str, model: &str, input_rate: f64) -> (f64, 
         (input_rate * 0.10, input_rate * 1.25)
     } else if prov.contains("deepseek") || mod_name.contains("deepseek") {
         (input_rate * 0.10, input_rate)
-    } else if prov.contains("openai") || mod_name.contains("gpt") || mod_name.contains("o1") || mod_name.contains("o3") {
+    } else if prov.contains("openai")
+        || mod_name.contains("gpt")
+        || mod_name.contains("o1")
+        || mod_name.contains("o3")
+    {
         (input_rate * 0.50, input_rate)
     } else {
         (input_rate * 0.50, input_rate)
@@ -581,7 +585,8 @@ pub fn is_pricing_cache_fresh(path: &Path, ttl_secs: u64) -> bool {
         Ok(contents) => match serde_json::from_str::<PricingCacheEnvelope>(&contents) {
             Ok(cache) => {
                 let now = Utc::now().timestamp() as u64;
-                cache.version == PRICING_CACHE_VERSION && now.saturating_sub(cache.timestamp) <= ttl_secs
+                cache.version == PRICING_CACHE_VERSION
+                    && now.saturating_sub(cache.timestamp) <= ttl_secs
             }
             Err(_) => false,
         },
@@ -619,10 +624,14 @@ pub fn load_stale_pricing_cache(path: &Path) -> Option<PricingCacheEnvelope> {
 }
 
 /// Saves the pricing cache envelope to disk safely.
-pub fn save_pricing_cache(path: &Path, cache: &PricingCacheEnvelope) -> Result<(), PricingSyncError> {
+pub fn save_pricing_cache(
+    path: &Path,
+    cache: &PricingCacheEnvelope,
+) -> Result<(), PricingSyncError> {
     if let Some(parent) = path.parent() {
-        std::fs::create_dir_all(parent)
-            .map_err(|e| PricingSyncError::Io(format!("Failed to create cache directory: {}", e)))?;
+        std::fs::create_dir_all(parent).map_err(|e| {
+            PricingSyncError::Io(format!("Failed to create cache directory: {}", e))
+        })?;
     }
     let json_bytes = serde_json::to_vec_pretty(cache)
         .map_err(|e| PricingSyncError::Json(format!("Failed to serialize cache: {}", e)))?;
@@ -635,7 +644,9 @@ pub fn save_pricing_cache(path: &Path, cache: &PricingCacheEnvelope) -> Result<(
 pub fn clear_pricing_cache(custom_path: Option<&Path>) -> Result<(), PricingSyncError> {
     let path = match custom_path {
         Some(p) => p.to_path_buf(),
-        None => Config::config_dir().join("cache").join(DEFAULT_PRICING_CACHE_FILENAME),
+        None => Config::config_dir()
+            .join("cache")
+            .join(DEFAULT_PRICING_CACHE_FILENAME),
     };
     if path.exists() {
         std::fs::remove_file(&path)
@@ -666,7 +677,10 @@ pub async fn fetch_openrouter_raw(
     }
 
     let resp = req.send().await.map_err(|e| {
-        PricingSyncError::Network(format!("Failed to connect to OpenRouter pricing endpoint: {}", e))
+        PricingSyncError::Network(format!(
+            "Failed to connect to OpenRouter pricing endpoint: {}",
+            e
+        ))
     })?;
 
     let status = resp.status();
@@ -826,7 +840,13 @@ impl PricingSynchronizer {
         // 1. Check fresh disk cache unless forced
         if !force && is_pricing_cache_fresh(&cache_path, self.config.ttl_secs) {
             if let Some(cache) = load_pricing_cache(&cache_path, self.config.ttl_secs) {
-                let stats = self.apply_cached_envelope(cache, PricingSource::DiskCache, start_time.elapsed().as_millis() as u64).await;
+                let stats = self
+                    .apply_cached_envelope(
+                        cache,
+                        PricingSource::DiskCache,
+                        start_time.elapsed().as_millis() as u64,
+                    )
+                    .await;
                 self.is_syncing.store(false, Ordering::SeqCst);
                 return Ok(stats);
             }
@@ -875,7 +895,10 @@ impl PricingSynchronizer {
                             start_time.elapsed().as_millis() as u64,
                         )
                         .await;
-                    stats.errors.push(format!("Live sync failed ({}), fell back to stale disk cache", err));
+                    stats.errors.push(format!(
+                        "Live sync failed ({}), fell back to stale disk cache",
+                        err
+                    ));
                     self.is_syncing.store(false, Ordering::SeqCst);
                     return Ok(stats);
                 }
@@ -989,7 +1012,11 @@ impl PricingSynchronizer {
         map.insert(record.model_id.to_lowercase(), record.clone());
 
         // 2. Provider:Model key (e.g. "anthropic:claude-3.7-sonnet")
-        let prov_key = format!("{}:{}", record.canonical_provider.to_lowercase(), record.canonical_name.to_lowercase());
+        let prov_key = format!(
+            "{}:{}",
+            record.canonical_provider.to_lowercase(),
+            record.canonical_name.to_lowercase()
+        );
         map.insert(prov_key, record.clone());
 
         // 3. Simple Model Name (e.g. "claude-3.7-sonnet") if not conflicting
@@ -1007,7 +1034,9 @@ impl PricingSynchronizer {
 
         let envelope = PricingCacheEnvelope {
             version: PRICING_CACHE_VERSION,
-            timestamp: state.last_synced_at.unwrap_or_else(|| Utc::now().timestamp() as u64),
+            timestamp: state
+                .last_synced_at
+                .unwrap_or_else(|| Utc::now().timestamp() as u64),
             source: "openrouter".to_string(),
             model_count: state.unique_models.len(),
             models: models_map,
@@ -1088,7 +1117,11 @@ impl PricingSynchronizer {
                     || m.display_name.to_lowercase().contains(&q)
                     || m.canonical_provider.to_lowercase().contains(&q)
                     || m.canonical_name.to_lowercase().contains(&q)
-                    || m.description.as_deref().unwrap_or("").to_lowercase().contains(&q)
+                    || m.description
+                        .as_deref()
+                        .unwrap_or("")
+                        .to_lowercase()
+                        .contains(&q)
             })
             .cloned()
             .collect()
@@ -1131,7 +1164,9 @@ impl PricingSynchronizer {
         list.sort_by(|a, b| {
             let cost_a = (a.pricing.input_per_million * 3.0) + a.pricing.output_per_million;
             let cost_b = (b.pricing.input_per_million * 3.0) + b.pricing.output_per_million;
-            cost_a.partial_cmp(&cost_b).unwrap_or(std::cmp::Ordering::Equal)
+            cost_a
+                .partial_cmp(&cost_b)
+                .unwrap_or(std::cmp::Ordering::Equal)
         });
         list.truncate(limit);
         list
@@ -1174,7 +1209,12 @@ impl PricingSynchronizer {
         cache_write_tokens: u64,
     ) -> CostBreakdown {
         let pricing = self.get_pricing_or_fallback(provider, model).await;
-        pricing.calculate(input_tokens, output_tokens, cache_read_tokens, cache_write_tokens)
+        pricing.calculate(
+            input_tokens,
+            output_tokens,
+            cache_read_tokens,
+            cache_write_tokens,
+        )
     }
 
     /// Exports all currently synchronized models into a [`ModelPricingRegistry`].
@@ -1291,11 +1331,26 @@ pub fn format_sync_summary(stats: &PricingSyncStats) -> String {
     out.push_str("║           OpenRouter Dynamic Pricing Sync Summary            ║\n");
     out.push_str("╠══════════════════════════════════════════════════════════════╣\n");
     out.push_str(&format!("║ Source:            {:<41} ║\n", source_str));
-    out.push_str(&format!("║ Models Indexed:    {:<41} ║\n", stats.models_fetched));
-    out.push_str(&format!("║ Newly Added:       {:<41} ║\n", stats.models_added));
-    out.push_str(&format!("║ Prices Updated:    {:<41} ║\n", stats.models_updated));
-    out.push_str(&format!("║ Free Models:       {:<41} ║\n", stats.free_models_count));
-    out.push_str(&format!("║ Latency:           {:<41} ║\n", format!("{} ms", stats.sync_duration_ms)));
+    out.push_str(&format!(
+        "║ Models Indexed:    {:<41} ║\n",
+        stats.models_fetched
+    ));
+    out.push_str(&format!(
+        "║ Newly Added:       {:<41} ║\n",
+        stats.models_added
+    ));
+    out.push_str(&format!(
+        "║ Prices Updated:    {:<41} ║\n",
+        stats.models_updated
+    ));
+    out.push_str(&format!(
+        "║ Free Models:       {:<41} ║\n",
+        stats.free_models_count
+    ));
+    out.push_str(&format!(
+        "║ Latency:           {:<41} ║\n",
+        format!("{} ms", stats.sync_duration_ms)
+    ));
     if !stats.errors.is_empty() {
         out.push_str("╠──────────────────────────────────────────────────────────────╣\n");
         out.push_str("║ Warnings / Notes:                                            ║\n");
@@ -1706,6 +1761,9 @@ mod tests {
         assert!(summary.contains("10"));
 
         let comparison = format_model_cost_comparison(&[record], 100_000, 20_000);
-        assert!(comparison.contains("Claude 3.7 Sonnet") || comparison.contains("anthropic/claude-3.7-sonnet"));
+        assert!(
+            comparison.contains("Claude 3.7 Sonnet")
+                || comparison.contains("anthropic/claude-3.7-sonnet")
+        );
     }
 }

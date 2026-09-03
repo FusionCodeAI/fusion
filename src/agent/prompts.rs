@@ -509,7 +509,11 @@ impl SystemPromptBuilder {
     }
 
     /// Injects persistent memories relevant to the specified workspace from a `MemoryStore`.
-    pub fn with_memory_store(mut self, store: &crate::agent::memory::MemoryStore, workspace: Option<&str>) -> Self {
+    pub fn with_memory_store(
+        mut self,
+        store: &crate::agent::memory::MemoryStore,
+        workspace: Option<&str>,
+    ) -> Self {
         let mem_formatted = store.format_for_system_prompt(workspace);
         if !mem_formatted.is_empty() {
             self.memory_context = Some(mem_formatted);
@@ -536,7 +540,10 @@ impl SystemPromptBuilder {
 
     /// Appends a concise catalog of available tools (names + one-line descriptions)
     /// formatted for system prompt injection.
-    pub fn with_tool_definitions(mut self, tools: &[crate::provider::types::ToolDefinition]) -> Self {
+    pub fn with_tool_definitions(
+        mut self,
+        tools: &[crate::provider::types::ToolDefinition],
+    ) -> Self {
         if tools.is_empty() {
             return self;
         }
@@ -626,7 +633,8 @@ impl SystemPromptBuilder {
         // 7. Persistent Memory (User Preferences, Project Architecture & Conventions)
         if let Some(mem) = &self.memory_context {
             if !mem.trim().is_empty() {
-                prompt.push_str("\n\nPersistent Memory (Preferences, Architecture & Conventions):\n");
+                prompt
+                    .push_str("\n\nPersistent Memory (Preferences, Architecture & Conventions):\n");
                 prompt.push_str(mem.trim());
             }
         }
@@ -1220,7 +1228,10 @@ mod tests {
         let tokens = builder.estimate_tokens();
         let len = builder.len();
 
-        assert!(tokens > 0, "compiled prompt must have nonzero token estimate");
+        assert!(
+            tokens > 0,
+            "compiled prompt must have nonzero token estimate"
+        );
         assert!(len > 0);
         // Rust prompt is several paragraphs; rough sanity bounds.
         assert!(tokens > 100 && tokens < 20_000);
@@ -1288,7 +1299,8 @@ mod tests {
     #[test]
     fn test_domain_task_prompts_differ_by_preset() {
         let subject = "SELECT * FROM users WHERE id = $1";
-        let rust_prompt = domain_task_prompt(&PromptPreset::Rust, DomainTask::SecurityAudit, subject);
+        let rust_prompt =
+            domain_task_prompt(&PromptPreset::Rust, DomainTask::SecurityAudit, subject);
         let go_prompt = domain_task_prompt(&PromptPreset::Go, DomainTask::SecurityAudit, subject);
 
         assert!(rust_prompt.contains("unsafe"));

@@ -287,9 +287,13 @@ pub fn estimate_text_tokens_with_family(text: &str, family: TokenizerFamily) -> 
         if family == TokenizerFamily::Claude && b == b'<' && i + 1 < len {
             let is_close = bytes[i + 1] == b'/';
             let tag_start = if is_close { i + 2 } else { i + 1 };
-            if tag_start < len && (bytes[tag_start].is_ascii_alphabetic() || bytes[tag_start] == b'_') {
+            if tag_start < len
+                && (bytes[tag_start].is_ascii_alphabetic() || bytes[tag_start] == b'_')
+            {
                 let mut j = tag_start;
-                while j < len && (bytes[j].is_ascii_alphanumeric() || bytes[j] == b'_' || bytes[j] == b'-') {
+                while j < len
+                    && (bytes[j].is_ascii_alphanumeric() || bytes[j] == b'_' || bytes[j] == b'-')
+                {
                     j += 1;
                 }
                 if j < len && bytes[j] == b'>' {
@@ -353,7 +357,10 @@ pub fn estimate_text_tokens_with_family(text: &str, family: TokenizerFamily) -> 
         // 8. ASCII Punctuation and Operators
         if b.is_ascii_punctuation() {
             // Check for 3-character operators (e.g. ===, !==, ..., <<=, >>=, ```)
-            if i + 2 < len && bytes[i + 1].is_ascii_punctuation() && bytes[i + 2].is_ascii_punctuation() {
+            if i + 2 < len
+                && bytes[i + 1].is_ascii_punctuation()
+                && bytes[i + 2].is_ascii_punctuation()
+            {
                 let triplet = [b, bytes[i + 1], bytes[i + 2]];
                 if matches!(
                     &triplet,
@@ -370,9 +377,29 @@ pub fn estimate_text_tokens_with_family(text: &str, family: TokenizerFamily) -> 
                 let pair = [b, bytes[i + 1]];
                 if matches!(
                     &pair,
-                    b"::" | b"->" | b"=>" | b"==" | b"!=" | b"<=" | b">=" | b"&&" | b"||"
-                        | b"//" | b"/*" | b"*/" | b"+=" | b"-=" | b"*=" | b"/=" | b"<<" | b">>"
-                        | b"??" | b"?." | b"##" | b"**" | b"~~"
+                    b"::"
+                        | b"->"
+                        | b"=>"
+                        | b"=="
+                        | b"!="
+                        | b"<="
+                        | b">="
+                        | b"&&"
+                        | b"||"
+                        | b"//"
+                        | b"/*"
+                        | b"*/"
+                        | b"+="
+                        | b"-="
+                        | b"*="
+                        | b"/="
+                        | b"<<"
+                        | b">>"
+                        | b"??"
+                        | b"?."
+                        | b"##"
+                        | b"**"
+                        | b"~~"
                 ) {
                     tokens += 1;
                     i += 2;
@@ -510,13 +537,19 @@ pub fn estimate_tool_definition_tokens(tool: &ToolDefinition) -> usize {
 }
 
 /// Estimates tokens consumed by a `ToolDefinition` under a specific `TokenizerFamily`.
-pub fn estimate_tool_definition_tokens_with_family(tool: &ToolDefinition, family: TokenizerFamily) -> usize {
+pub fn estimate_tool_definition_tokens_with_family(
+    tool: &ToolDefinition,
+    family: TokenizerFamily,
+) -> usize {
     let detailed = estimate_tool_definition_detailed(tool, family);
     detailed.total
 }
 
 /// Detailed calculation of tokens for a `ToolDefinition`.
-pub fn estimate_tool_definition_detailed(tool: &ToolDefinition, family: TokenizerFamily) -> ToolDefinitionTokens {
+pub fn estimate_tool_definition_detailed(
+    tool: &ToolDefinition,
+    family: TokenizerFamily,
+) -> ToolDefinitionTokens {
     let name_tokens = estimate_text_tokens_with_family(&tool.name, family);
     let description_tokens = estimate_text_tokens_with_family(&tool.description, family);
     let params_str = tool.parameters.to_string();
@@ -535,7 +568,11 @@ pub fn estimate_tool_definition_detailed(tool: &ToolDefinition, family: Tokenize
 }
 
 /// Estimates detailed tokens consumed by a tool execution result message.
-pub fn estimate_tool_result_detailed(tool_call_id: &str, content: &str, family: TokenizerFamily) -> ToolResultTokens {
+pub fn estimate_tool_result_detailed(
+    tool_call_id: &str,
+    content: &str,
+    family: TokenizerFamily,
+) -> ToolResultTokens {
     let id_tokens = estimate_text_tokens_with_family(tool_call_id, family);
     let content_tokens = estimate_text_tokens_with_family(content, family);
     let framing_overhead = family.message_base_tokens() + 1;
@@ -556,7 +593,10 @@ pub fn estimate_tools_tokens(tools: &[ToolDefinition]) -> usize {
 }
 
 /// Estimates total tokens consumed by a collection of `ToolDefinition`s with a specific `TokenizerFamily`.
-pub fn estimate_tools_tokens_with_family(tools: &[ToolDefinition], family: TokenizerFamily) -> usize {
+pub fn estimate_tools_tokens_with_family(
+    tools: &[ToolDefinition],
+    family: TokenizerFamily,
+) -> usize {
     if tools.is_empty() {
         return 0;
     }
@@ -626,7 +666,10 @@ pub fn estimate_messages_tokens(messages: &[Message]) -> usize {
 }
 
 /// Estimates total tokens for messages under a specific `TokenizerFamily`.
-pub fn estimate_messages_tokens_with_family(messages: &[Message], family: TokenizerFamily) -> usize {
+pub fn estimate_messages_tokens_with_family(
+    messages: &[Message],
+    family: TokenizerFamily,
+) -> usize {
     if messages.is_empty() {
         return 0;
     }
@@ -649,7 +692,11 @@ pub fn estimate_messages_tokens_with_system(
     messages: &[Message],
     system_prompt: Option<&str>,
 ) -> usize {
-    estimate_messages_tokens_with_system_and_family(messages, system_prompt, TokenizerFamily::GenericBpe)
+    estimate_messages_tokens_with_system_and_family(
+        messages,
+        system_prompt,
+        TokenizerFamily::GenericBpe,
+    )
 }
 
 /// Estimates total tokens for messages including an optional system prompt with a specific family.
@@ -661,7 +708,8 @@ pub fn estimate_messages_tokens_with_system_and_family(
     let mut total = estimate_messages_tokens_with_family(messages, family);
     if let Some(system) = system_prompt {
         if !system.is_empty() {
-            total += family.message_base_tokens() + estimate_text_tokens_with_family(system, family);
+            total +=
+                family.message_base_tokens() + estimate_text_tokens_with_family(system, family);
         }
     }
     total
@@ -747,7 +795,8 @@ impl StreamingTokenEstimator {
                     } else {
                         // Still incomplete trailing tail, update tail buffer
                         let copy_tail = combo_len.min(16);
-                        self.tail_buf[..copy_tail].copy_from_slice(&combo[combo_len - copy_tail..combo_len]);
+                        self.tail_buf[..copy_tail]
+                            .copy_from_slice(&combo[combo_len - copy_tail..combo_len]);
                         self.tail_len = copy_tail;
                     }
                     return self.total_tokens - old_total;
@@ -781,7 +830,11 @@ impl StreamingTokenEstimator {
 
         // Check if slice ends cleanly on whitespace/newline
         let last_byte = bytes[len - 1];
-        if last_byte.is_ascii_whitespace() || last_byte == b'\n' || last_byte == b';' || last_byte == b'}' {
+        if last_byte.is_ascii_whitespace()
+            || last_byte == b'\n'
+            || last_byte == b';'
+            || last_byte == b'}'
+        {
             if let Ok(valid_str) = std::str::from_utf8(bytes) {
                 let toks = estimate_text_tokens_with_family(valid_str, self.family);
                 self.total_tokens += toks;
@@ -886,14 +939,9 @@ impl StreamingCompletionEstimator {
                 name,
                 arguments_delta,
                 ..
-            } => self.feed_tool_call_delta(
-                id.as_deref(),
-                name.as_deref(),
-                arguments_delta,
-            ),
+            } => self.feed_tool_call_delta(id.as_deref(), name.as_deref(), arguments_delta),
             StreamChunk::Done {
-                completion_tokens,
-                ..
+                completion_tokens, ..
             } => {
                 if let Some(tokens) = completion_tokens {
                     self.exact_completion_tokens = Some(*tokens as usize);
@@ -930,7 +978,8 @@ impl StreamingCompletionEstimator {
             added += estimate_text_tokens_with_family(id_str, self.family);
         }
         if let Some(name_str) = name {
-            added += estimate_text_tokens_with_family(name_str, self.family) + self.family.tool_call_overhead();
+            added += estimate_text_tokens_with_family(name_str, self.family)
+                + self.family.tool_call_overhead();
         }
         if !args_delta.is_empty() {
             added += estimate_text_tokens_with_family(args_delta, self.family);
@@ -1230,7 +1279,11 @@ pub fn model_context_limit(model: &str) -> usize {
     }
 
     // 2. Anthropic Claude models (200k tokens)
-    if m.contains("claude-3") || m.contains("claude-sonnet") || m.contains("claude-opus") || m.contains("claude-haiku") {
+    if m.contains("claude-3")
+        || m.contains("claude-sonnet")
+        || m.contains("claude-opus")
+        || m.contains("claude-haiku")
+    {
         return 200_000;
     }
     if m.contains("claude") {
@@ -1243,7 +1296,11 @@ pub fn model_context_limit(model: &str) -> usize {
     }
 
     // 4. OpenAI GPT-4o / GPT-4o-mini / GPT-4-turbo (128k tokens)
-    if m.contains("gpt-4o") || m.contains("gpt-4-turbo") || m.contains("gpt-4-1106") || m.contains("gpt-4-0125") {
+    if m.contains("gpt-4o")
+        || m.contains("gpt-4-turbo")
+        || m.contains("gpt-4-1106")
+        || m.contains("gpt-4-0125")
+    {
         return 128_000;
     }
 
@@ -1334,7 +1391,9 @@ impl BudgetStatus {
     pub fn should_compact(&self) -> bool {
         matches!(
             self,
-            BudgetStatus::Warning { .. } | BudgetStatus::Danger { .. } | BudgetStatus::Overflow { .. }
+            BudgetStatus::Warning { .. }
+                | BudgetStatus::Danger { .. }
+                | BudgetStatus::Overflow { .. }
         )
     }
 
@@ -1471,7 +1530,10 @@ impl ContextBudget {
     ) -> ContextBreakdown {
         let system_tokens = system_prompt
             .filter(|s| !s.is_empty())
-            .map(|s| self.tokenizer_family.message_base_tokens() + estimate_text_tokens_with_family(s, self.tokenizer_family))
+            .map(|s| {
+                self.tokenizer_family.message_base_tokens()
+                    + estimate_text_tokens_with_family(s, self.tokenizer_family)
+            })
             .unwrap_or(0);
 
         let messages_tokens = estimate_messages_tokens_with_family(messages, self.tokenizer_family);
@@ -1651,7 +1713,11 @@ fn calculate_sum(a: i32, b: i32) -> i32 {
     fn test_estimate_unicode_cjk() {
         let cjk = "你好世界，人工智能编程助手";
         let tokens = estimate_text_tokens(cjk);
-        assert!(tokens >= 12 && tokens <= 35, "got {} tokens for CJK", tokens);
+        assert!(
+            tokens >= 12 && tokens <= 35,
+            "got {} tokens for CJK",
+            tokens
+        );
     }
 
     #[test]
@@ -1661,7 +1727,12 @@ fn calculate_sum(a: i32, b: i32) -> i32 {
         let tok_cl100k = estimate_text_tokens_with_family(cjk, TokenizerFamily::Cl100kBase);
 
         // o200k has a more compact CJK representation than cl100k
-        assert!(tok_o200k <= tok_cl100k, "o200k ({}) should be <= cl100k ({})", tok_o200k, tok_cl100k);
+        assert!(
+            tok_o200k <= tok_cl100k,
+            "o200k ({}) should be <= cl100k ({})",
+            tok_o200k,
+            tok_cl100k
+        );
 
         // Test Claude XML tag recognition
         let xml_text = "<thinking>\nLet me analyze this code.\n</thinking>";
@@ -1672,22 +1743,56 @@ fn calculate_sum(a: i32, b: i32) -> i32 {
 
     #[test]
     fn test_model_inference_to_family() {
-        assert_eq!(TokenizerFamily::from_model("gpt-4o"), TokenizerFamily::O200kBase);
-        assert_eq!(TokenizerFamily::from_model("gpt-4o-mini"), TokenizerFamily::O200kBase);
-        assert_eq!(TokenizerFamily::from_model("o1-mini"), TokenizerFamily::O200kBase);
-        assert_eq!(TokenizerFamily::from_model("o3-mini"), TokenizerFamily::O200kBase);
-        assert_eq!(TokenizerFamily::from_model("claude-3-5-sonnet-20241022"), TokenizerFamily::Claude);
-        assert_eq!(TokenizerFamily::from_model("claude-3-7-sonnet"), TokenizerFamily::Claude);
-        assert_eq!(TokenizerFamily::from_model("deepseek-chat"), TokenizerFamily::DeepSeek);
-        assert_eq!(TokenizerFamily::from_model("deepseek-r1"), TokenizerFamily::DeepSeek);
-        assert_eq!(TokenizerFamily::from_model("llama-3.1-70b"), TokenizerFamily::Llama3);
-        assert_eq!(TokenizerFamily::from_model("gemini-1.5-pro"), TokenizerFamily::Gemini);
-        assert_eq!(TokenizerFamily::from_model("gpt-4-0613"), TokenizerFamily::Cl100kBase);
+        assert_eq!(
+            TokenizerFamily::from_model("gpt-4o"),
+            TokenizerFamily::O200kBase
+        );
+        assert_eq!(
+            TokenizerFamily::from_model("gpt-4o-mini"),
+            TokenizerFamily::O200kBase
+        );
+        assert_eq!(
+            TokenizerFamily::from_model("o1-mini"),
+            TokenizerFamily::O200kBase
+        );
+        assert_eq!(
+            TokenizerFamily::from_model("o3-mini"),
+            TokenizerFamily::O200kBase
+        );
+        assert_eq!(
+            TokenizerFamily::from_model("claude-3-5-sonnet-20241022"),
+            TokenizerFamily::Claude
+        );
+        assert_eq!(
+            TokenizerFamily::from_model("claude-3-7-sonnet"),
+            TokenizerFamily::Claude
+        );
+        assert_eq!(
+            TokenizerFamily::from_model("deepseek-chat"),
+            TokenizerFamily::DeepSeek
+        );
+        assert_eq!(
+            TokenizerFamily::from_model("deepseek-r1"),
+            TokenizerFamily::DeepSeek
+        );
+        assert_eq!(
+            TokenizerFamily::from_model("llama-3.1-70b"),
+            TokenizerFamily::Llama3
+        );
+        assert_eq!(
+            TokenizerFamily::from_model("gemini-1.5-pro"),
+            TokenizerFamily::Gemini
+        );
+        assert_eq!(
+            TokenizerFamily::from_model("gpt-4-0613"),
+            TokenizerFamily::Cl100kBase
+        );
     }
 
     #[test]
     fn test_streaming_token_estimator_parity() {
-        let full_text = "fn main() {\n    let answer = 42;\n    println!(\"The answer is {}\", answer);\n}\n";
+        let full_text =
+            "fn main() {\n    let answer = 42;\n    println!(\"The answer is {}\", answer);\n}\n";
         let batch_tokens = estimate_text_tokens(full_text);
 
         // Stream chunk by chunk (simulating 5-character chunks)
@@ -1700,7 +1805,12 @@ fn calculate_sum(a: i32, b: i32) -> i32 {
 
         // Parity within small threshold
         let diff = (batch_tokens as isize - stream_tokens as isize).abs();
-        assert!(diff <= 2, "batch was {}, stream was {}", batch_tokens, stream_tokens);
+        assert!(
+            diff <= 2,
+            "batch was {}, stream was {}",
+            batch_tokens,
+            stream_tokens
+        );
     }
 
     #[test]
@@ -1721,7 +1831,12 @@ fn calculate_sum(a: i32, b: i32) -> i32 {
         assert!(estimator.tool_call_tokens() > 0);
 
         let total = estimator.finish();
-        assert_eq!(total, estimator.content_tokens() + estimator.reasoning_tokens() + estimator.tool_call_tokens());
+        assert_eq!(
+            total,
+            estimator.content_tokens()
+                + estimator.reasoning_tokens()
+                + estimator.tool_call_tokens()
+        );
     }
 
     #[test]
@@ -1762,7 +1877,10 @@ fn calculate_sum(a: i32, b: i32) -> i32 {
         assert!(def_tokens.framing_overhead > 0);
         assert_eq!(
             def_tokens.total,
-            def_tokens.name_tokens + def_tokens.description_tokens + def_tokens.parameters_tokens + def_tokens.framing_overhead
+            def_tokens.name_tokens
+                + def_tokens.description_tokens
+                + def_tokens.parameters_tokens
+                + def_tokens.framing_overhead
         );
 
         let call = ToolCall {
@@ -1777,10 +1895,17 @@ fn calculate_sum(a: i32, b: i32) -> i32 {
         assert!(call_tokens.arguments_tokens > 0);
         assert_eq!(
             call_tokens.total,
-            call_tokens.id_tokens + call_tokens.name_tokens + call_tokens.arguments_tokens + call_tokens.syntax_overhead
+            call_tokens.id_tokens
+                + call_tokens.name_tokens
+                + call_tokens.arguments_tokens
+                + call_tokens.syntax_overhead
         );
 
-        let result_tokens = estimate_tool_result_detailed("call_987xyz", "Build succeeded with 0 warnings.", TokenizerFamily::O200kBase);
+        let result_tokens = estimate_tool_result_detailed(
+            "call_987xyz",
+            "Build succeeded with 0 warnings.",
+            TokenizerFamily::O200kBase,
+        );
         assert!(result_tokens.total > 0);
     }
 
@@ -1851,7 +1976,10 @@ fn calculate_sum(a: i32, b: i32) -> i32 {
         assert_eq!(model_context_limit("gemini-1.5-pro"), 2_097_152);
         assert_eq!(model_context_limit("llama-3.1-70b"), 128_000);
         assert_eq!(model_context_limit("llama-3-8b"), 8_192);
-        assert_eq!(model_context_limit("unknown-custom-model"), DEFAULT_CONTEXT_WINDOW);
+        assert_eq!(
+            model_context_limit("unknown-custom-model"),
+            DEFAULT_CONTEXT_WINDOW
+        );
     }
 
     #[test]

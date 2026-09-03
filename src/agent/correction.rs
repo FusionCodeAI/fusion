@@ -18,8 +18,8 @@ use std::time::{Duration, Instant};
 
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
-use tracing::{debug, info};
 use tokio::sync::RwLock;
+use tracing::{debug, info};
 
 use crate::tools::types::{ToolContext, ToolRegistry};
 // ---------------------------------------------------------------------------
@@ -36,10 +36,7 @@ pub enum ErrorCategory {
         suggested_paths: Vec<String>,
     },
     /// A required directory does not exist (e.g. when creating or writing files).
-    DirectoryNotFound {
-        path: String,
-        parent_dir: String,
-    },
+    DirectoryNotFound { path: String, parent_dir: String },
     /// Permission denied on filesystem or resource.
     PermissionDenied {
         path: Option<String>,
@@ -87,13 +84,9 @@ pub enum ErrorCategory {
         details: String,
     },
     /// Tool output or context window exceeded size limit.
-    OutputTooLarge {
-        approx_bytes: usize,
-    },
+    OutputTooLarge { approx_bytes: usize },
     /// Uncategorized or unknown error.
-    Unknown {
-        raw_error: String,
-    },
+    Unknown { raw_error: String },
 }
 
 impl ErrorCategory {
@@ -118,12 +111,21 @@ impl ErrorCategory {
     /// Whether this error is likely auto-recoverable without needing LLM-level code generation.
     pub fn is_auto_recoverable(&self) -> bool {
         match self {
-            Self::FileNotFound { suggested_paths, .. } => !suggested_paths.is_empty(),
+            Self::FileNotFound {
+                suggested_paths, ..
+            } => !suggested_paths.is_empty(),
             Self::DirectoryNotFound { .. } => true,
-            Self::CommandNotFound { suggested_alternatives, .. } => !suggested_alternatives.is_empty(),
+            Self::CommandNotFound {
+                suggested_alternatives,
+                ..
+            } => !suggested_alternatives.is_empty(),
             Self::ToolArgumentError { .. } => true,
-            Self::PatchOrEditMismatch { has_crlf_mismatch, .. } => *has_crlf_mismatch,
-            Self::GitError { is_index_locked, .. } => *is_index_locked,
+            Self::PatchOrEditMismatch {
+                has_crlf_mismatch, ..
+            } => *has_crlf_mismatch,
+            Self::GitError {
+                is_index_locked, ..
+            } => *is_index_locked,
             Self::RateLimitOrTimeout { .. } => true,
             Self::SyntaxOrCompileError { .. } => false,
             Self::ProcessNonZeroExit { .. } => false,
@@ -205,19 +207,36 @@ pub enum CorrectiveAction {
 impl CorrectiveAction {
     pub fn description(&self) -> String {
         match self {
-            Self::RetryWithModifiedArgs { new_tool, reason, .. } => {
+            Self::RetryWithModifiedArgs {
+                new_tool, reason, ..
+            } => {
                 format!("Retry '{new_tool}' with modified arguments: {reason}")
             }
-            Self::ExecutePrecursorAction { precursor_tool, reason, .. } => {
+            Self::ExecutePrecursorAction {
+                precursor_tool,
+                reason,
+                ..
+            } => {
                 format!("Execute precursor '{precursor_tool}' first: {reason}")
             }
-            Self::FallbackAlternativeTool { fallback_tool, reason, .. } => {
+            Self::FallbackAlternativeTool {
+                fallback_tool,
+                reason,
+                ..
+            } => {
                 format!("Fallback to '{fallback_tool}': {reason}")
             }
-            Self::ExponentialBackoff { delay_ms, current_retry, max_retries, reason } => {
+            Self::ExponentialBackoff {
+                delay_ms,
+                current_retry,
+                max_retries,
+                reason,
+            } => {
                 format!("Backoff {delay_ms}ms (retry {current_retry}/{max_retries}): {reason}")
             }
-            Self::FormatDiagnosticGuidanceForAgent { diagnosis_summary, .. } => {
+            Self::FormatDiagnosticGuidanceForAgent {
+                diagnosis_summary, ..
+            } => {
                 format!("Provide diagnostic guidance to agent: {diagnosis_summary}")
             }
             Self::AbortUnrecoverable { reason, .. } => {
@@ -374,7 +393,10 @@ impl CorrectionOutcome {
     pub fn output_or_error(&self) -> &str {
         match self {
             Self::Success { output, .. } => output,
-            Self::Failed { enriched_diagnostic, .. } => enriched_diagnostic,
+            Self::Failed {
+                enriched_diagnostic,
+                ..
+            } => enriched_diagnostic,
         }
     }
 
@@ -561,7 +583,10 @@ pub fn parse_python_traceback(stderr: &str) -> Option<PythonTracebackDiagnostic>
                 file = line[6..6 + quote_end].to_string();
                 if let Some(line_idx) = line.find(", line ") {
                     let rest = &line[line_idx + 7..];
-                    let end = rest.find(',').or_else(|| rest.find(' ')).unwrap_or(rest.len());
+                    let end = rest
+                        .find(',')
+                        .or_else(|| rest.find(' '))
+                        .unwrap_or(rest.len());
                     line_num = rest[..end].trim().parse().unwrap_or(1);
                 }
                 if i + 1 < lines.len() {
@@ -634,7 +659,9 @@ pub fn find_fuzzy_file_matches(target_str: &str, cwd: &Path) -> Vec<String> {
     let mut suggestions = Vec::new();
 
     // Strategy 1: Check common missing extensions (.rs, .ts, .js, .json, .toml, .py, .md)
-    let common_exts = ["rs", "ts", "js", "json", "toml", "py", "md", "sh", "yaml", "yml"];
+    let common_exts = [
+        "rs", "ts", "js", "json", "toml", "py", "md", "sh", "yaml", "yml",
+    ];
     for ext in common_exts {
         let with_ext = format!("{clean}.{ext}");
         if cwd.join(&with_ext).exists() {
@@ -662,7 +689,8 @@ pub fn find_fuzzy_file_matches(target_str: &str, cwd: &Path) -> Vec<String> {
                         matching_paths.push(rel.to_string_lossy().to_string());
                     }
                 } else if target_filename.len() >= 4
-                    && (name_lower.contains(&target_filename) || target_filename.contains(&name_lower))
+                    && (name_lower.contains(&target_filename)
+                        || target_filename.contains(&name_lower))
                 {
                     if let Ok(rel) = path.strip_prefix(cwd) {
                         matching_paths.push(rel.to_string_lossy().to_string());
@@ -691,7 +719,10 @@ where
             let path = entry.path();
             if let Some(file_name) = path.file_name().and_then(|n| n.to_str()) {
                 // Ignore heavy or hidden directories
-                if file_name.starts_with('.') || file_name == "target" || file_name == "node_modules" {
+                if file_name.starts_with('.')
+                    || file_name == "target"
+                    || file_name == "node_modules"
+                {
                     continue;
                 }
             }
@@ -767,7 +798,8 @@ impl ErrorAnalyzer {
         }
 
         // 2. Check for Directory Not Found (e.g. writing to missing folder)
-        if (err_lower.contains("no such file or directory") && (tool_name == "write" || tool_name == "write_file"))
+        if (err_lower.contains("no such file or directory")
+            && (tool_name == "write" || tool_name == "write_file"))
             || err_lower.contains("parent directory does not exist")
         {
             let target_path = extract_path_from_args(args).unwrap_or_default();
@@ -795,7 +827,10 @@ impl ErrorAnalyzer {
         }
 
         // 3. Check for Permission Denied
-        if err_lower.contains("permission denied") || err_lower.contains("access is denied") || err_lower.contains("operation not permitted") {
+        if err_lower.contains("permission denied")
+            || err_lower.contains("access is denied")
+            || err_lower.contains("operation not permitted")
+        {
             let path = extract_path_from_args(args);
             return ErrorDiagnosis {
                 category: ErrorCategory::PermissionDenied {
@@ -807,7 +842,8 @@ impl ErrorAnalyzer {
                 root_cause: "Filesystem or OS permissions denied the operation.".to_string(),
                 confidence: 0.9,
                 is_recoverable: false,
-                suggested_action: "Check file permissions or target an authorized writable directory.".to_string(),
+                suggested_action:
+                    "Check file permissions or target an authorized writable directory.".to_string(),
                 details,
             };
         }
@@ -829,9 +865,15 @@ impl ErrorAnalyzer {
             }
 
             let suggested_action = if is_rec {
-                format!("Replace '{}' with alternative: '{}'", first_word, alternatives[0])
+                format!(
+                    "Replace '{}' with alternative: '{}'",
+                    first_word, alternatives[0]
+                )
             } else {
-                format!("Ensure binary '{}' is installed or use standard POSIX tools.", first_word)
+                format!(
+                    "Ensure binary '{}' is installed or use standard POSIX tools.",
+                    first_word
+                )
             };
 
             return ErrorDiagnosis {
@@ -855,7 +897,8 @@ impl ErrorAnalyzer {
             || err_lower.contains("could not find text to replace")
             || err_lower.contains("line ending differences (crlf vs lf)")
         {
-            let has_crlf = err_lower.contains("crlf") || err_lower.contains("line ending differences");
+            let has_crlf =
+                err_lower.contains("crlf") || err_lower.contains("line ending differences");
             let multiple_matches = err_lower.contains("occurs") && err_lower.contains("times");
             let file = extract_path_from_args(args).unwrap_or_default();
 
@@ -867,7 +910,8 @@ impl ErrorAnalyzer {
             } else if multiple_matches {
                 "Add more surrounding context lines to disambiguate the target block".to_string()
             } else {
-                "Re-read file to verify current content and exact indentation before editing".to_string()
+                "Re-read file to verify current content and exact indentation before editing"
+                    .to_string()
             };
 
             return ErrorDiagnosis {
@@ -878,7 +922,9 @@ impl ErrorAnalyzer {
                 },
                 tool_name: tool_name.to_string(),
                 raw_error: error_str.to_string(),
-                root_cause: "Target search text in edit/patch operation does not match file content.".to_string(),
+                root_cause:
+                    "Target search text in edit/patch operation does not match file content."
+                        .to_string(),
                 confidence: 0.95,
                 is_recoverable: has_crlf,
                 suggested_action,
@@ -892,7 +938,8 @@ impl ErrorAnalyzer {
             || err_lower.contains("conflict (content)")
             || err_lower.contains("merge conflict")
         {
-            let is_locked = err_lower.contains("index.lock") || err_lower.contains("another git process");
+            let is_locked =
+                err_lower.contains("index.lock") || err_lower.contains("another git process");
             let is_conflict = err_lower.contains("conflict");
 
             let suggested_action = if is_locked {
@@ -970,7 +1017,8 @@ impl ErrorAnalyzer {
                 },
                 tool_name: tool_name.to_string(),
                 raw_error: error_str.to_string(),
-                root_cause: "Remote service rate limited request or network connection timed out.".to_string(),
+                root_cause: "Remote service rate limited request or network connection timed out."
+                    .to_string(),
                 confidence: 0.9,
                 is_recoverable: true,
                 suggested_action: "Retry with exponential backoff.".to_string(),
@@ -979,7 +1027,10 @@ impl ErrorAnalyzer {
         }
 
         // 9. Check for Syntax or Compilation Errors (Rust / TypeScript / Python)
-        if error_str.contains("error[E") || error_str.contains("error TS") || error_str.contains("Traceback (most recent call last)") {
+        if error_str.contains("error[E")
+            || error_str.contains("error TS")
+            || error_str.contains("Traceback (most recent call last)")
+        {
             let language = if error_str.contains("error[E") {
                 Some("Rust".to_string())
             } else if error_str.contains("error TS") {
@@ -1001,13 +1052,17 @@ impl ErrorAnalyzer {
                 root_cause: "Source code failed compilation or syntax validation.".to_string(),
                 confidence: 0.95,
                 is_recoverable: false,
-                suggested_action: "Formulate code fix addressing compiler error diagnostics.".to_string(),
+                suggested_action: "Formulate code fix addressing compiler error diagnostics."
+                    .to_string(),
                 details,
             };
         }
 
         // 10. Check for Process Non-Zero Exit
-        if err_lower.contains("exit status") || err_lower.contains("exit code") || err_lower.contains("command failed with") {
+        if err_lower.contains("exit status")
+            || err_lower.contains("exit code")
+            || err_lower.contains("command failed with")
+        {
             let code = extract_exit_code(error_str);
             let cmd = extract_command_from_args(args).unwrap_or_else(|| "bash".to_string());
 
@@ -1022,7 +1077,8 @@ impl ErrorAnalyzer {
                 root_cause: "Command exited with non-zero status code.".to_string(),
                 confidence: 0.85,
                 is_recoverable: false,
-                suggested_action: "Inspect stderr output and adjust command or source code.".to_string(),
+                suggested_action: "Inspect stderr output and adjust command or source code."
+                    .to_string(),
                 details,
             };
         }
@@ -1037,7 +1093,8 @@ impl ErrorAnalyzer {
             root_cause: "Uncategorized tool execution failure.".to_string(),
             confidence: 0.5,
             is_recoverable: false,
-            suggested_action: "Review error output and formulate alternative tool strategy.".to_string(),
+            suggested_action: "Review error output and formulate alternative tool strategy."
+                .to_string(),
             details,
         }
     }
@@ -1049,7 +1106,15 @@ impl ErrorAnalyzer {
 
 fn extract_path_from_args(args: &Value) -> Option<String> {
     if let Value::Object(map) = args {
-        for key in ["path", "file_path", "file", "filename", "filepath", "target", "dest"] {
+        for key in [
+            "path",
+            "file_path",
+            "file",
+            "filename",
+            "filepath",
+            "target",
+            "dest",
+        ] {
             if let Some(Value::String(s)) = map.get(key) {
                 return Some(s.clone());
             }
@@ -1087,7 +1152,13 @@ fn extract_path_from_error(error_str: &str) -> Option<String> {
 fn extract_missing_param(error_str: &str) -> Option<String> {
     if let Some(idx) = error_str.find("Missing required parameter:") {
         let after = &error_str[idx + 27..].trim();
-        let name = after.split_whitespace().next().unwrap_or("").trim_matches(':').trim_matches('\'').trim_matches('\"');
+        let name = after
+            .split_whitespace()
+            .next()
+            .unwrap_or("")
+            .trim_matches(':')
+            .trim_matches('\'')
+            .trim_matches('\"');
         if !name.is_empty() {
             return Some(name.to_string());
         }
@@ -1113,7 +1184,10 @@ fn extract_exit_code(error_str: &str) -> Option<i32> {
     for pattern in ["exit status ", "exit code ", "code "] {
         if let Some(idx) = error_str.to_lowercase().find(pattern) {
             let rest = &error_str[idx + pattern.len()..];
-            let num_str: String = rest.chars().take_while(|c| c.is_ascii_digit() || *c == '-').collect();
+            let num_str: String = rest
+                .chars()
+                .take_while(|c| c.is_ascii_digit() || *c == '-')
+                .collect();
             if let Ok(code) = num_str.parse::<i32>() {
                 return Some(code);
             }
@@ -1188,7 +1262,9 @@ impl CorrectionEngine {
 
         match &diagnosis.category {
             // Recovery 1: File not found with suggested fuzzy path match
-            ErrorCategory::FileNotFound { suggested_paths, .. } if self.config.enable_fuzzy_path_correction => {
+            ErrorCategory::FileNotFound {
+                suggested_paths, ..
+            } if self.config.enable_fuzzy_path_correction => {
                 if let Some(best_match) = suggested_paths.first() {
                     let mut new_args = original_args.clone();
                     if let Value::Object(map) = &mut new_args {
@@ -1202,7 +1278,10 @@ impl CorrectionEngine {
                     let action = CorrectiveAction::RetryWithModifiedArgs {
                         new_tool: original_tool.to_string(),
                         new_args: new_args.clone(),
-                        reason: format!("Corrected missing file path to closest match: '{}'", best_match),
+                        reason: format!(
+                            "Corrected missing file path to closest match: '{}'",
+                            best_match
+                        ),
                     };
 
                     if !history.has_attempted(original_tool, &new_args, &action.description()) {
@@ -1212,7 +1291,9 @@ impl CorrectionEngine {
             }
 
             // Recovery 2: Directory not found -> Precursor mkdir -p
-            ErrorCategory::DirectoryNotFound { parent_dir, .. } if self.config.enable_precursor_actions && !parent_dir.is_empty() => {
+            ErrorCategory::DirectoryNotFound { parent_dir, .. }
+                if self.config.enable_precursor_actions && !parent_dir.is_empty() =>
+            {
                 let precursor_tool = "bash".to_string();
                 let precursor_args = json!({
                     "command": format!("mkdir -p '{}'", parent_dir)
@@ -1222,7 +1303,9 @@ impl CorrectionEngine {
                     precursor_tool: precursor_tool.clone(),
                     precursor_args: precursor_args.clone(),
                     then_retry_original: true,
-                    reason: format!("Create missing parent directory '{parent_dir}' before creating file"),
+                    reason: format!(
+                        "Create missing parent directory '{parent_dir}' before creating file"
+                    ),
                 };
 
                 if !history.has_attempted(&precursor_tool, &precursor_args, &action.description()) {
@@ -1237,34 +1320,56 @@ impl CorrectionEngine {
 
                 if let Value::Object(map) = &mut mutated_args {
                     // Normalize path parameter aliases
-                    if (map.contains_key("file") || map.contains_key("file_path") || map.contains_key("filename")) && !map.contains_key("path") {
-                        let val = map.remove("file").or_else(|| map.remove("file_path")).or_else(|| map.remove("filename")).unwrap();
+                    if (map.contains_key("file")
+                        || map.contains_key("file_path")
+                        || map.contains_key("filename"))
+                        && !map.contains_key("path")
+                    {
+                        let val = map
+                            .remove("file")
+                            .or_else(|| map.remove("file_path"))
+                            .or_else(|| map.remove("filename"))
+                            .unwrap();
                         map.insert("path".to_string(), val);
                         mutated = true;
                     }
 
                     // Normalize command parameter aliases
-                    if (map.contains_key("cmd") || map.contains_key("script")) && !map.contains_key("command") {
+                    if (map.contains_key("cmd") || map.contains_key("script"))
+                        && !map.contains_key("command")
+                    {
                         let val = map.remove("cmd").or_else(|| map.remove("script")).unwrap();
                         map.insert("command".to_string(), val);
                         mutated = true;
                     }
 
                     // Normalize content parameter aliases
-                    if (map.contains_key("text") || map.contains_key("data")) && !map.contains_key("content") {
+                    if (map.contains_key("text") || map.contains_key("data"))
+                        && !map.contains_key("content")
+                    {
                         let val = map.remove("text").or_else(|| map.remove("data")).unwrap();
                         map.insert("content".to_string(), val);
                         mutated = true;
                     }
 
                     // Normalize edit tool parameter aliases
-                    if (map.contains_key("old_string") || map.contains_key("old_content")) && !map.contains_key("old_text") {
-                        let val = map.remove("old_string").or_else(|| map.remove("old_content")).unwrap();
+                    if (map.contains_key("old_string") || map.contains_key("old_content"))
+                        && !map.contains_key("old_text")
+                    {
+                        let val = map
+                            .remove("old_string")
+                            .or_else(|| map.remove("old_content"))
+                            .unwrap();
                         map.insert("old_text".to_string(), val);
                         mutated = true;
                     }
-                    if (map.contains_key("new_string") || map.contains_key("new_content")) && !map.contains_key("new_text") {
-                        let val = map.remove("new_string").or_else(|| map.remove("new_content")).unwrap();
+                    if (map.contains_key("new_string") || map.contains_key("new_content"))
+                        && !map.contains_key("new_text")
+                    {
+                        let val = map
+                            .remove("new_string")
+                            .or_else(|| map.remove("new_content"))
+                            .unwrap();
                         map.insert("new_text".to_string(), val);
                         mutated = true;
                     }
@@ -1283,7 +1388,10 @@ impl CorrectionEngine {
             }
 
             // Recovery 4: Command not found -> Fallback alternative CLI command
-            ErrorCategory::CommandNotFound { suggested_alternatives, .. } if self.config.enable_tool_fallbacks => {
+            ErrorCategory::CommandNotFound {
+                suggested_alternatives,
+                ..
+            } if self.config.enable_tool_fallbacks => {
                 if let Some(alt_cmd) = suggested_alternatives.first() {
                     let mut new_args = original_args.clone();
                     if let Value::Object(map) = &mut new_args {
@@ -1300,7 +1408,11 @@ impl CorrectionEngine {
                                     reason: format!("Substituted alternative command '{alt_cmd}'"),
                                 };
 
-                                if !history.has_attempted(original_tool, &new_args, &action.description()) {
+                                if !history.has_attempted(
+                                    original_tool,
+                                    &new_args,
+                                    &action.description(),
+                                ) {
                                     return action;
                                 }
                             }
@@ -1310,7 +1422,10 @@ impl CorrectionEngine {
             }
 
             // Recovery 5: Edit CRLF mismatch -> Normalize line endings
-            ErrorCategory::PatchOrEditMismatch { has_crlf_mismatch: true, .. } => {
+            ErrorCategory::PatchOrEditMismatch {
+                has_crlf_mismatch: true,
+                ..
+            } => {
                 let mut new_args = original_args.clone();
                 if let Value::Object(map) = &mut new_args {
                     if let Some(Value::String(old_t)) = map.get("old_text") {
@@ -1324,7 +1439,8 @@ impl CorrectionEngine {
                     let action = CorrectiveAction::RetryWithModifiedArgs {
                         new_tool: original_tool.to_string(),
                         new_args: new_args.clone(),
-                        reason: "Normalized line endings from CRLF to LF in edit parameters.".to_string(),
+                        reason: "Normalized line endings from CRLF to LF in edit parameters."
+                            .to_string(),
                     };
                     if !history.has_attempted(original_tool, &new_args, &action.description()) {
                         return action;
@@ -1333,7 +1449,10 @@ impl CorrectionEngine {
             }
 
             // Recovery 6: Git index locked -> Precursor remove .git/index.lock
-            ErrorCategory::GitError { is_index_locked: true, .. } if self.config.enable_precursor_actions => {
+            ErrorCategory::GitError {
+                is_index_locked: true,
+                ..
+            } if self.config.enable_precursor_actions => {
                 let precursor_tool = "bash".to_string();
                 let precursor_args = json!({
                     "command": "rm -f .git/index.lock"
@@ -1352,7 +1471,9 @@ impl CorrectionEngine {
             }
 
             // Recovery 7: Rate limit or timeout -> Exponential backoff
-            ErrorCategory::RateLimitOrTimeout { retry_after_secs, .. } if self.config.enable_backoff => {
+            ErrorCategory::RateLimitOrTimeout {
+                retry_after_secs, ..
+            } if self.config.enable_backoff => {
                 let retry_count = (history.count() + 1) as u32;
                 let calculated_delay = if let Some(secs) = retry_after_secs {
                     (*secs * 1000).min(self.config.max_backoff_ms)
@@ -1366,7 +1487,9 @@ impl CorrectionEngine {
                     delay_ms: delay,
                     max_retries: self.config.max_retries as u32,
                     current_retry: retry_count,
-                    reason: format!("Transient rate limit or network timeout; backing off {delay}ms"),
+                    reason: format!(
+                        "Transient rate limit or network timeout; backing off {delay}ms"
+                    ),
                 };
 
                 if !history.has_attempted(original_tool, original_args, &action.description()) {
@@ -1392,34 +1515,60 @@ impl CorrectionEngine {
         let mut followup_tools = Vec::new();
 
         match &diagnosis.category {
-            ErrorCategory::FileNotFound { path, suggested_paths } => {
+            ErrorCategory::FileNotFound {
+                path,
+                suggested_paths,
+            } => {
                 hints.push(format!("File '{path}' does not exist in workspace."));
                 if !suggested_paths.is_empty() {
-                    hints.push(format!("Possible matching files: {}", suggested_paths.join(", ")));
+                    hints.push(format!(
+                        "Possible matching files: {}",
+                        suggested_paths.join(", ")
+                    ));
                 } else {
-                    hints.push("Use `glob` or `search` to verify directory structure and locate the file.".to_string());
+                    hints.push(
+                        "Use `glob` or `search` to verify directory structure and locate the file."
+                            .to_string(),
+                    );
                 }
                 followup_tools.push("glob".to_string());
                 followup_tools.push("search".to_string());
             }
-            ErrorCategory::SyntaxOrCompileError { language, primary_message, .. } => {
+            ErrorCategory::SyntaxOrCompileError {
+                language,
+                primary_message,
+                ..
+            } => {
                 let lang = language.as_deref().unwrap_or("Code");
                 hints.push(format!("{lang} validation failed: {primary_message}"));
                 hints.push("Read affected source files around the reported error line numbers and apply surgical edits.".to_string());
                 followup_tools.push("read".to_string());
                 followup_tools.push("edit".to_string());
             }
-            ErrorCategory::PatchOrEditMismatch { file, multiple_matches, .. } => {
-                hints.push(format!("Search block in '{file}' could not be matched uniquely."));
+            ErrorCategory::PatchOrEditMismatch {
+                file,
+                multiple_matches,
+                ..
+            } => {
+                hints.push(format!(
+                    "Search block in '{file}' could not be matched uniquely."
+                ));
                 if *multiple_matches {
-                    hints.push("Include 3-5 lines of surrounding context to make `old_text` unique.".to_string());
+                    hints.push(
+                        "Include 3-5 lines of surrounding context to make `old_text` unique."
+                            .to_string(),
+                    );
                 } else {
                     hints.push("Re-read the file with `read` tool to copy the exact lines including indentation.".to_string());
                 }
                 followup_tools.push("read".to_string());
                 followup_tools.push("edit".to_string());
             }
-            ErrorCategory::ProcessNonZeroExit { exit_code, stderr_snippet, .. } => {
+            ErrorCategory::ProcessNonZeroExit {
+                exit_code,
+                stderr_snippet,
+                ..
+            } => {
                 if let Some(code) = exit_code {
                     hints.push(format!("Process failed with exit code {code}."));
                 }
@@ -1510,7 +1659,11 @@ impl CorrectionEngine {
                     history.record(
                         current_tool,
                         current_args,
-                        if was_corrected { "Self-correcting retry succeeded".to_string() } else { "Initial execution".to_string() },
+                        if was_corrected {
+                            "Self-correcting retry succeeded".to_string()
+                        } else {
+                            "Initial execution".to_string()
+                        },
                         Ok(output.clone()),
                         duration_ms,
                     );
@@ -1534,20 +1687,36 @@ impl CorrectionEngine {
                         duration_ms,
                     );
 
-                    let action = self.formulate_action(&diagnosis, &current_tool, &current_args, &history, ctx);
+                    let action = self.formulate_action(
+                        &diagnosis,
+                        &current_tool,
+                        &current_args,
+                        &history,
+                        ctx,
+                    );
                     debug!(target: "correction", "Formulated corrective action: {}", action.description());
 
                     match action {
-                        CorrectiveAction::RetryWithModifiedArgs { new_tool, new_args, reason } => {
+                        CorrectiveAction::RetryWithModifiedArgs {
+                            new_tool,
+                            new_args,
+                            reason,
+                        } => {
                             info!(target: "correction", "Applying corrective argument modification: {reason}");
                             current_tool = new_tool;
                             current_args = new_args;
                             turn_corrections += 1;
                         }
-                        CorrectiveAction::ExecutePrecursorAction { precursor_tool, precursor_args, reason, .. } => {
+                        CorrectiveAction::ExecutePrecursorAction {
+                            precursor_tool,
+                            precursor_args,
+                            reason,
+                            ..
+                        } => {
                             info!(target: "correction", "Executing precursor action: {reason}");
                             let prec_start = Instant::now();
-                            let prec_res = executor(precursor_tool.clone(), precursor_args.clone()).await;
+                            let prec_res =
+                                executor(precursor_tool.clone(), precursor_args.clone()).await;
                             let prec_duration = prec_start.elapsed().as_millis() as u64;
 
                             match prec_res {
@@ -1571,7 +1740,12 @@ impl CorrectionEngine {
                                         prec_duration,
                                     );
                                     // Precursor failed, return structured feedback
-                                    let feedback = self.format_agent_feedback(&current_tool, &current_args, &diagnosis, &history);
+                                    let feedback = self.format_agent_feedback(
+                                        &current_tool,
+                                        &current_args,
+                                        &diagnosis,
+                                        &history,
+                                    );
                                     return CorrectionOutcome::Failed {
                                         error: raw_err_msg,
                                         enriched_diagnostic: feedback,
@@ -1581,7 +1755,11 @@ impl CorrectionEngine {
                                 }
                             }
                         }
-                        CorrectiveAction::FallbackAlternativeTool { fallback_tool, fallback_args, reason } => {
+                        CorrectiveAction::FallbackAlternativeTool {
+                            fallback_tool,
+                            fallback_args,
+                            reason,
+                        } => {
                             info!(target: "correction", "Falling back to alternative tool: {reason}");
                             current_tool = fallback_tool;
                             current_args = fallback_args;
@@ -1594,7 +1772,12 @@ impl CorrectionEngine {
                         }
                         CorrectiveAction::FormatDiagnosticGuidanceForAgent { .. }
                         | CorrectiveAction::AbortUnrecoverable { .. } => {
-                            let feedback = self.format_agent_feedback(&current_tool, &current_args, &diagnosis, &history);
+                            let feedback = self.format_agent_feedback(
+                                &current_tool,
+                                &current_args,
+                                &diagnosis,
+                                &history,
+                            );
                             return CorrectionOutcome::Failed {
                                 error: raw_err_msg,
                                 enriched_diagnostic: feedback,
@@ -1605,7 +1788,12 @@ impl CorrectionEngine {
                     }
 
                     if turn_corrections > self.config.max_cascade_depth {
-                        let feedback = self.format_agent_feedback(&current_tool, &current_args, &diagnosis, &history);
+                        let feedback = self.format_agent_feedback(
+                            &current_tool,
+                            &current_args,
+                            &diagnosis,
+                            &history,
+                        );
                         return CorrectionOutcome::Failed {
                             error: raw_err_msg,
                             enriched_diagnostic: feedback,
@@ -1655,7 +1843,10 @@ mod tests {
 
         let diagnosis = ErrorAnalyzer::diagnose("read", &args, err, &ctx);
         assert_eq!(diagnosis.category.name(), "File Not Found");
-        assert!(matches!(diagnosis.category, ErrorCategory::FileNotFound { .. }));
+        assert!(matches!(
+            diagnosis.category,
+            ErrorCategory::FileNotFound { .. }
+        ));
     }
 
     #[test]
@@ -1678,7 +1869,11 @@ mod tests {
         let diagnosis = ErrorAnalyzer::diagnose("bash", &args, err, &ctx);
         assert_eq!(diagnosis.category.name(), "Command Not Found");
         assert!(diagnosis.is_recoverable);
-        if let ErrorCategory::CommandNotFound { suggested_alternatives, .. } = diagnosis.category {
+        if let ErrorCategory::CommandNotFound {
+            suggested_alternatives,
+            ..
+        } = diagnosis.category
+        {
             assert!(suggested_alternatives.contains(&"grep -rn".to_string()));
         } else {
             panic!("Expected CommandNotFound category");
@@ -1726,7 +1921,12 @@ mod tests {
 
         let diagnosis = ErrorAnalyzer::diagnose("web_search", &args, err, &ctx);
         assert_eq!(diagnosis.category.name(), "Rate Limit or Timeout");
-        if let ErrorCategory::RateLimitOrTimeout { is_rate_limited, retry_after_secs, .. } = diagnosis.category {
+        if let ErrorCategory::RateLimitOrTimeout {
+            is_rate_limited,
+            retry_after_secs,
+            ..
+        } = diagnosis.category
+        {
             assert!(is_rate_limited);
             assert_eq!(retry_after_secs, Some(5));
         } else {
@@ -1757,9 +1957,15 @@ mod tests {
         let history = CorrectionHistory::new();
         let action = engine.formulate_action(&diagnosis, "read", &args, &history, &ctx);
 
-        if let CorrectiveAction::RetryWithModifiedArgs { new_tool, new_args, .. } = action {
+        if let CorrectiveAction::RetryWithModifiedArgs {
+            new_tool, new_args, ..
+        } = action
+        {
             assert_eq!(new_tool, "read");
-            assert_eq!(new_args.get("path").and_then(|v| v.as_str()), Some("src/main.rs"));
+            assert_eq!(
+                new_args.get("path").and_then(|v| v.as_str()),
+                Some("src/main.rs")
+            );
         } else {
             panic!("Expected RetryWithModifiedArgs action");
         }
@@ -1769,7 +1975,8 @@ mod tests {
     fn test_formulate_action_crlf_normalization() {
         let engine = CorrectionEngine::default();
         let ctx = ToolContext::default();
-        let args = json!({ "path": "test.txt", "old_text": "line1\r\nline2", "new_text": "new1\r\nnew2" });
+        let args =
+            json!({ "path": "test.txt", "old_text": "line1\r\nline2", "new_text": "new1\r\nnew2" });
         let diagnosis = ErrorDiagnosis {
             category: ErrorCategory::PatchOrEditMismatch {
                 file: "test.txt".to_string(),
@@ -1789,8 +1996,14 @@ mod tests {
         let action = engine.formulate_action(&diagnosis, "edit", &args, &history, &ctx);
 
         if let CorrectiveAction::RetryWithModifiedArgs { new_args, .. } = action {
-            assert_eq!(new_args.get("old_text").and_then(|v| v.as_str()), Some("line1\nline2"));
-            assert_eq!(new_args.get("new_text").and_then(|v| v.as_str()), Some("new1\nnew2"));
+            assert_eq!(
+                new_args.get("old_text").and_then(|v| v.as_str()),
+                Some("line1\nline2")
+            );
+            assert_eq!(
+                new_args.get("new_text").and_then(|v| v.as_str()),
+                Some("new1\nnew2")
+            );
         } else {
             panic!("Expected RetryWithModifiedArgs action");
         }
@@ -1805,21 +2018,29 @@ mod tests {
         let call_count_clone = call_count.clone();
 
         let outcome = engine
-            .execute_with_auto_correction("read", json!({ "file": "src/lib.rs" }), &ctx, |tool, args| {
-                let count = call_count_clone.fetch_add(1, Ordering::SeqCst);
-                async move {
-                    if count == 0 {
-                        // First call fails because "path" is missing
-                        if args.get("path").is_none() {
-                            anyhow::bail!("Missing required parameter: path");
+            .execute_with_auto_correction(
+                "read",
+                json!({ "file": "src/lib.rs" }),
+                &ctx,
+                |tool, args| {
+                    let count = call_count_clone.fetch_add(1, Ordering::SeqCst);
+                    async move {
+                        if count == 0 {
+                            // First call fails because "path" is missing
+                            if args.get("path").is_none() {
+                                anyhow::bail!("Missing required parameter: path");
+                            }
                         }
+                        // Second call with corrected args succeeds
+                        assert_eq!(tool, "read");
+                        assert_eq!(
+                            args.get("path").and_then(|v| v.as_str()),
+                            Some("src/lib.rs")
+                        );
+                        Ok("file content here".to_string())
                     }
-                    // Second call with corrected args succeeds
-                    assert_eq!(tool, "read");
-                    assert_eq!(args.get("path").and_then(|v| v.as_str()), Some("src/lib.rs"));
-                    Ok("file content here".to_string())
-                }
-            })
+                },
+            )
             .await;
 
         assert!(outcome.is_success());
@@ -1849,7 +2070,12 @@ mod tests {
                         } else if count == 1 {
                             // Precursor mkdir -p succeeds
                             assert_eq!(tool, "bash");
-                            assert!(args.get("command").unwrap().as_str().unwrap().contains("mkdir -p"));
+                            assert!(args
+                                .get("command")
+                                .unwrap()
+                                .as_str()
+                                .unwrap()
+                                .contains("mkdir -p"));
                             Ok("Directory created".to_string())
                         } else {
                             // Retried original write succeeds
@@ -1894,7 +2120,11 @@ error[E0308]: mismatched types
         assert_eq!(diags[0].file, "src/agent/mod.rs");
         assert_eq!(diags[0].line, 42);
         assert_eq!(diags[0].column, 15);
-        assert!(diags[0].suggestion.as_ref().unwrap().contains("use crate::agent::foo"));
+        assert!(diags[0]
+            .suggestion
+            .as_ref()
+            .unwrap()
+            .contains("use crate::agent::foo"));
 
         assert_eq!(diags[1].code.as_deref(), Some("E0308"));
         assert_eq!(diags[1].file, "src/agent/loop_runner.rs");
@@ -1911,7 +2141,10 @@ error[E0308]: mismatched types
         assert_eq!(diags[0].file, "src/index.ts");
         assert_eq!(diags[0].line, 14);
         assert_eq!(diags[0].column, 5);
-        assert_eq!(diags[0].message, "Type 'string' is not assignable to type 'number'.");
+        assert_eq!(
+            diags[0].message,
+            "Type 'string' is not assignable to type 'number'."
+        );
 
         assert_eq!(diags[1].code.as_deref(), Some("TS2304"));
         assert_eq!(diags[1].file, "src/app.ts");
@@ -1974,7 +2207,10 @@ ZeroDivisionError: division by zero
                             anyhow::bail!("bash: rg: command not found");
                         } else {
                             assert_eq!(tool, "bash");
-                            assert_eq!(args.get("command").unwrap().as_str().unwrap(), "grep -rn 'pattern' src");
+                            assert_eq!(
+                                args.get("command").unwrap().as_str().unwrap(),
+                                "grep -rn 'pattern' src"
+                            );
                             Ok("matched line".to_string())
                         }
                     }
@@ -2046,7 +2282,8 @@ ZeroDivisionError: division by zero
         let engine = CorrectionEngine::default();
         let ctx = ToolContext::default();
         let args = json!({ "path": "src/missing_file.rs" });
-        let diagnosis = engine.diagnose("read", &args, "File not found: 'src/missing_file.rs'", &ctx);
+        let diagnosis =
+            engine.diagnose("read", &args, "File not found: 'src/missing_file.rs'", &ctx);
         let mut history = CorrectionHistory::new();
         history.record(
             "read".to_string(),

@@ -250,7 +250,11 @@ pub fn export_session_html_with_options(session: &Session, options: &ExportOptio
     );
     html.push_str(&format!(
         "Exported at <time>{}</time></p>\n",
-        escape_html(&chrono::Utc::now().format("%Y-%m-%d %H:%M:%S UTC").to_string())
+        escape_html(
+            &chrono::Utc::now()
+                .format("%Y-%m-%d %H:%M:%S UTC")
+                .to_string()
+        )
     ));
     html.push_str("    </footer>\n");
 
@@ -363,10 +367,14 @@ fn render_toolbar(html: &mut String) {
     html.push_str("        <input type=\"search\" id=\"search-input\" placeholder=\"Search transcript messages...\" autocomplete=\"off\" spellcheck=\"false\">\n");
     html.push_str("        <span id=\"search-count\" class=\"search-count\"></span>\n");
     html.push_str("      </div>\n");
-    html.push_str("      <div class=\"filter-group\" role=\"tablist\" aria-label=\"Filter by role\">\n");
+    html.push_str(
+        "      <div class=\"filter-group\" role=\"tablist\" aria-label=\"Filter by role\">\n",
+    );
     html.push_str("        <button class=\"filter-btn active\" data-role=\"all\">All</button>\n");
     html.push_str("        <button class=\"filter-btn\" data-role=\"user\">👤 User</button>\n");
-    html.push_str("        <button class=\"filter-btn\" data-role=\"assistant\">🤖 Assistant</button>\n");
+    html.push_str(
+        "        <button class=\"filter-btn\" data-role=\"assistant\">🤖 Assistant</button>\n",
+    );
     html.push_str("        <button class=\"filter-btn\" data-role=\"tool\">🔧 Tools</button>\n");
     html.push_str("        <button class=\"filter-btn\" data-role=\"system\">⚙️ System</button>\n");
     html.push_str("      </div>\n");
@@ -405,7 +413,10 @@ fn render_message(
     // Message Card Header
     html.push_str("        <div class=\"message-header\">\n");
     html.push_str("          <div class=\"role-info\">\n");
-    html.push_str(&format!("            <span class=\"role-avatar\">{}</span>\n", role_icon));
+    html.push_str(&format!(
+        "            <span class=\"role-avatar\">{}</span>\n",
+        role_icon
+    ));
     html.push_str(&format!(
         "            <span class=\"role-title\">{}</span>\n",
         role_name
@@ -425,7 +436,10 @@ fn render_message(
     html.push_str("          </div>\n");
 
     html.push_str("          <div class=\"message-actions\">\n");
-    html.push_str(&format!("            <span class=\"turn-index\">#{}</span>\n", index));
+    html.push_str(&format!(
+        "            <span class=\"turn-index\">#{}</span>\n",
+        index
+    ));
     html.push_str(&format!(
         "            <button class=\"copy-btn\" data-target=\"body-{}\" title=\"Copy message content\" aria-label=\"Copy message content\">📋 Copy</button>\n",
         index
@@ -443,7 +457,9 @@ fn render_message(
         Role::System => {
             // System prompts rendered in a neat collapsible box
             html.push_str("          <details class=\"system-details\" open>\n");
-            html.push_str("            <summary class=\"system-summary\">System Instructions</summary>\n");
+            html.push_str(
+                "            <summary class=\"system-summary\">System Instructions</summary>\n",
+            );
             html.push_str("            <div class=\"system-content markdown-body\">\n");
             render_markdown_to_html(html, &msg.content, syntax_highlight);
             html.push_str("            </div>\n");
@@ -462,7 +478,9 @@ fn render_message(
                 html.push_str("          <details class=\"thinking-box\" open>\n");
                 html.push_str("            <summary class=\"thinking-header\">\n");
                 html.push_str("              <span class=\"thinking-icon\">🧠</span>\n");
-                html.push_str("              <span class=\"thinking-title\">Reasoning Process</span>\n");
+                html.push_str(
+                    "              <span class=\"thinking-title\">Reasoning Process</span>\n",
+                );
                 html.push_str("            </summary>\n");
                 html.push_str("            <div class=\"thinking-content markdown-body\">\n");
                 render_markdown_to_html(html, &thought, syntax_highlight);
@@ -492,7 +510,9 @@ fn render_message(
             html.push_str("              <span class=\"terminal-dot dot-red\"></span>\n");
             html.push_str("              <span class=\"terminal-dot dot-yellow\"></span>\n");
             html.push_str("              <span class=\"terminal-dot dot-green\"></span>\n");
-            html.push_str("              <span class=\"tool-output-title\">Standard Output</span>\n");
+            html.push_str(
+                "              <span class=\"tool-output-title\">Standard Output</span>\n",
+            );
             html.push_str("            </div>\n");
             html.push_str("            <pre class=\"tool-output-pre\"><code>");
             html.push_str(&escape_html(&msg.content));
@@ -574,9 +594,7 @@ pub fn render_markdown_to_html(output: &mut String, markdown: &str, syntax_highl
         }
     };
 
-    let flush_table = |output: &mut String,
-                       in_table: &mut bool,
-                       rows: &mut Vec<Vec<String>>| {
+    let flush_table = |output: &mut String, in_table: &mut bool, rows: &mut Vec<Vec<String>>| {
         if *in_table && !rows.is_empty() {
             output.push_str("<div class=\"table-wrapper\"><table>\n");
             // First row is header
@@ -626,7 +644,9 @@ pub fn render_markdown_to_html(output: &mut String, markdown: &str, syntax_highl
                         &code_lang
                     }
                 ));
-                output.push_str("    <button class=\"copy-code-btn\" title=\"Copy code block\">Copy</button>\n");
+                output.push_str(
+                    "    <button class=\"copy-code-btn\" title=\"Copy code block\">Copy</button>\n",
+                );
                 output.push_str("  </div>\n");
 
                 let formatted_code = if syntax_highlight {
@@ -674,10 +694,7 @@ pub fn render_markdown_to_html(output: &mut String, markdown: &str, syntax_highl
                 .all(|s| s.trim().chars().all(|c| c == '-' || c == ':' || c == ' '));
 
             if !is_separator {
-                let cells: Vec<String> = trimmed
-                    .split('|')
-                    .map(|s| s.to_string())
-                    .collect();
+                let cells: Vec<String> = trimmed.split('|').map(|s| s.to_string()).collect();
                 // strip leading/trailing empty cells from split
                 let inner_cells = if cells.len() >= 2 {
                     cells[1..cells.len() - 1].to_vec()
@@ -789,7 +806,10 @@ pub fn render_markdown_to_html(output: &mut String, markdown: &str, syntax_highl
                     "  <li class=\"task-item\"><input type=\"checkbox\" disabled> {}</li>\n",
                     render_inline_markdown(task_rest)
                 ));
-            } else if let Some(task_rest) = item_content.strip_prefix("[x] ").or_else(|| item_content.strip_prefix("[X] ")) {
+            } else if let Some(task_rest) = item_content
+                .strip_prefix("[x] ")
+                .or_else(|| item_content.strip_prefix("[X] "))
+            {
                 output.push_str(&format!(
                     "  <li class=\"task-item\"><input type=\"checkbox\" checked disabled> {}</li>\n",
                     render_inline_markdown(task_rest)
@@ -1121,7 +1141,8 @@ fn is_keyword(word: &str, kind: TokenizerKind) -> bool {
         ),
         TokenizerKind::Python => matches!(
             word,
-            "and" | "as"
+            "and"
+                | "as"
                 | "assert"
                 | "async"
                 | "await"
@@ -1388,7 +1409,8 @@ fn is_builtin_type(word: &str, kind: TokenizerKind) -> bool {
         ),
         TokenizerKind::Go => matches!(
             word,
-            "int" | "int8"
+            "int"
+                | "int8"
                 | "int16"
                 | "int32"
                 | "int64"
@@ -1410,7 +1432,8 @@ fn is_builtin_type(word: &str, kind: TokenizerKind) -> bool {
         ),
         TokenizerKind::C => matches!(
             word,
-            "int" | "char"
+            "int"
+                | "char"
                 | "float"
                 | "double"
                 | "short"
@@ -1528,9 +1551,7 @@ fn highlight_tokens(code: &str, kind: TokenizerKind) -> String {
         }
 
         // 3. Numbers
-        if c.is_ascii_digit()
-            || (c == '.' && i + 1 < len && chars[i + 1].is_ascii_digit())
-        {
+        if c.is_ascii_digit() || (c == '.' && i + 1 < len && chars[i + 1].is_ascii_digit()) {
             let mut num_str = String::new();
             while i < len
                 && (chars[i].is_ascii_alphanumeric()
@@ -1568,7 +1589,11 @@ fn highlight_tokens(code: &str, kind: TokenizerKind) -> String {
                 out.push_str(&escape_html(&word));
                 out.push_str("</span>");
             } else if is_builtin_type(&word, kind)
-                || (word.chars().next().map(|ch| ch.is_uppercase()).unwrap_or(false)
+                || (word
+                    .chars()
+                    .next()
+                    .map(|ch| ch.is_uppercase())
+                    .unwrap_or(false)
                     && kind != TokenizerKind::Sql)
             {
                 out.push_str("<span class=\"tok-type\">");
@@ -2673,8 +2698,12 @@ mod tests {
 
         session.token_stats.add(150, 220);
 
-        session.messages.push(Message::system("You are an expert systems programmer."));
-        session.messages.push(Message::user("How do I structure a fast Rust CLI?"));
+        session
+            .messages
+            .push(Message::system("You are an expert systems programmer."));
+        session
+            .messages
+            .push(Message::user("How do I structure a fast Rust CLI?"));
         session.messages.push(Message::assistant_with_tools(
             "<think>Analyzing architecture options for Rust CLI apps.</think>Here is a breakdown using **clap** and **tokio**:\n\n```rust\nfn main() {\n    println!(\"Hello World\");\n}\n```",
             vec![ToolCall {
@@ -2683,7 +2712,9 @@ mod tests {
                 arguments: r#"{"query":"src/main.rs"}"#.to_string(),
             }],
         ));
-        session.messages.push(Message::tool_result("call_123", "Found 1 matching file."));
+        session
+            .messages
+            .push(Message::tool_result("call_123", "Found 1 matching file."));
 
         session
     }
@@ -2727,7 +2758,9 @@ mod tests {
     #[test]
     fn test_html_escaping_xss_protection() {
         let mut session = make_test_session();
-        session.messages.push(Message::user("<script>alert('xss')</script> & dangerous < >"));
+        session.messages.push(Message::user(
+            "<script>alert('xss')</script> & dangerous < >",
+        ));
 
         let html = export_session_html(&session);
         assert!(!html.contains("<script>alert('xss')</script>"));

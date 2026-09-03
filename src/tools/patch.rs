@@ -131,10 +131,7 @@ pub fn normalize_diff_path(path_str: &str) -> String {
 /// Returns `("", path)` when no drive prefix is present.
 fn split_drive_prefix(path: &str) -> (&str, &str) {
     let b = path.as_bytes();
-    if b.len() >= 3
-        && b[0].is_ascii_alphabetic()
-        && b[1] == b':'
-        && (b[2] == b'/' || b[2] == b'\\')
+    if b.len() >= 3 && b[0].is_ascii_alphabetic() && b[1] == b':' && (b[2] == b'/' || b[2] == b'\\')
     {
         path.split_at(3)
     } else {
@@ -275,9 +272,7 @@ pub fn parse_unified_diff(diff_str: &str) -> anyhow::Result<Vec<FilePatch>> {
                     file.hunks.push(hunk);
                 }
             }
-            let starts_new_file = current_file
-                .as_ref()
-                .is_some_and(|f| !f.hunks.is_empty());
+            let starts_new_file = current_file.as_ref().is_some_and(|f| !f.hunks.is_empty());
             if starts_new_file {
                 if let Some(file) = current_file.take() {
                     files.push(file);
@@ -623,7 +618,8 @@ fn find_hunk_location(
             if matches {
                 // Compute indentation shift between expected and actual
                 let first_exp_indent = slice[0].len() - slice[0].trim_start().len();
-                let first_act_indent = file_lines[start_idx].len() - file_lines[start_idx].trim_start().len();
+                let first_act_indent =
+                    file_lines[start_idx].len() - file_lines[start_idx].trim_start().len();
                 let indent_shift = first_act_indent as isize - first_exp_indent as isize;
 
                 let dist = start_idx.abs_diff(target_line_idx);
@@ -889,7 +885,10 @@ pub async fn apply_file_patch(
     } else if patch.is_new || options.reverse {
         String::new()
     } else {
-        return Err(anyhow::anyhow!("Target file '{}' does not exist.", full_path.display()));
+        return Err(anyhow::anyhow!(
+            "Target file '{}' does not exist.",
+            full_path.display()
+        ));
     };
 
     let (new_content, reports) = apply_file_patch_to_string(&existing_content, patch, options)?;
@@ -1228,10 +1227,19 @@ mod tests {
         // Windows-style separators normalized to forward slashes
         assert_eq!(normalize_diff_path("src\\lib\\main.rs"), "src/lib/main.rs");
         // Git-quoted paths (paths with spaces or special chars)
-        assert_eq!(normalize_diff_path("\"my dir/file name.rs\""), "my dir/file name.rs");
+        assert_eq!(
+            normalize_diff_path("\"my dir/file name.rs\""),
+            "my dir/file name.rs"
+        );
         // Verbatim/device prefixes preserved untouched
-        assert_eq!(normalize_diff_path("\\\\?\\C:\\very\\long\\path"), "\\\\?\\C:\\very\\long\\path");
-        assert_eq!(normalize_diff_path("\\\\.\\PhysicalDrive0"), "\\\\.\\PhysicalDrive0");
+        assert_eq!(
+            normalize_diff_path("\\\\?\\C:\\very\\long\\path"),
+            "\\\\?\\C:\\very\\long\\path"
+        );
+        assert_eq!(
+            normalize_diff_path("\\\\.\\PhysicalDrive0"),
+            "\\\\.\\PhysicalDrive0"
+        );
         // Plain POSIX path untouched
         assert_eq!(normalize_diff_path("a/src/lib.rs"), "a/src/lib.rs");
         // Tab-stripped upstream; quotes handled before separator normalization
@@ -1385,8 +1393,7 @@ mod tests {
         let patches = parse_unified_diff(diff).unwrap();
         assert!(patches[0].is_new);
         let options = PatchOptions::default();
-        let (res, reports) =
-            apply_file_patch_to_string("", &patches[0], &options).unwrap();
+        let (res, reports) = apply_file_patch_to_string("", &patches[0], &options).unwrap();
         assert_eq!(res, "first line\nsecond line\n");
         assert_eq!(reports.len(), 1);
         assert_eq!(reports[0].applied_at_line, 1);

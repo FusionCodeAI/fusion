@@ -1,11 +1,11 @@
-use async_trait::async_trait;
-use serde_json::{json, Value};
-use std::sync::Arc;
 use crate::provider::types::ToolDefinition;
 use crate::tools::bash::BashTool;
 use crate::tools::edit::EditFileTool;
 use crate::tools::file::{resolve_path, ReadFileTool, WriteFileTool};
 use crate::tools::types::{DynTool, Tool, ToolContext, ToolRegistry};
+use async_trait::async_trait;
+use serde_json::{json, Value};
+use std::sync::Arc;
 
 // ===========================================================================
 // Canonical Mapping Table & Normalization
@@ -245,7 +245,14 @@ pub fn normalize_tool_args(canonical_name: &str, args: &Value) -> Value {
         "edit" => {
             let path = extract_path_field(
                 args,
-                &["path", "file_path", "filePath", "file", "filename", "target_file"],
+                &[
+                    "path",
+                    "file_path",
+                    "filePath",
+                    "file",
+                    "filename",
+                    "target_file",
+                ],
             )
             .unwrap_or_default();
 
@@ -285,13 +292,29 @@ pub fn normalize_tool_args(canonical_name: &str, args: &Value) -> Value {
         "read" => {
             let path = extract_path_field(
                 args,
-                &["path", "file_path", "filePath", "file", "filename", "path_str", "target"],
+                &[
+                    "path",
+                    "file_path",
+                    "filePath",
+                    "file",
+                    "filename",
+                    "path_str",
+                    "target",
+                ],
             )
             .unwrap_or_default();
 
             let mut offset = extract_u64_field(
                 args,
-                &["offset", "start_line", "start", "line_start", "line_offset", "from_line", "begin"],
+                &[
+                    "offset",
+                    "start_line",
+                    "start",
+                    "line_start",
+                    "line_offset",
+                    "from_line",
+                    "begin",
+                ],
             );
 
             let mut limit = extract_u64_field(
@@ -315,7 +338,12 @@ pub fn normalize_tool_args(canonical_name: &str, args: &Value) -> Value {
 
             let line_numbers = extract_bool_field(
                 args,
-                &["line_numbers", "line_number", "numbers", "show_line_numbers"],
+                &[
+                    "line_numbers",
+                    "line_number",
+                    "numbers",
+                    "show_line_numbers",
+                ],
             );
 
             let mut res = json!({ "path": path });
@@ -333,13 +361,32 @@ pub fn normalize_tool_args(canonical_name: &str, args: &Value) -> Value {
         "write" => {
             let path = extract_path_field(
                 args,
-                &["path", "file_path", "filePath", "file", "filename", "path_str", "dest", "destination", "target"],
+                &[
+                    "path",
+                    "file_path",
+                    "filePath",
+                    "file",
+                    "filename",
+                    "path_str",
+                    "dest",
+                    "destination",
+                    "target",
+                ],
             )
             .unwrap_or_default();
 
             let content = extract_string_field(
                 args,
-                &["content", "file_text", "text", "contents", "file_content", "data", "body", "code"],
+                &[
+                    "content",
+                    "file_text",
+                    "text",
+                    "contents",
+                    "file_content",
+                    "data",
+                    "body",
+                    "code",
+                ],
             )
             .unwrap_or_default();
 
@@ -351,19 +398,15 @@ pub fn normalize_tool_args(canonical_name: &str, args: &Value) -> Value {
         "bash" => {
             let command = extract_string_field(
                 args,
-                &["command", "cmd", "input", "script", "run", "code", "line", "exec", "cli"],
+                &[
+                    "command", "cmd", "input", "script", "run", "code", "line", "exec", "cli",
+                ],
             )
             .unwrap_or_default();
 
-            let timeout = extract_u64_field(
-                args,
-                &["timeout", "timeout_secs", "timeout_seconds"],
-            );
+            let timeout = extract_u64_field(args, &["timeout", "timeout_secs", "timeout_seconds"]);
 
-            let cwd = extract_path_field(
-                args,
-                &["cwd", "workdir", "working_directory", "dir"],
-            );
+            let cwd = extract_path_field(args, &["cwd", "workdir", "working_directory", "dir"]);
 
             let mut res = json!({ "command": command });
             if let Some(t) = timeout {
@@ -375,54 +418,25 @@ pub fn normalize_tool_args(canonical_name: &str, args: &Value) -> Value {
             res
         }
         "git_log" => {
-            let path = extract_string_field(
-                args,
-                &["path", "repo_path", "target_dir", "dir", "cwd"],
-            );
+            let path =
+                extract_string_field(args, &["path", "repo_path", "target_dir", "dir", "cwd"]);
             let file_path = extract_string_field(
                 args,
                 &["file_path", "file", "filename", "target_file", "filepath"],
             );
-            let max_count = extract_u64_field(
-                args,
-                &["max_count", "limit", "count", "n", "num"],
-            );
-            let skip = extract_u64_field(
-                args,
-                &["skip", "offset"],
-            );
-            let revision = extract_string_field(
-                args,
-                &["revision", "rev", "range", "branch", "ref"],
-            );
-            let author = extract_string_field(
-                args,
-                &["author", "user", "committer"],
-            );
-            let grep = extract_string_field(
-                args,
-                &["grep", "query", "search", "pattern", "message"],
-            );
-            let since = extract_string_field(
-                args,
-                &["since", "after", "from"],
-            );
-            let until = extract_string_field(
-                args,
-                &["until", "before", "to"],
-            );
-            let show_files = extract_bool_field(
-                args,
-                &["show_files", "files", "stat", "stats", "numstat"],
-            );
-            let oneline = extract_bool_field(
-                args,
-                &["oneline", "compact", "short"],
-            );
-            let format = extract_string_field(
-                args,
-                &["format", "style", "mode"],
-            );
+            let max_count = extract_u64_field(args, &["max_count", "limit", "count", "n", "num"]);
+            let skip = extract_u64_field(args, &["skip", "offset"]);
+            let revision =
+                extract_string_field(args, &["revision", "rev", "range", "branch", "ref"]);
+            let author = extract_string_field(args, &["author", "user", "committer"]);
+            let grep =
+                extract_string_field(args, &["grep", "query", "search", "pattern", "message"]);
+            let since = extract_string_field(args, &["since", "after", "from"]);
+            let until = extract_string_field(args, &["until", "before", "to"]);
+            let show_files =
+                extract_bool_field(args, &["show_files", "files", "stat", "stats", "numstat"]);
+            let oneline = extract_bool_field(args, &["oneline", "compact", "short"]);
+            let format = extract_string_field(args, &["format", "style", "mode"]);
 
             let mut res = json!({});
             if let Some(p) = path {
@@ -541,7 +555,14 @@ impl Tool for StrReplaceEditorTool {
     async fn execute(&self, args: Value, ctx: &ToolContext) -> anyhow::Result<String> {
         let path_str = extract_string_field(
             &args,
-            &["path", "file_path", "filePath", "file", "filename", "target_file"],
+            &[
+                "path",
+                "file_path",
+                "filePath",
+                "file",
+                "filename",
+                "target_file",
+            ],
         )
         .ok_or_else(|| anyhow::anyhow!("Missing required parameter: path"))?;
 
@@ -917,7 +938,11 @@ pub struct ToolAlias {
 }
 
 impl ToolAlias {
-    pub fn new(alias_name: impl Into<String>, canonical_target: impl Into<String>, inner: DynTool) -> Self {
+    pub fn new(
+        alias_name: impl Into<String>,
+        canonical_target: impl Into<String>,
+        inner: DynTool,
+    ) -> Self {
         let alias = alias_name.into();
         let target = canonical_target.into();
         let desc = format!("Alias for '{}': {}", target, inner.description());
@@ -994,8 +1019,8 @@ pub fn compat_registry() -> ToolRegistry {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::sync::atomic::{AtomicUsize, Ordering};
     use std::path::PathBuf;
+    use std::sync::atomic::{AtomicUsize, Ordering};
 
     static TEST_COUNTER: AtomicUsize = AtomicUsize::new(0);
 
@@ -1315,11 +1340,20 @@ mod tests {
         // Surrounding quotes stripped
         assert_eq!(normalize_path_arg("\"my dir/file.rs\""), "my dir/file.rs");
         // Windows verbatim prefix preserved untouched
-        assert_eq!(normalize_path_arg("\\\\?\\C:\\very\\long\\path"), "\\\\?\\C:\\very\\long\\path");
+        assert_eq!(
+            normalize_path_arg("\\\\?\\C:\\very\\long\\path"),
+            "\\\\?\\C:\\very\\long\\path"
+        );
         // Windows device prefix preserved untouched
-        assert_eq!(normalize_path_arg("\\\\.\\PhysicalDrive0"), "\\\\.\\PhysicalDrive0");
+        assert_eq!(
+            normalize_path_arg("\\\\.\\PhysicalDrive0"),
+            "\\\\.\\PhysicalDrive0"
+        );
         // UNC share preserved untouched
-        assert_eq!(normalize_path_arg("\\\\server\\share\\file.txt"), "\\\\server\\share\\file.txt");
+        assert_eq!(
+            normalize_path_arg("\\\\server\\share\\file.txt"),
+            "\\\\server\\share\\file.txt"
+        );
         // Empty string stays empty
         assert_eq!(normalize_path_arg(""), "");
     }

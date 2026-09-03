@@ -4,10 +4,12 @@ use std::io::Write;
 use std::time::{Duration, Instant};
 use tokio::sync::mpsc::{unbounded_channel, UnboundedSender};
 
-use crate::agent::advisor::{consult_advisors, format_critiques_for_system_prompt, AdvisorRegistry};
+use crate::agent::advisor::{
+    consult_advisors, format_critiques_for_system_prompt, AdvisorRegistry,
+};
 use crate::agent::prompts::{self, PromptPreset, SystemPromptBuilder};
-use crate::agent::skills::SkillRegistry;
 use crate::agent::session::Session;
+use crate::agent::skills::SkillRegistry;
 use crate::config::Config;
 use crate::provider::types::{Message, StreamChunk, ToolCall};
 use crate::provider::LlmClient;
@@ -35,10 +37,7 @@ pub enum AgentEvent {
         duration: Duration,
     },
     /// Advisor review started.
-    AdvisorStarted {
-        advisor: String,
-        role: String,
-    },
+    AdvisorStarted { advisor: String, role: String },
     /// Advisor critique received.
     AdvisorCritique {
         advisor: String,
@@ -46,10 +45,7 @@ pub enum AgentEvent {
         critique: String,
     },
     /// Subagent task started.
-    SubagentStarted {
-        name: String,
-        task: String,
-    },
+    SubagentStarted { name: String, task: String },
     /// Subagent task finished.
     SubagentFinished {
         name: String,
@@ -59,9 +55,7 @@ pub enum AgentEvent {
     /// Informational status update.
     Status(String),
     /// Turn completed.
-    Finished {
-        usage: Option<serde_json::Value>,
-    },
+    Finished { usage: Option<serde_json::Value> },
     /// Error encountered during execution.
     Error(String),
 }
@@ -83,7 +77,12 @@ pub struct AgentRunner {
 }
 impl AgentRunner {
     /// Creates a new AgentRunner with default advisors.
-    pub fn new(client: LlmClient, config: Config, tools: ToolRegistry, tool_ctx: ToolContext) -> Self {
+    pub fn new(
+        client: LlmClient,
+        config: Config,
+        tools: ToolRegistry,
+        tool_ctx: ToolContext,
+    ) -> Self {
         Self {
             client,
             config,
@@ -113,7 +112,9 @@ impl AgentRunner {
         self
     }
     /// Returns a shared reference to the CheckpointManager.
-    pub fn checkpoints(&self) -> std::sync::Arc<std::sync::Mutex<crate::agent::undo::CheckpointManager>> {
+    pub fn checkpoints(
+        &self,
+    ) -> std::sync::Arc<std::sync::Mutex<crate::agent::undo::CheckpointManager>> {
         self.checkpoints.clone()
     }
 
@@ -127,7 +128,10 @@ impl AgentRunner {
     }
 
     /// Sets a custom CorrectionConfig for the self-correcting retry loop.
-    pub fn with_correction_config(mut self, config: crate::agent::correction::CorrectionConfig) -> Self {
+    pub fn with_correction_config(
+        mut self,
+        config: crate::agent::correction::CorrectionConfig,
+    ) -> Self {
         self.corrections = crate::agent::correction::CorrectionEngine::new(config);
         self
     }
@@ -160,7 +164,6 @@ impl AgentRunner {
         self
     }
 
-
     /// Overrides the default system prompt.
     pub fn with_system_prompt(mut self, prompt: impl Into<String>) -> Self {
         self.system_prompt = Some(prompt.into());
@@ -169,9 +172,7 @@ impl AgentRunner {
 
     /// Sets a language-specific system prompt preset.
     pub fn with_preset(mut self, preset: PromptPreset) -> Self {
-        let prompt = SystemPromptBuilder::new()
-            .with_preset(preset)
-            .build();
+        let prompt = SystemPromptBuilder::new().with_preset(preset).build();
         self.system_prompt = Some(prompt);
         self
     }
@@ -237,7 +238,11 @@ impl AgentRunner {
     }
 
     /// Runs a single turn synchronously/CLI-style, printing tokens directly to stdout.
-    pub async fn run_turn(&self, session: &mut Session, user_input: &str) -> anyhow::Result<String> {
+    pub async fn run_turn(
+        &self,
+        session: &mut Session,
+        user_input: &str,
+    ) -> anyhow::Result<String> {
         let (tx, mut rx) = unbounded_channel();
 
         // Spawn a background task to handle event printing
@@ -255,15 +260,28 @@ impl AgentRunner {
                         md.finish();
                         println!("\n⚙️  Tool [{}] with args: {}", name, args);
                     }
-                    AgentEvent::ToolFinished { name, success, output, duration, .. } => {
+                    AgentEvent::ToolFinished {
+                        name,
+                        success,
+                        output,
+                        duration,
+                        ..
+                    } => {
                         let status = if success { "✓" } else { "✗" };
                         let preview: String = output.lines().take(3).collect::<Vec<_>>().join("\n");
-                        println!("  {} Tool [{}] finished in {:.2?}: {}", status, name, duration, preview);
+                        println!(
+                            "  {} Tool [{}] finished in {:.2?}: {}",
+                            status, name, duration, preview
+                        );
                     }
                     AgentEvent::AdvisorStarted { advisor, role } => {
                         tracing::debug!("Advisor [{}] started: {}", advisor, role);
                     }
-                    AgentEvent::AdvisorCritique { advisor, approved, critique } => {
+                    AgentEvent::AdvisorCritique {
+                        advisor,
+                        approved,
+                        critique,
+                    } => {
                         let tag = if approved { "APPROVED" } else { "WARNING" };
                         tracing::info!("Advisor [{}] {}: {}", advisor, tag, critique);
                     }
@@ -304,7 +322,9 @@ impl AgentRunner {
         // Advisor consultation phase (if enabled)
         let mut advisor_notes = String::new();
         if self.config.advisors_enabled && !self.advisors.is_empty() {
-            let _ = event_tx.send(AgentEvent::Status("Consulting advisors in parallel...".to_string()));
+            let _ = event_tx.send(AgentEvent::Status(
+                "Consulting advisors in parallel...".to_string(),
+            ));
             let _ = self.recovery.on_advisor_phase();
             for adv in self.advisors.all() {
                 let _ = event_tx.send(AgentEvent::AdvisorStarted {
@@ -334,15 +354,14 @@ impl AgentRunner {
         }
 
         let default_prompt = Self::default_system_prompt();
-        let base_system_prompt = self
-            .system_prompt
-            .as_deref()
-            .unwrap_or(default_prompt);
+        let base_system_prompt = self.system_prompt.as_deref().unwrap_or(default_prompt);
 
         let mut system_message_content = base_system_prompt.to_string();
 
         // Domain skills dynamic injection
-        let relevant_matches = self.skills.find_relevant(user_input, Some(&self.tool_ctx.cwd));
+        let relevant_matches = self
+            .skills
+            .find_relevant(user_input, Some(&self.tool_ctx.cwd));
         if !relevant_matches.is_empty() {
             let skill_names: Vec<&str> = relevant_matches.iter().map(|m| m.skill.name()).collect();
             let _ = event_tx.send(AgentEvent::Status(format!(
@@ -350,11 +369,10 @@ impl AgentRunner {
                 skill_names.join(", ")
             )));
 
-            if let Some(skills_block) = self.skills.inject_relevant_skills(
-                user_input,
-                Some(&self.tool_ctx.cwd),
-                Some(4),
-            ) {
+            if let Some(skills_block) =
+                self.skills
+                    .inject_relevant_skills(user_input, Some(&self.tool_ctx.cwd), Some(4))
+            {
                 system_message_content.push_str("\n\n");
                 system_message_content.push_str(&skills_block);
             }
@@ -391,10 +409,16 @@ impl AgentRunner {
             }
             messages.push(Message::system(&sys_content));
             messages.extend_from_slice(session.messages());
-            let _ = event_tx.send(AgentEvent::Status("Waiting for model response...".to_string()));
+            let _ = event_tx.send(AgentEvent::Status(
+                "Waiting for model response...".to_string(),
+            ));
 
             // Stream response from LLM
-            let mut chunk_stream = match self.client.stream_chat(&self.config, &messages, &tool_defs).await {
+            let mut chunk_stream = match self
+                .client
+                .stream_chat(&self.config, &messages, &tool_defs)
+                .await
+            {
                 Ok(rx) => rx,
                 Err(e) => {
                     let err_msg = format!("{}", e);
@@ -406,7 +430,8 @@ impl AgentRunner {
 
             let mut full_content = String::new();
             let mut full_thinking = String::new();
-            let mut partial_tools: HashMap<usize, (Option<String>, Option<String>, String)> = HashMap::new();
+            let mut partial_tools: HashMap<usize, (Option<String>, Option<String>, String)> =
+                HashMap::new();
 
             while let Some(chunk) = chunk_stream.recv().await {
                 match chunk {
@@ -424,7 +449,10 @@ impl AgentRunner {
                         name,
                         arguments_delta,
                     } => {
-                        let entry = partial_tools.entry(index).or_insert((None, None, String::new()));
+                        let entry =
+                            partial_tools
+                                .entry(index)
+                                .or_insert((None, None, String::new()));
                         if let Some(id_val) = id {
                             entry.0 = Some(id_val);
                         }
@@ -464,17 +492,18 @@ impl AgentRunner {
             if tool_calls.is_empty() {
                 let final_content = if full_content.trim().is_empty() {
                     if !full_thinking.trim().is_empty() {
-                        let clean_answer = if let Some((_, ans)) = full_thinking.split_once("</think>") {
-                            ans.trim().to_string()
-                        } else if let Some((_, ans)) = full_thinking.rsplit_once("\n\n") {
-                            if !ans.trim().is_empty() {
+                        let clean_answer =
+                            if let Some((_, ans)) = full_thinking.split_once("</think>") {
                                 ans.trim().to_string()
+                            } else if let Some((_, ans)) = full_thinking.rsplit_once("\n\n") {
+                                if !ans.trim().is_empty() {
+                                    ans.trim().to_string()
+                                } else {
+                                    full_thinking.trim().to_string()
+                                }
                             } else {
                                 full_thinking.trim().to_string()
-                            }
-                        } else {
-                            full_thinking.trim().to_string()
-                        };
+                            };
                         let _ = event_tx.send(AgentEvent::TextDelta(clean_answer.clone()));
                         clean_answer
                     } else {
@@ -644,8 +673,7 @@ mod tests {
         let tools = ToolRegistry::new();
         let ctx = ToolContext::default();
 
-        let runner = AgentRunner::new(client, config, tools, ctx)
-            .with_preset(PromptPreset::Rust);
+        let runner = AgentRunner::new(client, config, tools, ctx).with_preset(PromptPreset::Rust);
 
         let prompt = runner.system_prompt.as_deref().unwrap();
         assert!(prompt.contains("expert Rust systems"));

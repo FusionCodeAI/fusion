@@ -247,10 +247,7 @@ pub enum EnvError {
 
     /// Cyclic variable dependency detected during expansion.
     #[error("Cyclic variable dependency detected for '{variable}': {}", path.join(" -> "))]
-    CyclicVariable {
-        variable: String,
-        path: Vec<String>,
-    },
+    CyclicVariable { variable: String, path: Vec<String> },
 
     /// Undefined variable during `${VAR:?error}` evaluation.
     #[error("Required variable '{variable}' is undefined or empty: {message}")]
@@ -265,11 +262,10 @@ pub enum EnvError {
     InvalidKey { line: usize, key: String },
 
     /// Maximum expansion depth exceeded.
-    #[error("Maximum variable expansion depth ({max_depth}) exceeded while resolving '{variable}'")]
-    DepthLimitExceeded {
-        variable: String,
-        max_depth: usize,
-    },
+    #[error(
+        "Maximum variable expansion depth ({max_depth}) exceeded while resolving '{variable}'"
+    )]
+    DepthLimitExceeded { variable: String, max_depth: usize },
 }
 
 /// Masking style for sensitive environment variable values.
@@ -413,12 +409,7 @@ impl fmt::Debug for EnvVariable {
 
 impl fmt::Display for EnvVariable {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(
-            f,
-            "{}={}",
-            self.key,
-            self.masked_value(MaskStyle::Partial)
-        )
+        write!(f, "{}={}", self.key, self.masked_value(MaskStyle::Partial))
     }
 }
 
@@ -848,10 +839,7 @@ fn parse_braced_expression(inner: &str) -> ExpandToken {
                 }
             };
 
-            return ExpandToken::VarBraced {
-                name,
-                op: Some(op),
-            };
+            return ExpandToken::VarBraced { name, op: Some(op) };
         }
     }
 
@@ -900,8 +888,7 @@ fn expand_variables_internal(
 
                 match op {
                     None => {
-                        let resolved =
-                            resolve_variable_value(&name, context, active_stack, depth)?;
+                        let resolved = resolve_variable_value(&name, context, active_stack, depth)?;
                         result.push_str(&resolved);
                     }
                     Some(ExpansionOp::Default { value, check_empty }) => {
@@ -1100,10 +1087,7 @@ fn parse_raw_entries_with_context(
             None => {
                 return Err(EnvError::Parse {
                     line: line_num,
-                    message: format!(
-                        "Expected 'KEY=VALUE' format, found: '{}'",
-                        line_to_parse
-                    ),
+                    message: format!("Expected 'KEY=VALUE' format, found: '{}'", line_to_parse),
                 });
             }
         };
@@ -2340,10 +2324,7 @@ line 3"
             env.get("MULTILINE_SINGLE"),
             Some("first line\nsecond line\nthird line")
         );
-        assert_eq!(
-            env.get("MULTILINE_DOUBLE"),
-            Some("line 1\nline 2\nline 3")
-        );
+        assert_eq!(env.get("MULTILINE_DOUBLE"), Some("line 1\nline 2\nline 3"));
     }
 
     #[test]
@@ -2355,7 +2336,10 @@ UNQUOTED_HASH=foo#bar # inline comment after space
 "#;
         let env = EnvLoader::parse_str(input).unwrap();
         assert_eq!(env.get("URL"), Some("https://example.com/api"));
-        assert_eq!(env.get("URL_WITH_HASH"), Some("https://example.com/#section"));
+        assert_eq!(
+            env.get("URL_WITH_HASH"),
+            Some("https://example.com/#section")
+        );
         assert_eq!(env.get("UNQUOTED_HASH"), Some("foo#bar"));
     }
 
@@ -2405,7 +2389,9 @@ UNSET_ALT=${UNSET_VAR:+enabled}
         let res = EnvLoader::parse_str(err_input);
         assert!(res.is_err());
         match res.unwrap_err() {
-            EnvError::UndefinedVariable { variable, message, .. } => {
+            EnvError::UndefinedVariable {
+                variable, message, ..
+            } => {
                 assert_eq!(variable, "UNSET_SECRET");
                 assert_eq!(message, "API key is mandatory");
             }
@@ -2645,10 +2631,7 @@ overridden_by_cli=dotenv-val
 
         // Verify Tier 2 overrides Tier 1
         assert_eq!(loaded.get("project_only"), Some("from-project"));
-        assert_eq!(
-            loaded.get("overridden_by_project"),
-            Some("project-val")
-        );
+        assert_eq!(loaded.get("overridden_by_project"), Some("project-val"));
         assert_eq!(
             loaded.get_tier("overridden_by_project"),
             Some(HierarchyTier::ProjectConfig)
@@ -2688,9 +2671,11 @@ overridden_by_cli=dotenv-val
             }
         }"#;
 
-        let entries =
-            parse_json_config_str(json_content, EnvSource::GlobalConfig(PathBuf::from("config.json")))
-                .unwrap();
+        let entries = parse_json_config_str(
+            json_content,
+            EnvSource::GlobalConfig(PathBuf::from("config.json")),
+        )
+        .unwrap();
 
         let mut map = HashMap::new();
         for e in entries {

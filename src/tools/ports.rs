@@ -56,79 +56,439 @@ pub struct KnownService {
 pub static KNOWN_SERVICES: LazyLock<Vec<KnownService>> = LazyLock::new(|| {
     vec![
         // Standard Web
-        KnownService { port: 80, name: "HTTP", category: "Web / Standard", description: "Standard World Wide Web HTTP", default_protocol: "http" },
-        KnownService { port: 443, name: "HTTPS", category: "Web / Standard", description: "Standard Secure HTTP over TLS", default_protocol: "https" },
-        KnownService { port: 8080, name: "HTTP-Alt / Tomcat / llama.cpp", category: "Web / App Server", description: "Alternative HTTP / Spring Boot / Tomcat / llama.cpp / LocalAI", default_protocol: "http" },
-        KnownService { port: 8443, name: "HTTPS-Alt", category: "Web / App Server", description: "Alternative HTTPS server", default_protocol: "https" },
-
+        KnownService {
+            port: 80,
+            name: "HTTP",
+            category: "Web / Standard",
+            description: "Standard World Wide Web HTTP",
+            default_protocol: "http",
+        },
+        KnownService {
+            port: 443,
+            name: "HTTPS",
+            category: "Web / Standard",
+            description: "Standard Secure HTTP over TLS",
+            default_protocol: "https",
+        },
+        KnownService {
+            port: 8080,
+            name: "HTTP-Alt / Tomcat / llama.cpp",
+            category: "Web / App Server",
+            description: "Alternative HTTP / Spring Boot / Tomcat / llama.cpp / LocalAI",
+            default_protocol: "http",
+        },
+        KnownService {
+            port: 8443,
+            name: "HTTPS-Alt",
+            category: "Web / App Server",
+            description: "Alternative HTTPS server",
+            default_protocol: "https",
+        },
         // Frontend & Web Framework Dev Servers
-        KnownService { port: 3000, name: "Node / React / Next.js / Rails", category: "Web / Frontend", description: "Default dev server for Next.js, Create React App, Grafana, Rails", default_protocol: "http" },
-        KnownService { port: 3001, name: "Dev Server (Secondary)", category: "Web / Frontend", description: "Secondary dev server / React / Express", default_protocol: "http" },
-        KnownService { port: 3002, name: "Dev Server (Tertiary)", category: "Web / Frontend", description: "Tertiary dev server", default_protocol: "http" },
-        KnownService { port: 3333, name: "AdonisJS / Dev Server", category: "Web / Backend", description: "AdonisJS framework / Alt web dev", default_protocol: "http" },
-        KnownService { port: 4000, name: "Hexo / Jekyll / Phoenix / Strapi", category: "Web / Static & CMS", description: "Static site generators, Phoenix, Strapi CMS", default_protocol: "http" },
-        KnownService { port: 4173, name: "Vite Preview", category: "Web / Frontend", description: "Vite production preview server", default_protocol: "http" },
-        KnownService { port: 4200, name: "Angular CLI", category: "Web / Frontend", description: "Default Angular development server", default_protocol: "http" },
-        KnownService { port: 4321, name: "Astro Dev Server", category: "Web / Frontend", description: "Astro static & SSR web framework", default_protocol: "http" },
-        KnownService { port: 5000, name: "Flask / AirPlay / ASP.NET", category: "Web / Backend", description: "Flask default dev server, macOS AirPlay Receiver, ASP.NET", default_protocol: "http" },
-        KnownService { port: 5001, name: "Flask SSL / Control Center", category: "Web / Backend", description: "Flask SSL / macOS Control Center", default_protocol: "https" },
-        KnownService { port: 5173, name: "Vite Dev Server", category: "Web / Frontend", description: "Vite (Vue 3, React, Svelte, Solid) dev server", default_protocol: "http" },
-        KnownService { port: 5174, name: "Vite Dev Server #2", category: "Web / Frontend", description: "Vite secondary instance", default_protocol: "http" },
-        KnownService { port: 5175, name: "Vite Dev Server #3", category: "Web / Frontend", description: "Vite tertiary instance", default_protocol: "http" },
-        KnownService { port: 5500, name: "VS Code Live Server", category: "Web / Frontend", description: "Visual Studio Code Live Server extension", default_protocol: "http" },
-        KnownService { port: 8000, name: "Django / FastAPI / Python HTTP", category: "Web / Backend", description: "Django dev server, FastAPI/Uvicorn, Python http.server, vLLM", default_protocol: "http" },
-        KnownService { port: 8001, name: "FastAPI Alt / Docs", category: "Web / Backend", description: "FastAPI secondary / API documentation", default_protocol: "http" },
-        KnownService { port: 8081, name: "React Native Metro", category: "Mobile / Dev", description: "React Native Metro bundler / Alt web server", default_protocol: "http" },
-        KnownService { port: 8082, name: "Alt Web Server", category: "Web / Backend", description: "Alternative web service", default_protocol: "http" },
-        KnownService { port: 8787, name: "Cloudflare Wrangler", category: "Cloud / Serverless", description: "Cloudflare Workers / Wrangler dev server", default_protocol: "http" },
-        KnownService { port: 8888, name: "Jupyter Notebook", category: "Data Science", description: "Jupyter Notebook & JupyterLab server", default_protocol: "http" },
-        KnownService { port: 9000, name: "PHP-FPM / MinIO / SonarQube", category: "Web / Storage", description: "PHP-FPM listener, MinIO S3 API, SonarQube web UI", default_protocol: "http" },
-        KnownService { port: 9001, name: "MinIO Console / Supervisord", category: "Management", description: "MinIO Admin UI, Supervisord web interface", default_protocol: "http" },
-        KnownService { port: 9999, name: "Webpack / Dev Tool", category: "Development", description: "Webpack dev server alternate / Debuggers", default_protocol: "http" },
-
+        KnownService {
+            port: 3000,
+            name: "Node / React / Next.js / Rails",
+            category: "Web / Frontend",
+            description: "Default dev server for Next.js, Create React App, Grafana, Rails",
+            default_protocol: "http",
+        },
+        KnownService {
+            port: 3001,
+            name: "Dev Server (Secondary)",
+            category: "Web / Frontend",
+            description: "Secondary dev server / React / Express",
+            default_protocol: "http",
+        },
+        KnownService {
+            port: 3002,
+            name: "Dev Server (Tertiary)",
+            category: "Web / Frontend",
+            description: "Tertiary dev server",
+            default_protocol: "http",
+        },
+        KnownService {
+            port: 3333,
+            name: "AdonisJS / Dev Server",
+            category: "Web / Backend",
+            description: "AdonisJS framework / Alt web dev",
+            default_protocol: "http",
+        },
+        KnownService {
+            port: 4000,
+            name: "Hexo / Jekyll / Phoenix / Strapi",
+            category: "Web / Static & CMS",
+            description: "Static site generators, Phoenix, Strapi CMS",
+            default_protocol: "http",
+        },
+        KnownService {
+            port: 4173,
+            name: "Vite Preview",
+            category: "Web / Frontend",
+            description: "Vite production preview server",
+            default_protocol: "http",
+        },
+        KnownService {
+            port: 4200,
+            name: "Angular CLI",
+            category: "Web / Frontend",
+            description: "Default Angular development server",
+            default_protocol: "http",
+        },
+        KnownService {
+            port: 4321,
+            name: "Astro Dev Server",
+            category: "Web / Frontend",
+            description: "Astro static & SSR web framework",
+            default_protocol: "http",
+        },
+        KnownService {
+            port: 5000,
+            name: "Flask / AirPlay / ASP.NET",
+            category: "Web / Backend",
+            description: "Flask default dev server, macOS AirPlay Receiver, ASP.NET",
+            default_protocol: "http",
+        },
+        KnownService {
+            port: 5001,
+            name: "Flask SSL / Control Center",
+            category: "Web / Backend",
+            description: "Flask SSL / macOS Control Center",
+            default_protocol: "https",
+        },
+        KnownService {
+            port: 5173,
+            name: "Vite Dev Server",
+            category: "Web / Frontend",
+            description: "Vite (Vue 3, React, Svelte, Solid) dev server",
+            default_protocol: "http",
+        },
+        KnownService {
+            port: 5174,
+            name: "Vite Dev Server #2",
+            category: "Web / Frontend",
+            description: "Vite secondary instance",
+            default_protocol: "http",
+        },
+        KnownService {
+            port: 5175,
+            name: "Vite Dev Server #3",
+            category: "Web / Frontend",
+            description: "Vite tertiary instance",
+            default_protocol: "http",
+        },
+        KnownService {
+            port: 5500,
+            name: "VS Code Live Server",
+            category: "Web / Frontend",
+            description: "Visual Studio Code Live Server extension",
+            default_protocol: "http",
+        },
+        KnownService {
+            port: 8000,
+            name: "Django / FastAPI / Python HTTP",
+            category: "Web / Backend",
+            description: "Django dev server, FastAPI/Uvicorn, Python http.server, vLLM",
+            default_protocol: "http",
+        },
+        KnownService {
+            port: 8001,
+            name: "FastAPI Alt / Docs",
+            category: "Web / Backend",
+            description: "FastAPI secondary / API documentation",
+            default_protocol: "http",
+        },
+        KnownService {
+            port: 8081,
+            name: "React Native Metro",
+            category: "Mobile / Dev",
+            description: "React Native Metro bundler / Alt web server",
+            default_protocol: "http",
+        },
+        KnownService {
+            port: 8082,
+            name: "Alt Web Server",
+            category: "Web / Backend",
+            description: "Alternative web service",
+            default_protocol: "http",
+        },
+        KnownService {
+            port: 8787,
+            name: "Cloudflare Wrangler",
+            category: "Cloud / Serverless",
+            description: "Cloudflare Workers / Wrangler dev server",
+            default_protocol: "http",
+        },
+        KnownService {
+            port: 8888,
+            name: "Jupyter Notebook",
+            category: "Data Science",
+            description: "Jupyter Notebook & JupyterLab server",
+            default_protocol: "http",
+        },
+        KnownService {
+            port: 9000,
+            name: "PHP-FPM / MinIO / SonarQube",
+            category: "Web / Storage",
+            description: "PHP-FPM listener, MinIO S3 API, SonarQube web UI",
+            default_protocol: "http",
+        },
+        KnownService {
+            port: 9001,
+            name: "MinIO Console / Supervisord",
+            category: "Management",
+            description: "MinIO Admin UI, Supervisord web interface",
+            default_protocol: "http",
+        },
+        KnownService {
+            port: 9999,
+            name: "Webpack / Dev Tool",
+            category: "Development",
+            description: "Webpack dev server alternate / Debuggers",
+            default_protocol: "http",
+        },
         // AI / LLM Local Servers
-        KnownService { port: 11434, name: "Ollama Local LLM", category: "AI / LLM", description: "Ollama local LLM runner REST API", default_protocol: "http" },
-        KnownService { port: 1234, name: "LM Studio", category: "AI / LLM", description: "LM Studio local OpenAI-compatible LLM server", default_protocol: "http" },
-        KnownService { port: 7860, name: "Gradio AI App", category: "AI / ML", description: "Gradio machine learning & AI web interface", default_protocol: "http" },
-        KnownService { port: 8501, name: "Streamlit App", category: "Data / AI", description: "Streamlit data app / dashboard server", default_protocol: "http" },
-        KnownService { port: 6006, name: "TensorBoard", category: "AI / ML", description: "TensorFlow TensorBoard visualization", default_protocol: "http" },
-        KnownService { port: 6333, name: "Qdrant Vector DB (HTTP)", category: "AI / Vector DB", description: "Qdrant vector search engine HTTP API", default_protocol: "http" },
-        KnownService { port: 6334, name: "Qdrant Vector DB (gRPC)", category: "AI / Vector DB", description: "Qdrant vector search engine gRPC endpoint", default_protocol: "tcp" },
-        KnownService { port: 19530, name: "Milvus Vector DB", category: "AI / Vector DB", description: "Milvus distributed vector database", default_protocol: "tcp" },
-        KnownService { port: 8086, name: "InfluxDB API", category: "Database / Time-Series", description: "InfluxDB time-series database HTTP API", default_protocol: "http" },
-
+        KnownService {
+            port: 11434,
+            name: "Ollama Local LLM",
+            category: "AI / LLM",
+            description: "Ollama local LLM runner REST API",
+            default_protocol: "http",
+        },
+        KnownService {
+            port: 1234,
+            name: "LM Studio",
+            category: "AI / LLM",
+            description: "LM Studio local OpenAI-compatible LLM server",
+            default_protocol: "http",
+        },
+        KnownService {
+            port: 7860,
+            name: "Gradio AI App",
+            category: "AI / ML",
+            description: "Gradio machine learning & AI web interface",
+            default_protocol: "http",
+        },
+        KnownService {
+            port: 8501,
+            name: "Streamlit App",
+            category: "Data / AI",
+            description: "Streamlit data app / dashboard server",
+            default_protocol: "http",
+        },
+        KnownService {
+            port: 6006,
+            name: "TensorBoard",
+            category: "AI / ML",
+            description: "TensorFlow TensorBoard visualization",
+            default_protocol: "http",
+        },
+        KnownService {
+            port: 6333,
+            name: "Qdrant Vector DB (HTTP)",
+            category: "AI / Vector DB",
+            description: "Qdrant vector search engine HTTP API",
+            default_protocol: "http",
+        },
+        KnownService {
+            port: 6334,
+            name: "Qdrant Vector DB (gRPC)",
+            category: "AI / Vector DB",
+            description: "Qdrant vector search engine gRPC endpoint",
+            default_protocol: "tcp",
+        },
+        KnownService {
+            port: 19530,
+            name: "Milvus Vector DB",
+            category: "AI / Vector DB",
+            description: "Milvus distributed vector database",
+            default_protocol: "tcp",
+        },
+        KnownService {
+            port: 8086,
+            name: "InfluxDB API",
+            category: "Database / Time-Series",
+            description: "InfluxDB time-series database HTTP API",
+            default_protocol: "http",
+        },
         // Databases & Caches
-        KnownService { port: 3306, name: "MySQL / MariaDB", category: "Database / SQL", description: "MySQL / MariaDB relational database", default_protocol: "tcp" },
-        KnownService { port: 5432, name: "PostgreSQL", category: "Database / SQL", description: "PostgreSQL object-relational database", default_protocol: "tcp" },
-        KnownService { port: 6379, name: "Redis", category: "Database / In-Memory", description: "Redis in-memory key-value database & cache", default_protocol: "tcp" },
-        KnownService { port: 27017, name: "MongoDB", category: "Database / NoSQL", description: "MongoDB document database", default_protocol: "tcp" },
-        KnownService { port: 9200, name: "Elasticsearch", category: "Search / Analytics", description: "Elasticsearch REST API", default_protocol: "http" },
-        KnownService { port: 9300, name: "Elasticsearch Cluster", category: "Search / Analytics", description: "Elasticsearch internal cluster communication", default_protocol: "tcp" },
-        KnownService { port: 7700, name: "Meilisearch", category: "Search / Analytics", description: "Meilisearch instant search engine HTTP API", default_protocol: "http" },
-        KnownService { port: 7474, name: "Neo4j Web / HTTP", category: "Database / Graph", description: "Neo4j graph database browser & REST API", default_protocol: "http" },
-        KnownService { port: 7687, name: "Neo4j Bolt", category: "Database / Graph", description: "Neo4j Bolt binary protocol", default_protocol: "tcp" },
-        KnownService { port: 9042, name: "Apache Cassandra", category: "Database / NoSQL", description: "Cassandra native transport CQL port", default_protocol: "tcp" },
-        KnownService { port: 1433, name: "Microsoft SQL Server", category: "Database / SQL", description: "MS SQL Server database engine", default_protocol: "tcp" },
-        KnownService { port: 5984, name: "CouchDB", category: "Database / NoSQL", description: "Apache CouchDB document database", default_protocol: "http" },
-
+        KnownService {
+            port: 3306,
+            name: "MySQL / MariaDB",
+            category: "Database / SQL",
+            description: "MySQL / MariaDB relational database",
+            default_protocol: "tcp",
+        },
+        KnownService {
+            port: 5432,
+            name: "PostgreSQL",
+            category: "Database / SQL",
+            description: "PostgreSQL object-relational database",
+            default_protocol: "tcp",
+        },
+        KnownService {
+            port: 6379,
+            name: "Redis",
+            category: "Database / In-Memory",
+            description: "Redis in-memory key-value database & cache",
+            default_protocol: "tcp",
+        },
+        KnownService {
+            port: 27017,
+            name: "MongoDB",
+            category: "Database / NoSQL",
+            description: "MongoDB document database",
+            default_protocol: "tcp",
+        },
+        KnownService {
+            port: 9200,
+            name: "Elasticsearch",
+            category: "Search / Analytics",
+            description: "Elasticsearch REST API",
+            default_protocol: "http",
+        },
+        KnownService {
+            port: 9300,
+            name: "Elasticsearch Cluster",
+            category: "Search / Analytics",
+            description: "Elasticsearch internal cluster communication",
+            default_protocol: "tcp",
+        },
+        KnownService {
+            port: 7700,
+            name: "Meilisearch",
+            category: "Search / Analytics",
+            description: "Meilisearch instant search engine HTTP API",
+            default_protocol: "http",
+        },
+        KnownService {
+            port: 7474,
+            name: "Neo4j Web / HTTP",
+            category: "Database / Graph",
+            description: "Neo4j graph database browser & REST API",
+            default_protocol: "http",
+        },
+        KnownService {
+            port: 7687,
+            name: "Neo4j Bolt",
+            category: "Database / Graph",
+            description: "Neo4j Bolt binary protocol",
+            default_protocol: "tcp",
+        },
+        KnownService {
+            port: 9042,
+            name: "Apache Cassandra",
+            category: "Database / NoSQL",
+            description: "Cassandra native transport CQL port",
+            default_protocol: "tcp",
+        },
+        KnownService {
+            port: 1433,
+            name: "Microsoft SQL Server",
+            category: "Database / SQL",
+            description: "MS SQL Server database engine",
+            default_protocol: "tcp",
+        },
+        KnownService {
+            port: 5984,
+            name: "CouchDB",
+            category: "Database / NoSQL",
+            description: "Apache CouchDB document database",
+            default_protocol: "http",
+        },
         // Message Queues & Microservices
-        KnownService { port: 5672, name: "RabbitMQ AMQP", category: "Message Queue", description: "RabbitMQ AMQP messaging broker", default_protocol: "tcp" },
-        KnownService { port: 15672, name: "RabbitMQ Management", category: "Message Queue", description: "RabbitMQ web management UI", default_protocol: "http" },
-        KnownService { port: 9092, name: "Apache Kafka", category: "Message Queue", description: "Apache Kafka plaintext broker", default_protocol: "tcp" },
-        KnownService { port: 2181, name: "Apache ZooKeeper", category: "Coordination", description: "ZooKeeper client port", default_protocol: "tcp" },
-        KnownService { port: 2379, name: "etcd client", category: "Coordination", description: "etcd distributed key-value store client API", default_protocol: "http" },
-        KnownService { port: 8500, name: "Consul HTTP API", category: "Service Mesh", description: "HashiCorp Consul HTTP API & UI", default_protocol: "http" },
-        KnownService { port: 4566, name: "LocalStack", category: "Cloud Emulation", description: "LocalStack AWS cloud emulator edge port", default_protocol: "http" },
-
+        KnownService {
+            port: 5672,
+            name: "RabbitMQ AMQP",
+            category: "Message Queue",
+            description: "RabbitMQ AMQP messaging broker",
+            default_protocol: "tcp",
+        },
+        KnownService {
+            port: 15672,
+            name: "RabbitMQ Management",
+            category: "Message Queue",
+            description: "RabbitMQ web management UI",
+            default_protocol: "http",
+        },
+        KnownService {
+            port: 9092,
+            name: "Apache Kafka",
+            category: "Message Queue",
+            description: "Apache Kafka plaintext broker",
+            default_protocol: "tcp",
+        },
+        KnownService {
+            port: 2181,
+            name: "Apache ZooKeeper",
+            category: "Coordination",
+            description: "ZooKeeper client port",
+            default_protocol: "tcp",
+        },
+        KnownService {
+            port: 2379,
+            name: "etcd client",
+            category: "Coordination",
+            description: "etcd distributed key-value store client API",
+            default_protocol: "http",
+        },
+        KnownService {
+            port: 8500,
+            name: "Consul HTTP API",
+            category: "Service Mesh",
+            description: "HashiCorp Consul HTTP API & UI",
+            default_protocol: "http",
+        },
+        KnownService {
+            port: 4566,
+            name: "LocalStack",
+            category: "Cloud Emulation",
+            description: "LocalStack AWS cloud emulator edge port",
+            default_protocol: "http",
+        },
         // Observability & Metrics
-        KnownService { port: 9090, name: "Prometheus Server", category: "Observability", description: "Prometheus metrics server & web UI", default_protocol: "http" },
-        KnownService { port: 9100, name: "Node Exporter", category: "Observability", description: "Prometheus Node Exporter system metrics", default_protocol: "http" },
-        KnownService { port: 16686, name: "Jaeger UI", category: "Observability", description: "Jaeger distributed tracing web UI", default_protocol: "http" },
-        KnownService { port: 9411, name: "Zipkin", category: "Observability", description: "Zipkin distributed tracing collector & UI", default_protocol: "http" },
-
+        KnownService {
+            port: 9090,
+            name: "Prometheus Server",
+            category: "Observability",
+            description: "Prometheus metrics server & web UI",
+            default_protocol: "http",
+        },
+        KnownService {
+            port: 9100,
+            name: "Node Exporter",
+            category: "Observability",
+            description: "Prometheus Node Exporter system metrics",
+            default_protocol: "http",
+        },
+        KnownService {
+            port: 16686,
+            name: "Jaeger UI",
+            category: "Observability",
+            description: "Jaeger distributed tracing web UI",
+            default_protocol: "http",
+        },
+        KnownService {
+            port: 9411,
+            name: "Zipkin",
+            category: "Observability",
+            description: "Zipkin distributed tracing collector & UI",
+            default_protocol: "http",
+        },
         // System & Remote Access
-        KnownService { port: 22, name: "SSH", category: "System / Remote", description: "Secure Shell remote login", default_protocol: "tcp" },
-        KnownService { port: 8545, name: "Ethereum JSON-RPC", category: "Web3 / Blockchain", description: "Ethereum local node / Hardhat / Anvil RPC", default_protocol: "http" },
+        KnownService {
+            port: 22,
+            name: "SSH",
+            category: "System / Remote",
+            description: "Secure Shell remote login",
+            default_protocol: "tcp",
+        },
+        KnownService {
+            port: 8545,
+            name: "Ethereum JSON-RPC",
+            category: "Web3 / Blockchain",
+            description: "Ethereum local node / Hardhat / Anvil RPC",
+            default_protocol: "http",
+        },
     ]
 });
 
@@ -185,24 +545,19 @@ impl PortPreset {
     pub fn ports(&self) -> Vec<u16> {
         match self {
             PortPreset::Dev => vec![
-                3000, 3001, 3002, 3333, 4000, 4173, 4200, 4321, 5000, 5001,
-                5173, 5174, 5175, 5500, 7860, 8000, 8001, 8080, 8081, 8501,
-                8787, 8888, 9000, 9999, 11434, 1234,
+                3000, 3001, 3002, 3333, 4000, 4173, 4200, 4321, 5000, 5001, 5173, 5174, 5175, 5500,
+                7860, 8000, 8001, 8080, 8081, 8501, 8787, 8888, 9000, 9999, 11434, 1234,
             ],
             PortPreset::Web => vec![
-                80, 443, 3000, 3001, 4000, 4173, 4200, 4321, 5000, 5173,
-                5174, 8000, 8080, 8081, 8443, 8888, 9000,
+                80, 443, 3000, 3001, 4000, 4173, 4200, 4321, 5000, 5173, 5174, 8000, 8080, 8081,
+                8443, 8888, 9000,
             ],
             PortPreset::Databases => vec![
-                1433, 2181, 2379, 3306, 5432, 5984, 6333, 6334, 6379, 7474,
-                7687, 7700, 8086, 9042, 9092, 9200, 9300, 19530, 27017,
+                1433, 2181, 2379, 3306, 5432, 5984, 6333, 6334, 6379, 7474, 7687, 7700, 8086, 9042,
+                9092, 9200, 9300, 19530, 27017,
             ],
-            PortPreset::Ai => vec![
-                1234, 5000, 6006, 6333, 7860, 8000, 8080, 8501, 11434, 19530,
-            ],
-            PortPreset::Quick => vec![
-                3000, 5173, 8000, 8080, 11434, 5000, 4200, 8888, 5432, 6379,
-            ],
+            PortPreset::Ai => vec![1234, 5000, 6006, 6333, 7860, 8000, 8080, 8501, 11434, 19530],
+            PortPreset::Quick => vec![3000, 5173, 8000, 8080, 11434, 5000, 4200, 8888, 5432, 6379],
             PortPreset::AllCommon => {
                 let mut p: Vec<u16> = KNOWN_SERVICES.iter().map(|s| s.port).collect();
                 p.sort_unstable();
@@ -366,7 +721,11 @@ pub async fn scan_single_port(
                 let (http_info, raw_banner) = probe_service_details(host, port, timeout).await;
                 if let Some(http) = http_info {
                     if let Some(fw) = &http.detected_framework {
-                        result.service = Some(format!("{} ({})", fw, result.service.as_deref().unwrap_or("HTTP")));
+                        result.service = Some(format!(
+                            "{} ({})",
+                            fw,
+                            result.service.as_deref().unwrap_or("HTTP")
+                        ));
                     }
                     result.http_info = Some(http);
                 }
@@ -432,7 +791,10 @@ pub async fn probe_service_details(
         let mut buf = vec![0u8; 8192];
         let n = stream.read(&mut buf).await?;
         if n == 0 {
-            return Err(std::io::Error::new(std::io::ErrorKind::UnexpectedEof, "Empty response"));
+            return Err(std::io::Error::new(
+                std::io::ErrorKind::UnexpectedEof,
+                "Empty response",
+            ));
         }
         buf.truncate(n);
         Ok::<Vec<u8>, std::io::Error>(buf)
@@ -537,7 +899,10 @@ fn fingerprint_framework(port: u16, raw_http: &str, info: &HttpServiceInfo) -> O
     }
 
     // Vite detection
-    if lower_raw.contains("@vite/client") || lower_raw.contains("/@vite/") || lower_raw.contains("vite") {
+    if lower_raw.contains("@vite/client")
+        || lower_raw.contains("/@vite/")
+        || lower_raw.contains("vite")
+    {
         return Some("Vite".to_string());
     }
 
@@ -660,7 +1025,13 @@ fn clean_raw_banner(bytes: &[u8]) -> Option<String> {
     // Filter out non-printable binary junk
     let printable: String = trimmed
         .chars()
-        .map(|c| if c.is_control() && c != '\n' && c != '\r' && c != '\t' { '.' } else { c })
+        .map(|c| {
+            if c.is_control() && c != '\n' && c != '\r' && c != '\t' {
+                '.'
+            } else {
+                c
+            }
+        })
         .collect();
 
     let clean = printable.trim().to_string();
@@ -682,10 +1053,16 @@ async fn probe_redis(addr: &str, timeout: Duration) -> Option<String> {
             let res = String::from_utf8_lossy(&buf[..n]).trim().to_string();
             return Ok::<String, std::io::Error>(format!("Redis [{}]", res));
         }
-        Err(std::io::Error::new(std::io::ErrorKind::UnexpectedEof, "No response"))
+        Err(std::io::Error::new(
+            std::io::ErrorKind::UnexpectedEof,
+            "No response",
+        ))
     };
 
-    tokio::time::timeout(timeout, probe).await.ok().and_then(|r| r.ok())
+    tokio::time::timeout(timeout, probe)
+        .await
+        .ok()
+        .and_then(|r| r.ok())
 }
 
 /// Executes a concurrent port scan over a collection of ports.
@@ -896,7 +1273,9 @@ fn parse_port_range_string(s: &str, set: &mut HashSet<u16>) {
         }
 
         if let Some((start_s, end_s)) = p_trimmed.split_once('-') {
-            if let (Ok(start), Ok(end)) = (start_s.trim().parse::<u16>(), end_s.trim().parse::<u16>()) {
+            if let (Ok(start), Ok(end)) =
+                (start_s.trim().parse::<u16>(), end_s.trim().parse::<u16>())
+            {
                 let min_p = start.min(end);
                 let max_p = start.max(end);
                 for p in min_p..=max_p {
@@ -926,7 +1305,11 @@ pub fn format_summary_text(summary: &PortScanSummary, open_only: bool) -> String
     ));
 
     let display_results: Vec<&PortScanResult> = if open_only {
-        summary.results.iter().filter(|r| r.state == PortState::Open).collect()
+        summary
+            .results
+            .iter()
+            .filter(|r| r.state == PortState::Open)
+            .collect()
     } else {
         summary.results.iter().collect()
     };
@@ -958,10 +1341,7 @@ pub fn format_summary_text(summary: &PortScanSummary, open_only: bool) -> String
             .map(|l| format!("{:.1}ms", l))
             .unwrap_or_else(|| "-".to_string());
 
-        let service_str = r
-            .service
-            .clone()
-            .unwrap_or_else(|| "Unknown".to_string());
+        let service_str = r.service.clone().unwrap_or_else(|| "Unknown".to_string());
 
         let mut details = Vec::new();
         if let Some(http) = &r.http_info {
@@ -1009,17 +1389,18 @@ pub fn format_summary_text(summary: &PortScanSummary, open_only: bool) -> String
 /// Formats port scan summary as a Markdown table.
 pub fn format_summary_markdown(summary: &PortScanSummary, open_only: bool) -> String {
     let mut out = String::new();
-    out.push_str(&format!(
-        "### Port Scan Results for `{}`\n\n",
-        summary.host
-    ));
+    out.push_str(&format!("### Port Scan Results for `{}`\n\n", summary.host));
     out.push_str(&format!(
         "- **Total Scanned:** {}\n- **Open Ports:** {}\n- **Closed:** {}\n- **Filtered:** {}\n- **Scan Duration:** {:.1}ms\n\n",
         summary.total_scanned, summary.open_count, summary.closed_count, summary.filtered_count, summary.duration_ms
     ));
 
     let display_results: Vec<&PortScanResult> = if open_only {
-        summary.results.iter().filter(|r| r.state == PortState::Open).collect()
+        summary
+            .results
+            .iter()
+            .filter(|r| r.state == PortState::Open)
+            .collect()
     } else {
         summary.results.iter().collect()
     };
@@ -1199,10 +1580,7 @@ impl Tool for PortScannerTool {
             .and_then(|v| v.as_bool())
             .unwrap_or(true);
 
-        let probe = args
-            .get("probe")
-            .and_then(|v| v.as_bool())
-            .unwrap_or(true);
+        let probe = args.get("probe").and_then(|v| v.as_bool()).unwrap_or(true);
 
         let timeout_ms = args
             .get("timeout_ms")
@@ -1255,10 +1633,7 @@ impl Tool for PortScannerTool {
                     .and_then(|v| v.as_u64())
                     .unwrap_or(3000) as u16;
 
-                let count = args
-                    .get("count")
-                    .and_then(|v| v.as_u64())
-                    .unwrap_or(1) as usize;
+                let count = args.get("count").and_then(|v| v.as_u64()).unwrap_or(1) as usize;
 
                 let free_ports = find_free_ports(host, start_port, count.clamp(1, 100)).await;
 
@@ -1272,11 +1647,22 @@ impl Tool for PortScannerTool {
                 }
 
                 if free_ports.is_empty() {
-                    Ok(format!("No free ports found on {} starting from {}", host, start_port))
+                    Ok(format!(
+                        "No free ports found on {} starting from {}",
+                        host, start_port
+                    ))
                 } else if free_ports.len() == 1 {
-                    Ok(format!("Available free port on {}: {}", host, free_ports[0]))
+                    Ok(format!(
+                        "Available free port on {}: {}",
+                        host, free_ports[0]
+                    ))
                 } else {
-                    Ok(format!("Found {} free ports on {}: {:?}", free_ports.len(), host, free_ports))
+                    Ok(format!(
+                        "Found {} free ports on {}: {:?}",
+                        free_ports.len(),
+                        host,
+                        free_ports
+                    ))
                 }
             }
 
@@ -1284,7 +1670,10 @@ impl Tool for PortScannerTool {
                 let port = args
                     .get("ports")
                     .or_else(|| args.get("start_port"))
-                    .and_then(|v| v.as_u64().or_else(|| v.as_str().and_then(|s| s.parse::<u64>().ok())))
+                    .and_then(|v| {
+                        v.as_u64()
+                            .or_else(|| v.as_str().and_then(|s| s.parse::<u64>().ok()))
+                    })
                     .unwrap_or(3000) as u16;
 
                 let target_status_str = args
@@ -1317,7 +1706,10 @@ impl Tool for PortScannerTool {
                                 res.state,
                                 res.latency_ms.unwrap_or(0.0),
                                 if let Some(http) = &res.http_info {
-                                    format!(" (Detected: {})", http.detected_framework.as_deref().unwrap_or("HTTP Server"))
+                                    format!(
+                                        " (Detected: {})",
+                                        http.detected_framework.as_deref().unwrap_or("HTTP Server")
+                                    )
                                 } else {
                                     String::new()
                                 }
@@ -1332,7 +1724,10 @@ impl Tool for PortScannerTool {
                 let port = args
                     .get("ports")
                     .or_else(|| args.get("start_port"))
-                    .and_then(|v| v.as_u64().or_else(|| v.as_str().and_then(|s| s.parse::<u64>().ok())))
+                    .and_then(|v| {
+                        v.as_u64()
+                            .or_else(|| v.as_str().and_then(|s| s.parse::<u64>().ok()))
+                    })
                     .unwrap_or(3000) as u16;
 
                 let res = scan_single_port(host, port, timeout, true).await;
@@ -1363,7 +1758,11 @@ impl Tool for PortScannerTool {
                     out.push_str("\n**HTTP Service Details:**\n");
                     out.push_str(&format!("- **Endpoint:** {}\n", http.url));
                     if let Some(code) = http.status_code {
-                        out.push_str(&format!("- **Status Code:** {} {}\n", code, http.status_text.as_deref().unwrap_or("")));
+                        out.push_str(&format!(
+                            "- **Status Code:** {} {}\n",
+                            code,
+                            http.status_text.as_deref().unwrap_or("")
+                        ));
                     }
                     if let Some(fw) = &http.detected_framework {
                         out.push_str(&format!("- **Detected Framework:** {}\n", fw));
@@ -1391,13 +1790,26 @@ impl Tool for PortScannerTool {
             // Default: "scan" or "check"
             _ => {
                 let preset_str = args.get("preset").and_then(|v| v.as_str());
-                let start_port = args.get("start_port").and_then(|v| v.as_u64()).map(|p| p as u16);
-                let end_port = args.get("end_port").and_then(|v| v.as_u64()).map(|p| p as u16);
+                let start_port = args
+                    .get("start_port")
+                    .and_then(|v| v.as_u64())
+                    .map(|p| p as u16);
+                let end_port = args
+                    .get("end_port")
+                    .and_then(|v| v.as_u64())
+                    .map(|p| p as u16);
                 let ports_val = args.get("ports");
 
                 let target_ports = parse_target_ports(ports_val, preset_str, start_port, end_port);
 
-                let summary = scan_ports(host, &target_ports, timeout, probe, DEFAULT_SCAN_CONCURRENCY).await;
+                let summary = scan_ports(
+                    host,
+                    &target_ports,
+                    timeout,
+                    probe,
+                    DEFAULT_SCAN_CONCURRENCY,
+                )
+                .await;
 
                 match format {
                     "json" => {
@@ -1467,7 +1879,10 @@ mod tests {
         assert!(quick.contains(&5173));
 
         assert_eq!(PortPreset::from_str_loose("dev"), Some(PortPreset::Dev));
-        assert_eq!(PortPreset::from_str_loose("databases"), Some(PortPreset::Databases));
+        assert_eq!(
+            PortPreset::from_str_loose("databases"),
+            Some(PortPreset::Databases)
+        );
         assert_eq!(PortPreset::from_str_loose("ai"), Some(PortPreset::Ai));
     }
 
@@ -1491,11 +1906,18 @@ mod tests {
 
     #[test]
     fn test_extract_html_title() {
-        let html = "<html><head><title>My Vite React App</title></head><body><h1>Hello</h1></body></html>";
-        assert_eq!(extract_html_title(html), Some("My Vite React App".to_string()));
+        let html =
+            "<html><head><title>My Vite React App</title></head><body><h1>Hello</h1></body></html>";
+        assert_eq!(
+            extract_html_title(html),
+            Some("My Vite React App".to_string())
+        );
 
         let html_entities = "<TITLE>Tom &amp; Jerry &lt;App&gt;</TITLE>";
-        assert_eq!(extract_html_title(html_entities), Some("Tom & Jerry <App>".to_string()));
+        assert_eq!(
+            extract_html_title(html_entities),
+            Some("Tom & Jerry <App>".to_string())
+        );
 
         let no_title = "<html><body>No title here</body></html>";
         assert_eq!(extract_html_title(no_title), None);
@@ -1512,7 +1934,8 @@ mod tests {
             Some("FastAPI / Uvicorn".to_string())
         );
 
-        let vite_html = "HTTP/1.1 200 OK\r\n\r\n<script type=\"module\" src=\"/@vite/client\"></script>";
+        let vite_html =
+            "HTTP/1.1 200 OK\r\n\r\n<script type=\"module\" src=\"/@vite/client\"></script>";
         assert_eq!(
             fingerprint_framework(5173, vite_html, &HttpServiceInfo::default()),
             Some("Vite".to_string())
@@ -1578,7 +2001,10 @@ mod tests {
 
         // 2. Test find_free action
         let free_out = tool
-            .execute(json!({"action": "find_free", "start_port": 45000, "count": 2, "format": "json"}), &ctx)
+            .execute(
+                json!({"action": "find_free", "start_port": 45000, "count": 2, "format": "json"}),
+                &ctx,
+            )
             .await
             .unwrap();
         let free_val: Value = serde_json::from_str(&free_out).unwrap();
@@ -1586,7 +2012,10 @@ mod tests {
 
         // 3. Test scan action with custom port
         let scan_out = tool
-            .execute(json!({"action": "scan", "ports": [65500], "open_only": false, "format": "json"}), &ctx)
+            .execute(
+                json!({"action": "scan", "ports": [65500], "open_only": false, "format": "json"}),
+                &ctx,
+            )
             .await
             .unwrap();
         let scan_val: Value = serde_json::from_str(&scan_out).unwrap();
@@ -1602,7 +2031,9 @@ mod tests {
         // Accept connections in background so the port stays open.
         tokio::spawn(async move {
             while let Ok((mut s, _)) = listener.accept().await {
-                tokio::spawn(async move { let _ = s.write_all(b"OK").await; });
+                tokio::spawn(async move {
+                    let _ = s.write_all(b"OK").await;
+                });
             }
         });
 
@@ -1641,7 +2072,9 @@ mod tests {
         let port = listener.local_addr().unwrap().port();
         tokio::spawn(async move {
             while let Ok((mut s, _)) = listener.accept().await {
-                tokio::spawn(async move { let _ = s.write_all(b"OK").await; });
+                tokio::spawn(async move {
+                    let _ = s.write_all(b"OK").await;
+                });
             }
         });
 

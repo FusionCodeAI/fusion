@@ -224,7 +224,10 @@ pub fn parse_rename_path(raw: &str) -> (String, Option<String>) {
             }
         }
     } else if let Some((old_part, new_part)) = raw.split_once(" => ") {
-        return (new_part.trim().to_string(), Some(old_part.trim().to_string()));
+        return (
+            new_part.trim().to_string(),
+            Some(old_part.trim().to_string()),
+        );
     }
     (raw.to_string(), None)
 }
@@ -302,7 +305,9 @@ pub fn parse_git_log_output(raw: &str) -> Vec<GitCommitInfo> {
             (chunk, "")
         };
 
-        let trimmed_meta = metadata_section.strip_prefix(FIELD_DELIMITER).unwrap_or(metadata_section);
+        let trimmed_meta = metadata_section
+            .strip_prefix(FIELD_DELIMITER)
+            .unwrap_or(metadata_section);
         let fields: Vec<&str> = trimmed_meta.split(FIELD_DELIMITER).collect();
 
         if fields.is_empty() || fields[0].trim().is_empty() {
@@ -327,7 +332,10 @@ pub fn parse_git_log_output(raw: &str) -> Vec<GitCommitInfo> {
         let parents = if parents_raw.is_empty() {
             Vec::new()
         } else {
-            parents_raw.split_whitespace().map(|s| s.to_string()).collect()
+            parents_raw
+                .split_whitespace()
+                .map(|s| s.to_string())
+                .collect()
         };
 
         let refs = if refs_raw.is_empty() {
@@ -580,7 +588,10 @@ pub fn format_log_report(report: &GitLogReport, format: LogFormat) -> String {
                 };
 
                 out.push_str(&format!("Commit:   {}{}\n", c.hash, refs_str));
-                out.push_str(&format!("Author:   {} <{}>\n", c.author_name, c.author_email));
+                out.push_str(&format!(
+                    "Author:   {} <{}>\n",
+                    c.author_name, c.author_email
+                ));
                 if !c.author_date.is_empty() {
                     if !c.author_date_relative.is_empty() {
                         out.push_str(&format!(
@@ -670,10 +681,7 @@ pub fn format_log_report(report: &GitLogReport, format: LogFormat) -> String {
 // ============================================================================
 
 /// Execute a Git log query and return a structured `GitLogReport`.
-pub async fn get_git_log(
-    repo_dir: &Path,
-    options: &GitLogOptions,
-) -> anyhow::Result<GitLogReport> {
+pub async fn get_git_log(repo_dir: &Path, options: &GitLogOptions) -> anyhow::Result<GitLogReport> {
     let repo_root = find_git_root(repo_dir).ok_or_else(|| {
         anyhow::anyhow!(
             "Not a git repository (or any parent directory): {}",
@@ -984,7 +992,10 @@ impl Tool for GitLogTool {
             .and_then(|v| v.as_str())
             .map(|s| s.to_string());
 
-        let author = args.get("author").and_then(|v| v.as_str()).map(|s| s.to_string());
+        let author = args
+            .get("author")
+            .and_then(|v| v.as_str())
+            .map(|s| s.to_string());
         let grep = args
             .get("grep")
             .or_else(|| args.get("query"))
@@ -1045,7 +1056,10 @@ impl Tool for GitLogTool {
         };
 
         let options = GitLogOptions {
-            path: args.get("path").and_then(|v| v.as_str()).map(|s| s.to_string()),
+            path: args
+                .get("path")
+                .and_then(|v| v.as_str())
+                .map(|s| s.to_string()),
             file_path,
             max_count,
             skip,
@@ -1083,7 +1097,8 @@ mod tests {
 
     impl TempGitRepo {
         fn new() -> Self {
-            let path = std::env::temp_dir().join(format!("fusion_gitlog_test_{}", uuid::Uuid::new_v4()));
+            let path =
+                std::env::temp_dir().join(format!("fusion_gitlog_test_{}", uuid::Uuid::new_v4()));
             fs::create_dir_all(&path).unwrap();
 
             Command::new("git")
@@ -1259,7 +1274,9 @@ mod tests {
 
         // Test detailed format
         let detailed = format_log_report(&report, LogFormat::Detailed);
-        assert!(detailed.contains("Commit:   abcdef1234567890abcdef1234567890abcdef12 (HEAD -> main)"));
+        assert!(
+            detailed.contains("Commit:   abcdef1234567890abcdef1234567890abcdef12 (HEAD -> main)")
+        );
         assert!(detailed.contains("Author:   Bob Builder <bob@example.com>"));
         assert!(detailed.contains("fix: resolve edge case in parser"));
         assert!(detailed.contains("Fixes parsing when inputs contain delimiters."));
@@ -1304,7 +1321,11 @@ mod tests {
             .status()
             .unwrap();
         Command::new("git")
-            .args(["commit", "-m", "docs: update file1 and add file2\n\nMore details in body."])
+            .args([
+                "commit",
+                "-m",
+                "docs: update file1 and add file2\n\nMore details in body.",
+            ])
             .current_dir(&repo.path)
             .status()
             .unwrap();
@@ -1318,7 +1339,10 @@ mod tests {
         assert!(res.contains("file2.txt"));
 
         // Execute compact log
-        let compact_res = tool.execute(json!({"format": "compact"}), &ctx).await.unwrap();
+        let compact_res = tool
+            .execute(json!({"format": "compact"}), &ctx)
+            .await
+            .unwrap();
         assert!(compact_res.contains("docs: update file1 and add file2"));
         assert!(compact_res.contains("feat: first commit"));
 
@@ -1332,12 +1356,18 @@ mod tests {
         assert!(!limit_res.contains("feat: first commit"));
 
         // Execute filtered by grep
-        let grep_res = tool.execute(json!({"grep": "first commit"}), &ctx).await.unwrap();
+        let grep_res = tool
+            .execute(json!({"grep": "first commit"}), &ctx)
+            .await
+            .unwrap();
         assert!(grep_res.contains("feat: first commit"));
         assert!(!grep_res.contains("docs: update file1"));
 
         // Execute filtered by file_path
-        let file_res = tool.execute(json!({"file_path": "file2.txt"}), &ctx).await.unwrap();
+        let file_res = tool
+            .execute(json!({"file_path": "file2.txt"}), &ctx)
+            .await
+            .unwrap();
         assert!(file_res.contains("docs: update file1 and add file2"));
         assert!(!file_res.contains("feat: first commit"));
     }

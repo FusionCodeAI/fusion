@@ -32,9 +32,9 @@ use serde_json::json;
 
 use clap::Parser;
 use fusion::acp::events::{
-    AcpSessionEvent, AdvisorConsensus, AdvisorFeedbackUpdate, AdvisorSeverity,
-    AdvisorStatusState, PlanProgressUpdate, PlanStep, SubagentStatusUpdate,
-    ThinkingStreamChunk, TokenStreamChunk, ToolExecutionState, ToolStatusUpdate,
+    AcpSessionEvent, AdvisorConsensus, AdvisorFeedbackUpdate, AdvisorSeverity, AdvisorStatusState,
+    PlanProgressUpdate, PlanStep, SubagentStatusUpdate, ThinkingStreamChunk, TokenStreamChunk,
+    ToolExecutionState, ToolStatusUpdate,
 };
 use fusion::acp::types::{
     JsonRpcNotification, JsonRpcRequest, JsonRpcResponse, RequestId, SessionUpdate,
@@ -184,12 +184,8 @@ impl BenchmarkMetric {
         budget_threshold: Option<f64>,
         description: impl Into<String>,
     ) -> Self {
-        let (delta_absolute, delta_percent, ratio_vs_baseline, status) = Self::evaluate_status(
-            current_value,
-            baseline_value,
-            budget_threshold,
-            unit,
-        );
+        let (delta_absolute, delta_percent, ratio_vs_baseline, status) =
+            Self::evaluate_status(current_value, baseline_value, budget_threshold, unit);
 
         Self {
             id: id.into(),
@@ -214,7 +210,13 @@ impl BenchmarkMetric {
         unit: MetricUnit,
     ) -> (Option<f64>, Option<f64>, Option<f64>, MetricStatus) {
         let delta_abs = baseline.map(|b| current - b);
-        let delta_pct = baseline.and_then(|b| if b > 0.0 { Some(((current - b) / b) * 100.0) } else { None });
+        let delta_pct = baseline.and_then(|b| {
+            if b > 0.0 {
+                Some(((current - b) / b) * 100.0)
+            } else {
+                None
+            }
+        });
         let ratio = baseline.and_then(|b| if b > 0.0 { Some(current / b) } else { None });
 
         let higher_is_better = matches!(unit, MetricUnit::OpsPerSec | MetricUnit::MegabytesPerSec);
@@ -381,7 +383,8 @@ impl PerformanceReport {
 
         let mut summary_notes = Vec::new();
         if overall_passed {
-            summary_notes.push("All performance metrics satisfy strict SLA budget thresholds.".to_string());
+            summary_notes
+                .push("All performance metrics satisfy strict SLA budget thresholds.".to_string());
         } else {
             summary_notes.push(format!(
                 "WARNING: {failed_count} performance budget violation(s) detected."
@@ -399,7 +402,10 @@ impl PerformanceReport {
     }
 
     pub fn get_category_metrics(&self, category: MetricCategory) -> Vec<&BenchmarkMetric> {
-        self.metrics.iter().filter(|m| m.category == category).collect()
+        self.metrics
+            .iter()
+            .filter(|m| m.category == category)
+            .collect()
     }
 }
 
@@ -424,7 +430,10 @@ impl SimulatedHeavyweightMessage {
     pub fn new_user(turn: usize) -> Self {
         let mut fields = HashMap::new();
         fields.insert("type".to_string(), json!("human_message"));
-        fields.insert("timestamp_ms".to_string(), json!(1710000000000_u64 + turn as u64));
+        fields.insert(
+            "timestamp_ms".to_string(),
+            json!(1710000000000_u64 + turn as u64),
+        );
         fields.insert("token_estimate".to_string(), json!(42 + turn * 3));
 
         let mut metadata = HashMap::new();
@@ -436,13 +445,15 @@ impl SimulatedHeavyweightMessage {
         trace_context.insert("span_id".to_string(), json!(format!("span_{turn:08x}")));
         trace_context.insert("parent_id".to_string(), json!("root_session_span"));
 
-        let content = format!("Turn {turn}: Refactor async network layer and add comprehensive benchmarks.");
+        let content =
+            format!("Turn {turn}: Refactor async network layer and add comprehensive benchmarks.");
         let raw_json_cache = json!({
             "role": "user",
             "content": &content,
             "fields": &fields,
             "metadata": &metadata
-        }).to_string();
+        })
+        .to_string();
 
         Self {
             role: "user".to_string(),
@@ -473,7 +484,8 @@ impl SimulatedHeavyweightMessage {
             "content": &content,
             "fields": &fields,
             "metadata": &metadata
-        }).to_string();
+        })
+        .to_string();
 
         Self {
             role: "assistant".to_string(),
@@ -503,8 +515,14 @@ impl SimulatedHeavyweightSession {
         global_state.insert("temperature".to_string(), json!(0.2));
 
         let mut tool_metadata_cache = HashMap::new();
-        tool_metadata_cache.insert("bash".to_string(), json!({ "timeout": 30, "sandboxed": true }));
-        tool_metadata_cache.insert("edit".to_string(), json!({ "fuzz": 2, "syntax_check": true }));
+        tool_metadata_cache.insert(
+            "bash".to_string(),
+            json!({ "timeout": 30, "sandboxed": true }),
+        );
+        tool_metadata_cache.insert(
+            "edit".to_string(),
+            json!({ "fuzz": 2, "syntax_check": true }),
+        );
 
         let mut messages = Vec::with_capacity(turns * 2);
         for i in 1..=turns {
@@ -551,7 +569,9 @@ pub fn generate_modified_source(original: &str, modification_rate: usize) -> Str
         if i % 3 == 0 && i < lines.len() {
             lines[i] = format!("// MODIFIED: optimized path with SIMD acceleration ({i})");
         } else if i % 3 == 1 && i < lines.len() {
-            lines[i] = format!("pub fn compute_metric_{i}_v2(input: u64, extra: u64) -> u64 {{ input ^ extra }}");
+            lines[i] = format!(
+                "pub fn compute_metric_{i}_v2(input: u64, extra: u64) -> u64 {{ input ^ extra }}"
+            );
         } else if i < lines.len() {
             lines.insert(i, format!("// INSERTED: telemetry metric hook {i}"));
         }
@@ -579,7 +599,10 @@ pub struct TimingStats {
 
 impl TimingStats {
     pub fn calculate(mut samples_ns: Vec<f64>) -> Self {
-        assert!(!samples_ns.is_empty(), "Cannot calculate timing stats on empty samples");
+        assert!(
+            !samples_ns.is_empty(),
+            "Cannot calculate timing stats on empty samples"
+        );
         samples_ns.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
 
         let len = samples_ns.len();
@@ -624,7 +647,11 @@ impl TimingStats {
 }
 
 /// Measures duration of a closure over multiple iterations with warm-up.
-pub fn measure_latency<F: FnMut()>(mut f: F, warmup_runs: usize, sample_runs: usize) -> TimingStats {
+pub fn measure_latency<F: FnMut()>(
+    mut f: F,
+    warmup_runs: usize,
+    sample_runs: usize,
+) -> TimingStats {
     for _ in 0..warmup_runs {
         f();
     }
@@ -649,7 +676,9 @@ pub fn measure_binary_size_metrics() -> Vec<BenchmarkMetric> {
 
     let release_bin_path = PathBuf::from("target/release/fusion");
     let release_size = if release_bin_path.exists() {
-        fs::metadata(&release_bin_path).map(|m| m.len() as f64).unwrap_or(11.8 * 1_048_576.0)
+        fs::metadata(&release_bin_path)
+            .map(|m| m.len() as f64)
+            .unwrap_or(11.8 * 1_048_576.0)
     } else {
         11.8 * 1_048_576.0
     };
@@ -667,7 +696,9 @@ pub fn measure_binary_size_metrics() -> Vec<BenchmarkMetric> {
 
     let debug_bin_path = PathBuf::from("target/debug/fusion");
     let debug_size = if debug_bin_path.exists() {
-        fs::metadata(&debug_bin_path).map(|m| m.len() as f64).unwrap_or(38.5 * 1_048_576.0)
+        fs::metadata(&debug_bin_path)
+            .map(|m| m.len() as f64)
+            .unwrap_or(38.5 * 1_048_576.0)
     } else {
         38.5 * 1_048_576.0
     };
@@ -900,11 +931,15 @@ pub fn measure_memory_footprint_metrics() -> Vec<BenchmarkMetric> {
         });
         session_10.messages.push(Message {
             role: Role::Assistant,
-            content: format!("Here is the implementation for turn {i}:\n```rust\npub fn helper_{i}() {{}}\n```"),
+            content: format!(
+                "Here is the implementation for turn {i}:\n```rust\npub fn helper_{i}() {{}}\n```"
+            ),
             tool_calls: Some(vec![ToolCall {
                 id: format!("call_{i}"),
                 name: "write".to_string(),
-                arguments: json!({ "path": format!("src/helper_{i}.rs"), "content": "// sample code" }).to_string(),
+                arguments:
+                    json!({ "path": format!("src/helper_{i}.rs"), "content": "// sample code" })
+                        .to_string(),
             }]),
             tool_call_id: None,
         });
@@ -932,17 +967,22 @@ pub fn measure_memory_footprint_metrics() -> Vec<BenchmarkMetric> {
     for i in 1..=100 {
         session_100.messages.push(Message {
             role: Role::User,
-            content: format!("Task {i}: Refactor module and execute tests with multi-agent coordination."),
+            content: format!(
+                "Task {i}: Refactor module and execute tests with multi-agent coordination."
+            ),
             tool_calls: None,
             tool_call_id: None,
         });
         session_100.messages.push(Message {
             role: Role::Assistant,
-            content: format!("Task {i} analysis complete. Running subagent loop with advisor critique."),
+            content: format!(
+                "Task {i} analysis complete. Running subagent loop with advisor critique."
+            ),
             tool_calls: Some(vec![ToolCall {
                 id: format!("call_multi_{i}"),
                 name: "bash".to_string(),
-                arguments: json!({ "command": format!("cargo test --test module_{i}") }).to_string(),
+                arguments: json!({ "command": format!("cargo test --test module_{i}") })
+                    .to_string(),
             }]),
             tool_call_id: None,
         });
@@ -1258,7 +1298,10 @@ pub fn measure_diff_patch_metrics() -> Vec<BenchmarkMetric> {
     let small_diff_stats = measure_latency(
         || {
             let diff = TextDiff::from_lines(&small_old, &small_new);
-            let unified = diff.unified_diff().header("a/small.rs", "b/small.rs").to_string();
+            let unified = diff
+                .unified_diff()
+                .header("a/small.rs", "b/small.rs")
+                .to_string();
             std::hint::black_box(unified);
         },
         50,
@@ -1283,7 +1326,10 @@ pub fn measure_diff_patch_metrics() -> Vec<BenchmarkMetric> {
     let medium_diff_stats = measure_latency(
         || {
             let diff = TextDiff::from_lines(&medium_old, &medium_new);
-            let unified = diff.unified_diff().header("a/medium.rs", "b/medium.rs").to_string();
+            let unified = diff
+                .unified_diff()
+                .header("a/medium.rs", "b/medium.rs")
+                .to_string();
             std::hint::black_box(unified);
         },
         20,
@@ -1308,7 +1354,10 @@ pub fn measure_diff_patch_metrics() -> Vec<BenchmarkMetric> {
     let large_diff_stats = measure_latency(
         || {
             let diff = TextDiff::from_lines(&large_old, &large_new);
-            let unified = diff.unified_diff().header("a/large.rs", "b/large.rs").to_string();
+            let unified = diff
+                .unified_diff()
+                .header("a/large.rs", "b/large.rs")
+                .to_string();
             std::hint::black_box(unified);
         },
         5,
@@ -1321,15 +1370,17 @@ pub fn measure_diff_patch_metrics() -> Vec<BenchmarkMetric> {
         MetricCategory::DiffPatchPerformance,
         MetricUnit::Milliseconds,
         large_diff_stats.median_ns / 1_000_000.0,
-        Some(85.0),  // Baseline: Python difflib (~85ms)
-        Some(8.0),   // Target SLA: <= 8.0ms
+        Some(85.0), // Baseline: Python difflib (~85ms)
+        Some(8.0),  // Target SLA: <= 8.0ms
         "Heavy monolithic file diffing with hundreds of distributed hunks.",
     ));
 
     // 4. Algorithm Comparison: Myers vs Patience vs LCS (500 lines)
     let myers_stats = measure_latency(
         || {
-            let diff = TextDiff::configure().algorithm(Algorithm::Myers).diff_lines(&medium_old, &medium_new);
+            let diff = TextDiff::configure()
+                .algorithm(Algorithm::Myers)
+                .diff_lines(&medium_old, &medium_new);
             std::hint::black_box(diff.ops().len());
         },
         20,
@@ -1338,7 +1389,9 @@ pub fn measure_diff_patch_metrics() -> Vec<BenchmarkMetric> {
 
     let patience_stats = measure_latency(
         || {
-            let diff = TextDiff::configure().algorithm(Algorithm::Patience).diff_lines(&medium_old, &medium_new);
+            let diff = TextDiff::configure()
+                .algorithm(Algorithm::Patience)
+                .diff_lines(&medium_old, &medium_new);
             std::hint::black_box(diff.ops().len());
         },
         20,
@@ -1587,8 +1640,14 @@ pub fn generate_markdown_report(report: &PerformanceReport) -> String {
     for (id, label) in highlights {
         if let Some(m) = report.metrics.iter().find(|m| m.id == id) {
             let current = m.format_value(m.current_value);
-            let baseline = m.baseline_value.map(|b| m.format_value(b)).unwrap_or_else(|| "N/A".to_string());
-            let delta = m.delta_percent.map(|p| format!("{:.1}%", p)).unwrap_or_else(|| "-".to_string());
+            let baseline = m
+                .baseline_value
+                .map(|b| m.format_value(b))
+                .unwrap_or_else(|| "N/A".to_string());
+            let delta = m
+                .delta_percent
+                .map(|p| format!("{:.1}%", p))
+                .unwrap_or_else(|| "-".to_string());
             md.push_str(&format!(
                 "| **{}** | **{}** | {} | `{}` | {} |\n",
                 label,
@@ -1612,15 +1671,29 @@ pub fn generate_markdown_report(report: &PerformanceReport) -> String {
 
     for cat in categories {
         md.push_str(&format!("### {}\n\n", cat));
-        md.push_str("| Benchmark Metric | Measured | Baseline | SLA Budget | Delta | Ratio | Status |\n");
+        md.push_str(
+            "| Benchmark Metric | Measured | Baseline | SLA Budget | Delta | Ratio | Status |\n",
+        );
         md.push_str("| :--- | :--- | :--- | :--- | :--- | :--- | :--- |\n");
 
         for m in report.get_category_metrics(cat) {
             let measured = m.format_value(m.current_value);
-            let baseline = m.baseline_value.map(|b| m.format_value(b)).unwrap_or_else(|| "-".to_string());
-            let budget = m.budget_threshold.map(|b| m.format_value(b)).unwrap_or_else(|| "-".to_string());
-            let delta = m.delta_percent.map(|p| format!("{:.1}%", p)).unwrap_or_else(|| "-".to_string());
-            let ratio = m.ratio_vs_baseline.map(|r| format!("{:.2}x", r)).unwrap_or_else(|| "-".to_string());
+            let baseline = m
+                .baseline_value
+                .map(|b| m.format_value(b))
+                .unwrap_or_else(|| "-".to_string());
+            let budget = m
+                .budget_threshold
+                .map(|b| m.format_value(b))
+                .unwrap_or_else(|| "-".to_string());
+            let delta = m
+                .delta_percent
+                .map(|p| format!("{:.1}%", p))
+                .unwrap_or_else(|| "-".to_string());
+            let ratio = m
+                .ratio_vs_baseline
+                .map(|r| format!("{:.2}x", r))
+                .unwrap_or_else(|| "-".to_string());
 
             md.push_str(&format!(
                 "| **{}**<br>_{}_ | `{}` | `{}` | `{}` | `{}` | `{}` | {} |\n",
@@ -1701,16 +1774,29 @@ pub fn generate_terminal_report(report: &PerformanceReport) -> String {
             "{:<42} | {:<12} | {:<12} | {:<10} | {:<12}\n",
             "Benchmark Name", "Measured", "Baseline", "Budget", "Status"
         ));
-        out.push_str(&format!("{:-<42}-+-{:-<12}-+-{:-<12}-+-{:-<10}-+-{:-<12}\n", "", "", "", "", ""));
+        out.push_str(&format!(
+            "{:-<42}-+-{:-<12}-+-{:-<12}-+-{:-<10}-+-{:-<12}\n",
+            "", "", "", "", ""
+        ));
 
         for m in report.get_category_metrics(cat) {
             let measured = m.format_value(m.current_value);
-            let baseline = m.baseline_value.map(|b| m.format_value(b)).unwrap_or_else(|| "-".to_string());
-            let budget = m.budget_threshold.map(|b| m.format_value(b)).unwrap_or_else(|| "-".to_string());
+            let baseline = m
+                .baseline_value
+                .map(|b| m.format_value(b))
+                .unwrap_or_else(|| "-".to_string());
+            let budget = m
+                .budget_threshold
+                .map(|b| m.format_value(b))
+                .unwrap_or_else(|| "-".to_string());
 
             out.push_str(&format!(
                 "{:<42} | {:<12} | {:<12} | {:<10} | {:<12}\n",
-                if m.name.len() > 40 { format!("{}...", &m.name[..37]) } else { m.name.clone() },
+                if m.name.len() > 40 {
+                    format!("{}...", &m.name[..37])
+                } else {
+                    m.name.clone()
+                },
                 measured,
                 baseline,
                 budget,
@@ -1722,7 +1808,9 @@ pub fn generate_terminal_report(report: &PerformanceReport) -> String {
 
     out.push_str("========================================================================================\n");
     if report.overall_passed {
-        out.push_str(" RESULT: \x1b[1;32m[PASS] ALL PERFORMANCE BUDGETS AND SLA GATES SATISFIED\x1b[0m\n");
+        out.push_str(
+            " RESULT: \x1b[1;32m[PASS] ALL PERFORMANCE BUDGETS AND SLA GATES SATISFIED\x1b[0m\n",
+        );
     } else {
         out.push_str(&format!(
             " RESULT: \x1b[1;31m[FAIL] {} PERFORMANCE BUDGET VIOLATION(S) DETECTED\x1b[0m\n",
@@ -1831,19 +1919,37 @@ pub fn generate_html_report(report: &PerformanceReport) -> String {
         report.environment.num_cpus
     ));
 
-    html.push_str(r#"
+    html.push_str(
+        r#"
             </div>
         </header>
         <div class="grid">
-"#);
+"#,
+    );
 
     let kpi_ids = [
         ("bin_size_release", "Binary Size", "Release Stripped"),
-        ("startup_full_cold_start", "Cold Start Latency", "Full Pipeline"),
+        (
+            "startup_full_cold_start",
+            "Cold Start Latency",
+            "Full Pipeline",
+        ),
         ("mem_peak_rss", "Peak Working Set", "Resident Set Size"),
-        ("acp_ser_token_chunk", "Token Serialization", "JSON-RPC Rate"),
-        ("diff_medium_500_lines", "Diff Generation", "500-Line Module"),
-        ("build_incremental_time", "Incremental Rebuild", "Single-File Edit"),
+        (
+            "acp_ser_token_chunk",
+            "Token Serialization",
+            "JSON-RPC Rate",
+        ),
+        (
+            "diff_medium_500_lines",
+            "Diff Generation",
+            "500-Line Module",
+        ),
+        (
+            "build_incremental_time",
+            "Incremental Rebuild",
+            "Single-File Edit",
+        ),
     ];
 
     for (id, label, sub) in kpi_ids {
@@ -1858,7 +1964,9 @@ pub fn generate_html_report(report: &PerformanceReport) -> String {
                 label,
                 m.format_value(m.current_value),
                 sub,
-                m.delta_percent.map(|p| format!("{:.1}%", p)).unwrap_or_else(|| "-".to_string())
+                m.delta_percent
+                    .map(|p| format!("{:.1}%", p))
+                    .unwrap_or_else(|| "-".to_string())
             ));
         }
     }
@@ -1875,7 +1983,8 @@ pub fn generate_html_report(report: &PerformanceReport) -> String {
     ];
 
     for cat in categories {
-        html.push_str(&format!(r#"        <h2 class="cat-header">{}</h2>
+        html.push_str(&format!(
+            r#"        <h2 class="cat-header">{}</h2>
         <table>
             <thead>
                 <tr>
@@ -1888,7 +1997,9 @@ pub fn generate_html_report(report: &PerformanceReport) -> String {
                 </tr>
             </thead>
             <tbody>
-"#, cat));
+"#,
+            cat
+        ));
 
         for m in report.get_category_metrics(cat) {
             let badge_class = match m.status {
@@ -1928,14 +2039,18 @@ pub fn generate_html_report(report: &PerformanceReport) -> String {
             ));
         }
 
-        html.push_str(r#"            </tbody>
+        html.push_str(
+            r#"            </tbody>
         </table>
-"#);
+"#,
+        );
     }
 
-    html.push_str(r#"    </div>
+    html.push_str(
+        r#"    </div>
 </body>
-</html>"#);
+</html>"#,
+    );
 
     html
 }
@@ -1949,7 +2064,8 @@ pub fn verify_sla_budgets(report: &PerformanceReport) -> Result<(), Vec<String>>
 
     for m in &report.metrics {
         if let Some(budget) = m.budget_threshold {
-            let higher_is_better = matches!(m.unit, MetricUnit::OpsPerSec | MetricUnit::MegabytesPerSec);
+            let higher_is_better =
+                matches!(m.unit, MetricUnit::OpsPerSec | MetricUnit::MegabytesPerSec);
             let violated = if higher_is_better {
                 m.current_value < budget
             } else {
@@ -1988,7 +2104,10 @@ fn run_cli_mode() -> Result<(), Box<dyn std::error::Error>> {
     let is_csv = args.iter().any(|a| a == "--csv");
     let check_budgets = args.iter().any(|a| a == "--check-budgets" || a == "--ci");
 
-    let save_path = args.windows(2).find(|w| w[0] == "--save" || w[0] == "-o").map(|w| &w[1]);
+    let save_path = args
+        .windows(2)
+        .find(|w| w[0] == "--save" || w[0] == "-o")
+        .map(|w| &w[1]);
 
     let report = run_all_benchmarks();
 
@@ -2018,7 +2137,10 @@ fn run_cli_mode() -> Result<(), Box<dyn std::error::Error>> {
                 std::process::exit(0);
             }
             Err(violations) => {
-                eprintln!("\n❌ [CI GATE FAILURE] {} performance budget violations detected:", violations.len());
+                eprintln!(
+                    "\n❌ [CI GATE FAILURE] {} performance budget violations detected:",
+                    violations.len()
+                );
                 for v in &violations {
                     eprintln!("  - {v}");
                 }
@@ -2139,7 +2261,8 @@ fn main() {
                 tool_calls: Some(vec![ToolCall {
                     id: format!("call_{i}"),
                     name: "edit".to_string(),
-                    arguments: json!({ "path": format!("file_{i}.rs"), "content": "fn test() {}" }).to_string(),
+                    arguments: json!({ "path": format!("file_{i}.rs"), "content": "fn test() {}" })
+                        .to_string(),
                 }]),
                 tool_call_id: None,
             });
@@ -2229,7 +2352,8 @@ fn main() {
 
     group_acp.bench_function("deserialize/token_stream_chunk", |b| {
         b.iter(|| {
-            let res: TokenStreamChunk = serde_json::from_str(criterion::black_box(&token_json)).unwrap();
+            let res: TokenStreamChunk =
+                serde_json::from_str(criterion::black_box(&token_json)).unwrap();
             criterion::black_box(res);
         });
     });
@@ -2256,7 +2380,8 @@ fn main() {
 
     group_acp.bench_function("deserialize/tool_status_update", |b| {
         b.iter(|| {
-            let res: ToolStatusUpdate = serde_json::from_str(criterion::black_box(&tool_json)).unwrap();
+            let res: ToolStatusUpdate =
+                serde_json::from_str(criterion::black_box(&tool_json)).unwrap();
             criterion::black_box(res);
         });
     });
@@ -2273,14 +2398,16 @@ fn main() {
 
     group_acp.bench_function("serialize/advisor_feedback_update", |b| {
         b.iter(|| {
-            let s = serde_json::to_string(criterion::black_box(&advisor_update)).unwrap_or_default();
+            let s =
+                serde_json::to_string(criterion::black_box(&advisor_update)).unwrap_or_default();
             criterion::black_box(s);
         });
     });
 
     group_acp.bench_function("deserialize/advisor_feedback_update", |b| {
         b.iter(|| {
-            let res: AdvisorFeedbackUpdate = serde_json::from_str(criterion::black_box(&advisor_json)).unwrap();
+            let res: AdvisorFeedbackUpdate =
+                serde_json::from_str(criterion::black_box(&advisor_json)).unwrap();
             criterion::black_box(res);
         });
     });
@@ -2290,10 +2417,26 @@ fn main() {
         current_step_index: 2,
         total_steps: 4,
         steps: vec![
-            PlanStep { index: 0, title: "Refactor core AST".to_string(), completed: true },
-            PlanStep { index: 1, title: "Update serde attributes".to_string(), completed: true },
-            PlanStep { index: 2, title: "Benchmark throughput".to_string(), completed: false },
-            PlanStep { index: 3, title: "Run test suites".to_string(), completed: false },
+            PlanStep {
+                index: 0,
+                title: "Refactor core AST".to_string(),
+                completed: true,
+            },
+            PlanStep {
+                index: 1,
+                title: "Update serde attributes".to_string(),
+                completed: true,
+            },
+            PlanStep {
+                index: 2,
+                title: "Benchmark throughput".to_string(),
+                completed: false,
+            },
+            PlanStep {
+                index: 3,
+                title: "Run test suites".to_string(),
+                completed: false,
+            },
         ],
     };
     let plan_json = serde_json::to_string(&plan_update).unwrap_or_default();
@@ -2307,7 +2450,8 @@ fn main() {
 
     group_acp.bench_function("deserialize/plan_progress_update", |b| {
         b.iter(|| {
-            let res: PlanProgressUpdate = serde_json::from_str(criterion::black_box(&plan_json)).unwrap();
+            let res: PlanProgressUpdate =
+                serde_json::from_str(criterion::black_box(&plan_json)).unwrap();
             criterion::black_box(res);
         });
     });
@@ -2333,7 +2477,8 @@ fn main() {
 
     group_acp.bench_function("deserialize/jsonrpc_notification", |b| {
         b.iter(|| {
-            let res: JsonRpcNotification = serde_json::from_str(criterion::black_box(&rpc_notif_json)).unwrap();
+            let res: JsonRpcNotification =
+                serde_json::from_str(criterion::black_box(&rpc_notif_json)).unwrap();
             criterion::black_box(res);
         });
     });
@@ -2383,7 +2528,10 @@ fn main() {
                 criterion::black_box(&small_old),
                 criterion::black_box(&small_new),
             );
-            let unified = diff.unified_diff().header("a/file.rs", "b/file.rs").to_string();
+            let unified = diff
+                .unified_diff()
+                .header("a/file.rs", "b/file.rs")
+                .to_string();
             criterion::black_box(unified);
         });
     });
@@ -2394,7 +2542,10 @@ fn main() {
                 criterion::black_box(&medium_old),
                 criterion::black_box(&medium_new),
             );
-            let unified = diff.unified_diff().header("a/file.rs", "b/file.rs").to_string();
+            let unified = diff
+                .unified_diff()
+                .header("a/file.rs", "b/file.rs")
+                .to_string();
             criterion::black_box(unified);
         });
     });
@@ -2405,7 +2556,10 @@ fn main() {
                 criterion::black_box(&large_old),
                 criterion::black_box(&large_new),
             );
-            let unified = diff.unified_diff().header("a/file.rs", "b/file.rs").to_string();
+            let unified = diff
+                .unified_diff()
+                .header("a/file.rs", "b/file.rs")
+                .to_string();
             criterion::black_box(unified);
         });
     });
@@ -2414,7 +2568,10 @@ fn main() {
         b.iter(|| {
             let diff = TextDiff::configure()
                 .algorithm(Algorithm::Myers)
-                .diff_lines(criterion::black_box(&medium_old), criterion::black_box(&medium_new));
+                .diff_lines(
+                    criterion::black_box(&medium_old),
+                    criterion::black_box(&medium_new),
+                );
             criterion::black_box(diff.ops().len());
         });
     });
@@ -2423,16 +2580,20 @@ fn main() {
         b.iter(|| {
             let diff = TextDiff::configure()
                 .algorithm(Algorithm::Patience)
-                .diff_lines(criterion::black_box(&medium_old), criterion::black_box(&medium_new));
+                .diff_lines(
+                    criterion::black_box(&medium_old),
+                    criterion::black_box(&medium_new),
+                );
             criterion::black_box(diff.ops().len());
         });
     });
 
     group_diff.bench_function("diff/algorithm_lcs", |b| {
         b.iter(|| {
-            let diff = TextDiff::configure()
-                .algorithm(Algorithm::Lcs)
-                .diff_lines(criterion::black_box(&medium_old), criterion::black_box(&medium_new));
+            let diff = TextDiff::configure().algorithm(Algorithm::Lcs).diff_lines(
+                criterion::black_box(&medium_old),
+                criterion::black_box(&medium_new),
+            );
             criterion::black_box(diff.ops().len());
         });
     });
@@ -2451,11 +2612,14 @@ fn main() {
     });
 
     let parsed_patches = parse_unified_diff(&diff_text).unwrap();
-    let sample_patch = parsed_patches.into_iter().next().unwrap_or_else(|| FilePatch {
-        old_path: Some(PathBuf::from("src/bench.rs")),
-        new_path: Some(PathBuf::from("src/bench.rs")),
-        hunks: Vec::new(),
-    });
+    let sample_patch = parsed_patches
+        .into_iter()
+        .next()
+        .unwrap_or_else(|| FilePatch {
+            old_path: Some(PathBuf::from("src/bench.rs")),
+            new_path: Some(PathBuf::from("src/bench.rs")),
+            hunks: Vec::new(),
+        });
     let patch_opts = PatchOptions::default();
 
     group_diff.bench_function("patch/apply_file_patch_to_string", |b| {
@@ -2551,7 +2715,10 @@ mod tests {
         let new = generate_modified_source(&old, 10);
 
         let diff = TextDiff::from_lines(&old, &new);
-        let diff_str = diff.unified_diff().header("a/test.rs", "b/test.rs").to_string();
+        let diff_str = diff
+            .unified_diff()
+            .header("a/test.rs", "b/test.rs")
+            .to_string();
         assert!(diff_str.contains("--- a/test.rs"));
         assert!(diff_str.contains("+++ b/test.rs"));
 
@@ -2620,6 +2787,10 @@ mod tests {
 
         // Verify SLA Budget Check passes on default suite
         let budget_res = verify_sla_budgets(&report);
-        assert!(budget_res.is_ok(), "Expected default SLA budgets to pass: {:?}", budget_res);
+        assert!(
+            budget_res.is_ok(),
+            "Expected default SLA budgets to pass: {:?}",
+            budget_res
+        );
     }
 }

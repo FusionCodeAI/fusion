@@ -21,7 +21,9 @@ use std::path::{Component, Path, PathBuf};
 /// Errors emitted when a guardrail rule or security boundary is violated.
 #[derive(thiserror::Error, Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum GuardrailError {
-    #[error("Directory traversal detected: path '{path}' attempts to escape allowed root '{root}'")]
+    #[error(
+        "Directory traversal detected: path '{path}' attempts to escape allowed root '{root}'"
+    )]
     DirectoryTraversal { path: String, root: String },
 
     #[error("Access denied to forbidden path: '{path}' (matches restricted pattern '{pattern}')")]
@@ -290,7 +292,11 @@ impl PathGuard {
     }
 
     /// Validate a path for general access against allowed roots and denied patterns.
-    pub fn validate_path(&self, raw_path: impl AsRef<Path>, cwd: &Path) -> Result<PathBuf, GuardrailError> {
+    pub fn validate_path(
+        &self,
+        raw_path: impl AsRef<Path>,
+        cwd: &Path,
+    ) -> Result<PathBuf, GuardrailError> {
         let raw = raw_path.as_ref();
 
         // 1. If allowed_roots is empty, reject
@@ -320,18 +326,28 @@ impl PathGuard {
             }
         }
 
-        Err(last_error.unwrap_or_else(|| GuardrailError::OutsideAllowedRoot {
-            path: raw.display().to_string(),
-        }))
+        Err(
+            last_error.unwrap_or_else(|| GuardrailError::OutsideAllowedRoot {
+                path: raw.display().to_string(),
+            }),
+        )
     }
 
     /// Validate a path for read operations.
-    pub fn validate_read(&self, raw_path: impl AsRef<Path>, cwd: &Path) -> Result<PathBuf, GuardrailError> {
+    pub fn validate_read(
+        &self,
+        raw_path: impl AsRef<Path>,
+        cwd: &Path,
+    ) -> Result<PathBuf, GuardrailError> {
         self.validate_path(raw_path, cwd)
     }
 
     /// Validate a path for write/modification operations.
-    pub fn validate_write(&self, raw_path: impl AsRef<Path>, cwd: &Path) -> Result<PathBuf, GuardrailError> {
+    pub fn validate_write(
+        &self,
+        raw_path: impl AsRef<Path>,
+        cwd: &Path,
+    ) -> Result<PathBuf, GuardrailError> {
         if self.read_only {
             return Err(GuardrailError::ReadOnlyViolation {
                 path: raw_path.as_ref().display().to_string(),
@@ -772,12 +788,20 @@ impl SecurityGuardrails {
     }
 
     /// Validate a path for reading.
-    pub fn validate_read_path(&self, path: impl AsRef<Path>, cwd: &Path) -> Result<PathBuf, GuardrailError> {
+    pub fn validate_read_path(
+        &self,
+        path: impl AsRef<Path>,
+        cwd: &Path,
+    ) -> Result<PathBuf, GuardrailError> {
         self.path_guard.validate_read(path, cwd)
     }
 
     /// Validate a path for writing.
-    pub fn validate_write_path(&self, path: impl AsRef<Path>, cwd: &Path) -> Result<PathBuf, GuardrailError> {
+    pub fn validate_write_path(
+        &self,
+        path: impl AsRef<Path>,
+        cwd: &Path,
+    ) -> Result<PathBuf, GuardrailError> {
         self.path_guard.validate_write(path, cwd)
     }
 
@@ -802,18 +826,12 @@ mod tests {
 
     #[test]
     fn test_normalize_path_basic() {
-        assert_eq!(
-            normalize_path(Path::new("a/b/../c")),
-            PathBuf::from("a/c")
-        );
+        assert_eq!(normalize_path(Path::new("a/b/../c")), PathBuf::from("a/c"));
         assert_eq!(
             normalize_path(Path::new("./a/./b/./c")),
             PathBuf::from("a/b/c")
         );
-        assert_eq!(
-            normalize_path(Path::new("a/b/../../c")),
-            PathBuf::from("c")
-        );
+        assert_eq!(normalize_path(Path::new("a/b/../../c")), PathBuf::from("c"));
     }
 
     #[test]
@@ -839,21 +857,36 @@ mod tests {
         // Safe relative paths
         let safe1 = canonicalize_safely(Path::new("src/main.rs"), &cwd, &root);
         assert!(safe1.is_ok());
-        assert_eq!(safe1.unwrap(), PathBuf::from("/workspace/project/src/main.rs"));
+        assert_eq!(
+            safe1.unwrap(),
+            PathBuf::from("/workspace/project/src/main.rs")
+        );
 
         let safe2 = canonicalize_safely(Path::new("src/utils/../main.rs"), &cwd, &root);
         assert!(safe2.is_ok());
-        assert_eq!(safe2.unwrap(), PathBuf::from("/workspace/project/src/main.rs"));
+        assert_eq!(
+            safe2.unwrap(),
+            PathBuf::from("/workspace/project/src/main.rs")
+        );
 
         // Dangerous relative escapes
         let escape1 = canonicalize_safely(Path::new("../secret.txt"), &cwd, &root);
-        assert!(matches!(escape1, Err(GuardrailError::DirectoryTraversal { .. })));
+        assert!(matches!(
+            escape1,
+            Err(GuardrailError::DirectoryTraversal { .. })
+        ));
 
         let escape2 = canonicalize_safely(Path::new("../../etc/passwd"), &cwd, &root);
-        assert!(matches!(escape2, Err(GuardrailError::DirectoryTraversal { .. })));
+        assert!(matches!(
+            escape2,
+            Err(GuardrailError::DirectoryTraversal { .. })
+        ));
 
         let escape3 = canonicalize_safely(Path::new("src/../../../../etc/shadow"), &cwd, &root);
-        assert!(matches!(escape3, Err(GuardrailError::DirectoryTraversal { .. })));
+        assert!(matches!(
+            escape3,
+            Err(GuardrailError::DirectoryTraversal { .. })
+        ));
     }
 
     #[test]
@@ -864,7 +897,10 @@ mod tests {
 
         let malicious = Path::new("/workspace_secret/file.txt");
         let res = canonicalize_safely(malicious, &cwd, &root);
-        assert!(matches!(res, Err(GuardrailError::DirectoryTraversal { .. })));
+        assert!(matches!(
+            res,
+            Err(GuardrailError::DirectoryTraversal { .. })
+        ));
     }
 
     #[test]
@@ -902,7 +938,10 @@ mod tests {
         assert!(read_res.is_ok());
 
         let write_res = guard.validate_write("src/main.rs", &root);
-        assert!(matches!(write_res, Err(GuardrailError::ReadOnlyViolation { .. })));
+        assert!(matches!(
+            write_res,
+            Err(GuardrailError::ReadOnlyViolation { .. })
+        ));
     }
 
     #[test]
@@ -947,7 +986,10 @@ mod tests {
         env.insert("OPENAI_API_KEY".to_string(), "sk-123456789".to_string());
         env.insert("CUSTOM_API_KEY".to_string(), "sec-abcdef".to_string());
         env.insert("APP_SECRET".to_string(), "supersecret".to_string());
-        env.insert("DATABASE_URL".to_string(), "postgres://user:pass@localhost".to_string());
+        env.insert(
+            "DATABASE_URL".to_string(),
+            "postgres://user:pass@localhost".to_string(),
+        );
 
         let (cleaned, report) = scrubber.scrub_with_report(&env);
 
@@ -990,7 +1032,9 @@ mod tests {
 
         // Block raw disk wipe
         assert!(guard.validate_command("mkfs /dev/sda").is_err());
-        assert!(guard.validate_command("dd if=/dev/zero of=/dev/sda").is_err());
+        assert!(guard
+            .validate_command("dd if=/dev/zero of=/dev/sda")
+            .is_err());
 
         // Allow safe commands
         assert!(guard.validate_command("cargo build").is_ok());
@@ -1006,7 +1050,9 @@ mod tests {
 
         // Path check
         assert!(security.validate_read_path("src/main.rs", &root).is_ok());
-        assert!(security.validate_read_path("../../etc/passwd", &root).is_err());
+        assert!(security
+            .validate_read_path("../../etc/passwd", &root)
+            .is_err());
 
         // Env check
         let mut env = HashMap::new();
@@ -1024,7 +1070,8 @@ mod tests {
     #[cfg(unix)]
     #[test]
     fn test_symlink_escape_detection_real_fs() {
-        let temp = std::env::temp_dir().join(format!("fusion_guardrails_test_{}", std::process::id()));
+        let temp =
+            std::env::temp_dir().join(format!("fusion_guardrails_test_{}", std::process::id()));
         let workspace = temp.join("workspace");
         let outside = temp.join("outside");
 
@@ -1056,7 +1103,10 @@ mod tests {
         inherited.insert("PATH".to_string(), "/usr/bin".to_string());
         inherited.insert("HOME".to_string(), "/home/user".to_string());
         inherited.insert("OPENAI_API_KEY".to_string(), "sk-secret-123".to_string());
-        inherited.insert("AWS_SECRET_ACCESS_KEY".to_string(), "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY".to_string());
+        inherited.insert(
+            "AWS_SECRET_ACCESS_KEY".to_string(),
+            "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY".to_string(),
+        );
 
         let mut overrides = HashMap::new();
         overrides.insert("FOO".to_string(), "bar".to_string());
@@ -1105,7 +1155,10 @@ mod tests {
         ];
 
         for key in &test_keys {
-            assert!(scrubber.is_sensitive(key), "Expected sensitive detection for: {key}");
+            assert!(
+                scrubber.is_sensitive(key),
+                "Expected sensitive detection for: {key}"
+            );
         }
     }
 }

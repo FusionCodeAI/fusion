@@ -26,7 +26,9 @@ use ratatui::{
 };
 use serde::{Deserialize, Serialize};
 
-use crate::agent::subagent::{SubagentInfo, SubagentProgress, SubagentRole, SubagentStatus, SubagentTask};
+use crate::agent::subagent::{
+    SubagentInfo, SubagentProgress, SubagentRole, SubagentStatus, SubagentTask,
+};
 use crate::ui::spinner::BRAILLE_FRAMES;
 use crate::ui::table::{get_terminal_width, visible_width};
 use crate::ui::theme::Theme;
@@ -82,7 +84,12 @@ pub struct AgentTreeNode {
 
 impl AgentTreeNode {
     /// Creates a new subagent tree node.
-    pub fn new(id: impl Into<String>, name: impl Into<String>, role: SubagentRole, task: impl Into<String>) -> Self {
+    pub fn new(
+        id: impl Into<String>,
+        name: impl Into<String>,
+        role: SubagentRole,
+        task: impl Into<String>,
+    ) -> Self {
         Self {
             id: id.into(),
             name: name.into(),
@@ -109,36 +116,40 @@ impl AgentTreeNode {
 
     /// Creates a Lead / Coordinator agent node.
     pub fn lead(id: impl Into<String>, name: impl Into<String>, task: impl Into<String>) -> Self {
-        Self::new(id, name, SubagentRole::General, task)
-            .with_tag("lead")
+        Self::new(id, name, SubagentRole::General, task).with_tag("lead")
     }
 
     /// Creates a Scout exploration subagent node.
     pub fn scout(id: impl Into<String>, name: impl Into<String>, task: impl Into<String>) -> Self {
-        Self::new(id, name, SubagentRole::Scout, task)
-            .with_tag("scout")
+        Self::new(id, name, SubagentRole::Scout, task).with_tag("scout")
     }
 
     /// Creates a Coder implementation subagent node.
     pub fn coder(id: impl Into<String>, name: impl Into<String>, task: impl Into<String>) -> Self {
-        Self::new(id, name, SubagentRole::Coder, task)
-            .with_tag("coder")
+        Self::new(id, name, SubagentRole::Coder, task).with_tag("coder")
     }
 
     /// Creates a Tester verification subagent node.
     pub fn tester(id: impl Into<String>, name: impl Into<String>, task: impl Into<String>) -> Self {
-        Self::new(id, name, SubagentRole::Tester, task)
-            .with_tag("tester")
+        Self::new(id, name, SubagentRole::Tester, task).with_tag("tester")
     }
 
     /// Creates a Reviewer / Security subagent node.
-    pub fn reviewer(id: impl Into<String>, name: impl Into<String>, task: impl Into<String>) -> Self {
-        Self::new(id, name, SubagentRole::Reviewer, task)
-            .with_tag("reviewer")
+    pub fn reviewer(
+        id: impl Into<String>,
+        name: impl Into<String>,
+        task: impl Into<String>,
+    ) -> Self {
+        Self::new(id, name, SubagentRole::Reviewer, task).with_tag("reviewer")
     }
 
     /// Creates an Advisor critique node.
-    pub fn advisor(id: impl Into<String>, name: impl Into<String>, focus: impl Into<String>, task: impl Into<String>) -> Self {
+    pub fn advisor(
+        id: impl Into<String>,
+        name: impl Into<String>,
+        focus: impl Into<String>,
+        task: impl Into<String>,
+    ) -> Self {
         let focus_str = focus.into();
         Self::new(
             id,
@@ -154,7 +165,11 @@ impl AgentTreeNode {
     }
 
     /// Creates a general-purpose worker subagent node.
-    pub fn general(id: impl Into<String>, name: impl Into<String>, task: impl Into<String>) -> Self {
+    pub fn general(
+        id: impl Into<String>,
+        name: impl Into<String>,
+        task: impl Into<String>,
+    ) -> Self {
         Self::new(id, name, SubagentRole::General, task)
     }
 
@@ -246,7 +261,9 @@ impl AgentTreeNode {
 
     /// Returns `true` if this agent is the lead / root coordinator.
     pub fn is_lead(&self) -> bool {
-        self.tags.iter().any(|t| t == "lead") || self.name.to_lowercase().contains("lead") || self.name.to_lowercase().contains("coordinator")
+        self.tags.iter().any(|t| t == "lead")
+            || self.name.to_lowercase().contains("lead")
+            || self.name.to_lowercase().contains("coordinator")
     }
 
     /// Returns `true` if this agent is an advisor.
@@ -496,7 +513,11 @@ impl From<&SubagentInfo> for AgentTreeNode {
             if let Ok(completed) = DateTime::parse_from_rfc3339(completed_str) {
                 node.completed_at = Some(completed.with_timezone(&Utc));
                 if let Some(started) = node.started_at {
-                    if let Ok(dur) = completed.with_timezone(&Utc).signed_duration_since(started).to_std() {
+                    if let Ok(dur) = completed
+                        .with_timezone(&Utc)
+                        .signed_duration_since(started)
+                        .to_std()
+                    {
                         node.duration = Some(dur);
                     }
                 }
@@ -546,10 +567,7 @@ impl AgentTree {
 
     /// Creates an agent tree with multiple root agents.
     pub fn with_roots(roots: Vec<AgentTreeNode>) -> Self {
-        Self {
-            roots,
-            title: None,
-        }
+        Self { roots, title: None }
     }
 
     /// Sets the tree title.
@@ -575,7 +593,10 @@ impl AgentTree {
         }
 
         // 2. Recursive helper to attach children from the map
-        fn attach_children(node: &mut AgentTreeNode, map: &mut HashMap<String, Vec<AgentTreeNode>>) {
+        fn attach_children(
+            node: &mut AgentTreeNode,
+            map: &mut HashMap<String, Vec<AgentTreeNode>>,
+        ) {
             if let Some(mut kids) = map.remove(&node.id) {
                 for kid in &mut kids {
                     attach_children(kid, map);
@@ -718,7 +739,9 @@ impl AgentTree {
         };
 
         match progress {
-            SubagentProgress::Started { name, role, task, .. } => {
+            SubagentProgress::Started {
+                name, role, task, ..
+            } => {
                 node.name = name.clone();
                 node.role = role.clone();
                 node.task = task.clone();
@@ -728,7 +751,9 @@ impl AgentTree {
                 };
                 node.started_at = Some(Utc::now());
             }
-            SubagentProgress::TurnStarted { turn, max_turns, .. } => {
+            SubagentProgress::TurnStarted {
+                turn, max_turns, ..
+            } => {
                 node.turns = *turn;
                 node.max_turns = Some(*max_turns);
                 node.status = SubagentStatus::Running {
@@ -754,7 +779,11 @@ impl AgentTree {
                     };
                 }
             }
-            SubagentProgress::Completed { output, turns_taken, .. } => {
+            SubagentProgress::Completed {
+                output,
+                turns_taken,
+                ..
+            } => {
                 node.current_tool = None;
                 node.turns = *turns_taken;
                 node.completed_at = Some(Utc::now());
@@ -890,10 +919,19 @@ impl AgentTree {
     pub fn max_duration(&self) -> Duration {
         fn max_dur(node: &AgentTreeNode) -> Duration {
             let self_dur = node.effective_duration().unwrap_or(Duration::ZERO);
-            let child_max = node.children.iter().map(max_dur).max().unwrap_or(Duration::ZERO);
+            let child_max = node
+                .children
+                .iter()
+                .map(max_dur)
+                .max()
+                .unwrap_or(Duration::ZERO);
             self_dur.max(child_max)
         }
-        self.roots.iter().map(max_dur).max().unwrap_or(Duration::ZERO)
+        self.roots
+            .iter()
+            .map(max_dur)
+            .max()
+            .unwrap_or(Duration::ZERO)
     }
 
     /// Total turn count across all nodes.
@@ -995,7 +1033,10 @@ impl AgentTree {
                 || node.task.to_lowercase().contains(q)
                 || node.role.default_name().to_lowercase().contains(q)
                 || node.tags.iter().any(|t| t.to_lowercase().contains(q))
-                || node.custom_attributes.iter().any(|(k, v)| k.to_lowercase().contains(q) || v.to_lowercase().contains(q))
+                || node
+                    .custom_attributes
+                    .iter()
+                    .any(|(k, v)| k.to_lowercase().contains(q) || v.to_lowercase().contains(q))
             {
                 matches.push(node);
             }
@@ -1013,83 +1054,113 @@ impl AgentTree {
     /// Generates a rich mock multi-agent mesh tree containing Lead Agent, Scout, Coder, Tester, and Advisors.
     pub fn mesh_demo_tree() -> Self {
         // 1. Scout subagent
-        let scout = AgentTreeNode::scout("scout-01", "ArchitectureScout", "Scan src/ directory, identify module graph and layout dependencies")
-            .with_status(SubagentStatus::Completed {
-                output: "Discovered 32 modules with complete cross-references".to_string(),
-                turns: 3,
-            })
-            .with_turns(3, Some(8))
-            .with_duration(Duration::from_millis(1250))
-            .with_token_breakdown(1800, 1400)
-            .with_cost(0.0064);
+        let scout = AgentTreeNode::scout(
+            "scout-01",
+            "ArchitectureScout",
+            "Scan src/ directory, identify module graph and layout dependencies",
+        )
+        .with_status(SubagentStatus::Completed {
+            output: "Discovered 32 modules with complete cross-references".to_string(),
+            turns: 3,
+        })
+        .with_turns(3, Some(8))
+        .with_duration(Duration::from_millis(1250))
+        .with_token_breakdown(1800, 1400)
+        .with_cost(0.0064);
 
         // 2. Tester subagent
-        let tester = AgentTreeNode::tester("tester-01", "RegressionTester", "Run isolated unit tests for widget buffer rendering and state transitions")
-            .with_status(SubagentStatus::Running {
-                turn: 2,
-                current_tool: Some("bash".to_string()),
-            })
-            .with_turns(2, Some(10))
-            .with_tool("bash")
-            .with_token_breakdown(1200, 950)
-            .with_cost(0.0045);
+        let tester = AgentTreeNode::tester(
+            "tester-01",
+            "RegressionTester",
+            "Run isolated unit tests for widget buffer rendering and state transitions",
+        )
+        .with_status(SubagentStatus::Running {
+            turn: 2,
+            current_tool: Some("bash".to_string()),
+        })
+        .with_turns(2, Some(10))
+        .with_tool("bash")
+        .with_token_breakdown(1200, 950)
+        .with_cost(0.0045);
 
         // 3. Reviewer subagent
-        let reviewer = AgentTreeNode::reviewer("review-01", "SecurityReviewer", "Audit buffer slicing for out-of-bounds panics and Unicode width alignment")
-            .with_status(SubagentStatus::Completed {
-                output: "Zero buffer overflows or ANSI injections found".to_string(),
-                turns: 2,
-            })
-            .with_turns(2, Some(5))
-            .with_duration(Duration::from_millis(850))
-            .with_token_breakdown(2100, 1100)
-            .with_cost(0.0058);
+        let reviewer = AgentTreeNode::reviewer(
+            "review-01",
+            "SecurityReviewer",
+            "Audit buffer slicing for out-of-bounds panics and Unicode width alignment",
+        )
+        .with_status(SubagentStatus::Completed {
+            output: "Zero buffer overflows or ANSI injections found".to_string(),
+            turns: 2,
+        })
+        .with_turns(2, Some(5))
+        .with_duration(Duration::from_millis(850))
+        .with_token_breakdown(2100, 1100)
+        .with_cost(0.0058);
 
         // 4. Coder subagent with nested Tester and Reviewer children
-        let coder = AgentTreeNode::coder("coder-01", "WidgetCoder", "Implement Ratatui AgentTreeWidget with animated status spinners and split-pane layout")
-            .with_status(SubagentStatus::Running {
-                turn: 4,
-                current_tool: Some("edit".to_string()),
-            })
-            .with_turns(4, Some(12))
-            .with_tool("edit")
-            .with_token_breakdown(4800, 3600)
-            .with_cost(0.0195)
-            .with_child(tester)
-            .with_child(reviewer);
+        let coder = AgentTreeNode::coder(
+            "coder-01",
+            "WidgetCoder",
+            "Implement Ratatui AgentTreeWidget with animated status spinners and split-pane layout",
+        )
+        .with_status(SubagentStatus::Running {
+            turn: 4,
+            current_tool: Some("edit".to_string()),
+        })
+        .with_turns(4, Some(12))
+        .with_tool("edit")
+        .with_token_breakdown(4800, 3600)
+        .with_cost(0.0195)
+        .with_child(tester)
+        .with_child(reviewer);
 
         // 5. Advisors
-        let sec_advisor = AgentTreeNode::advisor("adv-sec", "SecurityAdvisor", "Security", "Evaluate execution safety and sanitize tool invocation arguments")
-            .with_status(SubagentStatus::Completed {
-                output: "Risk assessed: LOW. Tool sandboxing verified.".to_string(),
-                turns: 1,
-            })
-            .with_duration(Duration::from_millis(600))
-            .with_token_breakdown(1100, 800)
-            .with_cost(0.0035);
+        let sec_advisor = AgentTreeNode::advisor(
+            "adv-sec",
+            "SecurityAdvisor",
+            "Security",
+            "Evaluate execution safety and sanitize tool invocation arguments",
+        )
+        .with_status(SubagentStatus::Completed {
+            output: "Risk assessed: LOW. Tool sandboxing verified.".to_string(),
+            turns: 1,
+        })
+        .with_duration(Duration::from_millis(600))
+        .with_token_breakdown(1100, 800)
+        .with_cost(0.0035);
 
-        let arch_advisor = AgentTreeNode::advisor("adv-arch", "ArchAdvisor", "Architecture", "Review component boundaries and state transition invariants")
-            .with_status(SubagentStatus::Completed {
-                output: "Clean separation between State, Widget, and ANSI formatters.".to_string(),
-                turns: 1,
-            })
-            .with_duration(Duration::from_millis(520))
-            .with_token_breakdown(950, 750)
-            .with_cost(0.0031);
+        let arch_advisor = AgentTreeNode::advisor(
+            "adv-arch",
+            "ArchAdvisor",
+            "Architecture",
+            "Review component boundaries and state transition invariants",
+        )
+        .with_status(SubagentStatus::Completed {
+            output: "Clean separation between State, Widget, and ANSI formatters.".to_string(),
+            turns: 1,
+        })
+        .with_duration(Duration::from_millis(520))
+        .with_token_breakdown(950, 750)
+        .with_cost(0.0031);
 
         // 6. Lead Coordinator Agent (Root)
-        let lead = AgentTreeNode::lead("lead-coord", "Lead Coordinator", "Orchestrate multi-agent swarm for high-speed parallel development")
-            .with_status(SubagentStatus::Running {
-                turn: 5,
-                current_tool: Some("task".to_string()),
-            })
-            .with_turns(5, Some(20))
-            .with_token_breakdown(9200, 6800)
-            .with_cost(0.0385)
-            .with_child(scout)
-            .with_child(coder)
-            .with_child(sec_advisor)
-            .with_child(arch_advisor);
+        let lead = AgentTreeNode::lead(
+            "lead-coord",
+            "Lead Coordinator",
+            "Orchestrate multi-agent swarm for high-speed parallel development",
+        )
+        .with_status(SubagentStatus::Running {
+            turn: 5,
+            current_tool: Some("task".to_string()),
+        })
+        .with_turns(5, Some(20))
+        .with_token_breakdown(9200, 6800)
+        .with_cost(0.0385)
+        .with_child(scout)
+        .with_child(coder)
+        .with_child(sec_advisor)
+        .with_child(arch_advisor);
 
         Self::with_root(lead).with_title("Multi-Agent Swarm Execution Mesh")
     }
@@ -1458,7 +1529,11 @@ pub fn render_tree_ansi(tree: &AgentTree, options: &TreeRenderOptions, theme: &T
 
         let mut summary_parts = Vec::new();
         if running > 0 {
-            let spin = if BRAILLE_FRAMES.is_empty() { "⚡" } else { BRAILLE_FRAMES[options.anim_tick % BRAILLE_FRAMES.len()] };
+            let spin = if BRAILLE_FRAMES.is_empty() {
+                "⚡"
+            } else {
+                BRAILLE_FRAMES[options.anim_tick % BRAILLE_FRAMES.len()]
+            };
             summary_parts.push(if options.use_colors {
                 format!("\x1b[1;36m{spin} {running} running\x1b[0m")
             } else {
@@ -1551,7 +1626,9 @@ fn render_tree_row_ansi(
     theme: &Theme,
     out: &mut String,
 ) {
-    let prefix = options.glyphs.format_prefix(row, options.show_expand_indicators);
+    let prefix = options
+        .glyphs
+        .format_prefix(row, options.show_expand_indicators);
     let node = &row.node;
     let status_icon = node.animated_status_icon(options.anim_tick);
 
@@ -1566,7 +1643,8 @@ fn render_tree_row_ansi(
         ));
 
         // Role icon and name
-        let (role_r, role_g, role_b) = role_color(&node.role, node.is_lead(), node.is_advisor(), theme);
+        let (role_r, role_g, role_b) =
+            role_color(&node.role, node.is_lead(), node.is_advisor(), theme);
         out.push_str(&format!(
             "{} \x1b[1;38;2;{};{};{}m{}\x1b[0m ",
             node.role_icon(),
@@ -1747,8 +1825,16 @@ fn role_color(role: &SubagentRole, is_lead: bool, is_advisor: bool, theme: &Them
         SubagentRole::Coder => (theme.primary.r(), theme.primary.g(), theme.primary.b()),
         SubagentRole::Tester => (theme.accent.r(), theme.accent.g(), theme.accent.b()),
         SubagentRole::Reviewer => (theme.warning.r(), theme.warning.g(), theme.warning.b()),
-        SubagentRole::General => (theme.foreground.r(), theme.foreground.g(), theme.foreground.b()),
-        SubagentRole::Custom { .. } => (theme.secondary.r(), theme.secondary.g(), theme.secondary.b()),
+        SubagentRole::General => (
+            theme.foreground.r(),
+            theme.foreground.g(),
+            theme.foreground.b(),
+        ),
+        SubagentRole::Custom { .. } => (
+            theme.secondary.r(),
+            theme.secondary.g(),
+            theme.secondary.b(),
+        ),
     }
 }
 
@@ -1756,7 +1842,9 @@ fn status_color(status: &SubagentStatus, theme: &Theme) -> (u8, u8, u8) {
     match status {
         SubagentStatus::Pending => (theme.muted.r(), theme.muted.g(), theme.muted.b()),
         SubagentStatus::Running { .. } => (theme.info.r(), theme.info.g(), theme.info.b()),
-        SubagentStatus::Completed { .. } => (theme.success.r(), theme.success.g(), theme.success.b()),
+        SubagentStatus::Completed { .. } => {
+            (theme.success.r(), theme.success.g(), theme.success.b())
+        }
         SubagentStatus::Failed { .. } => (theme.error.r(), theme.error.g(), theme.error.b()),
         SubagentStatus::Cancelled => (theme.warning.r(), theme.warning.g(), theme.warning.b()),
     }
@@ -1894,7 +1982,8 @@ impl AgentTreeState {
     /// Scrolls down by a page.
     pub fn scroll_page_down(&mut self, page_size: usize, total_rows: usize) {
         if total_rows > 0 {
-            self.selected_index = (self.selected_index + page_size).min(total_rows.saturating_sub(1));
+            self.selected_index =
+                (self.selected_index + page_size).min(total_rows.saturating_sub(1));
         }
     }
 
@@ -1919,7 +2008,9 @@ impl AgentTreeState {
 
         match key.code {
             KeyCode::Char('q') | KeyCode::Esc => AgentTreeAction::Close,
-            KeyCode::Char('c') if key.modifiers.contains(KeyModifiers::CONTROL) => AgentTreeAction::Close,
+            KeyCode::Char('c') if key.modifiers.contains(KeyModifiers::CONTROL) => {
+                AgentTreeAction::Close
+            }
 
             // Navigation
             KeyCode::Up | KeyCode::Char('k') => {
@@ -2063,7 +2154,11 @@ impl<'a> StatefulWidget for AgentTreeWidget<'a> {
             block.render(area, buf);
             inner
         } else {
-            let title = self.tree.title.as_deref().unwrap_or("Active Subagents Mesh");
+            let title = self
+                .tree
+                .title
+                .as_deref()
+                .unwrap_or("Active Subagents Mesh");
             let default_block = Block::default()
                 .borders(Borders::ALL)
                 .border_type(BorderType::Rounded)
@@ -2126,7 +2221,10 @@ impl<'a> AgentTreeWidget<'a> {
             state.scroll_offset = state.selected_index.saturating_sub(visible_height - 1);
         }
 
-        for (i, row_idx) in (state.scroll_offset..rows.len()).take(visible_height).enumerate() {
+        for (i, row_idx) in (state.scroll_offset..rows.len())
+            .take(visible_height)
+            .enumerate()
+        {
             let y = area.y + i as u16;
             if y >= area.bottom() {
                 break;
@@ -2151,24 +2249,38 @@ impl<'a> AgentTreeWidget<'a> {
         }
     }
 
-    fn build_row_spans(&self, row: &FlattenedTreeRow, is_selected: bool, max_width: usize, tick: usize) -> Vec<Span<'a>> {
+    fn build_row_spans(
+        &self,
+        row: &FlattenedTreeRow,
+        is_selected: bool,
+        max_width: usize,
+        tick: usize,
+    ) -> Vec<Span<'a>> {
         let mut spans = Vec::new();
         let node = &row.node;
-        let prefix = self.options.glyphs.format_prefix(row, self.options.show_expand_indicators);
+        let prefix = self
+            .options
+            .glyphs
+            .format_prefix(row, self.options.show_expand_indicators);
 
         // 1. Tree Guide Prefix
-        spans.push(Span::styled(
-            prefix,
-            Style::default().fg(self.theme.border),
-        ));
+        spans.push(Span::styled(prefix, Style::default().fg(self.theme.border)));
 
         // 2. Role Icon & Name
-        let role_color = role_to_ratatui_color(&node.role, node.is_lead(), node.is_advisor(), self.theme);
+        let role_color =
+            role_to_ratatui_color(&node.role, node.is_lead(), node.is_advisor(), self.theme);
         let role_style = Style::default()
             .fg(role_color)
-            .add_modifier(if is_selected { Modifier::BOLD } else { Modifier::empty() });
+            .add_modifier(if is_selected {
+                Modifier::BOLD
+            } else {
+                Modifier::empty()
+            });
 
-        spans.push(Span::styled(format!("{} ", node.role_icon()), Style::default()));
+        spans.push(Span::styled(
+            format!("{} ", node.role_icon()),
+            Style::default(),
+        ));
         spans.push(Span::styled(format!("{} ", node.name), role_style));
 
         // 3. Status Badge with Animated Icon
@@ -2178,11 +2290,17 @@ impl<'a> AgentTreeWidget<'a> {
             .add_modifier(Modifier::BOLD);
 
         let status_glyph = node.animated_status_icon(tick);
-        spans.push(Span::styled(format!("{status_glyph} [{}] ", node.status_label()), status_style));
+        spans.push(Span::styled(
+            format!("{status_glyph} [{}] ", node.status_label()),
+            status_style,
+        ));
 
         // 4. Status summary
         let summary_style = Style::default().fg(status_color);
-        spans.push(Span::styled(format!("{} ", node.status_summary()), summary_style));
+        spans.push(Span::styled(
+            format!("{} ", node.status_summary()),
+            summary_style,
+        ));
 
         // 5. Metrics (Token usage & Execution time)
         if self.options.show_metrics {
@@ -2238,10 +2356,16 @@ impl<'a> AgentTreeWidget<'a> {
         let mut lines = Vec::new();
 
         // 1. Header Identifiers
-        let role_col = role_to_ratatui_color(&node.role, node.is_lead(), node.is_advisor(), self.theme);
+        let role_col =
+            role_to_ratatui_color(&node.role, node.is_lead(), node.is_advisor(), self.theme);
         lines.push(Line::from(vec![
             Span::styled("ID: ", Style::default().fg(self.theme.muted)),
-            Span::styled(&node.id, Style::default().fg(self.theme.foreground).add_modifier(Modifier::BOLD)),
+            Span::styled(
+                &node.id,
+                Style::default()
+                    .fg(self.theme.foreground)
+                    .add_modifier(Modifier::BOLD),
+            ),
             Span::styled("  Role: ", Style::default().fg(self.theme.muted)),
             Span::styled(
                 format!("{} {}", node.role_icon(), node.role_badge()),
@@ -2256,51 +2380,90 @@ impl<'a> AgentTreeWidget<'a> {
             Span::styled("Status: ", Style::default().fg(self.theme.muted)),
             Span::styled(
                 format!("{anim_icon} {}", node.status_label()),
-                Style::default()
-                    .fg(status_col)
-                    .add_modifier(Modifier::BOLD),
+                Style::default().fg(status_col).add_modifier(Modifier::BOLD),
             ),
-            Span::styled(format!(" ({})", node.status_summary()), Style::default().fg(self.theme.muted)),
+            Span::styled(
+                format!(" ({})", node.status_summary()),
+                Style::default().fg(self.theme.muted),
+            ),
         ]));
 
         if let Some(tool) = &node.current_tool {
             lines.push(Line::from(vec![
                 Span::styled("Active Tool: ", Style::default().fg(self.theme.muted)),
-                Span::styled(tool, Style::default().fg(self.theme.warning).add_modifier(Modifier::BOLD)),
+                Span::styled(
+                    tool,
+                    Style::default()
+                        .fg(self.theme.warning)
+                        .add_modifier(Modifier::BOLD),
+                ),
             ]));
         }
 
         // 3. Execution & Token Metrics
         let mut metric_spans = Vec::new();
-        metric_spans.push(Span::styled("Turns: ", Style::default().fg(self.theme.muted)));
+        metric_spans.push(Span::styled(
+            "Turns: ",
+            Style::default().fg(self.theme.muted),
+        ));
         if let Some(max) = node.max_turns {
-            metric_spans.push(Span::styled(format!("{}/{}  ", node.turns, max), Style::default().fg(self.theme.foreground)));
+            metric_spans.push(Span::styled(
+                format!("{}/{}  ", node.turns, max),
+                Style::default().fg(self.theme.foreground),
+            ));
         } else {
-            metric_spans.push(Span::styled(format!("{}  ", node.turns), Style::default().fg(self.theme.foreground)));
+            metric_spans.push(Span::styled(
+                format!("{}  ", node.turns),
+                Style::default().fg(self.theme.foreground),
+            ));
         }
 
         if let Some(dur_str) = node.formatted_duration() {
-            metric_spans.push(Span::styled("Duration: ", Style::default().fg(self.theme.muted)));
-            metric_spans.push(Span::styled(format!("{dur_str}  "), Style::default().fg(self.theme.info)));
+            metric_spans.push(Span::styled(
+                "Duration: ",
+                Style::default().fg(self.theme.muted),
+            ));
+            metric_spans.push(Span::styled(
+                format!("{dur_str}  "),
+                Style::default().fg(self.theme.info),
+            ));
         }
 
         if let Some(tokens) = node.tokens_used {
-            metric_spans.push(Span::styled("Tokens: ", Style::default().fg(self.theme.muted)));
+            metric_spans.push(Span::styled(
+                "Tokens: ",
+                Style::default().fg(self.theme.muted),
+            ));
             let tok_detail = match (node.prompt_tokens, node.completion_tokens) {
                 (Some(p), Some(c)) => format!("{tokens} (p:{p}, c:{c})  "),
                 _ => format!("{tokens}  "),
             };
-            metric_spans.push(Span::styled(tok_detail, Style::default().fg(self.theme.foreground)));
+            metric_spans.push(Span::styled(
+                tok_detail,
+                Style::default().fg(self.theme.foreground),
+            ));
         }
 
         if let Some(tps) = node.tokens_per_second() {
-            metric_spans.push(Span::styled("Speed: ", Style::default().fg(self.theme.muted)));
-            metric_spans.push(Span::styled(format!("{tps:.1} tok/s  "), Style::default().fg(self.theme.primary)));
+            metric_spans.push(Span::styled(
+                "Speed: ",
+                Style::default().fg(self.theme.muted),
+            ));
+            metric_spans.push(Span::styled(
+                format!("{tps:.1} tok/s  "),
+                Style::default().fg(self.theme.primary),
+            ));
         }
 
         if let Some(cost) = node.cost_usd {
-            metric_spans.push(Span::styled("Cost: ", Style::default().fg(self.theme.muted)));
-            metric_spans.push(Span::styled(format!("${cost:.4}  "), Style::default().fg(self.theme.success)));
+            metric_spans.push(Span::styled(
+                "Cost: ",
+                Style::default().fg(self.theme.muted),
+            ));
+            metric_spans.push(Span::styled(
+                format!("${cost:.4}  "),
+                Style::default().fg(self.theme.success),
+            ));
         }
 
         lines.push(Line::from(metric_spans));
@@ -2309,13 +2472,30 @@ impl<'a> AgentTreeWidget<'a> {
         if !node.tags.is_empty() || !node.custom_attributes.is_empty() {
             let mut meta_spans = Vec::new();
             if !node.tags.is_empty() {
-                let tag_str = node.tags.iter().map(|t| format!("#{t}")).collect::<Vec<_>>().join(" ");
-                meta_spans.push(Span::styled("Tags: ", Style::default().fg(self.theme.muted)));
-                meta_spans.push(Span::styled(format!("{tag_str}  "), Style::default().fg(self.theme.info)));
+                let tag_str = node
+                    .tags
+                    .iter()
+                    .map(|t| format!("#{t}"))
+                    .collect::<Vec<_>>()
+                    .join(" ");
+                meta_spans.push(Span::styled(
+                    "Tags: ",
+                    Style::default().fg(self.theme.muted),
+                ));
+                meta_spans.push(Span::styled(
+                    format!("{tag_str}  "),
+                    Style::default().fg(self.theme.info),
+                ));
             }
             for (k, v) in &node.custom_attributes {
-                meta_spans.push(Span::styled(format!("{k}: "), Style::default().fg(self.theme.muted)));
-                meta_spans.push(Span::styled(format!("{v}  "), Style::default().fg(self.theme.foreground)));
+                meta_spans.push(Span::styled(
+                    format!("{k}: "),
+                    Style::default().fg(self.theme.muted),
+                ));
+                meta_spans.push(Span::styled(
+                    format!("{v}  "),
+                    Style::default().fg(self.theme.foreground),
+                ));
             }
             lines.push(Line::from(meta_spans));
         }
@@ -2325,7 +2505,9 @@ impl<'a> AgentTreeWidget<'a> {
         // 5. Assigned Task Prompt
         lines.push(Line::from(Span::styled(
             "── Assigned Task ──",
-            Style::default().fg(self.theme.primary).add_modifier(Modifier::BOLD),
+            Style::default()
+                .fg(self.theme.primary)
+                .add_modifier(Modifier::BOLD),
         )));
         lines.push(Line::from(Span::styled(
             &node.task,
@@ -2337,7 +2519,9 @@ impl<'a> AgentTreeWidget<'a> {
             lines.push(Line::from(""));
             lines.push(Line::from(Span::styled(
                 "── Output Summary ──",
-                Style::default().fg(self.theme.success).add_modifier(Modifier::BOLD),
+                Style::default()
+                    .fg(self.theme.success)
+                    .add_modifier(Modifier::BOLD),
             )));
             lines.push(Line::from(Span::styled(
                 output,
@@ -2347,7 +2531,9 @@ impl<'a> AgentTreeWidget<'a> {
             lines.push(Line::from(""));
             lines.push(Line::from(Span::styled(
                 "── Error Detail ──",
-                Style::default().fg(self.theme.error).add_modifier(Modifier::BOLD),
+                Style::default()
+                    .fg(self.theme.error)
+                    .add_modifier(Modifier::BOLD),
             )));
             lines.push(Line::from(Span::styled(
                 error,
@@ -2360,7 +2546,12 @@ impl<'a> AgentTreeWidget<'a> {
     }
 }
 
-fn role_to_ratatui_color(role: &SubagentRole, is_lead: bool, is_advisor: bool, theme: &Theme) -> Color {
+fn role_to_ratatui_color(
+    role: &SubagentRole,
+    is_lead: bool,
+    is_advisor: bool,
+    theme: &Theme,
+) -> Color {
     if is_lead {
         return theme.primary;
     }
@@ -2397,16 +2588,21 @@ mod tests {
 
     #[test]
     fn test_node_creation_and_builders() {
-        let node = AgentTreeNode::new("a1", "Worker-1", SubagentRole::Coder, "Refactor database models")
-            .with_status(SubagentStatus::Running {
-                turn: 2,
-                current_tool: Some("edit".to_string()),
-            })
-            .with_turns(2, Some(10))
-            .with_token_breakdown(1000, 500)
-            .with_cost(0.003)
-            .with_duration(Duration::from_millis(1500))
-            .with_tag("backend");
+        let node = AgentTreeNode::new(
+            "a1",
+            "Worker-1",
+            SubagentRole::Coder,
+            "Refactor database models",
+        )
+        .with_status(SubagentStatus::Running {
+            turn: 2,
+            current_tool: Some("edit".to_string()),
+        })
+        .with_turns(2, Some(10))
+        .with_token_breakdown(1000, 500)
+        .with_cost(0.003)
+        .with_duration(Duration::from_millis(1500))
+        .with_tag("backend");
 
         assert_eq!(node.id, "a1");
         assert_eq!(node.name, "Worker-1");
@@ -2462,28 +2658,32 @@ mod tests {
 
     #[test]
     fn test_animated_status_indicators() {
-        let running_node = AgentTreeNode::coder("c1", "Builder", "Compile").with_status(SubagentStatus::Running {
-            turn: 1,
-            current_tool: None,
-        });
+        let running_node =
+            AgentTreeNode::coder("c1", "Builder", "Compile").with_status(SubagentStatus::Running {
+                turn: 1,
+                current_tool: None,
+            });
 
         assert_eq!(running_node.animated_status_icon(0), "⠋");
         assert_eq!(running_node.animated_status_icon(1), "⠙");
         assert_eq!(running_node.animated_status_icon(2), "⠹");
 
-        let done_node = AgentTreeNode::tester("t1", "Tester", "Pass").with_status(SubagentStatus::Completed {
-            output: "Passed".to_string(),
-            turns: 1,
-        });
+        let done_node =
+            AgentTreeNode::tester("t1", "Tester", "Pass").with_status(SubagentStatus::Completed {
+                output: "Passed".to_string(),
+                turns: 1,
+            });
         assert_eq!(done_node.animated_status_icon(0), "✓");
         assert_eq!(done_node.animated_status_icon(5), "✓");
 
-        let fail_node = AgentTreeNode::tester("t2", "Tester", "Fail").with_status(SubagentStatus::Failed {
-            error: "Broken".to_string(),
-        });
+        let fail_node =
+            AgentTreeNode::tester("t2", "Tester", "Fail").with_status(SubagentStatus::Failed {
+                error: "Broken".to_string(),
+            });
         assert_eq!(fail_node.animated_status_icon(0), "✗");
 
-        let cancel_node = AgentTreeNode::general("c1", "Worker", "Cancel").with_status(SubagentStatus::Cancelled);
+        let cancel_node =
+            AgentTreeNode::general("c1", "Worker", "Cancel").with_status(SubagentStatus::Cancelled);
         assert_eq!(cancel_node.animated_status_icon(0), "⊘");
 
         let pending_node = AgentTreeNode::general("g1", "Worker", "Wait");
@@ -2538,8 +2738,8 @@ mod tests {
     fn test_flatten_visible_prefixes_and_box_drawing() {
         let grandchild = AgentTreeNode::reviewer("gc", "Reviewer", "Review code");
         let child1 = AgentTreeNode::scout("c1", "Scout", "Search code");
-        let child2 = AgentTreeNode::coder("c2", "Coder", "Implement feature")
-            .with_child(grandchild);
+        let child2 =
+            AgentTreeNode::coder("c2", "Coder", "Implement feature").with_child(grandchild);
 
         let root = AgentTreeNode::lead("root", "Coordinator", "Manage project")
             .with_child(child1)
@@ -2750,7 +2950,8 @@ mod tests {
 
     #[test]
     fn test_progress_event_updates() {
-        let mut tree = AgentTree::with_root(AgentTreeNode::coder("worker-1", "Worker", "Initial task"));
+        let mut tree =
+            AgentTree::with_root(AgentTreeNode::coder("worker-1", "Worker", "Initial task"));
 
         let start_ev = SubagentProgress::Started {
             id: "worker-1".to_string(),
@@ -2827,7 +3028,10 @@ mod tests {
 
         let tab_key = KeyEvent::new(KeyCode::Tab, KeyModifiers::empty());
         let action = state.handle_key(tab_key, &mut tree);
-        assert_eq!(action, AgentTreeAction::ViewModeChanged(TreeViewMode::SplitWithDetails));
+        assert_eq!(
+            action,
+            AgentTreeAction::ViewModeChanged(TreeViewMode::SplitWithDetails)
+        );
 
         let enter_key = KeyEvent::new(KeyCode::Enter, KeyModifiers::empty());
         let action = state.handle_key(enter_key, &mut tree);

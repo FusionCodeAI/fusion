@@ -90,19 +90,23 @@ impl SqlValue {
             (SqlValue::Real(a), SqlValue::Real(b)) => {
                 a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal)
             }
-            (SqlValue::Integer(a), SqlValue::Real(b)) => {
-                (*a as f64).partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal)
-            }
-            (SqlValue::Real(a), SqlValue::Integer(b)) => {
-                a.partial_cmp(&(*b as f64)).unwrap_or(std::cmp::Ordering::Equal)
-            }
+            (SqlValue::Integer(a), SqlValue::Real(b)) => (*a as f64)
+                .partial_cmp(b)
+                .unwrap_or(std::cmp::Ordering::Equal),
+            (SqlValue::Real(a), SqlValue::Integer(b)) => a
+                .partial_cmp(&(*b as f64))
+                .unwrap_or(std::cmp::Ordering::Equal),
 
             (SqlValue::Text(a), SqlValue::Text(b)) => a.cmp(b),
             (SqlValue::Blob(a), SqlValue::Blob(b)) => a.cmp(b),
 
             // SQLite type sorting affinity: NULL < Numbers < Text < Blob
-            (SqlValue::Integer(_) | SqlValue::Real(_), SqlValue::Text(_)) => std::cmp::Ordering::Less,
-            (SqlValue::Text(_), SqlValue::Integer(_) | SqlValue::Real(_)) => std::cmp::Ordering::Greater,
+            (SqlValue::Integer(_) | SqlValue::Real(_), SqlValue::Text(_)) => {
+                std::cmp::Ordering::Less
+            }
+            (SqlValue::Text(_), SqlValue::Integer(_) | SqlValue::Real(_)) => {
+                std::cmp::Ordering::Greater
+            }
             (SqlValue::Blob(_), _) => std::cmp::Ordering::Greater,
             (_, SqlValue::Blob(_)) => std::cmp::Ordering::Less,
         }
@@ -176,17 +180,27 @@ impl SqliteHeader {
             max_payload_fraction: header[21],
             min_payload_fraction: header[22],
             leaf_payload_fraction: header[23],
-            file_change_counter: u32::from_be_bytes([header[24], header[25], header[26], header[27]]),
+            file_change_counter: u32::from_be_bytes([
+                header[24], header[25], header[26], header[27],
+            ]),
             db_size_in_pages: u32::from_be_bytes([header[28], header[29], header[30], header[31]]),
-            first_freelist_trunk_page: u32::from_be_bytes([header[32], header[33], header[34], header[35]]),
-            total_freelist_pages: u32::from_be_bytes([header[36], header[37], header[38], header[39]]),
+            first_freelist_trunk_page: u32::from_be_bytes([
+                header[32], header[33], header[34], header[35],
+            ]),
+            total_freelist_pages: u32::from_be_bytes([
+                header[36], header[37], header[38], header[39],
+            ]),
             schema_cookie: u32::from_be_bytes([header[40], header[41], header[42], header[43]]),
             schema_format: u32::from_be_bytes([header[44], header[45], header[46], header[47]]),
-            default_page_cache_size: u32::from_be_bytes([header[48], header[49], header[50], header[51]]),
+            default_page_cache_size: u32::from_be_bytes([
+                header[48], header[49], header[50], header[51],
+            ]),
             largest_root_page: u32::from_be_bytes([header[52], header[53], header[54], header[55]]),
             text_encoding: u32::from_be_bytes([header[56], header[57], header[58], header[59]]),
             user_version: u32::from_be_bytes([header[60], header[61], header[62], header[63]]),
-            incremental_vacuum_mode: u32::from_be_bytes([header[64], header[65], header[66], header[67]]),
+            incremental_vacuum_mode: u32::from_be_bytes([
+                header[64], header[65], header[66], header[67],
+            ]),
             application_id: u32::from_be_bytes([header[68], header[69], header[70], header[71]]),
             version_valid_for: u32::from_be_bytes([header[92], header[93], header[94], header[95]]),
             sqlite_version: u32::from_be_bytes([header[96], header[97], header[98], header[99]]),
@@ -265,7 +279,9 @@ pub struct SqliteReader<'a> {
 impl<'a> SqliteReader<'a> {
     pub fn new(data: &'a [u8]) -> anyhow::Result<Self> {
         let header = SqliteHeader::parse(data)?;
-        let usable_page_size = header.page_size.saturating_sub(header.reserved_space as u32);
+        let usable_page_size = header
+            .page_size
+            .saturating_sub(header.reserved_space as u32);
         if usable_page_size < 480 {
             anyhow::bail!("Usable page size is too small: {}", usable_page_size);
         }
@@ -284,7 +300,12 @@ impl<'a> SqliteReader<'a> {
         let start = (page_num as usize - 1) * page_size;
         let end = start + page_size;
         if start >= self.data.len() {
-            anyhow::bail!("Page {} is out of file bounds (file size: {} bytes, page offset: {})", page_num, self.data.len(), start);
+            anyhow::bail!(
+                "Page {} is out of file bounds (file size: {} bytes, page offset: {})",
+                page_num,
+                self.data.len(),
+                start
+            );
         }
         let actual_end = end.min(self.data.len());
         Ok(&self.data[start..actual_end])
@@ -295,7 +316,10 @@ impl<'a> SqliteReader<'a> {
         let mut bytes_read = 0;
         while bytes_read < 8 {
             if *offset >= data.len() {
-                anyhow::bail!("Unexpected end of data while reading varint at offset {}", *offset);
+                anyhow::bail!(
+                    "Unexpected end of data while reading varint at offset {}",
+                    *offset
+                );
             }
             let b = data[*offset];
             *offset += 1;
@@ -306,7 +330,10 @@ impl<'a> SqliteReader<'a> {
             }
         }
         if *offset >= data.len() {
-            anyhow::bail!("Unexpected end of data for 9th byte of varint at offset {}", *offset);
+            anyhow::bail!(
+                "Unexpected end of data for 9th byte of varint at offset {}",
+                *offset
+            );
         }
         let b = data[*offset];
         *offset += 1;
@@ -347,7 +374,9 @@ impl<'a> SqliteReader<'a> {
                     if body_offset + 2 > payload.len() {
                         values.push(SqlValue::Null);
                     } else {
-                        let val = i16::from_be_bytes([payload[body_offset], payload[body_offset + 1]]) as i64;
+                        let val =
+                            i16::from_be_bytes([payload[body_offset], payload[body_offset + 1]])
+                                as i64;
                         body_offset += 2;
                         values.push(SqlValue::Integer(val));
                     }
@@ -450,7 +479,9 @@ impl<'a> SqliteReader<'a> {
                         body_offset = payload.len();
                         values.push(SqlValue::Text(text));
                     } else {
-                        let text = String::from_utf8_lossy(&payload[body_offset..body_offset + len]).to_string();
+                        let text =
+                            String::from_utf8_lossy(&payload[body_offset..body_offset + len])
+                                .to_string();
                         body_offset += len;
                         values.push(SqlValue::Text(text));
                     }
@@ -462,20 +493,28 @@ impl<'a> SqliteReader<'a> {
         Ok(values)
     }
 
-    fn read_overflow_chain(&self, mut overflow_page_num: u32, needed_bytes: usize) -> anyhow::Result<Vec<u8>> {
+    fn read_overflow_chain(
+        &self,
+        mut overflow_page_num: u32,
+        needed_bytes: usize,
+    ) -> anyhow::Result<Vec<u8>> {
         let mut overflow_bytes = Vec::with_capacity(needed_bytes);
         let u = self.usable_page_size as usize;
         let mut visited = std::collections::HashSet::new();
 
         while overflow_page_num != 0 && overflow_bytes.len() < needed_bytes {
             if !visited.insert(overflow_page_num) {
-                anyhow::bail!("Detected cycle in overflow page chain at page {}", overflow_page_num);
+                anyhow::bail!(
+                    "Detected cycle in overflow page chain at page {}",
+                    overflow_page_num
+                );
             }
             let page_data = self.get_page(overflow_page_num)?;
             if page_data.len() < 4 {
                 break;
             }
-            let next_page = u32::from_be_bytes([page_data[0], page_data[1], page_data[2], page_data[3]]);
+            let next_page =
+                u32::from_be_bytes([page_data[0], page_data[1], page_data[2], page_data[3]]);
             let payload_in_page = &page_data[4..page_data.len().min(u)];
             let remaining = needed_bytes - overflow_bytes.len();
             let take = payload_in_page.len().min(remaining);
@@ -486,9 +525,17 @@ impl<'a> SqliteReader<'a> {
         Ok(overflow_bytes)
     }
 
-    fn read_table_leaf_cell(&self, page: &[u8], cell_offset: usize) -> anyhow::Result<(i64, Vec<u8>)> {
+    fn read_table_leaf_cell(
+        &self,
+        page: &[u8],
+        cell_offset: usize,
+    ) -> anyhow::Result<(i64, Vec<u8>)> {
         if cell_offset >= page.len() {
-            anyhow::bail!("Cell offset {} beyond page size {}", cell_offset, page.len());
+            anyhow::bail!(
+                "Cell offset {} beyond page size {}",
+                cell_offset,
+                page.len()
+            );
         }
         let mut offset = cell_offset;
         let payload_size = Self::read_varint(page, &mut offset)? as usize;
@@ -523,7 +570,8 @@ impl<'a> SqliteReader<'a> {
                     page[offset + 3],
                 ]);
                 let remaining_needed = payload_size.saturating_sub(payload.len());
-                let overflow_data = self.read_overflow_chain(overflow_page_num, remaining_needed)?;
+                let overflow_data =
+                    self.read_overflow_chain(overflow_page_num, remaining_needed)?;
                 payload.extend_from_slice(&overflow_data);
             }
         }
@@ -600,10 +648,9 @@ impl<'a> SqliteReader<'a> {
         }
 
         let page_type = page[page_header_offset];
-        let num_cells = u16::from_be_bytes([
-            page[page_header_offset + 3],
-            page[page_header_offset + 4],
-        ]) as usize;
+        let num_cells =
+            u16::from_be_bytes([page[page_header_offset + 3], page[page_header_offset + 4]])
+                as usize;
 
         match page_type {
             0x0D => {
@@ -614,7 +661,8 @@ impl<'a> SqliteReader<'a> {
                     if ptr_pos + 2 > page.len() {
                         break;
                     }
-                    let cell_offset = u16::from_be_bytes([page[ptr_pos], page[ptr_pos + 1]]) as usize;
+                    let cell_offset =
+                        u16::from_be_bytes([page[ptr_pos], page[ptr_pos + 1]]) as usize;
                     if let Ok((rowid, payload)) = self.read_table_leaf_cell(page, cell_offset) {
                         if let Ok(values) = self.parse_record(&payload) {
                             rows.push(Row {
@@ -645,7 +693,8 @@ impl<'a> SqliteReader<'a> {
                     if ptr_pos + 2 > page.len() {
                         break;
                     }
-                    let cell_offset = u16::from_be_bytes([page[ptr_pos], page[ptr_pos + 1]]) as usize;
+                    let cell_offset =
+                        u16::from_be_bytes([page[ptr_pos], page[ptr_pos + 1]]) as usize;
                     if cell_offset + 4 <= page.len() {
                         let left_child = u32::from_be_bytes([
                             page[cell_offset],
@@ -775,7 +824,12 @@ pub fn parse_columns_from_ddl(sql: &str) -> Vec<ColumnDef> {
 
         let dflt_value = if let Some(def_pos) = upper.find("DEFAULT") {
             let rest = col_sql[def_pos + 7..].trim();
-            let def_val = rest.split_whitespace().next().unwrap_or("").trim_matches('\'').to_string();
+            let def_val = rest
+                .split_whitespace()
+                .next()
+                .unwrap_or("")
+                .trim_matches('\'')
+                .to_string();
             Some(def_val)
         } else {
             None
@@ -1025,7 +1079,9 @@ impl<'a> SqlEngine<'a> {
     }
 
     fn execute_pragma_table_info(&self, table_name: &str) -> anyhow::Result<QueryResult> {
-        let schema = self.reader.get_table_schema(table_name)?
+        let schema = self
+            .reader
+            .get_table_schema(table_name)?
             .ok_or_else(|| anyhow::anyhow!("Table '{}' not found", table_name))?;
 
         let mut rows = Vec::new();
@@ -1064,7 +1120,10 @@ impl<'a> SqlEngine<'a> {
                 let mut out_cols = Vec::new();
                 let mut out_row = Vec::new();
                 for (i, item) in query.items.iter().enumerate() {
-                    let col_name = item.alias.clone().unwrap_or_else(|| format!("col_{}", i + 1));
+                    let col_name = item
+                        .alias
+                        .clone()
+                        .unwrap_or_else(|| format!("col_{}", i + 1));
                     out_cols.push(col_name);
                     let val = eval_expr(&item.expr, &[], &HashMap::new(), None)?;
                     out_row.push(val);
@@ -1077,13 +1136,16 @@ impl<'a> SqlEngine<'a> {
         };
 
         // Check if querying sqlite_master or sqlite_schema
-        if table_name.eq_ignore_ascii_case("sqlite_master") || table_name.eq_ignore_ascii_case("sqlite_schema") {
+        if table_name.eq_ignore_ascii_case("sqlite_master")
+            || table_name.eq_ignore_ascii_case("sqlite_schema")
+        {
             return self.execute_select_sqlite_master(query);
         }
 
         // Get table schema
-        let schema = self.reader.get_table_schema(table_name)?
-            .ok_or_else(|| anyhow::anyhow!("Table or view '{}' not found in database", table_name))?;
+        let schema = self.reader.get_table_schema(table_name)?.ok_or_else(|| {
+            anyhow::anyhow!("Table or view '{}' not found in database", table_name)
+        })?;
 
         // Read raw rows
         let raw_rows = self.reader.read_table_rows(schema.rootpage)?;
@@ -1095,7 +1157,10 @@ impl<'a> SqlEngine<'a> {
         }
 
         // Find primary key integer alias column (e.g. INTEGER PRIMARY KEY)
-        let ipk_cid = schema.columns.iter().position(|c| c.pk && c.data_type.eq_ignore_ascii_case("INTEGER"));
+        let ipk_cid = schema
+            .columns
+            .iter()
+            .position(|c| c.pk && c.data_type.eq_ignore_ascii_case("INTEGER"));
 
         // Evaluate WHERE filter
         let mut filtered_rows = Vec::new();
@@ -1133,8 +1198,10 @@ impl<'a> SqlEngine<'a> {
         if !query.order_by.is_empty() {
             filtered_rows.sort_by(|a, b| {
                 for order_item in &query.order_by {
-                    let val_a = eval_expr(&order_item.expr, &a.1, &col_map, a.0).unwrap_or(SqlValue::Null);
-                    let val_b = eval_expr(&order_item.expr, &b.1, &col_map, b.0).unwrap_or(SqlValue::Null);
+                    let val_a =
+                        eval_expr(&order_item.expr, &a.1, &col_map, a.0).unwrap_or(SqlValue::Null);
+                    let val_b =
+                        eval_expr(&order_item.expr, &b.1, &col_map, b.0).unwrap_or(SqlValue::Null);
                     let mut ord = val_a.compare(&val_b);
                     if order_item.descending {
                         ord = ord.reverse();
@@ -1259,7 +1326,10 @@ impl<'a> SqlEngine<'a> {
                     continue;
                 }
             }
-            let name = item.alias.clone().unwrap_or_else(|| expr_to_column_name(&item.expr, i));
+            let name = item
+                .alias
+                .clone()
+                .unwrap_or_else(|| expr_to_column_name(&item.expr, i));
             out_cols.push(name);
         }
 
@@ -1296,34 +1366,38 @@ impl<'a> SqlEngine<'a> {
         let mut out_values = Vec::new();
 
         for (i, item) in query.items.iter().enumerate() {
-            let col_name = item.alias.clone().unwrap_or_else(|| expr_to_column_name(&item.expr, i));
+            let col_name = item
+                .alias
+                .clone()
+                .unwrap_or_else(|| expr_to_column_name(&item.expr, i));
             out_cols.push(col_name);
 
             let val = match &item.expr {
                 Expr::FunctionCall { name, arg } => {
                     let fn_upper = name.to_uppercase();
                     match fn_upper.as_str() {
-                        "COUNT" => {
-                            match arg {
-                                None => SqlValue::Integer(rows.len() as i64),
-                                Some(inner) => {
-                                    if let Expr::Column(c) = &**inner {
-                                        if c == "*" {
-                                            SqlValue::Integer(rows.len() as i64)
-                                        } else {
-                                            let count = rows.iter().filter(|(rowid, vals)| {
+                        "COUNT" => match arg {
+                            None => SqlValue::Integer(rows.len() as i64),
+                            Some(inner) => {
+                                if let Expr::Column(c) = &**inner {
+                                    if c == "*" {
+                                        SqlValue::Integer(rows.len() as i64)
+                                    } else {
+                                        let count = rows
+                                            .iter()
+                                            .filter(|(rowid, vals)| {
                                                 eval_expr(inner, vals, col_map, *rowid)
                                                     .map(|v| !v.is_null())
                                                     .unwrap_or(false)
-                                            }).count();
-                                            SqlValue::Integer(count as i64)
-                                        }
-                                    } else {
-                                        SqlValue::Integer(rows.len() as i64)
+                                            })
+                                            .count();
+                                        SqlValue::Integer(count as i64)
                                     }
+                                } else {
+                                    SqlValue::Integer(rows.len() as i64)
                                 }
                             }
-                        }
+                        },
                         "SUM" => {
                             if let Some(inner) = arg {
                                 let mut sum_f = 0.0;
@@ -1383,7 +1457,8 @@ impl<'a> SqlEngine<'a> {
                                             min_val = match min_val {
                                                 None => Some(v),
                                                 Some(curr) => {
-                                                    if v.compare(&curr) == std::cmp::Ordering::Less {
+                                                    if v.compare(&curr) == std::cmp::Ordering::Less
+                                                    {
                                                         Some(v)
                                                     } else {
                                                         Some(curr)
@@ -1407,7 +1482,9 @@ impl<'a> SqlEngine<'a> {
                                             max_val = match max_val {
                                                 None => Some(v),
                                                 Some(curr) => {
-                                                    if v.compare(&curr) == std::cmp::Ordering::Greater {
+                                                    if v.compare(&curr)
+                                                        == std::cmp::Ordering::Greater
+                                                    {
                                                         Some(v)
                                                     } else {
                                                         Some(curr)
@@ -1616,11 +1693,16 @@ fn eval_expr(
                         let v = eval_expr(a, values, col_map, rowid)?;
                         match v {
                             SqlValue::Blob(b) => {
-                                let hex_s: String = b.iter().map(|byte| format!("{:02X}", byte)).collect();
+                                let hex_s: String =
+                                    b.iter().map(|byte| format!("{:02X}", byte)).collect();
                                 Ok(SqlValue::Text(hex_s))
                             }
                             SqlValue::Text(s) => {
-                                let hex_s: String = s.as_bytes().iter().map(|byte| format!("{:02X}", byte)).collect();
+                                let hex_s: String = s
+                                    .as_bytes()
+                                    .iter()
+                                    .map(|byte| format!("{:02X}", byte))
+                                    .collect();
                                 Ok(SqlValue::Text(hex_s))
                             }
                             _ => Ok(SqlValue::Null),
@@ -1694,7 +1776,11 @@ fn eval_bool_expr(
             let v = eval_expr(inner, values, col_map, rowid)?;
             Ok(!v.is_null())
         }
-        Expr::Like { expr: inner, pattern, negated } => {
+        Expr::Like {
+            expr: inner,
+            pattern,
+            negated,
+        } => {
             let v = eval_expr(inner, values, col_map, rowid)?;
             let p = eval_expr(pattern, values, col_map, rowid)?;
             if v.is_null() || p.is_null() {
@@ -1705,7 +1791,12 @@ fn eval_bool_expr(
             let matched = sql_like_match(&pat, &s);
             Ok(if *negated { !matched } else { matched })
         }
-        Expr::Between { expr: inner, low, high, negated } => {
+        Expr::Between {
+            expr: inner,
+            low,
+            high,
+            negated,
+        } => {
             let v = eval_expr(inner, values, col_map, rowid)?;
             let l = eval_expr(low, values, col_map, rowid)?;
             let h = eval_expr(high, values, col_map, rowid)?;
@@ -1717,7 +1808,11 @@ fn eval_bool_expr(
             let in_range = ge_low && le_high;
             Ok(if *negated { !in_range } else { in_range })
         }
-        Expr::InList { expr: inner, list, negated } => {
+        Expr::InList {
+            expr: inner,
+            list,
+            negated,
+        } => {
             let v = eval_expr(inner, values, col_map, rowid)?;
             if v.is_null() {
                 return Ok(false);
@@ -1912,17 +2007,30 @@ pub fn validate_read_only_query(sql: &str) -> anyhow::Result<()> {
     }
 
     let stmt = statements[0].trim();
-    let first_word = stmt
-        .split_whitespace()
-        .next()
-        .unwrap_or("")
-        .to_uppercase();
+    let first_word = stmt.split_whitespace().next().unwrap_or("").to_uppercase();
 
     // Check forbidden modification / administrative commands
     const FORBIDDEN_COMMANDS: &[&str] = &[
-        "INSERT", "UPDATE", "DELETE", "DROP", "ALTER", "CREATE", "REPLACE",
-        "TRUNCATE", "ATTACH", "DETACH", "VACUUM", "REINDEX", "GRANT", "REVOKE",
-        "BEGIN", "COMMIT", "ROLLBACK", "SAVEPOINT", "RELEASE", "UPSERT",
+        "INSERT",
+        "UPDATE",
+        "DELETE",
+        "DROP",
+        "ALTER",
+        "CREATE",
+        "REPLACE",
+        "TRUNCATE",
+        "ATTACH",
+        "DETACH",
+        "VACUUM",
+        "REINDEX",
+        "GRANT",
+        "REVOKE",
+        "BEGIN",
+        "COMMIT",
+        "ROLLBACK",
+        "SAVEPOINT",
+        "RELEASE",
+        "UPSERT",
     ];
 
     for &forbidden in FORBIDDEN_COMMANDS {
@@ -1938,11 +2046,15 @@ pub fn validate_read_only_query(sql: &str) -> anyhow::Result<()> {
     if first_word == "PRAGMA" {
         let upper_stmt = stmt.to_uppercase();
         if upper_stmt.contains('=') {
-            anyhow::bail!("PRAGMA statement modifying database settings is forbidden in read-only mode");
+            anyhow::bail!(
+                "PRAGMA statement modifying database settings is forbidden in read-only mode"
+            );
         }
     }
 
-    let allowed_prefixes = ["SELECT", "EXPLAIN", "PRAGMA", "SHOW", "DESCRIBE", "DESC", ".TABLES", ".SCHEMA"];
+    let allowed_prefixes = [
+        "SELECT", "EXPLAIN", "PRAGMA", "SHOW", "DESCRIBE", "DESC", ".TABLES", ".SCHEMA",
+    ];
     if !allowed_prefixes.iter().any(|p| first_word == *p) {
         anyhow::bail!(
             "Unsupported or unsafe query command '{}'. Only read-only queries (SELECT, .tables, .schema, PRAGMA table_info) are permitted.",
@@ -1995,7 +2107,10 @@ fn tokenize_sql(input: &str) -> Vec<Token> {
         }
 
         // Single character symbols
-        if matches!(c, '(' | ')' | ',' | '.' | '=' | '<' | '>' | '+' | '-' | '*' | '/' | ';') {
+        if matches!(
+            c,
+            '(' | ')' | ',' | '.' | '=' | '<' | '>' | '+' | '-' | '*' | '/' | ';'
+        ) {
             tokens.push(Token::Symbol(c));
             i += 1;
             continue;
@@ -2044,7 +2159,8 @@ fn tokenize_sql(input: &str) -> Vec<Token> {
         }
 
         // Numbers
-        if c.is_ascii_digit() || (c == '.' && i + 1 < chars.len() && chars[i + 1].is_ascii_digit()) {
+        if c.is_ascii_digit() || (c == '.' && i + 1 < chars.len() && chars[i + 1].is_ascii_digit())
+        {
             let mut num_str = String::new();
             while i < chars.len() && (chars[i].is_ascii_digit() || chars[i] == '.') {
                 num_str.push(chars[i]);
@@ -2575,7 +2691,11 @@ pub fn format_table(res: &QueryResult) -> String {
     }
     out.push('\n');
 
-    out.push_str(&format!("({} row{} returned)", res.rows.len(), if res.rows.len() == 1 { "" } else { "s" }));
+    out.push_str(&format!(
+        "({} row{} returned)",
+        res.rows.len(),
+        if res.rows.len() == 1 { "" } else { "s" }
+    ));
 
     out
 }
@@ -2602,7 +2722,10 @@ pub fn format_csv(res: &QueryResult) -> String {
 
     // Rows
     for row in &res.rows {
-        let row_vals: Vec<String> = row.iter().map(|v| csv_escape(&v.to_string_repr())).collect();
+        let row_vals: Vec<String> = row
+            .iter()
+            .map(|v| csv_escape(&v.to_string_repr()))
+            .collect();
         out.push_str(&row_vals.join(","));
         out.push('\n');
     }
@@ -2696,22 +2819,32 @@ impl Tool for SqliteTool {
         }
 
         if full_path.is_dir() {
-            anyhow::bail!("Specified path is a directory, not a SQLite file: '{}'", full_path.display());
+            anyhow::bail!(
+                "Specified path is a directory, not a SQLite file: '{}'",
+                full_path.display()
+            );
         }
 
-        let file_bytes = tokio::fs::read(&full_path)
-            .await
-            .map_err(|e| anyhow::anyhow!("Failed to read SQLite file '{}': {e}", full_path.display()))?;
+        let file_bytes = tokio::fs::read(&full_path).await.map_err(|e| {
+            anyhow::anyhow!("Failed to read SQLite file '{}': {e}", full_path.display())
+        })?;
 
-        let reader = SqliteReader::new(&file_bytes)
-            .map_err(|e| anyhow::anyhow!("Failed to parse SQLite file '{}': {e}", full_path.display()))?;
+        let reader = SqliteReader::new(&file_bytes).map_err(|e| {
+            anyhow::anyhow!("Failed to parse SQLite file '{}': {e}", full_path.display())
+        })?;
 
         let engine = SqlEngine::new(&reader);
 
         let query_param = args.get("query").and_then(|v| v.as_str()).map(|s| s.trim());
-        let action_param = args.get("action").and_then(|v| v.as_str()).map(|s| s.trim().to_lowercase());
+        let action_param = args
+            .get("action")
+            .and_then(|v| v.as_str())
+            .map(|s| s.trim().to_lowercase());
         let table_param = args.get("table").and_then(|v| v.as_str()).map(|s| s.trim());
-        let format_param = args.get("format").and_then(|v| v.as_str()).unwrap_or("table");
+        let format_param = args
+            .get("format")
+            .and_then(|v| v.as_str())
+            .unwrap_or("table");
 
         let action = match (action_param.as_deref(), query_param) {
             (Some(act), _) => act.to_string(),
@@ -2992,7 +3125,7 @@ mod tests {
         // Col 3: Null (serial type 0)
         // Header length: 4 bytes (varint 4, st 1, st 23, st 0)
         let payload = vec![
-            4, 1, 23, 0, // header
+            4, 1, 23, 0,  // header
             42, // int 42
             b'h', b'e', b'l', b'l', b'o', // text hello
         ];
@@ -3056,11 +3189,20 @@ mod tests {
                 };
 
                 // 1. Test tables action
-                let res = tool.execute(json!({ "path": db_path, "action": "tables" }), &ctx).await.unwrap();
+                let res = tool
+                    .execute(json!({ "path": db_path, "action": "tables" }), &ctx)
+                    .await
+                    .unwrap();
                 assert!(res.contains("users"));
 
                 // 2. Test query action: SELECT *
-                let res = tool.execute(json!({ "path": db_path, "query": "SELECT * FROM users ORDER BY age ASC" }), &ctx).await.unwrap();
+                let res = tool
+                    .execute(
+                        json!({ "path": db_path, "query": "SELECT * FROM users ORDER BY age ASC" }),
+                        &ctx,
+                    )
+                    .await
+                    .unwrap();
                 assert!(res.contains("Alice"));
                 assert!(res.contains("Bob"));
                 assert!(res.contains("Charlie"));
@@ -3085,12 +3227,21 @@ mod tests {
                 assert!(res.contains("1,Alice"));
 
                 // 7. Test info action
-                let res = tool.execute(json!({ "path": db_path, "action": "info" }), &ctx).await.unwrap();
+                let res = tool
+                    .execute(json!({ "path": db_path, "action": "info" }), &ctx)
+                    .await
+                    .unwrap();
                 assert!(res.contains("Page Size"));
                 assert!(res.contains("Tables Count"));
 
                 // 8. Test describe action
-                let res = tool.execute(json!({ "path": db_path, "action": "describe", "table": "users" }), &ctx).await.unwrap();
+                let res = tool
+                    .execute(
+                        json!({ "path": db_path, "action": "describe", "table": "users" }),
+                        &ctx,
+                    )
+                    .await
+                    .unwrap();
                 assert!(res.contains("name"));
                 assert!(res.contains("age"));
                 assert!(res.contains("score"));
@@ -3100,10 +3251,22 @@ mod tests {
 
     #[test]
     fn test_strip_sql_comments() {
-        assert_eq!(strip_sql_comments("SELECT * -- line comment\nFROM users"), "SELECT *   FROM users");
-        assert_eq!(strip_sql_comments("SELECT /* block comment */ name FROM users"), "SELECT   name FROM users");
-        assert_eq!(strip_sql_comments("SELECT 'hello -- not a comment' FROM users"), "SELECT 'hello -- not a comment' FROM users");
-        assert_eq!(strip_sql_comments("SELECT \"/* not a comment */\" FROM users"), "SELECT \"/* not a comment */\" FROM users");
+        assert_eq!(
+            strip_sql_comments("SELECT * -- line comment\nFROM users"),
+            "SELECT *   FROM users"
+        );
+        assert_eq!(
+            strip_sql_comments("SELECT /* block comment */ name FROM users"),
+            "SELECT   name FROM users"
+        );
+        assert_eq!(
+            strip_sql_comments("SELECT 'hello -- not a comment' FROM users"),
+            "SELECT 'hello -- not a comment' FROM users"
+        );
+        assert_eq!(
+            strip_sql_comments("SELECT \"/* not a comment */\" FROM users"),
+            "SELECT \"/* not a comment */\" FROM users"
+        );
     }
 
     #[test]
@@ -3137,7 +3300,10 @@ mod tests {
     #[test]
     fn test_query_safety_guardrails_allowed() {
         assert!(validate_read_only_query("SELECT * FROM users").is_ok());
-        assert!(validate_read_only_query("SELECT name, age FROM users WHERE age > 21 ORDER BY age DESC LIMIT 10").is_ok());
+        assert!(validate_read_only_query(
+            "SELECT name, age FROM users WHERE age > 21 ORDER BY age DESC LIMIT 10"
+        )
+        .is_ok());
         assert!(validate_read_only_query("-- read users\nSELECT * FROM users").is_ok());
         assert!(validate_read_only_query("/* read query */ SELECT id, score FROM users;").is_ok());
         assert!(validate_read_only_query("PRAGMA table_info(users)").is_ok());
@@ -3153,8 +3319,16 @@ mod tests {
         let res = QueryResult {
             columns: vec!["id".to_string(), "name".to_string(), "active".to_string()],
             rows: vec![
-                vec![SqlValue::Integer(1), SqlValue::Text("Alice".to_string()), SqlValue::Integer(1)],
-                vec![SqlValue::Integer(2), SqlValue::Text("Bob, \"The Builder\"".to_string()), SqlValue::Null],
+                vec![
+                    SqlValue::Integer(1),
+                    SqlValue::Text("Alice".to_string()),
+                    SqlValue::Integer(1),
+                ],
+                vec![
+                    SqlValue::Integer(2),
+                    SqlValue::Text("Bob, \"The Builder\"".to_string()),
+                    SqlValue::Null,
+                ],
             ],
         };
 

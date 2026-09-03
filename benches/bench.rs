@@ -17,9 +17,7 @@ use std::str::FromStr;
 use std::sync::Arc;
 use std::time::Duration;
 
-use criterion::{
-    black_box, criterion_group, criterion_main, Criterion, Throughput,
-};
+use criterion::{black_box, criterion_group, criterion_main, Criterion, Throughput};
 use ratatui::backend::TestBackend;
 use ratatui::layout::Rect;
 use ratatui::Terminal;
@@ -258,11 +256,15 @@ fn generate_code_content(lines: usize) -> String {
     out.push_str("use std::collections::HashMap;\n\n");
     for i in 1..=lines {
         if i % 10 == 0 {
-            out.push_str(&format!("pub fn function_marker_{i}() -> usize {{ {i} }}\n"));
+            out.push_str(&format!(
+                "pub fn function_marker_{i}() -> usize {{ {i} }}\n"
+            ));
         } else if i % 5 == 0 {
             out.push_str(&format!("    let var_{i} = \"value_{i}\";\n"));
         } else {
-            out.push_str(&format!("    // Line {i}: standard statement and processing logic\n"));
+            out.push_str(&format!(
+                "    // Line {i}: standard statement and processing logic\n"
+            ));
         }
     }
     out
@@ -339,7 +341,9 @@ fn generate_large_markdown() -> String {
 
     for section in 1..=15 {
         doc.push_str(&format!("## Section {section}: Subsystem Architecture\n\n"));
-        doc.push_str("This module handles core communication, serialization, and stream decoding.\n");
+        doc.push_str(
+            "This module handles core communication, serialization, and stream decoding.\n",
+        );
         doc.push_str("Key considerations include **zero-allocation** paths, *cache-friendly* layouts, and robust error recovery.\n\n");
 
         doc.push_str("### Implementation Details\n");
@@ -349,7 +353,9 @@ fn generate_large_markdown() -> String {
 
         if section % 2 == 0 {
             doc.push_str("```rust\n");
-            doc.push_str("pub async fn execute_step(id: u64, name: &str) -> Result<String, Error> {\n");
+            doc.push_str(
+                "pub async fn execute_step(id: u64, name: &str) -> Result<String, Error> {\n",
+            );
             doc.push_str("    let client = HttpClient::new();\n");
             doc.push_str("    let res = client.get(&format!(\"/api/{id}\")).await?;\n");
             doc.push_str("    Ok(res.text().await?)\n");
@@ -440,7 +446,8 @@ fn bench_cold_startup(c: &mut Criterion) {
 
     group.bench_function("config_parsing/env_variable_expansion", |b| {
         b.iter(|| {
-            let expanded = expand_variables(black_box(env_template), black_box(&env_context)).unwrap();
+            let expanded =
+                expand_variables(black_box(env_template), black_box(&env_context)).unwrap();
             black_box(expanded);
         });
     });
@@ -519,7 +526,8 @@ fn bench_cold_startup(c: &mut Criterion) {
     });
 
     let workspace_ctx = "Project: Fusion AI Coding Assistant\nArchitecture: Pure Rust CLI + TUI + Subagents\nTarget OS: macOS, Linux, Windows, Android Termux";
-    let tool_instructions = "Available tools: bash, read, write, edit, grep, glob, git_diff, patch, symbols, process.";
+    let tool_instructions =
+        "Available tools: bash, read, write, edit, grep, glob, git_diff, patch, symbols, process.";
     let advisor_critique = "Architecture Advisor: Approved. Ensure zero-allocation inner loops and clean error handling.";
 
     group.bench_function("system_prompt/builder_domain_rust_full", |b| {
@@ -594,10 +602,23 @@ fn bench_rendering_throughput(c: &mut Criterion) {
 
     // 2.1 Streaming Markdown Tokens / Throughput
     let short_tokens = vec![
-        "### ", "Quick ", "Overview\n",
-        "This ", "is ", "**bold** ", "and ", "*italic* ", "text, ", "plus ", "`code()`.\n",
-        "- ", "Item ", "1\n",
-        "- ", "Item ", "2\n",
+        "### ",
+        "Quick ",
+        "Overview\n",
+        "This ",
+        "is ",
+        "**bold** ",
+        "and ",
+        "*italic* ",
+        "text, ",
+        "plus ",
+        "`code()`.\n",
+        "- ",
+        "Item ",
+        "1\n",
+        "- ",
+        "Item ",
+        "2\n",
     ];
     let short_bytes: usize = short_tokens.iter().map(|t| t.len()).sum();
     group.throughput(Throughput::Bytes(short_bytes as u64));
@@ -718,7 +739,8 @@ fn bench_rendering_throughput(c: &mut Criterion) {
     });
 
     // 2.3 Syntax Highlighting Throughput
-    let rust_code = "pub async fn handle_request(req: Request<Body>) -> Result<Response<Body>, StatusCode> {";
+    let rust_code =
+        "pub async fn handle_request(req: Request<Body>) -> Result<Response<Body>, StatusCode> {";
     group.bench_function("syntax_highlighting/rust", |b| {
         b.iter(|| {
             let highlighted = highlight_code_line(black_box(rust_code), black_box("rust"));
@@ -726,7 +748,8 @@ fn bench_rendering_throughput(c: &mut Criterion) {
         });
     });
 
-    let python_code = "async def fetch_user_data(user_id: int, session: aiohttp.ClientSession) -> dict:";
+    let python_code =
+        "async def fetch_user_data(user_id: int, session: aiohttp.ClientSession) -> dict:";
     group.bench_function("syntax_highlighting/python", |b| {
         b.iter(|| {
             let highlighted = highlight_code_line(black_box(python_code), black_box("python"));
@@ -734,7 +757,8 @@ fn bench_rendering_throughput(c: &mut Criterion) {
         });
     });
 
-    let ts_code = "const response: ApiResponse<User> = await client.query({ id: 'u_123', timeout: 5000 });";
+    let ts_code =
+        "const response: ApiResponse<User> = await client.query({ id: 'u_123', timeout: 5000 });";
     group.bench_function("syntax_highlighting/typescript", |b| {
         b.iter(|| {
             let highlighted = highlight_code_line(black_box(ts_code), black_box("typescript"));
@@ -742,7 +766,8 @@ fn bench_rendering_throughput(c: &mut Criterion) {
         });
     });
 
-    let shell_code = "cargo test --release --all-features -- --nocapture && ./scripts/verify_pipeline.sh";
+    let shell_code =
+        "cargo test --release --all-features -- --nocapture && ./scripts/verify_pipeline.sh";
     group.bench_function("syntax_highlighting/shell", |b| {
         b.iter(|| {
             let highlighted = highlight_code_line(black_box(shell_code), black_box("sh"));
@@ -812,7 +837,12 @@ fn bench_rendering_throughput(c: &mut Criterion) {
             terminal_status
                 .draw(|f| {
                     let area = f.area();
-                    render_status_bar_themed(f, area, black_box(&status_info), black_box(&theme_tokyo));
+                    render_status_bar_themed(
+                        f,
+                        area,
+                        black_box(&status_info),
+                        black_box(&theme_tokyo),
+                    );
                 })
                 .unwrap();
         });
@@ -821,7 +851,8 @@ fn bench_rendering_throughput(c: &mut Criterion) {
     let backend_card = TestBackend::new(70, 5);
     let mut terminal_card = Terminal::new(backend_card).unwrap();
     let card_title = "Subagent Mesh Telemetry";
-    let card_content = "Dispatched 4 subagents across DAG. All locks acquired without deadlock. Review passed.";
+    let card_content =
+        "Dispatched 4 subagents across DAG. All locks acquired without deadlock. Review passed.";
 
     group.bench_function("frame_rendering/card_widget", |b| {
         b.iter(|| {
@@ -855,7 +886,9 @@ fn bench_rendering_throughput(c: &mut Criterion) {
                         area,
                         black_box("ArchitectureAdvisor"),
                         black_box(true),
-                        black_box("Verified modular DAG design. No circular dependencies detected."),
+                        black_box(
+                            "Verified modular DAG design. No circular dependencies detected.",
+                        ),
                         black_box(&critique_theme),
                     );
                 })
@@ -939,7 +972,10 @@ fn bench_tool_execution(c: &mut Criterion) {
             "case_sensitive": true
         });
         b.to_async(&rt).iter(|| async {
-            let res = grep_tool.execute(black_box(args.clone()), &ctx).await.unwrap();
+            let res = grep_tool
+                .execute(black_box(args.clone()), &ctx)
+                .await
+                .unwrap();
             black_box(res);
         });
     });
@@ -950,7 +986,10 @@ fn bench_tool_execution(c: &mut Criterion) {
             "case_sensitive": true
         });
         b.to_async(&rt).iter(|| async {
-            let res = grep_tool.execute(black_box(args.clone()), &ctx).await.unwrap();
+            let res = grep_tool
+                .execute(black_box(args.clone()), &ctx)
+                .await
+                .unwrap();
             black_box(res);
         });
     });
@@ -961,7 +1000,10 @@ fn bench_tool_execution(c: &mut Criterion) {
             "case_sensitive": false
         });
         b.to_async(&rt).iter(|| async {
-            let res = grep_tool.execute(black_box(args.clone()), &ctx).await.unwrap();
+            let res = grep_tool
+                .execute(black_box(args.clone()), &ctx)
+                .await
+                .unwrap();
             black_box(res);
         });
     });
@@ -1029,7 +1071,10 @@ fn bench_tool_execution(c: &mut Criterion) {
     group.bench_function("glob/shallow_pattern", |b| {
         let args = json!({ "pattern": "*.toml" });
         b.to_async(&rt).iter(|| async {
-            let res = glob_tool.execute(black_box(args.clone()), &ctx).await.unwrap();
+            let res = glob_tool
+                .execute(black_box(args.clone()), &ctx)
+                .await
+                .unwrap();
             black_box(res);
         });
     });
@@ -1037,7 +1082,10 @@ fn bench_tool_execution(c: &mut Criterion) {
     group.bench_function("glob/recursive_all_rs", |b| {
         let args = json!({ "pattern": "**/*.rs" });
         b.to_async(&rt).iter(|| async {
-            let res = glob_tool.execute(black_box(args.clone()), &ctx).await.unwrap();
+            let res = glob_tool
+                .execute(black_box(args.clone()), &ctx)
+                .await
+                .unwrap();
             black_box(res);
         });
     });
@@ -1048,7 +1096,10 @@ fn bench_tool_execution(c: &mut Criterion) {
             "path": "src"
         });
         b.to_async(&rt).iter(|| async {
-            let res = glob_tool.execute(black_box(args.clone()), &ctx).await.unwrap();
+            let res = glob_tool
+                .execute(black_box(args.clone()), &ctx)
+                .await
+                .unwrap();
             black_box(res);
         });
     });
@@ -1058,7 +1109,11 @@ fn bench_tool_execution(c: &mut Criterion) {
     let s2 = generate_test_session("TypeScript React State Management", "claude-3-5-sonnet", 5);
     let s3 = generate_test_session("Python FastAPI Asynchronous Endpoints", "deepseek-chat", 5);
     let s4 = generate_test_session("Go Goroutine Channels and Context", "gpt-4o", 5);
-    let s5 = generate_test_session("Android Termux Rust Build & Toolchain", "claude-3-5-haiku", 5);
+    let s5 = generate_test_session(
+        "Android Termux Rust Build & Toolchain",
+        "claude-3-5-haiku",
+        5,
+    );
     let sessions = vec![s1.clone(), s2.clone(), s3.clone(), s4.clone(), s5.clone()];
 
     group.bench_function("search_indexing/build_session_index", |b| {
@@ -1104,7 +1159,8 @@ fn bench_tool_execution(c: &mut Criterion) {
     let symbol_scanner = SymbolScanner::new();
     group.bench_function("search_indexing/workspace_symbol_scanning", |b| {
         b.iter(|| {
-            let symbols = symbol_scanner.scan_content(black_box(&sample_rs_file), black_box("src/lib.rs"));
+            let symbols =
+                symbol_scanner.scan_content(black_box(&sample_rs_file), black_box("src/lib.rs"));
             black_box(symbols);
         });
     });
@@ -1117,7 +1173,10 @@ fn bench_tool_execution(c: &mut Criterion) {
     group.bench_function("file_tools/read_numbered_medium", |b| {
         let args = json!({ "path": "medium_code.rs" });
         b.to_async(&rt).iter(|| async {
-            let res = read_tool.execute(black_box(args.clone()), &ctx).await.unwrap();
+            let res = read_tool
+                .execute(black_box(args.clone()), &ctx)
+                .await
+                .unwrap();
             black_box(res);
         });
     });
@@ -1125,14 +1184,18 @@ fn bench_tool_execution(c: &mut Criterion) {
     group.bench_function("file_tools/read_windowed_slice", |b| {
         let args = json!({ "path": "medium_code.rs", "offset": 100, "limit": 50 });
         b.to_async(&rt).iter(|| async {
-            let res = read_tool.execute(black_box(args.clone()), &ctx).await.unwrap();
+            let res = read_tool
+                .execute(black_box(args.clone()), &ctx)
+                .await
+                .unwrap();
             black_box(res);
         });
     });
 
     let old_text = generate_code_content(200);
     let target_needle = "pub fn function_marker_50() -> usize { 50 }";
-    let replacement = "pub fn function_marker_50() -> usize {\n    // Replaced during bench\n    100\n}";
+    let replacement =
+        "pub fn function_marker_50() -> usize {\n    // Replaced during bench\n    100\n}";
     let new_text = old_text.replace(target_needle, replacement);
 
     group.bench_function("diff_tools/apply_exact_edit_algorithm", |b| {
@@ -1183,7 +1246,10 @@ fn bench_tool_execution(c: &mut Criterion) {
     group.bench_function("bash_tool/simple_echo", |b| {
         let args = json!({ "command": "echo 'fusion_bench_echo'" });
         b.to_async(&rt).iter(|| async {
-            let res = bash_tool.execute(black_box(args.clone()), &ctx).await.unwrap();
+            let res = bash_tool
+                .execute(black_box(args.clone()), &ctx)
+                .await
+                .unwrap();
             black_box(res);
         });
     });
@@ -1210,10 +1276,22 @@ fn bench_subagent_mesh(c: &mut Criterion) {
     group.bench_function("peer_lifecycle/register_peers_batch", |b| {
         b.to_async(&rt).iter(|| async {
             let mesh = AgentMesh::new();
-            let c1 = mesh.register("scout-01", AgentRole::Scout, "Exploration agent").await.unwrap();
-            let c2 = mesh.register("coder-01", AgentRole::Coder, "Implementation agent").await.unwrap();
-            let c3 = mesh.register("tester-01", AgentRole::Tester, "Test runner").await.unwrap();
-            let c4 = mesh.register("reviewer-01", AgentRole::Reviewer, "Quality reviewer").await.unwrap();
+            let c1 = mesh
+                .register("scout-01", AgentRole::Scout, "Exploration agent")
+                .await
+                .unwrap();
+            let c2 = mesh
+                .register("coder-01", AgentRole::Coder, "Implementation agent")
+                .await
+                .unwrap();
+            let c3 = mesh
+                .register("tester-01", AgentRole::Tester, "Test runner")
+                .await
+                .unwrap();
+            let c4 = mesh
+                .register("reviewer-01", AgentRole::Reviewer, "Quality reviewer")
+                .await
+                .unwrap();
             black_box((c1, c2, c3, c4));
         });
     });
@@ -1221,17 +1299,32 @@ fn bench_subagent_mesh(c: &mut Criterion) {
     group.bench_function("peer_lifecycle/deregister_peer", |b| {
         b.to_async(&rt).iter(|| async {
             let mesh = AgentMesh::new();
-            let _c = mesh.register("temp-agent", AgentRole::General, "Temporary agent").await.unwrap();
+            let _c = mesh
+                .register("temp-agent", AgentRole::General, "Temporary agent")
+                .await
+                .unwrap();
             mesh.unregister("temp-agent").await.unwrap();
         });
     });
 
     let active_mesh = rt.block_on(async {
         let mesh = AgentMesh::new();
-        let _c1 = mesh.register("scout-01", AgentRole::Scout, "Scout").await.unwrap();
-        let _c2 = mesh.register("coder-01", AgentRole::Coder, "Coder").await.unwrap();
-        let _c3 = mesh.register("tester-01", AgentRole::Tester, "Tester").await.unwrap();
-        let _c4 = mesh.register("reviewer-01", AgentRole::Reviewer, "Reviewer").await.unwrap();
+        let _c1 = mesh
+            .register("scout-01", AgentRole::Scout, "Scout")
+            .await
+            .unwrap();
+        let _c2 = mesh
+            .register("coder-01", AgentRole::Coder, "Coder")
+            .await
+            .unwrap();
+        let _c3 = mesh
+            .register("tester-01", AgentRole::Tester, "Tester")
+            .await
+            .unwrap();
+        let _c4 = mesh
+            .register("reviewer-01", AgentRole::Reviewer, "Reviewer")
+            .await
+            .unwrap();
         mesh
     });
 
@@ -1245,7 +1338,10 @@ fn bench_subagent_mesh(c: &mut Criterion) {
     // 4.2 Pub-Sub Broadcast Routing Overhead
     let (broadcast_mesh, mut sender_channel, mut subscriber_5_channels) = rt.block_on(async {
         let mesh = AgentMesh::with_capacity(2048);
-        let sender = mesh.register("sender-agent", AgentRole::Orchestrator, "Sender").await.unwrap();
+        let sender = mesh
+            .register("sender-agent", AgentRole::Orchestrator, "Sender")
+            .await
+            .unwrap();
         let mut subs = Vec::new();
         for i in 1..=5 {
             let sub = mesh
@@ -1341,8 +1437,14 @@ fn bench_subagent_mesh(c: &mut Criterion) {
     // 4.3 Direct Peer-to-Peer Message Dispatch
     let (direct_mesh, mut direct_sender, mut direct_receiver) = rt.block_on(async {
         let mesh = AgentMesh::new();
-        let sender = mesh.register("direct-alice", AgentRole::Coder, "Alice").await.unwrap();
-        let receiver = mesh.register("direct-bob", AgentRole::Tester, "Bob").await.unwrap();
+        let sender = mesh
+            .register("direct-alice", AgentRole::Coder, "Alice")
+            .await
+            .unwrap();
+        let receiver = mesh
+            .register("direct-bob", AgentRole::Tester, "Bob")
+            .await
+            .unwrap();
         (mesh, sender, receiver)
     });
 
@@ -1365,11 +1467,7 @@ fn bench_subagent_mesh(c: &mut Criterion) {
         let receiver = &mut direct_receiver;
         b.to_async(&rt).iter(|| async {
             sender
-                .send_direct(
-                    "direct-bob",
-                    "ping",
-                    "ping payload content",
-                )
+                .send_direct("direct-bob", "ping", "ping payload content")
                 .await
                 .unwrap();
 
@@ -1381,8 +1479,14 @@ fn bench_subagent_mesh(c: &mut Criterion) {
     // 4.4 Request-Response Peer RPC Queries
     let (rpc_mesh, mut rpc_requester, mut rpc_responder) = rt.block_on(async {
         let mesh = AgentMesh::new();
-        let req = mesh.register("requester-agent", AgentRole::Coder, "Requester").await.unwrap();
-        let resp = mesh.register("responder-agent", AgentRole::Reviewer, "Responder").await.unwrap();
+        let req = mesh
+            .register("requester-agent", AgentRole::Coder, "Requester")
+            .await
+            .unwrap();
+        let resp = mesh
+            .register("responder-agent", AgentRole::Reviewer, "Responder")
+            .await
+            .unwrap();
         (mesh, req, resp)
     });
 
@@ -1418,7 +1522,10 @@ fn bench_subagent_mesh(c: &mut Criterion) {
     // 4.5 Resource Claiming, Locking, & Blackboard Coordination
     let (coord_mesh, coord_agent) = rt.block_on(async {
         let mesh = AgentMesh::new();
-        let agent = mesh.register("lock-agent", AgentRole::Coder, "Lock Agent").await.unwrap();
+        let agent = mesh
+            .register("lock-agent", AgentRole::Coder, "Lock Agent")
+            .await
+            .unwrap();
         (mesh, agent)
     });
 
@@ -1430,7 +1537,10 @@ fn bench_subagent_mesh(c: &mut Criterion) {
                 .await
                 .unwrap();
 
-            let released = agent.release_resource(black_box("src/agent/mesh.rs")).await.unwrap();
+            let released = agent
+                .release_resource(black_box("src/agent/mesh.rs"))
+                .await
+                .unwrap();
             black_box(released);
         });
     });
@@ -1458,25 +1568,13 @@ fn bench_subagent_mesh(c: &mut Criterion) {
 // Criterion Benchmark Groups & Main Entrypoint
 // ============================================================================
 
-criterion_group!(
-    cold_startup,
-    bench_cold_startup,
-);
+criterion_group!(cold_startup, bench_cold_startup,);
 
-criterion_group!(
-    rendering_throughput,
-    bench_rendering_throughput,
-);
+criterion_group!(rendering_throughput, bench_rendering_throughput,);
 
-criterion_group!(
-    tool_execution,
-    bench_tool_execution,
-);
+criterion_group!(tool_execution, bench_tool_execution,);
 
-criterion_group!(
-    subagent_mesh,
-    bench_subagent_mesh,
-);
+criterion_group!(subagent_mesh, bench_subagent_mesh,);
 
 criterion_main!(
     cold_startup,

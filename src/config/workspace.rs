@@ -103,15 +103,10 @@ pub enum WorkspaceConfigError {
     },
 
     #[error("Validation error in workspace config '{path}': {message}")]
-    Validation {
-        path: PathBuf,
-        message: String,
-    },
+    Validation { path: PathBuf, message: String },
 
     #[error("Unsupported workspace config format for '{path}'. Expected .toml or .json")]
-    UnsupportedFormat {
-        path: PathBuf,
-    },
+    UnsupportedFormat { path: PathBuf },
 }
 
 /// Workspace-level MCP server definition.
@@ -346,11 +341,7 @@ pub struct WorkspaceConfig {
     )]
     pub bell_on_completion: Option<bool>,
 
-    #[serde(
-        default,
-        skip_serializing_if = "Option::is_none",
-        alias = "bell_error"
-    )]
+    #[serde(default, skip_serializing_if = "Option::is_none", alias = "bell_error")]
     pub bell_on_error: Option<bool>,
 
     // Desktop & Terminal Notifications
@@ -896,8 +887,7 @@ impl WorkspaceConfig {
             }
         }
         if let Some(adv_m) = &self.advisor_model {
-            let (_, resolved) =
-                Config::resolve_model(adv_m, Some(&config.default_provider));
+            let (_, resolved) = Config::resolve_model(adv_m, Some(&config.default_provider));
             if config.advisor_model.as_deref() != Some(&resolved) {
                 diffs.push(WorkspaceOverrideEntry {
                     field: "advisor_model".to_string(),
@@ -1228,12 +1218,13 @@ impl WorkspaceConfig {
         let format = WorkspaceConfigFormat::from_path(path).unwrap_or(WorkspaceConfigFormat::Toml);
         let content = match format {
             WorkspaceConfigFormat::Toml => self.to_toml_string(),
-            WorkspaceConfigFormat::Json => self
-                .to_json_string()
-                .map_err(|e| WorkspaceConfigError::JsonParse {
-                    path: path.to_path_buf(),
-                    source: e,
-                })?,
+            WorkspaceConfigFormat::Json => {
+                self.to_json_string()
+                    .map_err(|e| WorkspaceConfigError::JsonParse {
+                        path: path.to_path_buf(),
+                        source: e,
+                    })?
+            }
         };
 
         fs::write(path, content).map_err(|e| WorkspaceConfigError::Io {
@@ -1857,7 +1848,8 @@ fn normalize_workspace_json_value(mut root: Value) -> Value {
                     .or_insert_with(|| enabled.clone());
             }
             if let Some(bc) = snd.get("bell_on_completion") {
-                map.entry("bell_on_completion").or_insert_with(|| bc.clone());
+                map.entry("bell_on_completion")
+                    .or_insert_with(|| bc.clone());
             }
             if let Some(be) = snd.get("bell_on_error") {
                 map.entry("bell_on_error").or_insert_with(|| be.clone());
@@ -1891,8 +1883,7 @@ fn normalize_workspace_json_value(mut root: Value) -> Value {
         // 6. [instructions] or [prompt] section
         if let Some(Value::Object(inst)) = map.get("instructions").cloned() {
             if let Some(prompt) = inst.get("prompt").or_else(|| inst.get("system_prompt")) {
-                map.entry("instructions")
-                    .or_insert_with(|| prompt.clone());
+                map.entry("instructions").or_insert_with(|| prompt.clone());
             }
             if let Some(rules) = inst.get("rules") {
                 map.entry("custom_rules").or_insert_with(|| rules.clone());
@@ -2125,9 +2116,14 @@ FUSION_TEST_MODE = "1"
         assert_eq!(loaded.format, WorkspaceConfigFormat::Toml);
         assert_eq!(loaded.config.name.as_deref(), Some("saved-workspace"));
         assert_eq!(loaded.config.default_provider.as_deref(), Some("deepseek"));
-        assert_eq!(loaded.config.default_model.as_deref(), Some("deepseek-reasoner"));
+        assert_eq!(
+            loaded.config.default_model.as_deref(),
+            Some("deepseek-reasoner")
+        );
         assert_eq!(loaded.config.custom_rules, vec!["Rule A", "Rule B"]);
-        assert!(loaded.overridden_fields.contains(&"default_provider".to_string()));
+        assert!(loaded
+            .overridden_fields
+            .contains(&"default_provider".to_string()));
     }
 
     #[test]

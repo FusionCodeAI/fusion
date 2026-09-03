@@ -136,7 +136,10 @@ impl Default for ThemeKind {
 impl ThemeKind {
     /// Parse theme kind from string (case-insensitive, kebab/snake allowed).
     pub fn from_name(name: &str) -> Option<Self> {
-        let normalized = name.trim().to_ascii_lowercase().replace(['-', '_', ' '], "");
+        let normalized = name
+            .trim()
+            .to_ascii_lowercase()
+            .replace(['-', '_', ' '], "");
         match normalized.as_str() {
             "tokyonight" | "tokyo" | "night" => Some(Self::TokyoNight),
             "monokai" => Some(Self::Monokai),
@@ -306,17 +309,17 @@ impl Theme {
             border: Color::Rgb(65, 72, 104),       // Border #414868
             border_focused: Color::Rgb(125, 207, 255),
 
-            success: Color::Rgb(158, 206, 106),    // Green #9ece6a
-            warning: Color::Rgb(224, 175, 104),    // Yellow/Orange #e0af68
-            error: Color::Rgb(247, 118, 142),      // Red #f7768e
-            info: Color::Rgb(125, 207, 255),       // Cyan #7dcfff
+            success: Color::Rgb(158, 206, 106), // Green #9ece6a
+            warning: Color::Rgb(224, 175, 104), // Yellow/Orange #e0af68
+            error: Color::Rgb(247, 118, 142),   // Red #f7768e
+            info: Color::Rgb(125, 207, 255),    // Cyan #7dcfff
 
-            provider: Color::Rgb(125, 207, 255),   // Cyan
-            model: Color::Rgb(192, 202, 245),      // Light White
-            agent: Color::Rgb(187, 154, 247),      // Magenta
-            advisor: Color::Rgb(224, 175, 104),    // Yellow
-            status: Color::Rgb(158, 206, 106),     // Green
-            selection: Color::Rgb(40, 52, 87),     // #283457
+            provider: Color::Rgb(125, 207, 255), // Cyan
+            model: Color::Rgb(192, 202, 245),    // Light White
+            agent: Color::Rgb(187, 154, 247),    // Magenta
+            advisor: Color::Rgb(224, 175, 104),  // Yellow
+            status: Color::Rgb(158, 206, 106),   // Green
+            selection: Color::Rgb(40, 52, 87),   // #283457
         }
     }
 
@@ -327,25 +330,25 @@ impl Theme {
             kind: ThemeKind::TokyoNight,
             mode: BackgroundMode::Light,
 
-            primary: Color::Rgb(55, 96, 191),      // Deep Blue #3760bf
-            secondary: Color::Rgb(15, 75, 160),    // Darker Blue #0f4ba0
-            accent: Color::Rgb(152, 84, 194),      // Deep Purple #9854c2
-            foreground: Color::Rgb(52, 59, 88),    // Dark Charcoal #343b58
-            muted: Color::Rgb(137, 142, 164),      // Muted #898ea4
+            primary: Color::Rgb(55, 96, 191),   // Deep Blue #3760bf
+            secondary: Color::Rgb(15, 75, 160), // Darker Blue #0f4ba0
+            accent: Color::Rgb(152, 84, 194),   // Deep Purple #9854c2
+            foreground: Color::Rgb(52, 59, 88), // Dark Charcoal #343b58
+            muted: Color::Rgb(137, 142, 164),   // Muted #898ea4
             background: Some(Color::Rgb(225, 226, 231)), // Light Gray #e1e2e7
-            border: Color::Rgb(180, 185, 206),     // Light Border #b4b9ce
+            border: Color::Rgb(180, 185, 206),  // Light Border #b4b9ce
             border_focused: Color::Rgb(55, 96, 191),
 
-            success: Color::Rgb(88, 117, 57),      // Olive Green #587539
-            warning: Color::Rgb(140, 108, 62),     // Ochre/Amber #8c6c3e
-            error: Color::Rgb(245, 42, 101),       // Crimson #f52a65
-            info: Color::Rgb(0, 107, 184),         // Deep Cyan #006bb8
+            success: Color::Rgb(88, 117, 57),  // Olive Green #587539
+            warning: Color::Rgb(140, 108, 62), // Ochre/Amber #8c6c3e
+            error: Color::Rgb(245, 42, 101),   // Crimson #f52a65
+            info: Color::Rgb(0, 107, 184),     // Deep Cyan #006bb8
 
-            provider: Color::Rgb(55, 96, 191),     // Deep Blue
-            model: Color::Rgb(52, 59, 88),         // Dark text
-            agent: Color::Rgb(152, 84, 194),       // Deep Purple
-            advisor: Color::Rgb(140, 108, 62),     // Ochre
-            status: Color::Rgb(88, 117, 57),       // Olive Green
+            provider: Color::Rgb(55, 96, 191), // Deep Blue
+            model: Color::Rgb(52, 59, 88),     // Dark text
+            agent: Color::Rgb(152, 84, 194),   // Deep Purple
+            advisor: Color::Rgb(140, 108, 62), // Ochre
+            status: Color::Rgb(88, 117, 57),   // Olive Green
             selection: Color::Rgb(200, 210, 230),
         }
     }
@@ -368,16 +371,16 @@ impl Theme {
             border: Color::Rgb(73, 72, 62),        // Dark Stone #49483e
             border_focused: Color::Rgb(102, 217, 239),
 
-            success: Color::Rgb(166, 226, 46),     // Lime #a6e22e
-            warning: Color::Rgb(230, 219, 116),    // Yellow #e6db74
-            error: Color::Rgb(249, 38, 114),       // Hot Pink #f92672
-            info: Color::Rgb(102, 217, 239),       // Cyan #66d9ef
+            success: Color::Rgb(166, 226, 46),  // Lime #a6e22e
+            warning: Color::Rgb(230, 219, 116), // Yellow #e6db74
+            error: Color::Rgb(249, 38, 114),    // Hot Pink #f92672
+            info: Color::Rgb(102, 217, 239),    // Cyan #66d9ef
 
-            provider: Color::Rgb(102, 217, 239),   // Cyan
-            model: Color::Rgb(248, 248, 242),      // Bright White
-            agent: Color::Rgb(174, 129, 255),      // Purple
-            advisor: Color::Rgb(230, 219, 116),    // Yellow
-            status: Color::Rgb(166, 226, 46),      // Lime Green
+            provider: Color::Rgb(102, 217, 239), // Cyan
+            model: Color::Rgb(248, 248, 242),    // Bright White
+            agent: Color::Rgb(174, 129, 255),    // Purple
+            advisor: Color::Rgb(230, 219, 116),  // Yellow
+            status: Color::Rgb(166, 226, 46),    // Lime Green
             selection: Color::Rgb(60, 60, 50),
         }
     }
@@ -389,25 +392,25 @@ impl Theme {
             kind: ThemeKind::Monokai,
             mode: BackgroundMode::Light,
 
-            primary: Color::Rgb(0, 130, 160),      // Deep Teal
-            secondary: Color::Rgb(120, 70, 190),   // Violet
-            accent: Color::Rgb(200, 100, 0),       // Warm Amber
-            foreground: Color::Rgb(40, 40, 35),    // Dark Charcoal
-            muted: Color::Rgb(130, 130, 120),      // Warm Gray
+            primary: Color::Rgb(0, 130, 160),            // Deep Teal
+            secondary: Color::Rgb(120, 70, 190),         // Violet
+            accent: Color::Rgb(200, 100, 0),             // Warm Amber
+            foreground: Color::Rgb(40, 40, 35),          // Dark Charcoal
+            muted: Color::Rgb(130, 130, 120),            // Warm Gray
             background: Some(Color::Rgb(250, 249, 246)), // Warm White
-            border: Color::Rgb(205, 205, 195),     // Warm Border
+            border: Color::Rgb(205, 205, 195),           // Warm Border
             border_focused: Color::Rgb(0, 130, 160),
 
-            success: Color::Rgb(70, 140, 20),      // Deep Lime
-            warning: Color::Rgb(180, 140, 20),     // Dark Gold
-            error: Color::Rgb(200, 20, 80),        // Deep Pink/Red
-            info: Color::Rgb(0, 130, 160),         // Deep Teal
+            success: Color::Rgb(70, 140, 20),  // Deep Lime
+            warning: Color::Rgb(180, 140, 20), // Dark Gold
+            error: Color::Rgb(200, 20, 80),    // Deep Pink/Red
+            info: Color::Rgb(0, 130, 160),     // Deep Teal
 
-            provider: Color::Rgb(0, 130, 160),     // Teal
-            model: Color::Rgb(40, 40, 35),         // Charcoal
-            agent: Color::Rgb(120, 70, 190),       // Violet
-            advisor: Color::Rgb(180, 140, 20),     // Dark Gold
-            status: Color::Rgb(70, 140, 20),       // Deep Lime
+            provider: Color::Rgb(0, 130, 160), // Teal
+            model: Color::Rgb(40, 40, 35),     // Charcoal
+            agent: Color::Rgb(120, 70, 190),   // Violet
+            advisor: Color::Rgb(180, 140, 20), // Dark Gold
+            status: Color::Rgb(70, 140, 20),   // Deep Lime
             selection: Color::Rgb(230, 230, 220),
         }
     }
@@ -430,17 +433,17 @@ impl Theme {
             border: Color::Rgb(68, 71, 90),        // Current line #44475a
             border_focused: Color::Rgb(189, 147, 249),
 
-            success: Color::Rgb(80, 250, 123),     // Green #50fa7b
-            warning: Color::Rgb(241, 250, 140),    // Yellow #f1fa8c
-            error: Color::Rgb(255, 85, 85),        // Red #ff5555
-            info: Color::Rgb(139, 233, 253),       // Cyan #8be9fd
+            success: Color::Rgb(80, 250, 123),  // Green #50fa7b
+            warning: Color::Rgb(241, 250, 140), // Yellow #f1fa8c
+            error: Color::Rgb(255, 85, 85),     // Red #ff5555
+            info: Color::Rgb(139, 233, 253),    // Cyan #8be9fd
 
-            provider: Color::Rgb(139, 233, 253),   // Cyan
-            model: Color::Rgb(248, 248, 242),      // White
-            agent: Color::Rgb(255, 121, 198),      // Pink
-            advisor: Color::Rgb(241, 250, 140),    // Yellow
-            status: Color::Rgb(80, 250, 123),      // Green
-            selection: Color::Rgb(68, 71, 90),     // Current line
+            provider: Color::Rgb(139, 233, 253), // Cyan
+            model: Color::Rgb(248, 248, 242),    // White
+            agent: Color::Rgb(255, 121, 198),    // Pink
+            advisor: Color::Rgb(241, 250, 140),  // Yellow
+            status: Color::Rgb(80, 250, 123),    // Green
+            selection: Color::Rgb(68, 71, 90),   // Current line
         }
     }
 
@@ -451,25 +454,25 @@ impl Theme {
             kind: ThemeKind::Dracula,
             mode: BackgroundMode::Light,
 
-            primary: Color::Rgb(0, 120, 145),      // Dark Cyan
-            secondary: Color::Rgb(110, 75, 180),   // Violet
-            accent: Color::Rgb(190, 40, 120),      // Magenta
-            foreground: Color::Rgb(40, 42, 54),    // Dark Indigo
-            muted: Color::Rgb(120, 130, 160),      // Slate
+            primary: Color::Rgb(0, 120, 145),            // Dark Cyan
+            secondary: Color::Rgb(110, 75, 180),         // Violet
+            accent: Color::Rgb(190, 40, 120),            // Magenta
+            foreground: Color::Rgb(40, 42, 54),          // Dark Indigo
+            muted: Color::Rgb(120, 130, 160),            // Slate
             background: Some(Color::Rgb(248, 248, 242)), // Cream #f8f8f2
-            border: Color::Rgb(190, 195, 210),     // Soft Border
+            border: Color::Rgb(190, 195, 210),           // Soft Border
             border_focused: Color::Rgb(110, 75, 180),
 
-            success: Color::Rgb(40, 150, 70),      // Forest Green
-            warning: Color::Rgb(160, 140, 20),     // Dark Gold
-            error: Color::Rgb(210, 40, 40),        // Deep Red
-            info: Color::Rgb(0, 120, 145),         // Dark Cyan
+            success: Color::Rgb(40, 150, 70),  // Forest Green
+            warning: Color::Rgb(160, 140, 20), // Dark Gold
+            error: Color::Rgb(210, 40, 40),    // Deep Red
+            info: Color::Rgb(0, 120, 145),     // Dark Cyan
 
-            provider: Color::Rgb(0, 120, 145),     // Dark Cyan
-            model: Color::Rgb(40, 42, 54),         // Indigo
-            agent: Color::Rgb(190, 40, 120),       // Magenta
-            advisor: Color::Rgb(160, 140, 20),     // Dark Gold
-            status: Color::Rgb(40, 150, 70),       // Green
+            provider: Color::Rgb(0, 120, 145), // Dark Cyan
+            model: Color::Rgb(40, 42, 54),     // Indigo
+            agent: Color::Rgb(190, 40, 120),   // Magenta
+            advisor: Color::Rgb(160, 140, 20), // Dark Gold
+            status: Color::Rgb(40, 150, 70),   // Green
             selection: Color::Rgb(225, 225, 235),
         }
     }
@@ -483,25 +486,25 @@ impl Theme {
             kind: ThemeKind::HighContrast,
             mode: BackgroundMode::Dark,
 
-            primary: Color::Cyan,                  // Pure Cyan
-            secondary: Color::LightBlue,           // Light Blue
-            accent: Color::Magenta,                // Pure Magenta
-            foreground: Color::White,              // Pure White
-            muted: Color::Gray,                    // Clear Gray
-            background: Some(Color::Black),        // True Black
-            border: Color::White,                  // Solid White Border
+            primary: Color::Cyan,           // Pure Cyan
+            secondary: Color::LightBlue,    // Light Blue
+            accent: Color::Magenta,         // Pure Magenta
+            foreground: Color::White,       // Pure White
+            muted: Color::Gray,             // Clear Gray
+            background: Some(Color::Black), // True Black
+            border: Color::White,           // Solid White Border
             border_focused: Color::Yellow,
 
-            success: Color::LightGreen,            // Bright Green
-            warning: Color::Yellow,                // Bright Yellow
-            error: Color::LightRed,                // Bright Red
-            info: Color::Cyan,                     // Cyan
+            success: Color::LightGreen, // Bright Green
+            warning: Color::Yellow,     // Bright Yellow
+            error: Color::LightRed,     // Bright Red
+            info: Color::Cyan,          // Cyan
 
-            provider: Color::Cyan,                 // Cyan
-            model: Color::White,                   // White
-            agent: Color::Magenta,                 // Magenta
-            advisor: Color::Yellow,                // Yellow
-            status: Color::LightGreen,             // Green
+            provider: Color::Cyan,     // Cyan
+            model: Color::White,       // White
+            agent: Color::Magenta,     // Magenta
+            advisor: Color::Yellow,    // Yellow
+            status: Color::LightGreen, // Green
             selection: Color::DarkGray,
         }
     }
@@ -513,25 +516,25 @@ impl Theme {
             kind: ThemeKind::HighContrast,
             mode: BackgroundMode::Light,
 
-            primary: Color::Rgb(0, 50, 150),       // Bold Navy
-            secondary: Color::Rgb(80, 0, 120),     // Deep Purple
-            accent: Color::Rgb(160, 40, 0),        // Deep Rust
-            foreground: Color::Black,              // True Black
-            muted: Color::DarkGray,                // Dark Gray
-            background: Some(Color::White),        // Pure White
-            border: Color::Black,                  // Solid Black Border
+            primary: Color::Rgb(0, 50, 150),   // Bold Navy
+            secondary: Color::Rgb(80, 0, 120), // Deep Purple
+            accent: Color::Rgb(160, 40, 0),    // Deep Rust
+            foreground: Color::Black,          // True Black
+            muted: Color::DarkGray,            // Dark Gray
+            background: Some(Color::White),    // Pure White
+            border: Color::Black,              // Solid Black Border
             border_focused: Color::Rgb(0, 50, 150),
 
-            success: Color::Rgb(0, 120, 0),        // Crisp Dark Green
-            warning: Color::Rgb(140, 80, 0),       // Crisp Dark Amber
-            error: Color::Rgb(180, 0, 0),          // Crisp Dark Red
-            info: Color::Rgb(0, 50, 150),          // Bold Navy
+            success: Color::Rgb(0, 120, 0),  // Crisp Dark Green
+            warning: Color::Rgb(140, 80, 0), // Crisp Dark Amber
+            error: Color::Rgb(180, 0, 0),    // Crisp Dark Red
+            info: Color::Rgb(0, 50, 150),    // Bold Navy
 
-            provider: Color::Rgb(0, 50, 150),      // Bold Navy
-            model: Color::Black,                   // Black
-            agent: Color::Rgb(80, 0, 120),         // Deep Purple
-            advisor: Color::Rgb(140, 80, 0),       // Dark Amber
-            status: Color::Rgb(0, 120, 0),         // Dark Green
+            provider: Color::Rgb(0, 50, 150), // Bold Navy
+            model: Color::Black,              // Black
+            agent: Color::Rgb(80, 0, 120),    // Deep Purple
+            advisor: Color::Rgb(140, 80, 0),  // Dark Amber
+            status: Color::Rgb(0, 120, 0),    // Dark Green
             selection: Color::Gray,
         }
     }
@@ -548,7 +551,9 @@ impl Theme {
 
     /// Style for provider badge (bold).
     pub fn provider_style(&self) -> Style {
-        Style::default().fg(self.provider).add_modifier(Modifier::BOLD)
+        Style::default()
+            .fg(self.provider)
+            .add_modifier(Modifier::BOLD)
     }
 
     /// Style for model name (bold).
@@ -563,7 +568,9 @@ impl Theme {
 
     /// Style for active advisor badge (bold).
     pub fn advisor_style(&self) -> Style {
-        Style::default().fg(self.advisor).add_modifier(Modifier::BOLD)
+        Style::default()
+            .fg(self.advisor)
+            .add_modifier(Modifier::BOLD)
     }
 
     /// Style for running activity status.
@@ -583,12 +590,16 @@ impl Theme {
 
     /// Style for success (e.g. approved critiques).
     pub fn success_style(&self) -> Style {
-        Style::default().fg(self.success).add_modifier(Modifier::BOLD)
+        Style::default()
+            .fg(self.success)
+            .add_modifier(Modifier::BOLD)
     }
 
     /// Style for warnings (e.g. active critiques).
     pub fn warning_style(&self) -> Style {
-        Style::default().fg(self.warning).add_modifier(Modifier::BOLD)
+        Style::default()
+            .fg(self.warning)
+            .add_modifier(Modifier::BOLD)
     }
 
     /// Style for errors.
@@ -708,7 +719,10 @@ impl Theme {
             (self.warning, "!", "CRITIQUE")
         };
 
-        let title = format!(" [Advisor: {}] {} {} ", advisor_name, status_icon, status_text);
+        let title = format!(
+            " [Advisor: {}] {} {} ",
+            advisor_name, status_icon, status_text
+        );
 
         let block = Block::default()
             .title(title)
@@ -753,12 +767,24 @@ mod tests {
 
     #[test]
     fn test_theme_kind_parsing() {
-        assert_eq!(ThemeKind::from_name("tokyo-night"), Some(ThemeKind::TokyoNight));
-        assert_eq!(ThemeKind::from_name("tokyonight"), Some(ThemeKind::TokyoNight));
-        assert_eq!(ThemeKind::from_name("TOKYO_NIGHT"), Some(ThemeKind::TokyoNight));
+        assert_eq!(
+            ThemeKind::from_name("tokyo-night"),
+            Some(ThemeKind::TokyoNight)
+        );
+        assert_eq!(
+            ThemeKind::from_name("tokyonight"),
+            Some(ThemeKind::TokyoNight)
+        );
+        assert_eq!(
+            ThemeKind::from_name("TOKYO_NIGHT"),
+            Some(ThemeKind::TokyoNight)
+        );
         assert_eq!(ThemeKind::from_name("monokai"), Some(ThemeKind::Monokai));
         assert_eq!(ThemeKind::from_name("dracula"), Some(ThemeKind::Dracula));
-        assert_eq!(ThemeKind::from_name("high-contrast"), Some(ThemeKind::HighContrast));
+        assert_eq!(
+            ThemeKind::from_name("high-contrast"),
+            Some(ThemeKind::HighContrast)
+        );
         assert_eq!(ThemeKind::from_name("hc"), Some(ThemeKind::HighContrast));
         assert_eq!(ThemeKind::from_name("adaptive"), Some(ThemeKind::Adaptive));
         assert_eq!(ThemeKind::from_name("unknown_theme"), None);
@@ -821,10 +847,12 @@ mod tests {
             .with_status("Indexing codebase")
             .with_tokens("3.4k tokens");
 
-        terminal.draw(|f| {
-            let area = f.area();
-            theme.render_status_bar(f, area, &info);
-        }).unwrap();
+        terminal
+            .draw(|f| {
+                let area = f.area();
+                theme.render_status_bar(f, area, &info);
+            })
+            .unwrap();
 
         let buffer = terminal.backend().buffer();
         let text: String = buffer.content().iter().map(|c| c.symbol()).collect();
@@ -839,10 +867,12 @@ mod tests {
         let mut terminal = Terminal::new(backend).unwrap();
 
         let theme = Theme::dracula();
-        terminal.draw(|f| {
-            let area = f.area();
-            theme.render_card(f, area, "Notice", "Dracula theme active.", None);
-        }).unwrap();
+        terminal
+            .draw(|f| {
+                let area = f.area();
+                theme.render_card(f, area, "Notice", "Dracula theme active.", None);
+            })
+            .unwrap();
 
         let buffer = terminal.backend().buffer();
         let text: String = buffer.content().iter().map(|c| c.symbol()).collect();
@@ -856,10 +886,12 @@ mod tests {
         let mut terminal = Terminal::new(backend).unwrap();
 
         let theme = Theme::monokai();
-        terminal.draw(|f| {
-            let area = f.area();
-            theme.render_critique_card(f, area, "LinterAdvisor", true, "All checks passed.");
-        }).unwrap();
+        terminal
+            .draw(|f| {
+                let area = f.area();
+                theme.render_critique_card(f, area, "LinterAdvisor", true, "All checks passed.");
+            })
+            .unwrap();
 
         let buffer = terminal.backend().buffer();
         let text: String = buffer.content().iter().map(|c| c.symbol()).collect();
@@ -871,8 +903,7 @@ mod tests {
     #[test]
     fn test_high_contrast_status_spans() {
         let theme = Theme::high_contrast_dark();
-        let info = StatusInfo::new("openai", "gpt-4o")
-            .with_status("Ready");
+        let info = StatusInfo::new("openai", "gpt-4o").with_status("Ready");
 
         let spans = theme.build_status_spans(&info, false);
         assert!(!spans.is_empty());

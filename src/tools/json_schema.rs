@@ -150,9 +150,17 @@ impl ValidationReport {
             if self.warnings.is_empty() {
                 return "✓ JSON instance is valid against schema.".to_string();
             } else {
-                let mut out = format!("✓ JSON instance is valid (with {} warnings):\n", self.warning_count);
+                let mut out = format!(
+                    "✓ JSON instance is valid (with {} warnings):\n",
+                    self.warning_count
+                );
                 for (i, w) in self.warnings.iter().enumerate() {
-                    out.push_str(&format!("  [{}] Warning at `{}`: {}\n", i + 1, w.instance_path, w.message));
+                    out.push_str(&format!(
+                        "  [{}] Warning at `{}`: {}\n",
+                        i + 1,
+                        w.instance_path,
+                        w.message
+                    ));
                 }
                 return out;
             }
@@ -392,7 +400,10 @@ pub fn validate_string_format(format: &str, value: &str) -> bool {
         "uri" => {
             // Must have a scheme and not be empty
             if let Some(idx) = value.find(':') {
-                idx > 0 && value[..idx].chars().all(|c| c.is_ascii_alphanumeric() || c == '+' || c == '-' || c == '.')
+                idx > 0
+                    && value[..idx]
+                        .chars()
+                        .all(|c| c.is_ascii_alphanumeric() || c == '+' || c == '-' || c == '.')
             } else {
                 false
             }
@@ -411,9 +422,7 @@ pub fn validate_string_format(format: &str, value: &str) -> bool {
             })
         }
         "regex" => Regex::new(value).is_ok(),
-        "json-pointer" => {
-            value.is_empty() || value.starts_with('/')
-        }
+        "json-pointer" => value.is_empty() || value.starts_with('/'),
         _ => true, // Unknown or unsupported format keywords are ignored per JSON Schema spec
     }
 }
@@ -492,14 +501,15 @@ impl JsonSchemaValidator {
         errors: &mut Vec<ValidationError>,
     ) {
         if depth > self.max_depth {
-            errors.push(
-                ValidationError::new(
-                    instance_path,
-                    schema_path,
-                    "$depth",
-                    format!("Maximum schema evaluation depth of {} exceeded (possible cyclic $ref).", self.max_depth),
+            errors.push(ValidationError::new(
+                instance_path,
+                schema_path,
+                "$depth",
+                format!(
+                    "Maximum schema evaluation depth of {} exceeded (possible cyclic $ref).",
+                    self.max_depth
                 ),
-            );
+            ));
             return;
         }
 
@@ -584,11 +594,17 @@ impl JsonSchemaValidator {
                         instance_path,
                         format!("{}/type", schema_path),
                         "type",
-                        format!("Expected type `{}`, but got `{}`.", expected_desc, actual_type_name),
+                        format!(
+                            "Expected type `{}`, but got `{}`.",
+                            expected_desc, actual_type_name
+                        ),
                     )
                     .with_expected(type_val.clone())
                     .with_actual(json!(actual_type_name))
-                    .with_suggestion(format!("Provide a value of type `{}` instead.", expected_desc)),
+                    .with_suggestion(format!(
+                        "Provide a value of type `{}` instead.",
+                        expected_desc
+                    )),
                 );
                 return; // Early return on type mismatch for this branch
             }
@@ -653,7 +669,10 @@ impl JsonSchemaValidator {
                         instance_path,
                         format!("{}/minimum", schema_path),
                         "minimum",
-                        format!("Value {} must be greater than or equal to {}.", num, min_val),
+                        format!(
+                            "Value {} must be greater than or equal to {}.",
+                            num, min_val
+                        ),
                     ));
                 }
             }
@@ -730,7 +749,10 @@ impl JsonSchemaValidator {
                         instance_path,
                         format!("{}/minLength", schema_path),
                         "minLength",
-                        format!("String length {} is shorter than minimum length {}.", char_count, min_len),
+                        format!(
+                            "String length {} is shorter than minimum length {}.",
+                            char_count, min_len
+                        ),
                     ));
                 }
             }
@@ -741,7 +763,10 @@ impl JsonSchemaValidator {
                         instance_path,
                         format!("{}/maxLength", schema_path),
                         "maxLength",
-                        format!("String length {} is longer than maximum length {}.", char_count, max_len),
+                        format!(
+                            "String length {} is longer than maximum length {}.",
+                            char_count, max_len
+                        ),
                     ));
                 }
             }
@@ -755,7 +780,10 @@ impl JsonSchemaValidator {
                                     instance_path,
                                     format!("{}/pattern", schema_path),
                                     "pattern",
-                                    format!("String does not match required regex pattern `{}`.", pat),
+                                    format!(
+                                        "String does not match required regex pattern `{}`.",
+                                        pat
+                                    ),
                                 )
                                 .with_expected(json!(pat))
                                 .with_actual(json!(s)),
@@ -784,7 +812,10 @@ impl JsonSchemaValidator {
                         )
                         .with_expected(json!(fmt))
                         .with_actual(json!(s))
-                        .with_suggestion(format!("Ensure the string conforms to standard `{}` format.", fmt)),
+                        .with_suggestion(format!(
+                            "Ensure the string conforms to standard `{}` format.",
+                            fmt
+                        )),
                     );
                 }
             }
@@ -798,7 +829,11 @@ impl JsonSchemaValidator {
                         instance_path,
                         format!("{}/minItems", schema_path),
                         "minItems",
-                        format!("Array contains {} items, but minimum required is {}.", arr.len(), min_items),
+                        format!(
+                            "Array contains {} items, but minimum required is {}.",
+                            arr.len(),
+                            min_items
+                        ),
                     ));
                 }
             }
@@ -809,7 +844,11 @@ impl JsonSchemaValidator {
                         instance_path,
                         format!("{}/maxItems", schema_path),
                         "maxItems",
-                        format!("Array contains {} items, exceeding maximum allowed of {}.", arr.len(), max_items),
+                        format!(
+                            "Array contains {} items, exceeding maximum allowed of {}.",
+                            arr.len(),
+                            max_items
+                        ),
                     ));
                 }
             }
@@ -917,7 +956,10 @@ impl JsonSchemaValidator {
                         instance_path,
                         format!("{}/contains", schema_path),
                         "contains",
-                        format!("Array must contain at least {} matching item(s), but matched {}.", min_contains, match_count),
+                        format!(
+                            "Array must contain at least {} matching item(s), but matched {}.",
+                            min_contains, match_count
+                        ),
                     ));
                 }
 
@@ -927,7 +969,10 @@ impl JsonSchemaValidator {
                             instance_path,
                             format!("{}/maxContains", schema_path),
                             "maxContains",
-                            format!("Array must contain at most {} matching item(s), but matched {}.", max_contains, match_count),
+                            format!(
+                                "Array must contain at most {} matching item(s), but matched {}.",
+                                max_contains, match_count
+                            ),
                         ));
                     }
                 }
@@ -958,9 +1003,13 @@ impl JsonSchemaValidator {
                             // Suggest closest match among received keys
                             let received_keys: Vec<String> = obj.keys().cloned().collect();
                             if let Some(suggestion) = find_closest_match(req_name, &received_keys) {
-                                err = err.with_suggestion(format!("Did you mean `{}`?", suggestion));
+                                err =
+                                    err.with_suggestion(format!("Did you mean `{}`?", suggestion));
                             } else if declared_props.contains(&req_name.to_string()) {
-                                err = err.with_suggestion(format!("Provide the `{}` field in the request object.", req_name));
+                                err = err.with_suggestion(format!(
+                                    "Provide the `{}` field in the request object.",
+                                    req_name
+                                ));
                             }
                             errors.push(err);
                         }
@@ -975,7 +1024,11 @@ impl JsonSchemaValidator {
                         instance_path,
                         format!("{}/minProperties", schema_path),
                         "minProperties",
-                        format!("Object contains {} properties, fewer than minProperties of {}.", obj.len(), min_props),
+                        format!(
+                            "Object contains {} properties, fewer than minProperties of {}.",
+                            obj.len(),
+                            min_props
+                        ),
                     ));
                 }
             }
@@ -986,7 +1039,11 @@ impl JsonSchemaValidator {
                         instance_path,
                         format!("{}/maxProperties", schema_path),
                         "maxProperties",
-                        format!("Object contains {} properties, exceeding maxProperties of {}.", obj.len(), max_props),
+                        format!(
+                            "Object contains {} properties, exceeding maxProperties of {}.",
+                            obj.len(),
+                            max_props
+                        ),
                     ));
                 }
             }
@@ -1010,7 +1067,10 @@ impl JsonSchemaValidator {
                             format!("{}/{}", instance_path, escape_json_pointer_token(key)),
                             format!("{}/propertyNames", schema_path),
                             "propertyNames",
-                            format!("Property name `{}` is invalid according to propertyNames schema.", key),
+                            format!(
+                                "Property name `{}` is invalid according to propertyNames schema.",
+                                key
+                            ),
                         ));
                     }
                 }
@@ -1018,7 +1078,9 @@ impl JsonSchemaValidator {
 
             // Properties & PatternProperties & AdditionalProperties
             let declared_properties = schema_obj.get("properties").and_then(|v| v.as_object());
-            let pattern_properties = schema_obj.get("patternProperties").and_then(|v| v.as_object());
+            let pattern_properties = schema_obj
+                .get("patternProperties")
+                .and_then(|v| v.as_object());
             let additional_props = schema_obj.get("additionalProperties");
 
             for (key, val) in obj {
@@ -1033,7 +1095,11 @@ impl JsonSchemaValidator {
                 if let Some(props_map) = declared_properties {
                     if let Some(prop_schema) = props_map.get(key) {
                         matched_rule = true;
-                        let next_schema_path = format!("{}/properties/{}", schema_path, escape_json_pointer_token(key));
+                        let next_schema_path = format!(
+                            "{}/properties/{}",
+                            schema_path,
+                            escape_json_pointer_token(key)
+                        );
                         self.validate_node(
                             prop_schema,
                             val,
@@ -1053,7 +1119,11 @@ impl JsonSchemaValidator {
                             Ok(re) => {
                                 if re.is_match(key) {
                                     matched_rule = true;
-                                    let next_schema_path = format!("{}/patternProperties/{}", schema_path, escape_json_pointer_token(pat));
+                                    let next_schema_path = format!(
+                                        "{}/patternProperties/{}",
+                                        schema_path,
+                                        escape_json_pointer_token(pat)
+                                    );
                                     self.validate_node(
                                         sub_schema,
                                         val,
@@ -1084,15 +1154,20 @@ impl JsonSchemaValidator {
                                 .with_actual(json!(key));
 
                                 if let Some(props_map) = declared_properties {
-                                    let known_keys: Vec<String> = props_map.keys().cloned().collect();
+                                    let known_keys: Vec<String> =
+                                        props_map.keys().cloned().collect();
                                     if let Some(closest) = find_closest_match(key, &known_keys) {
-                                        err = err.with_suggestion(format!("Did you mean `{}`?", closest));
+                                        err = err.with_suggestion(format!(
+                                            "Did you mean `{}`?",
+                                            closest
+                                        ));
                                     }
                                 }
                                 errors.push(err);
                             }
                             Value::Object(_) | Value::Bool(true) => {
-                                let next_schema_path = format!("{}/additionalProperties", schema_path);
+                                let next_schema_path =
+                                    format!("{}/additionalProperties", schema_path);
                                 self.validate_node(
                                     additional,
                                     val,
@@ -1110,7 +1185,10 @@ impl JsonSchemaValidator {
             }
 
             // Dependent Required / Dependencies
-            if let Some(Value::Object(deps_map)) = schema_obj.get("dependentRequired").or_else(|| schema_obj.get("dependencies")) {
+            if let Some(Value::Object(deps_map)) = schema_obj
+                .get("dependentRequired")
+                .or_else(|| schema_obj.get("dependencies"))
+            {
                 for (prop_key, dep_val) in deps_map {
                     if obj.contains_key(prop_key) {
                         if let Value::Array(req_keys) = dep_val {
@@ -1128,7 +1206,8 @@ impl JsonSchemaValidator {
                             }
                         } else if dep_val.is_object() || dep_val.is_boolean() {
                             // Dependent Schema
-                            let next_schema_path = format!("{}/dependentSchemas/{}", schema_path, prop_key);
+                            let next_schema_path =
+                                format!("{}/dependentSchemas/{}", schema_path, prop_key);
                             self.validate_node(
                                 dep_val,
                                 instance,
@@ -1230,14 +1309,20 @@ impl JsonSchemaValidator {
                     instance_path,
                     format!("{}/oneOf", schema_path),
                     "oneOf",
-                    format!("Instance matched 0 `oneOf` schemas, expected exactly 1 (failures: {}).", reasons),
+                    format!(
+                        "Instance matched 0 `oneOf` schemas, expected exactly 1 (failures: {}).",
+                        reasons
+                    ),
                 ));
             } else if match_count > 1 {
                 errors.push(ValidationError::new(
                     instance_path,
                     format!("{}/oneOf", schema_path),
                     "oneOf",
-                    format!("Instance matched {} `oneOf` schemas, expected exactly 1.", match_count),
+                    format!(
+                        "Instance matched {} `oneOf` schemas, expected exactly 1.",
+                        match_count
+                    ),
                 ));
             }
         }
@@ -1409,9 +1494,8 @@ fn repair_node(
         _ => return instance.clone(),
     };
 
-    let declared_props: Option<&Map<String, Value>> = schema_obj
-        .get("properties")
-        .and_then(|v| v.as_object());
+    let declared_props: Option<&Map<String, Value>> =
+        schema_obj.get("properties").and_then(|v| v.as_object());
 
     let expected_type = schema_obj.get("type").and_then(|v| v.as_str());
 
@@ -1462,7 +1546,10 @@ fn repair_node(
                         actions.push(CoercionAction {
                             path: path.to_string(),
                             action_type: "coerce_integer".to_string(),
-                            description: format!("Coerced string \"{}\" to integer {}.", s, int_val),
+                            description: format!(
+                                "Coerced string \"{}\" to integer {}.",
+                                s, int_val
+                            ),
                         });
                         val = json!(int_val);
                     }
@@ -1478,7 +1565,10 @@ fn repair_node(
                         actions.push(CoercionAction {
                             path: path.to_string(),
                             action_type: "coerce_number".to_string(),
-                            description: format!("Coerced string \"{}\" to number {}.", s, float_val),
+                            description: format!(
+                                "Coerced string \"{}\" to number {}.",
+                                s, float_val
+                            ),
                         });
                         val = json!(float_val);
                     }
@@ -1546,7 +1636,10 @@ fn repair_node(
                             actions.push(CoercionAction {
                                 path: format!("{}/{}", path, prop_name),
                                 action_type: "apply_default".to_string(),
-                                description: format!("Applied default value for missing property `{}`: {}", prop_name, def_val),
+                                description: format!(
+                                    "Applied default value for missing property `{}`: {}",
+                                    prop_name, def_val
+                                ),
                             });
                         }
                     }
@@ -1621,7 +1714,10 @@ fn generate_template_node(schema: &Value, include_optional: bool, depth: usize) 
     if let Some(def) = schema_obj.get("default") {
         return def.clone();
     }
-    if let Some(ex) = schema_obj.get("example").or_else(|| schema_obj.get("examples").and_then(|v| v.get(0))) {
+    if let Some(ex) = schema_obj
+        .get("example")
+        .or_else(|| schema_obj.get("examples").and_then(|v| v.get(0)))
+    {
         return ex.clone();
     }
     if let Some(Value::Array(enum_vals)) = schema_obj.get("enum") {
@@ -1652,7 +1748,8 @@ fn generate_template_node(schema: &Value, include_optional: bool, depth: usize) 
                 for (prop_name, prop_schema) in props {
                     let is_req = required_set.contains(prop_name.as_str());
                     if is_req || include_optional {
-                        let sample_val = generate_template_node(prop_schema, include_optional, depth + 1);
+                        let sample_val =
+                            generate_template_node(prop_schema, include_optional, depth + 1);
                         obj.insert(prop_name.clone(), sample_val);
                     }
                 }
@@ -1843,7 +1940,11 @@ pub fn schema_to_markdown_docs(tool_name: &str, description: &str, parameters: &
     for p in &summary.properties {
         let req_icon = if p.required { "**Yes**" } else { "No" };
         let def_str = p.default_val.as_deref().unwrap_or("-");
-        let desc = if p.description.is_empty() { "-" } else { &p.description };
+        let desc = if p.description.is_empty() {
+            "-"
+        } else {
+            &p.description
+        };
         let constraints_str = if p.constraints.is_empty() {
             "-".to_string()
         } else {
@@ -1906,7 +2007,10 @@ pub fn diff_schemas(old_schema: &Value, new_schema: &Value) -> SchemaDiffReport 
                         path: format!("/properties/{}", new_p.name),
                         change_type: "newly_required".to_string(),
                         breaking: true,
-                        message: format!("Property `{}` was previously optional, now required without default.", new_p.name),
+                        message: format!(
+                            "Property `{}` was previously optional, now required without default.",
+                            new_p.name
+                        ),
                     });
                 }
             } else if new_p.default_val.is_none() {
@@ -1914,7 +2018,10 @@ pub fn diff_schemas(old_schema: &Value, new_schema: &Value) -> SchemaDiffReport 
                     path: format!("/properties/{}", new_p.name),
                     change_type: "new_required_property".to_string(),
                     breaking: true,
-                    message: format!("Newly added property `{}` is required without a default value.", new_p.name),
+                    message: format!(
+                        "Newly added property `{}` is required without a default value.",
+                        new_p.name
+                    ),
                 });
             }
         }
@@ -1941,7 +2048,10 @@ pub fn diff_schemas(old_schema: &Value, new_schema: &Value) -> SchemaDiffReport 
                     path: format!("/properties/{}/type", name),
                     change_type: "changed_type".to_string(),
                     breaking: true,
-                    message: format!("Property `{}` type changed from `{}` to `{}`.", name, old_p.type_desc, new_p.type_desc),
+                    message: format!(
+                        "Property `{}` type changed from `{}` to `{}`.",
+                        name, old_p.type_desc, new_p.type_desc
+                    ),
                 });
             }
         }
@@ -1959,7 +2069,10 @@ pub fn diff_schemas(old_schema: &Value, new_schema: &Value) -> SchemaDiffReport 
 // ===========================================================================
 
 /// Validates tool call arguments against declared tool parameter schema.
-pub fn validate_tool_args(declared_parameters: &Value, args: &Value) -> Result<(), ValidationReport> {
+pub fn validate_tool_args(
+    declared_parameters: &Value,
+    args: &Value,
+) -> Result<(), ValidationReport> {
     let validator = JsonSchemaValidator::new(declared_parameters.clone());
     let report = validator.validate(args);
     if report.valid {
@@ -1970,7 +2083,10 @@ pub fn validate_tool_args(declared_parameters: &Value, args: &Value) -> Result<(
 }
 
 /// Validates tool call arguments against a ToolDefinition.
-pub fn validate_tool_definition(def: &ToolDefinition, args: &Value) -> Result<(), ValidationReport> {
+pub fn validate_tool_definition(
+    def: &ToolDefinition,
+    args: &Value,
+) -> Result<(), ValidationReport> {
     validate_tool_args(&def.parameters, args)
 }
 
@@ -2117,7 +2233,8 @@ impl Tool for JsonSchemaTool {
             .get("schema")
             .ok_or_else(|| anyhow::anyhow!("Missing required parameter: `schema`"))?;
         let schema: Value = if let Value::String(s) = schema_raw {
-            serde_json::from_str(s).map_err(|e| anyhow::anyhow!("Invalid JSON in `schema`: {}", e))?
+            serde_json::from_str(s)
+                .map_err(|e| anyhow::anyhow!("Invalid JSON in `schema`: {}", e))?
         } else {
             schema_raw.clone()
         };
@@ -2348,7 +2465,11 @@ mod tests {
 
         let validator = JsonSchemaValidator::new(schema);
 
-        assert!(validator.validate(&json!({ "port": 8080, "step": 2.5 })).valid);
+        assert!(
+            validator
+                .validate(&json!({ "port": 8080, "step": 2.5 }))
+                .valid
+        );
         assert!(!validator.validate(&json!({ "port": 0 })).valid);
         assert!(!validator.validate(&json!({ "port": 70000 })).valid);
         assert!(!validator.validate(&json!({ "step": 2.3 })).valid);
@@ -2515,7 +2636,10 @@ mod tests {
 
         let report = diff_schemas(&old_schema, &new_schema);
         assert!(report.has_breaking_changes);
-        assert!(report.changes.iter().any(|c| c.change_type == "new_required_property"));
+        assert!(report
+            .changes
+            .iter()
+            .any(|c| c.change_type == "new_required_property"));
     }
 
     #[tokio::test]
@@ -2611,8 +2735,14 @@ mod tests {
     fn test_validate_fn_min_max() {
         let schema = json!({ "type": "number", "minimum": 1.0, "maximum": 100.0 });
         assert!(validate(&schema, &json!(50)).is_ok());
-        assert!(validate(&schema, &json!(0)).unwrap_err().iter().any(|e| e.keyword == "minimum"));
-        assert!(validate(&schema, &json!(101)).unwrap_err().iter().any(|e| e.keyword == "maximum"));
+        assert!(validate(&schema, &json!(0))
+            .unwrap_err()
+            .iter()
+            .any(|e| e.keyword == "minimum"));
+        assert!(validate(&schema, &json!(101))
+            .unwrap_err()
+            .iter()
+            .any(|e| e.keyword == "maximum"));
     }
 
     #[test]

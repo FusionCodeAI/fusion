@@ -406,7 +406,9 @@ fn build_glob_set(patterns: &[String]) -> anyhow::Result<Option<GlobSet>> {
         let glob = Glob::new(p).map_err(|e| anyhow::anyhow!("Invalid glob pattern '{p}': {e}"))?;
         builder.add(glob);
     }
-    let set = builder.build().map_err(|e| anyhow::anyhow!("Failed to build glob set: {e}"))?;
+    let set = builder
+        .build()
+        .map_err(|e| anyhow::anyhow!("Failed to build glob set: {e}"))?;
     Ok(Some(set))
 }
 
@@ -500,10 +502,8 @@ impl WorkspaceWatcher {
 
                 // Capture snapshot in blocking thread pool
                 let cfg_clone = loop_config.clone();
-                let current_res = tokio::task::spawn_blocking(move || {
-                    FileSnapshot::capture(&cfg_clone)
-                })
-                .await;
+                let current_res =
+                    tokio::task::spawn_blocking(move || FileSnapshot::capture(&cfg_clone)).await;
 
                 let current_snapshot = match current_res {
                     Ok(Ok(snap)) => snap,
@@ -900,7 +900,10 @@ impl Tool for WatchTool {
         match action {
             "start" => {
                 if !target_path.exists() {
-                    anyhow::bail!("Cannot watch non-existent path: '{}'", target_path.display());
+                    anyhow::bail!(
+                        "Cannot watch non-existent path: '{}'",
+                        target_path.display()
+                    );
                 }
 
                 let interval_ms = args
@@ -1030,10 +1033,7 @@ impl Tool for WatchTool {
             }
 
             "changes" => {
-                let clear = args
-                    .get("clear")
-                    .and_then(|v| v.as_bool())
-                    .unwrap_or(true);
+                let clear = args.get("clear").and_then(|v| v.as_bool()).unwrap_or(true);
 
                 let watcher_arc = if let Some(id) = watch_id {
                     mgr.get_watcher(id)
@@ -1080,7 +1080,9 @@ impl Tool for WatchTool {
                     let changes = w.diff_from_baseline().await?;
 
                     if changes.is_empty() {
-                        Ok(format!("Workspace is identical to baseline snapshot for '{id}'."))
+                        Ok(format!(
+                            "Workspace is identical to baseline snapshot for '{id}'."
+                        ))
                     } else {
                         let mut out = format!(
                             "Baseline diff for '{id}' ({} change(s) detected since start):\n",
@@ -1306,7 +1308,10 @@ mod tests {
         let created = diff.iter().find(|c| c.kind == ChangeKind::Created).unwrap();
         assert_eq!(created.path, "file_c.txt");
 
-        let modified = diff.iter().find(|c| c.kind == ChangeKind::Modified).unwrap();
+        let modified = diff
+            .iter()
+            .find(|c| c.kind == ChangeKind::Modified)
+            .unwrap();
         assert_eq!(modified.path, "file_a.txt");
 
         let deleted = diff.iter().find(|c| c.kind == ChangeKind::Deleted).unwrap();

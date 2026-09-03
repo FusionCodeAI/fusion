@@ -62,7 +62,7 @@ use serde::{Deserialize, Serialize, Serializer};
 use thiserror::Error;
 
 use crate::config::Config;
-use crate::ui::keys::{KeybindingProfile, ViMode, KeyResult, PromptState, KeyHandler};
+use crate::ui::keys::{KeyHandler, KeyResult, KeybindingProfile, PromptState, ViMode};
 
 /// Standard filename for custom keymap configuration in `~/.fusion/`.
 pub const KEYMAP_FILE_NAME: &str = "keymap.json";
@@ -748,9 +748,7 @@ impl KeyAction {
             "move_to_buffer_start" | "beginning_of_buffer" | "buffer_start" => {
                 Ok(KeyAction::MoveToBufferStart)
             }
-            "move_to_buffer_end" | "end_of_buffer" | "buffer_end" => {
-                Ok(KeyAction::MoveToBufferEnd)
-            }
+            "move_to_buffer_end" | "end_of_buffer" | "buffer_end" => Ok(KeyAction::MoveToBufferEnd),
 
             "insert_newline" | "newline" => Ok(KeyAction::InsertNewline),
             "insert_tab" | "tab" => Ok(KeyAction::InsertTab),
@@ -1254,16 +1252,14 @@ impl KeymapConfig {
     /// Bind a key chord to an action in Vi Normal mode scope.
     pub fn bind_vi_normal(&mut self, chord: &str, action: KeyAction) -> Result<(), KeymapError> {
         let parsed = KeyChord::parse(chord)?;
-        self.vi_normal
-            .insert(parsed.to_canonical_string(), action);
+        self.vi_normal.insert(parsed.to_canonical_string(), action);
         Ok(())
     }
 
     /// Bind a key chord to an action in Vi Insert mode scope.
     pub fn bind_vi_insert(&mut self, chord: &str, action: KeyAction) -> Result<(), KeymapError> {
         let parsed = KeyChord::parse(chord)?;
-        self.vi_insert
-            .insert(parsed.to_canonical_string(), action);
+        self.vi_insert.insert(parsed.to_canonical_string(), action);
         Ok(())
     }
 
@@ -1301,9 +1297,10 @@ impl KeymapConfig {
         for (chord_str, _action) in &self.bindings {
             validation.total_bindings += 1;
             if let Err(e) = KeyChord::parse(chord_str) {
-                validation
-                    .errors
-                    .push(format!("Invalid global binding chord '{}': {}", chord_str, e));
+                validation.errors.push(format!(
+                    "Invalid global binding chord '{}': {}",
+                    chord_str, e
+                ));
             }
         }
 
@@ -1311,9 +1308,10 @@ impl KeymapConfig {
         for (chord_str, _action) in &self.emacs {
             validation.total_bindings += 1;
             if let Err(e) = KeyChord::parse(chord_str) {
-                validation
-                    .errors
-                    .push(format!("Invalid Emacs binding chord '{}': {}", chord_str, e));
+                validation.errors.push(format!(
+                    "Invalid Emacs binding chord '{}': {}",
+                    chord_str, e
+                ));
             }
         }
 
@@ -1364,14 +1362,9 @@ impl KeymapConfig {
         cfg.leader_timeout_ms = Some(1000);
 
         // Global bindings
-        cfg.bindings.insert(
-            "Ctrl+S".to_string(),
-            KeyAction::Submit,
-        );
-        cfg.bindings.insert(
-            "Alt+Enter".to_string(),
-            KeyAction::InsertNewline,
-        );
+        cfg.bindings.insert("Ctrl+S".to_string(), KeyAction::Submit);
+        cfg.bindings
+            .insert("Alt+Enter".to_string(), KeyAction::InsertNewline);
         cfg.bindings.insert(
             "Ctrl+Shift+C".to_string(),
             KeyAction::ExecuteCommand("/clear".to_string()),
@@ -1382,18 +1375,11 @@ impl KeymapConfig {
         );
 
         // Emacs overrides
-        cfg.emacs.insert(
-            "Ctrl+K".to_string(),
-            KeyAction::KillToEol,
-        );
-        cfg.emacs.insert(
-            "Alt+F".to_string(),
-            KeyAction::MoveWordRight,
-        );
-        cfg.emacs.insert(
-            "Alt+B".to_string(),
-            KeyAction::MoveWordLeft,
-        );
+        cfg.emacs.insert("Ctrl+K".to_string(), KeyAction::KillToEol);
+        cfg.emacs
+            .insert("Alt+F".to_string(), KeyAction::MoveWordRight);
+        cfg.emacs
+            .insert("Alt+B".to_string(), KeyAction::MoveWordLeft);
 
         // Vi Normal overrides
         cfg.vi_normal.insert(
@@ -1526,10 +1512,7 @@ impl KeymapManager {
             }
         }
 
-        let leader_chord = config
-            .leader
-            .as_ref()
-            .and_then(|l| KeyChord::parse(l).ok());
+        let leader_chord = config.leader.as_ref().and_then(|l| KeyChord::parse(l).ok());
         let leader_timeout = Duration::from_millis(
             config
                 .leader_timeout_ms
@@ -1722,10 +1705,7 @@ mod tests {
 
     #[test]
     fn test_key_action_parsing() {
-        assert_eq!(
-            KeyAction::parse_str("submit").unwrap(),
-            KeyAction::Submit
-        );
+        assert_eq!(KeyAction::parse_str("submit").unwrap(), KeyAction::Submit);
         assert_eq!(
             KeyAction::parse_str("kill_to_eol").unwrap(),
             KeyAction::KillToEol
@@ -1747,12 +1727,8 @@ mod tests {
 
         let mut config = KeymapConfig::default();
         config.leader = Some("Ctrl+X".to_string());
-        config
-            .bind("ctrl+s", KeyAction::Submit)
-            .unwrap();
-        config
-            .bind("ctrl+k", KeyAction::KillToEol)
-            .unwrap();
+        config.bind("ctrl+s", KeyAction::Submit).unwrap();
+        config.bind("ctrl+k", KeyAction::KillToEol).unwrap();
         config
             .bind_emacs("alt+f", KeyAction::MoveWordRight)
             .unwrap();
@@ -1768,21 +1744,14 @@ mod tests {
         assert_eq!(loaded.leader.as_deref(), Some("Ctrl+X"));
         assert_eq!(loaded.bindings.get("Ctrl+S"), Some(&KeyAction::Submit));
         assert_eq!(loaded.bindings.get("Ctrl+K"), Some(&KeyAction::KillToEol));
-        assert_eq!(
-            loaded.emacs.get("Alt+F"),
-            Some(&KeyAction::MoveWordRight)
-        );
+        assert_eq!(loaded.emacs.get("Alt+F"), Some(&KeyAction::MoveWordRight));
     }
 
     #[test]
     fn test_keymap_validation() {
         let mut config = KeymapConfig::default();
-        config
-            .bind("ctrl+c", KeyAction::Cancel)
-            .unwrap();
-        config
-            .bind("alt+enter", KeyAction::InsertNewline)
-            .unwrap();
+        config.bind("ctrl+c", KeyAction::Cancel).unwrap();
+        config.bind("alt+enter", KeyAction::InsertNewline).unwrap();
 
         let val = config.validate();
         assert!(val.is_valid);
@@ -1801,15 +1770,9 @@ mod tests {
     #[test]
     fn test_keymap_manager_resolution() {
         let mut config = KeymapConfig::default();
-        config
-            .bind("ctrl+s", KeyAction::Submit)
-            .unwrap();
-        config
-            .bind_emacs("ctrl+k", KeyAction::KillToEol)
-            .unwrap();
-        config
-            .bind_vi_normal("j", KeyAction::MoveDown)
-            .unwrap();
+        config.bind("ctrl+s", KeyAction::Submit).unwrap();
+        config.bind_emacs("ctrl+k", KeyAction::KillToEol).unwrap();
+        config.bind_vi_normal("j", KeyAction::MoveDown).unwrap();
 
         let mut mgr = KeymapManager::from_config(config);
 

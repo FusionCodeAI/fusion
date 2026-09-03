@@ -29,9 +29,7 @@ pub struct ToolCall {
 
 impl PartialEq for ToolCall {
     fn eq(&self, other: &Self) -> bool {
-        self.id == other.id
-            && self.name == other.name
-            && self.arguments == other.arguments
+        self.id == other.id && self.name == other.name && self.arguments == other.arguments
     }
 }
 impl Eq for ToolCall {}

@@ -199,7 +199,10 @@ pub fn parse_upstream_tracking(track_str: &str) -> (usize, usize, bool) {
     let mut behind = 0;
     let mut is_gone = false;
 
-    let clean = track_str.trim().trim_start_matches('[').trim_end_matches(']');
+    let clean = track_str
+        .trim()
+        .trim_start_matches('[')
+        .trim_end_matches(']');
     if clean.is_empty() {
         return (ahead, behind, is_gone);
     }
@@ -238,7 +241,8 @@ pub async fn get_current_head_info(
     repo_dir: &Path,
 ) -> anyhow::Result<(Option<String>, bool, Option<String>, Option<String>)> {
     // Check if HEAD is symbolic (named branch)
-    let sym_output = run_git_command(&["symbolic-ref", "--short", "-q", "HEAD"], repo_dir, 5).await?;
+    let sym_output =
+        run_git_command(&["symbolic-ref", "--short", "-q", "HEAD"], repo_dir, 5).await?;
     if sym_output.success && !sym_output.stdout.trim().is_empty() {
         let branch = sym_output.stdout.trim().to_string();
         return Ok((Some(branch), false, None, None));
@@ -252,7 +256,8 @@ pub async fn get_current_head_info(
         None
     };
 
-    let subject_output = run_git_command(&["log", "-1", "--format=%s", "HEAD"], repo_dir, 5).await?;
+    let subject_output =
+        run_git_command(&["log", "-1", "--format=%s", "HEAD"], repo_dir, 5).await?;
     let commit_subject = if subject_output.success && !subject_output.stdout.trim().is_empty() {
         Some(subject_output.stdout.trim().to_string())
     } else {
@@ -265,7 +270,12 @@ pub async fn get_current_head_info(
 /// Checks if a local branch exists by name.
 pub async fn local_branch_exists(name: &str, repo_dir: &Path) -> bool {
     let full_ref = format!("refs/heads/{name}");
-    let out = run_git_command(&["rev-parse", "--verify", "--quiet", &full_ref], repo_dir, 5).await;
+    let out = run_git_command(
+        &["rev-parse", "--verify", "--quiet", &full_ref],
+        repo_dir,
+        5,
+    )
+    .await;
     match out {
         Ok(res) => res.success && !res.stdout.trim().is_empty(),
         Err(_) => false,
@@ -275,7 +285,12 @@ pub async fn local_branch_exists(name: &str, repo_dir: &Path) -> bool {
 /// Checks if a remote tracking branch exists by name (e.g. "origin/main").
 pub async fn remote_branch_exists(name: &str, repo_dir: &Path) -> bool {
     let full_ref = format!("refs/remotes/{name}");
-    let out = run_git_command(&["rev-parse", "--verify", "--quiet", &full_ref], repo_dir, 5).await;
+    let out = run_git_command(
+        &["rev-parse", "--verify", "--quiet", &full_ref],
+        repo_dir,
+        5,
+    )
+    .await;
     match out {
         Ok(res) => res.success && !res.stdout.trim().is_empty(),
         Err(_) => false,
@@ -399,7 +414,10 @@ pub fn format_branch_list(report: &BranchListReport) -> String {
     if report.branches.is_empty() {
         if report.is_detached {
             if let Some(hash) = &report.detached_commit {
-                let subj = report.detached_subject.as_deref().unwrap_or("No commit subject");
+                let subj = report
+                    .detached_subject
+                    .as_deref()
+                    .unwrap_or("No commit subject");
                 out.push_str(&format!(
                     "* (HEAD detached at {hash}) {subj}\n\n(No local branches found)\n"
                 ));
@@ -438,7 +456,8 @@ pub fn format_branch_list(report: &BranchListReport) -> String {
             if branch.is_gone {
                 tracking_info = format!(" [{up}: gone]");
             } else if branch.ahead > 0 && branch.behind > 0 {
-                tracking_info = format!(" [{up}: ahead {}, behind {}]", branch.ahead, branch.behind);
+                tracking_info =
+                    format!(" [{up}: ahead {}, behind {}]", branch.ahead, branch.behind);
             } else if branch.ahead > 0 {
                 tracking_info = format!(" [{up}: ahead {}]", branch.ahead);
             } else if branch.behind > 0 {
@@ -637,11 +656,12 @@ pub fn parse_worktree_standard(output: &str, repo_root: &Path) -> Vec<WorktreeIn
         }
 
         let path = parts[0].to_string();
-        let head_commit = if parts.len() > 1 && !parts[1].starts_with('(') && !parts[1].starts_with('[') {
-            parts[1].to_string()
-        } else {
-            "HEAD".to_string()
-        };
+        let head_commit =
+            if parts.len() > 1 && !parts[1].starts_with('(') && !parts[1].starts_with('[') {
+                parts[1].to_string()
+            } else {
+                "HEAD".to_string()
+            };
 
         let mut branch = None;
         for part in &parts {
@@ -775,7 +795,10 @@ pub async fn create_worktree(
     detach: bool,
 ) -> anyhow::Result<WorktreeOpResult> {
     let path_str = worktree_path.to_str().ok_or_else(|| {
-        anyhow::anyhow!("Invalid worktree path encoding: {}", worktree_path.display())
+        anyhow::anyhow!(
+            "Invalid worktree path encoding: {}",
+            worktree_path.display()
+        )
     })?;
 
     let mut cmd_args: Vec<&str> = vec!["worktree", "add"];
@@ -843,7 +866,11 @@ pub async fn create_worktree(
     Ok(WorktreeOpResult {
         action: "create_worktree".to_string(),
         path: worktree_path.display().to_string(),
-        branch: if detach { None } else { branch.map(|s| s.to_string()) },
+        branch: if detach {
+            None
+        } else {
+            branch.map(|s| s.to_string())
+        },
         success: true,
         message: format!(
             "Created worktree at '{}' with {}{}",
@@ -962,11 +989,7 @@ pub async fn prune_worktrees(
         path: repo_dir.display().to_string(),
         branch: None,
         success: true,
-        message: format!(
-            "{}{}",
-            if dry_run { "[dry-run] " } else { "" },
-            details
-        ),
+        message: format!("{}{}", if dry_run { "[dry-run] " } else { "" }, details),
         commit: None,
     })
 }
@@ -998,7 +1021,9 @@ pub async fn lock_worktree(
         message: format!(
             "Locked worktree '{}'{}",
             worktree_target,
-            reason.map(|r| format!(" (reason: {r})")).unwrap_or_default()
+            reason
+                .map(|r| format!(" (reason: {r})"))
+                .unwrap_or_default()
         ),
         commit: None,
     })
@@ -1220,10 +1245,7 @@ impl Tool for GitBranchTool {
             .and_then(|v| v.as_bool())
             .unwrap_or(false);
 
-        let json_output = args
-            .get("json")
-            .and_then(|v| v.as_bool())
-            .unwrap_or(false);
+        let json_output = args.get("json").and_then(|v| v.as_bool()).unwrap_or(false);
 
         match action.as_str() {
             // ----------------------------------------------------------------
@@ -1242,14 +1264,8 @@ impl Tool for GitBranchTool {
                 let contains = args.get("contains").and_then(|v| v.as_str());
                 let sort_by = args.get("sort").and_then(|v| v.as_str());
 
-                let report = list_branches(
-                    &repo_root,
-                    include_remotes,
-                    merged,
-                    contains,
-                    sort_by,
-                )
-                .await?;
+                let report =
+                    list_branches(&repo_root, include_remotes, merged, contains, sort_by).await?;
 
                 if json_output {
                     Ok(serde_json::to_string_pretty(&report)?)
@@ -1263,7 +1279,9 @@ impl Tool for GitBranchTool {
             // ----------------------------------------------------------------
             "create" | "new" | "create_branch" => {
                 let branch_name = branch_opt.ok_or_else(|| {
-                    anyhow::anyhow!("Branch name is required for 'create' action (provide 'branch' or 'name')")
+                    anyhow::anyhow!(
+                        "Branch name is required for 'create' action (provide 'branch' or 'name')"
+                    )
                 })?;
 
                 validate_branch_name(branch_name)?;
@@ -1276,12 +1294,9 @@ impl Tool for GitBranchTool {
 
                 // Verify base / start point if specified
                 if let Some(base) = from_opt {
-                    let check_base = run_git_command(
-                        &["rev-parse", "--verify", "--quiet", base],
-                        &repo_root,
-                        5,
-                    )
-                    .await?;
+                    let check_base =
+                        run_git_command(&["rev-parse", "--verify", "--quiet", base], &repo_root, 5)
+                            .await?;
                     if !check_base.success {
                         anyhow::bail!("Base reference '{base}' does not exist in repository.");
                     }
@@ -1302,13 +1317,16 @@ impl Tool for GitBranchTool {
                     let output = run_git_command(&cmd_args, &repo_root, 15).await?;
                     if !output.success {
                         let err = output.stderr.trim();
-                        anyhow::bail!("Failed to create and switch to branch '{branch_name}': {err}");
+                        anyhow::bail!(
+                            "Failed to create and switch to branch '{branch_name}': {err}"
+                        );
                     }
 
-                    let head_hash = run_git_command(&["rev-parse", "--short", "HEAD"], &repo_root, 5)
-                        .await
-                        .ok()
-                        .map(|o| o.stdout.trim().to_string());
+                    let head_hash =
+                        run_git_command(&["rev-parse", "--short", "HEAD"], &repo_root, 5)
+                            .await
+                            .ok()
+                            .map(|o| o.stdout.trim().to_string());
 
                     let res = BranchOpResult {
                         action: "create_and_switch".to_string(),
@@ -1341,14 +1359,11 @@ impl Tool for GitBranchTool {
                         anyhow::bail!("Failed to create branch '{branch_name}': {err}");
                     }
 
-                    let branch_commit = run_git_command(
-                        &["rev-parse", "--short", branch_name],
-                        &repo_root,
-                        5,
-                    )
-                    .await
-                    .ok()
-                    .map(|o| o.stdout.trim().to_string());
+                    let branch_commit =
+                        run_git_command(&["rev-parse", "--short", branch_name], &repo_root, 5)
+                            .await
+                            .ok()
+                            .map(|o| o.stdout.trim().to_string());
 
                     let res = BranchOpResult {
                         action: "create".to_string(),
@@ -1377,7 +1392,9 @@ impl Tool for GitBranchTool {
             // ----------------------------------------------------------------
             "switch" | "checkout" | "switch_branch" => {
                 let branch_name = branch_opt.ok_or_else(|| {
-                    anyhow::anyhow!("Branch name is required for 'switch' action (provide 'branch' or 'name')")
+                    anyhow::anyhow!(
+                        "Branch name is required for 'switch' action (provide 'branch' or 'name')"
+                    )
                 })?;
 
                 let create_if_missing = args
@@ -1402,13 +1419,16 @@ impl Tool for GitBranchTool {
                         let output = run_git_command(&cmd_args, &repo_root, 15).await?;
                         if !output.success {
                             let err = output.stderr.trim();
-                            anyhow::bail!("Failed to create and switch to branch '{branch_name}': {err}");
+                            anyhow::bail!(
+                                "Failed to create and switch to branch '{branch_name}': {err}"
+                            );
                         }
 
-                        let head_hash = run_git_command(&["rev-parse", "--short", "HEAD"], &repo_root, 5)
-                            .await
-                            .ok()
-                            .map(|o| o.stdout.trim().to_string());
+                        let head_hash =
+                            run_git_command(&["rev-parse", "--short", "HEAD"], &repo_root, 5)
+                                .await
+                                .ok()
+                                .map(|o| o.stdout.trim().to_string());
 
                         let res = BranchOpResult {
                             action: "create_and_switch".to_string(),
@@ -1442,13 +1462,16 @@ impl Tool for GitBranchTool {
                             .await?;
                             if !output.success {
                                 let err = output.stderr.trim();
-                                anyhow::bail!("Failed to switch to remote branch '{remote_name}': {err}");
+                                anyhow::bail!(
+                                    "Failed to switch to remote branch '{remote_name}': {err}"
+                                );
                             }
 
-                            let head_hash = run_git_command(&["rev-parse", "--short", "HEAD"], &repo_root, 5)
-                                .await
-                                .ok()
-                                .map(|o| o.stdout.trim().to_string());
+                            let head_hash =
+                                run_git_command(&["rev-parse", "--short", "HEAD"], &repo_root, 5)
+                                    .await
+                                    .ok()
+                                    .map(|o| o.stdout.trim().to_string());
 
                             let res = BranchOpResult {
                                 action: "switch".to_string(),
@@ -1542,10 +1565,15 @@ impl Tool for GitBranchTool {
             // ----------------------------------------------------------------
             "delete" | "remove" | "del" | "delete_branch" => {
                 let branch_name = branch_opt.ok_or_else(|| {
-                    anyhow::anyhow!("Branch name is required for 'delete' action (provide 'branch' or 'name')")
+                    anyhow::anyhow!(
+                        "Branch name is required for 'delete' action (provide 'branch' or 'name')"
+                    )
                 })?;
 
-                let is_remote = args.get("remote").and_then(|v| v.as_bool()).unwrap_or(false)
+                let is_remote = args
+                    .get("remote")
+                    .and_then(|v| v.as_bool())
+                    .unwrap_or(false)
                     || branch_name.starts_with("origin/");
 
                 if is_remote {
@@ -1598,17 +1626,15 @@ impl Tool for GitBranchTool {
                 }
 
                 // Get commit hash before deleting for reporting
-                let last_commit = run_git_command(
-                    &["rev-parse", "--short", branch_name],
-                    &repo_root,
-                    5,
-                )
-                .await
-                .ok()
-                .map(|o| o.stdout.trim().to_string());
+                let last_commit =
+                    run_git_command(&["rev-parse", "--short", branch_name], &repo_root, 5)
+                        .await
+                        .ok()
+                        .map(|o| o.stdout.trim().to_string());
 
                 let flag = if force { "-D" } else { "-d" };
-                let output = run_git_command(&["branch", flag, branch_name], &repo_root, 10).await?;
+                let output =
+                    run_git_command(&["branch", flag, branch_name], &repo_root, 10).await?;
 
                 if !output.success {
                     let err = output.stderr.trim();
@@ -1651,9 +1677,7 @@ impl Tool for GitBranchTool {
                     .or_else(|| args.get("to"))
                     .and_then(|v| v.as_str())
                     .map(|s| s.trim())
-                    .ok_or_else(|| {
-                        anyhow::anyhow!("'new_name' is required for 'rename' action")
-                    })?;
+                    .ok_or_else(|| anyhow::anyhow!("'new_name' is required for 'rename' action"))?;
 
                 validate_branch_name(new_name)?;
 
@@ -1731,7 +1755,9 @@ impl Tool for GitBranchTool {
                     } else {
                         let mut msg = format!("HEAD is detached at commit {hash}: {subj}\n");
                         if is_dirty {
-                            msg.push_str("Working directory: DIRTY (uncommitted changes present)\n");
+                            msg.push_str(
+                                "Working directory: DIRTY (uncommitted changes present)\n",
+                            );
                         } else {
                             msg.push_str("Working directory: CLEAN\n");
                         }
@@ -1745,12 +1771,9 @@ impl Tool for GitBranchTool {
                     }
                 } else if let Some(curr) = current_branch {
                     // Get commit info
-                    let commit_out = run_git_command(
-                        &["log", "-1", "--format=%h|%s|%cr", &curr],
-                        &repo_root,
-                        5,
-                    )
-                    .await?;
+                    let commit_out =
+                        run_git_command(&["log", "-1", "--format=%h|%s|%cr", &curr], &repo_root, 5)
+                            .await?;
 
                     let parts: Vec<&str> = commit_out.stdout.trim().splitn(3, '|').collect();
                     let hash = parts.first().copied().unwrap_or("");
@@ -1800,7 +1823,9 @@ impl Tool for GitBranchTool {
                     } else {
                         let mut msg = format!("Current branch:    {curr}\n");
                         if !hash.is_empty() {
-                            msg.push_str(&format!("Latest commit:     {hash} - {subject} ({date})\n"));
+                            msg.push_str(&format!(
+                                "Latest commit:     {hash} - {subject} ({date})\n"
+                            ));
                         }
                         if let Some(up) = upstream {
                             if is_gone {
@@ -1813,11 +1838,15 @@ impl Tool for GitBranchTool {
                                 msg.push_str(&format!("Upstream:          {up} [up to date]\n"));
                             }
                         } else {
-                            msg.push_str("Upstream:          None (not tracking a remote branch)\n");
+                            msg.push_str(
+                                "Upstream:          None (not tracking a remote branch)\n",
+                            );
                         }
 
                         if is_dirty {
-                            msg.push_str("Working directory: DIRTY (uncommitted changes present)\n");
+                            msg.push_str(
+                                "Working directory: DIRTY (uncommitted changes present)\n",
+                            );
                         } else {
                             msg.push_str("Working directory: CLEAN\n");
                         }
@@ -1877,12 +1906,9 @@ impl Tool for GitBranchTool {
                         })?;
 
                     let set_arg = format!("--set-upstream-to={upstream_target}");
-                    let output = run_git_command(
-                        &["branch", &set_arg, &branch_name],
-                        &repo_root,
-                        10,
-                    )
-                    .await?;
+                    let output =
+                        run_git_command(&["branch", &set_arg, &branch_name], &repo_root, 10)
+                            .await?;
                     if !output.success {
                         let err = output.stderr.trim();
                         anyhow::bail!(
@@ -1973,7 +1999,10 @@ impl Tool for GitBranchTool {
             // ----------------------------------------------------------------
             "prune_worktrees" | "worktree_prune" | "prune" => {
                 let expire = args.get("expire").and_then(|v| v.as_str());
-                let dry_run = args.get("dry_run").and_then(|v| v.as_bool()).unwrap_or(false);
+                let dry_run = args
+                    .get("dry_run")
+                    .and_then(|v| v.as_bool())
+                    .unwrap_or(false);
 
                 let result = prune_worktrees(&repo_root, expire, dry_run).await?;
 
@@ -1988,11 +2017,9 @@ impl Tool for GitBranchTool {
             // 12. Lock Worktree
             // ----------------------------------------------------------------
             "lock_worktree" | "worktree_lock" => {
-                let wt_target = worktree_opt
-                    .or(branch_opt)
-                    .ok_or_else(|| {
-                        anyhow::anyhow!("'worktree_path' is required to specify worktree to lock")
-                    })?;
+                let wt_target = worktree_opt.or(branch_opt).ok_or_else(|| {
+                    anyhow::anyhow!("'worktree_path' is required to specify worktree to lock")
+                })?;
 
                 let reason = args.get("reason").and_then(|v| v.as_str());
 
@@ -2009,11 +2036,9 @@ impl Tool for GitBranchTool {
             // 13. Unlock Worktree
             // ----------------------------------------------------------------
             "unlock_worktree" | "worktree_unlock" => {
-                let wt_target = worktree_opt
-                    .or(branch_opt)
-                    .ok_or_else(|| {
-                        anyhow::anyhow!("'worktree_path' is required to specify worktree to unlock")
-                    })?;
+                let wt_target = worktree_opt.or(branch_opt).ok_or_else(|| {
+                    anyhow::anyhow!("'worktree_path' is required to specify worktree to unlock")
+                })?;
 
                 let result = unlock_worktree(&repo_root, wt_target).await?;
 
@@ -2210,7 +2235,10 @@ prunable directory removed
         // Fifth: prunable
         assert_eq!(worktrees[4].path, "/Users/alice/projects/fusion-prunable");
         assert!(worktrees[4].is_prunable);
-        assert_eq!(worktrees[4].prune_reason.as_deref(), Some("directory removed"));
+        assert_eq!(
+            worktrees[4].prune_reason.as_deref(),
+            Some("directory removed")
+        );
     }
 
     #[test]
@@ -2270,10 +2298,7 @@ prunable directory removed
         assert!(cur_res.contains("Current branch:"));
 
         // List branches
-        let list_res = tool
-            .execute(json!({"action": "list"}), &ctx)
-            .await
-            .unwrap();
+        let list_res = tool.execute(json!({"action": "list"}), &ctx).await.unwrap();
         assert!(list_res.contains("* "));
         assert!(list_res.contains("Initial commit"));
 
@@ -2390,12 +2415,9 @@ prunable directory removed
         };
 
         // Create feature branch
-        tool.execute(
-            json!({"action": "create", "branch": "temp-feature"}),
-            &ctx,
-        )
-        .await
-        .unwrap();
+        tool.execute(json!({"action": "create", "branch": "temp-feature"}), &ctx)
+            .await
+            .unwrap();
 
         // Rename branch
         let rename_res = tool
@@ -2479,22 +2501,16 @@ prunable directory removed
         .unwrap();
 
         // Switch to branch-b
-        tool.execute(
-            json!({"action": "switch", "branch": "branch-b"}),
-            &ctx,
-        )
-        .await
-        .unwrap();
+        tool.execute(json!({"action": "switch", "branch": "branch-b"}), &ctx)
+            .await
+            .unwrap();
 
         // Now create file_a.txt untracked/modified on branch-b with conflicting content
         fs::write(&file_a, "conflicting untracked file\n").unwrap();
 
         // Switching back to branch-a would overwrite local file_a.txt
         let conflict_err = tool
-            .execute(
-                json!({"action": "switch", "branch": "branch-a"}),
-                &ctx,
-            )
+            .execute(json!({"action": "switch", "branch": "branch-a"}), &ctx)
             .await;
         assert!(conflict_err.is_err());
         let err_str = conflict_err.unwrap_err().to_string();
@@ -2559,7 +2575,10 @@ prunable directory removed
         let report: WorktreeListReport = serde_json::from_str(&json_res).unwrap();
         assert_eq!(report.total_count, 2);
         assert!(report.worktrees.iter().any(|w| w.is_main));
-        assert!(report.worktrees.iter().any(|w| w.branch.as_deref() == Some("wt-feature")));
+        assert!(report
+            .worktrees
+            .iter()
+            .any(|w| w.branch.as_deref() == Some("wt-feature")));
 
         // 4. Remove worktree
         let remove_res = tool
@@ -2603,7 +2622,10 @@ prunable directory removed
             .await;
 
         assert!(rem_err.is_err());
-        assert!(rem_err.unwrap_err().to_string().contains("Cannot remove main worktree"));
+        assert!(rem_err
+            .unwrap_err()
+            .to_string()
+            .contains("Cannot remove main worktree"));
     }
 
     #[tokio::test]

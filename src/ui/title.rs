@@ -336,7 +336,9 @@ impl TerminalTitle {
 
     /// Sets the session name from an optional string.
     pub fn with_opt_session(mut self, session_name: Option<impl Into<String>>) -> Self {
-        self.session_name = session_name.map(|s| s.into()).filter(|s| !s.trim().is_empty());
+        self.session_name = session_name
+            .map(|s| s.into())
+            .filter(|s| !s.trim().is_empty());
         self
     }
 
@@ -583,10 +585,7 @@ impl TerminalTitle {
             .tokens
             .map(|t| format_tokens_compact(t))
             .unwrap_or_default();
-        let cost_str = self
-            .cost
-            .map(|c| format!("${:.2}", c))
-            .unwrap_or_default();
+        let cost_str = self.cost.map(|c| format!("${:.2}", c)).unwrap_or_default();
 
         template
             .replace("{app}", &self.app_name)
@@ -883,7 +882,9 @@ impl TitleUpdater {
         if enriched.git_branch.is_none() && self.cached_branch.is_some() {
             enriched.git_branch = self.cached_branch.clone();
         }
-        if enriched.style == TitleFormatStyle::Default && self.config.style != TitleFormatStyle::Default {
+        if enriched.style == TitleFormatStyle::Default
+            && self.config.style != TitleFormatStyle::Default
+        {
             enriched.style = self.config.style.clone();
         }
         enriched.max_length = self.config.max_length;
@@ -1202,8 +1203,14 @@ mod tests {
     #[test]
     fn test_sanitize_title() {
         assert_eq!(sanitize_title("Hello World", 50), "Hello World");
-        assert_eq!(sanitize_title("Hello\nWorld\r\nTest", 50), "Hello World Test");
-        assert_eq!(sanitize_title("Hello\x07World\x1b[31mRed\x1b[0m", 50), "HelloWorldRed");
+        assert_eq!(
+            sanitize_title("Hello\nWorld\r\nTest", 50),
+            "Hello World Test"
+        );
+        assert_eq!(
+            sanitize_title("Hello\x07World\x1b[31mRed\x1b[0m", 50),
+            "HelloWorldRed"
+        );
         assert_eq!(sanitize_title("Multiple    Spaces", 50), "Multiple Spaces");
         assert_eq!(sanitize_title("   Trim Spaces   ", 50), "Trim Spaces");
 
@@ -1224,18 +1231,12 @@ mod tests {
             shorten_model_name("claude-3-5-sonnet-20241022"),
             "claude-3.5-sonnet"
         );
-        assert_eq!(
-            shorten_model_name("openai/gpt-4o-2024-08-06"),
-            "gpt-4o"
-        );
+        assert_eq!(shorten_model_name("openai/gpt-4o-2024-08-06"), "gpt-4o");
         assert_eq!(
             shorten_model_name("deepseek/deepseek-reasoner"),
             "deepseek-r1"
         );
-        assert_eq!(
-            shorten_model_name("deepseek/deepseek-chat"),
-            "deepseek-v3"
-        );
+        assert_eq!(shorten_model_name("deepseek/deepseek-chat"), "deepseek-v3");
         assert_eq!(
             shorten_model_name("meta-llama/llama-3.3-70b-instruct"),
             "llama-3.3-70b"
@@ -1248,7 +1249,10 @@ mod tests {
             .with_session("Refactor Parser")
             .with_model("claude-3-7-sonnet-20250219");
 
-        assert_eq!(title.format(), "fusion: Refactor Parser (claude-3.7-sonnet)");
+        assert_eq!(
+            title.format(),
+            "fusion: Refactor Parser (claude-3.7-sonnet)"
+        );
 
         // Session only
         let title_sess = TerminalTitle::new().with_session("My Session");
@@ -1366,7 +1370,9 @@ mod tests {
         // 4. Disabled updater -> suppresses everything
         updater.set_enabled(false);
         buffer.clear();
-        let emitted_disabled = updater.set_title_to("fusion: Disabled", &mut buffer).unwrap();
+        let emitted_disabled = updater
+            .set_title_to("fusion: Disabled", &mut buffer)
+            .unwrap();
         assert!(!emitted_disabled);
         assert!(buffer.is_empty());
     }

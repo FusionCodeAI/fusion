@@ -155,15 +155,19 @@ impl Bookmark {
         let turns = extract_turns(session.messages());
         let total_turns = turns.len();
 
-        let (msg_idx, msg_cnt, user_prev, asst_prev) = if turn_index > 0 && turn_index <= total_turns {
-            let t = &turns[turn_index - 1];
-            let u_prev = t.user_message.as_deref().map(|s| truncate_string(s, 80));
-            let a_prev = t.assistant_message.as_deref().map(|s| truncate_string(s, 80));
-            (t.start_message_index, t.end_message_index, u_prev, a_prev)
-        } else {
-            let count = session.total_messages();
-            (count.saturating_sub(1), count, None, None)
-        };
+        let (msg_idx, msg_cnt, user_prev, asst_prev) =
+            if turn_index > 0 && turn_index <= total_turns {
+                let t = &turns[turn_index - 1];
+                let u_prev = t.user_message.as_deref().map(|s| truncate_string(s, 80));
+                let a_prev = t
+                    .assistant_message
+                    .as_deref()
+                    .map(|s| truncate_string(s, 80));
+                (t.start_message_index, t.end_message_index, u_prev, a_prev)
+            } else {
+                let count = session.total_messages();
+                (count.saturating_sub(1), count, None, None)
+            };
 
         // Estimate tokens up to message_count
         let msgs_slice = &session.messages()[..msg_cnt.min(session.total_messages())];
@@ -301,7 +305,10 @@ pub fn list_bookmarks(session: &Session) -> Vec<Bookmark> {
 }
 
 /// Persists a list of bookmarks into a session's metadata.
-pub fn save_bookmarks_to_session(session: &mut Session, bookmarks: &[Bookmark]) -> anyhow::Result<()> {
+pub fn save_bookmarks_to_session(
+    session: &mut Session,
+    bookmarks: &[Bookmark],
+) -> anyhow::Result<()> {
     let json_str = serde_json::to_string(bookmarks)?;
     session.set_metadata(BOOKMARKS_METADATA_KEY, json_str);
     Ok(())
@@ -335,7 +342,10 @@ pub fn bookmark_specific_turn(
     let mut bookmarks = list_bookmarks(session);
 
     // Check if bookmark name already exists (case-insensitive)
-    if let Some(pos) = bookmarks.iter().position(|b| b.name.eq_ignore_ascii_case(clean_name)) {
+    if let Some(pos) = bookmarks
+        .iter()
+        .position(|b| b.name.eq_ignore_ascii_case(clean_name))
+    {
         // Update existing bookmark in place
         let mut b = Bookmark::new(session, clean_name, turn_index, kind);
         if let Some(n) = note {
@@ -414,7 +424,10 @@ pub fn get_bookmark(session: &Session, name_or_id: &str) -> Option<Bookmark> {
     let bookmarks = list_bookmarks(session);
 
     // 1. Match exact or case-insensitive name
-    if let Some(b) = bookmarks.iter().find(|b| b.name.eq_ignore_ascii_case(query)) {
+    if let Some(b) = bookmarks
+        .iter()
+        .find(|b| b.name.eq_ignore_ascii_case(query))
+    {
         return Some(b.clone());
     }
 
@@ -481,7 +494,10 @@ pub fn rename_bookmark(
     }
 
     let mut bookmarks = list_bookmarks(session);
-    if bookmarks.iter().any(|b| b.name.eq_ignore_ascii_case(clean_new)) {
+    if bookmarks
+        .iter()
+        .any(|b| b.name.eq_ignore_ascii_case(clean_new))
+    {
         anyhow::bail!("A bookmark named '{}' already exists", clean_new);
     }
 
@@ -506,10 +522,16 @@ pub fn tag_bookmark(session: &mut Session, name_or_id: &str, tag: &str) -> anyho
     let mut bookmarks = list_bookmarks(session);
     let pos = bookmarks
         .iter()
-        .position(|b| b.name.eq_ignore_ascii_case(name_or_id.trim()) || b.id.to_string() == name_or_id.trim())
+        .position(|b| {
+            b.name.eq_ignore_ascii_case(name_or_id.trim()) || b.id.to_string() == name_or_id.trim()
+        })
         .ok_or_else(|| anyhow::anyhow!("Bookmark '{}' not found", name_or_id))?;
 
-    if !bookmarks[pos].tags.iter().any(|t| t.eq_ignore_ascii_case(&clean_tag)) {
+    if !bookmarks[pos]
+        .tags
+        .iter()
+        .any(|t| t.eq_ignore_ascii_case(&clean_tag))
+    {
         bookmarks[pos].tags.push(clean_tag);
         bookmarks[pos].updated_at = Utc::now().to_rfc3339();
         save_bookmarks_to_session(session, &bookmarks)?;
@@ -523,10 +545,14 @@ pub fn untag_bookmark(session: &mut Session, name_or_id: &str, tag: &str) -> any
     let mut bookmarks = list_bookmarks(session);
     let pos = bookmarks
         .iter()
-        .position(|b| b.name.eq_ignore_ascii_case(name_or_id.trim()) || b.id.to_string() == name_or_id.trim())
+        .position(|b| {
+            b.name.eq_ignore_ascii_case(name_or_id.trim()) || b.id.to_string() == name_or_id.trim()
+        })
         .ok_or_else(|| anyhow::anyhow!("Bookmark '{}' not found", name_or_id))?;
 
-    bookmarks[pos].tags.retain(|t| !t.eq_ignore_ascii_case(clean_tag));
+    bookmarks[pos]
+        .tags
+        .retain(|t| !t.eq_ignore_ascii_case(clean_tag));
     bookmarks[pos].updated_at = Utc::now().to_rfc3339();
     save_bookmarks_to_session(session, &bookmarks)?;
     Ok(())
@@ -541,7 +567,9 @@ pub fn update_bookmark_note(
     let mut bookmarks = list_bookmarks(session);
     let pos = bookmarks
         .iter()
-        .position(|b| b.name.eq_ignore_ascii_case(name_or_id.trim()) || b.id.to_string() == name_or_id.trim())
+        .position(|b| {
+            b.name.eq_ignore_ascii_case(name_or_id.trim()) || b.id.to_string() == name_or_id.trim()
+        })
         .ok_or_else(|| anyhow::anyhow!("Bookmark '{}' not found", name_or_id))?;
 
     let clean = note.trim();
@@ -623,7 +651,8 @@ pub fn recall_bookmark(session: &Session, name_or_id: &str) -> anyhow::Result<Bo
             current_tokens.saturating_sub(tokens_at_bm)
         ));
     } else {
-        preview_lines.push("   📍 Status: Bookmark is at the current conversation head".to_string());
+        preview_lines
+            .push("   📍 Status: Bookmark is at the current conversation head".to_string());
     }
 
     let is_restorable = bookmark.snapshot.is_some() || bookmark.turn_index <= current_total_turns;
@@ -924,7 +953,10 @@ pub fn import_bookmarks_json(session: &mut Session, json_str: &str) -> anyhow::R
     let mut existing = list_bookmarks(session);
 
     for new_bm in imported {
-        if let Some(pos) = existing.iter().position(|b| b.name.eq_ignore_ascii_case(&new_bm.name)) {
+        if let Some(pos) = existing
+            .iter()
+            .position(|b| b.name.eq_ignore_ascii_case(&new_bm.name))
+        {
             existing[pos] = new_bm;
         } else {
             existing.push(new_bm);
@@ -1004,7 +1036,10 @@ pub fn handle_bookmark_command(args: &[String], session: &mut Session) -> String
         "help" | "-h" | "--help" => format_bookmark_help(),
         "clear" => {
             let removed = clear_bookmarks(session);
-            format!("\x1b[1;32mCleared {} bookmark(s) from session.\x1b[0m", removed)
+            format!(
+                "\x1b[1;32mCleared {} bookmark(s) from session.\x1b[0m",
+                removed
+            )
         }
         "checkpoint" | "cp" => {
             if args.len() < 2 {
@@ -1049,11 +1084,15 @@ pub fn handle_bookmark_command(args: &[String], session: &mut Session) -> String
         }
         "turn" => {
             if args.len() < 3 {
-                return "\x1b[1;31mUsage:\x1b[0m /bookmark turn <turn_number> <name> [note]".to_string();
+                return "\x1b[1;31mUsage:\x1b[0m /bookmark turn <turn_number> <name> [note]"
+                    .to_string();
             }
             let turn_idx = match args[1].parse::<usize>() {
                 Ok(n) if n > 0 => n,
-                _ => return "\x1b[1;31mInvalid turn number.\x1b[0m Must be a positive integer.".to_string(),
+                _ => {
+                    return "\x1b[1;31mInvalid turn number.\x1b[0m Must be a positive integer."
+                        .to_string()
+                }
             };
             let name = &args[2];
             let note = if args.len() > 3 {
@@ -1062,7 +1101,13 @@ pub fn handle_bookmark_command(args: &[String], session: &mut Session) -> String
                 None
             };
 
-            match bookmark_specific_turn(session, turn_idx, name, note.as_deref(), BookmarkKind::Turn) {
+            match bookmark_specific_turn(
+                session,
+                turn_idx,
+                name,
+                note.as_deref(),
+                BookmarkKind::Turn,
+            ) {
                 Ok(b) => format!(
                     "\x1b[1;32mBookmark created:\x1b[0m 🔖 \x1b[1m{}\x1b[0m on Turn {}",
                     b.name, b.turn_index
@@ -1122,7 +1167,10 @@ pub fn handle_bookmark_command(args: &[String], session: &mut Session) -> String
             let name = &args[1];
             let tag = &args[2];
             match tag_bookmark(session, name, tag) {
-                Ok(_) => format!("\x1b[1;32mTagged bookmark:\x1b[0m \x1b[1m{}\x1b[0m with \x1b[1;33m[{}]\x1b[0m", name, tag),
+                Ok(_) => format!(
+                    "\x1b[1;32mTagged bookmark:\x1b[0m \x1b[1m{}\x1b[0m with \x1b[1;33m[{}]\x1b[0m",
+                    name, tag
+                ),
                 Err(e) => format!("\x1b[1;31mTagging failed:\x1b[0m {}", e),
             }
         }
@@ -1133,7 +1181,10 @@ pub fn handle_bookmark_command(args: &[String], session: &mut Session) -> String
             let name = &args[1];
             let tag = &args[2];
             match untag_bookmark(session, name, tag) {
-                Ok(_) => format!("\x1b[1;32mRemoved tag:\x1b[0m \x1b[1;33m[{}]\x1b[0m from \x1b[1m{}\x1b[0m", tag, name),
+                Ok(_) => format!(
+                    "\x1b[1;32mRemoved tag:\x1b[0m \x1b[1;33m[{}]\x1b[0m from \x1b[1m{}\x1b[0m",
+                    tag, name
+                ),
                 Err(e) => format!("\x1b[1;31mUntagging failed:\x1b[0m {}", e),
             }
         }
@@ -1143,7 +1194,10 @@ pub fn handle_bookmark_command(args: &[String], session: &mut Session) -> String
             }
             let name = &args[1];
             match delete_bookmark(session, name) {
-                Some(b) => format!("\x1b[1;32mDeleted bookmark:\x1b[0m \x1b[1m{}\x1b[0m", b.name),
+                Some(b) => format!(
+                    "\x1b[1;32mDeleted bookmark:\x1b[0m \x1b[1m{}\x1b[0m",
+                    b.name
+                ),
                 None => format!("\x1b[1;31mBookmark '{}' not found.\x1b[0m", name),
             }
         }
@@ -1505,13 +1559,21 @@ impl CodeBookmark {
     /// Exports this single bookmark to Markdown format.
     pub fn to_markdown(&self) -> String {
         let mut md = String::new();
-        md.push_str(&format!("### {} `{}`\n\n", self.kind.emoji(), self.location_display()));
+        md.push_str(&format!(
+            "### {} `{}`\n\n",
+            self.kind.emoji(),
+            self.location_display()
+        ));
 
         if let Some(t) = &self.title {
             md.push_str(&format!("**Title:** {}\n\n", t));
         }
 
-        md.push_str(&format!("- **Location:** `{}` ({})\n", self.file_path, self.line_display()));
+        md.push_str(&format!(
+            "- **Location:** `{}` ({})\n",
+            self.file_path,
+            self.line_display()
+        ));
         md.push_str(&format!("- **Kind:** {}\n", self.kind.display_label()));
 
         if !self.tags.is_empty() {
@@ -1728,7 +1790,8 @@ impl CodeBookmarkStore {
         }
         let id = b.id;
         self.bookmarks.push(b);
-        self.get(&id).unwrap_or_else(|| &self.bookmarks[self.bookmarks.len() - 1])
+        self.get(&id)
+            .unwrap_or_else(|| &self.bookmarks[self.bookmarks.len() - 1])
     }
 
     /// Retrieves a bookmark by its unique ID.
@@ -1878,12 +1941,18 @@ impl CodeBookmarkStore {
         if q.is_empty() {
             return self.all();
         }
-        self.bookmarks.iter().filter(|b| b.matches_keyword(q)).collect()
+        self.bookmarks
+            .iter()
+            .filter(|b| b.matches_keyword(q))
+            .collect()
     }
 
     /// Filters bookmarks based on a `CodeBookmarkFilter`.
     pub fn filter(&self, filter: &CodeBookmarkFilter) -> Vec<&CodeBookmark> {
-        self.bookmarks.iter().filter(|b| filter.matches(b)).collect()
+        self.bookmarks
+            .iter()
+            .filter(|b| filter.matches(b))
+            .collect()
     }
 
     /// Finds all bookmarks for a specific file path.
@@ -1900,14 +1969,19 @@ impl CodeBookmarkStore {
         let clean = prefix.trim();
         self.bookmarks
             .iter()
-            .filter(|b| b.file_path.starts_with(clean) || Path::new(&b.file_path).starts_with(clean))
+            .filter(|b| {
+                b.file_path.starts_with(clean) || Path::new(&b.file_path).starts_with(clean)
+            })
             .collect()
     }
 
     /// Finds all bookmarks with a specific tag (case-insensitive).
     pub fn find_by_tag(&self, tag: &str) -> Vec<&CodeBookmark> {
         let clean = tag.trim().to_lowercase();
-        self.bookmarks.iter().filter(|b| b.has_tag(&clean)).collect()
+        self.bookmarks
+            .iter()
+            .filter(|b| b.has_tag(&clean))
+            .collect()
     }
 
     /// Finds all bookmarks of a specific kind.
@@ -1975,7 +2049,11 @@ impl CodeBookmarkStore {
             let tags = if bm.tags.is_empty() {
                 "-".to_string()
             } else {
-                bm.tags.iter().map(|t| format!("`#{}`", t)).collect::<Vec<_>>().join(" ")
+                bm.tags
+                    .iter()
+                    .map(|t| format!("`#{}`", t))
+                    .collect::<Vec<_>>()
+                    .join(" ")
             };
             md.push_str(&format!(
                 "| `{}` | {} | {} | {} |\n",
@@ -2000,10 +2078,7 @@ impl CodeBookmarkStore {
                 md.push_str(&format!("### 📄 `{}`\n\n", file));
 
                 for bm in file_bms {
-                    let header_title = bm
-                        .title
-                        .as_deref()
-                        .unwrap_or_else(|| bm.kind.as_str());
+                    let header_title = bm.title.as_deref().unwrap_or_else(|| bm.kind.as_str());
 
                     md.push_str(&format!(
                         "#### {} `{}` - {}\n\n",
@@ -2027,7 +2102,10 @@ impl CodeBookmarkStore {
                     }
 
                     if let Some(note) = &bm.note {
-                        md.push_str(&format!("\n**Note:**\n> {}\n\n", note.replace('\n', "\n> ")));
+                        md.push_str(&format!(
+                            "\n**Note:**\n> {}\n\n",
+                            note.replace('\n', "\n> ")
+                        ));
                     }
 
                     if let Some(snippet) = &bm.snippet {
@@ -2189,7 +2267,13 @@ pub fn extract_snippet_from_file(
 /// Detects markdown code block syntax language identifier from a file path extension.
 pub fn detect_language_from_path(path: &str) -> &'static str {
     let p = Path::new(path);
-    match p.extension().and_then(|ext| ext.to_str()).unwrap_or("").to_ascii_lowercase().as_str() {
+    match p
+        .extension()
+        .and_then(|ext| ext.to_str())
+        .unwrap_or("")
+        .to_ascii_lowercase()
+        .as_str()
+    {
         "rs" => "rust",
         "ts" => "typescript",
         "tsx" => "tsx",
@@ -2254,8 +2338,13 @@ mod tests {
         assert_eq!(list_bookmarks(&session).len(), 0);
 
         // Bookmark current (latest = Turn 3)
-        let b1 = bookmark_turn(&mut session, "dce-step", Some("Dead code elimination turn"), BookmarkKind::Turn)
-            .expect("should bookmark turn");
+        let b1 = bookmark_turn(
+            &mut session,
+            "dce-step",
+            Some("Dead code elimination turn"),
+            BookmarkKind::Turn,
+        )
+        .expect("should bookmark turn");
 
         assert_eq!(b1.name, "dce-step");
         assert_eq!(b1.turn_index, 3);
@@ -2286,8 +2375,14 @@ mod tests {
     #[test]
     fn test_bookmark_retrieval_and_recall() {
         let mut session = create_sample_session();
-        bookmark_specific_turn(&mut session, 2, "const-prop", Some("Rust constant folding"), BookmarkKind::Turn)
-            .unwrap();
+        bookmark_specific_turn(
+            &mut session,
+            2,
+            "const-prop",
+            Some("Rust constant folding"),
+            BookmarkKind::Turn,
+        )
+        .unwrap();
 
         // Retrieval by name (case-insensitive)
         let found = get_bookmark(&session, "CONST-PROP").expect("should find bookmark");
@@ -2327,7 +2422,8 @@ mod tests {
         assert_eq!(recall.turns_behind, 2);
 
         // Restore back to checkpoint
-        let reverted = restore_to_bookmark(&mut session, "v1-complete").expect("restore should succeed");
+        let reverted =
+            restore_to_bookmark(&mut session, "v1-complete").expect("restore should succeed");
         assert_eq!(reverted, 2);
         assert_eq!(count_turns(&session), 3);
     }
@@ -2370,8 +2466,22 @@ mod tests {
     #[test]
     fn test_bookmark_searching() {
         let mut session = create_sample_session();
-        bookmark_specific_turn(&mut session, 1, "ssa-intro", Some("Core compiler architecture"), BookmarkKind::Turn).unwrap();
-        bookmark_specific_turn(&mut session, 2, "prop-fold", Some("Optimization phase"), BookmarkKind::Turn).unwrap();
+        bookmark_specific_turn(
+            &mut session,
+            1,
+            "ssa-intro",
+            Some("Core compiler architecture"),
+            BookmarkKind::Turn,
+        )
+        .unwrap();
+        bookmark_specific_turn(
+            &mut session,
+            2,
+            "prop-fold",
+            Some("Optimization phase"),
+            BookmarkKind::Turn,
+        )
+        .unwrap();
 
         let res = search_bookmarks(&session, "compiler");
         assert_eq!(res.len(), 1);
@@ -2387,7 +2497,8 @@ mod tests {
         let mut session = create_sample_session();
         bookmark_specific_turn(&mut session, 2, "fork-point", None, BookmarkKind::Turn).unwrap();
 
-        let forked = fork_from_bookmark(&session, "fork-point", Some("Branch from Prop Fold")).unwrap();
+        let forked =
+            fork_from_bookmark(&session, "fork-point", Some("Branch from Prop Fold")).unwrap();
         assert_ne!(forked.id(), session.id());
         assert_eq!(forked.title(), Some("Branch from Prop Fold"));
         assert_eq!(count_turns(&forked), 2);
@@ -2415,7 +2526,14 @@ mod tests {
     #[test]
     fn test_bookmark_json_and_markdown_export() {
         let mut session = create_sample_session();
-        bookmark_specific_turn(&mut session, 1, "step1", Some("Note on step 1"), BookmarkKind::Turn).unwrap();
+        bookmark_specific_turn(
+            &mut session,
+            1,
+            "step1",
+            Some("Note on step 1"),
+            BookmarkKind::Turn,
+        )
+        .unwrap();
         tag_bookmark(&mut session, "step1", "core").unwrap();
 
         // Markdown export
@@ -2450,24 +2568,31 @@ mod tests {
         assert!(out_list.contains("my-mark"));
 
         // 3. /bookmark recall my-mark
-        let out_recall = handle_bookmark_command(&["recall".to_string(), "my-mark".to_string()], &mut session);
+        let out_recall =
+            handle_bookmark_command(&["recall".to_string(), "my-mark".to_string()], &mut session);
         assert!(out_recall.contains("Bookmark:"));
         assert!(out_recall.contains("my-mark"));
 
         // 4. /bookmark tag my-mark v1
-        let out_tag = handle_bookmark_command(&["tag".to_string(), "my-mark".to_string(), "v1".to_string()], &mut session);
+        let out_tag = handle_bookmark_command(
+            &["tag".to_string(), "my-mark".to_string(), "v1".to_string()],
+            &mut session,
+        );
         assert!(out_tag.contains("Tagged bookmark"));
 
         // 5. /bookmark checkpoint cp1
-        let out_cp = handle_bookmark_command(&["checkpoint".to_string(), "cp1".to_string()], &mut session);
+        let out_cp =
+            handle_bookmark_command(&["checkpoint".to_string(), "cp1".to_string()], &mut session);
         assert!(out_cp.contains("Checkpoint saved"));
 
         // 6. /bookmark restore cp1
-        let out_restore = handle_bookmark_command(&["restore".to_string(), "cp1".to_string()], &mut session);
+        let out_restore =
+            handle_bookmark_command(&["restore".to_string(), "cp1".to_string()], &mut session);
         assert!(out_restore.contains("Session restored"));
 
         // 7. /bookmark delete my-mark
-        let out_del = handle_bookmark_command(&["delete".to_string(), "my-mark".to_string()], &mut session);
+        let out_del =
+            handle_bookmark_command(&["delete".to_string(), "my-mark".to_string()], &mut session);
         assert!(out_del.contains("Deleted bookmark"));
 
         // 8. /bookmark clear
@@ -2494,7 +2619,10 @@ mod tests {
         assert_eq!(bm.line_end, None);
         assert_eq!(bm.kind, CodeBookmarkKind::Todo);
         assert_eq!(bm.title.as_deref(), Some("Refactor parser"));
-        assert_eq!(bm.note.as_deref(), Some("Need to optimize regex matching here"));
+        assert_eq!(
+            bm.note.as_deref(),
+            Some("Need to optimize regex matching here")
+        );
         assert_eq!(bm.tags, vec!["refactor", "perf"]);
         assert_eq!(bm.author.as_deref(), Some("dev-alice"));
         assert_eq!(bm.line_display(), "L42");
@@ -2523,13 +2651,34 @@ mod tests {
 
     #[test]
     fn test_code_bookmark_kind_parsing() {
-        assert_eq!(CodeBookmarkKind::from_str_loose("todo"), Some(CodeBookmarkKind::Todo));
-        assert_eq!(CodeBookmarkKind::from_str_loose("bug"), Some(CodeBookmarkKind::Bug));
-        assert_eq!(CodeBookmarkKind::from_str_loose("fixme"), Some(CodeBookmarkKind::Bug));
-        assert_eq!(CodeBookmarkKind::from_str_loose("refactor"), Some(CodeBookmarkKind::Refactor));
-        assert_eq!(CodeBookmarkKind::from_str_loose("security"), Some(CodeBookmarkKind::Security));
-        assert_eq!(CodeBookmarkKind::from_str_loose("perf"), Some(CodeBookmarkKind::Performance));
-        assert_eq!(CodeBookmarkKind::from_str_loose("bookmark"), Some(CodeBookmarkKind::Bookmark));
+        assert_eq!(
+            CodeBookmarkKind::from_str_loose("todo"),
+            Some(CodeBookmarkKind::Todo)
+        );
+        assert_eq!(
+            CodeBookmarkKind::from_str_loose("bug"),
+            Some(CodeBookmarkKind::Bug)
+        );
+        assert_eq!(
+            CodeBookmarkKind::from_str_loose("fixme"),
+            Some(CodeBookmarkKind::Bug)
+        );
+        assert_eq!(
+            CodeBookmarkKind::from_str_loose("refactor"),
+            Some(CodeBookmarkKind::Refactor)
+        );
+        assert_eq!(
+            CodeBookmarkKind::from_str_loose("security"),
+            Some(CodeBookmarkKind::Security)
+        );
+        assert_eq!(
+            CodeBookmarkKind::from_str_loose("perf"),
+            Some(CodeBookmarkKind::Performance)
+        );
+        assert_eq!(
+            CodeBookmarkKind::from_str_loose("bookmark"),
+            Some(CodeBookmarkKind::Bookmark)
+        );
         assert_eq!(CodeBookmarkKind::from_str_loose("unknown_value"), None);
     }
 
@@ -2561,16 +2710,24 @@ mod tests {
 
         // Find by ID prefix
         let prefix = &id2.to_string()[..8];
-        let b2 = store.find_by_id_str(prefix).expect("should find id2 by prefix");
+        let b2 = store
+            .find_by_id_str(prefix)
+            .expect("should find id2 by prefix");
         assert_eq!(b2.file_path, "src/db.rs");
 
         // Update note
         assert!(store.update_note(&id1, Some("Updated security note".to_string())));
-        assert_eq!(store.get(&id1).unwrap().note.as_deref(), Some("Updated security note"));
+        assert_eq!(
+            store.get(&id1).unwrap().note.as_deref(),
+            Some("Updated security note")
+        );
 
         // Update snippet
         assert!(store.update_snippet(&id1, Some("let token = parse();".to_string())));
-        assert_eq!(store.get(&id1).unwrap().snippet.as_deref(), Some("let token = parse();"));
+        assert_eq!(
+            store.get(&id1).unwrap().snippet.as_deref(),
+            Some("let token = parse();")
+        );
 
         // Update lines
         assert!(store.update_lines(&id1, 55, Some(60)));

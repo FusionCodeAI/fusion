@@ -63,10 +63,13 @@ mod tests {
         });
 
         let (out_tx, mut out_rx) = tokio::sync::mpsc::unbounded_channel();
-        server.process_raw_message(&init_req.to_string(), out_tx).await;
+        server
+            .process_raw_message(&init_req.to_string(), out_tx)
+            .await;
 
         let response_str = out_rx.recv().await.expect("Expected handshake response");
-        let resp: JsonRpcResponse = serde_json::from_str(&response_str).expect("Valid JSON-RPC response");
+        let resp: JsonRpcResponse =
+            serde_json::from_str(&response_str).expect("Valid JSON-RPC response");
 
         assert_eq!(resp.id, RequestId::Number(1));
         assert!(resp.error.is_none());
@@ -88,7 +91,9 @@ mod tests {
         });
 
         let (out_tx, mut out_rx) = tokio::sync::mpsc::unbounded_channel();
-        server.process_raw_message(&ping_req.to_string(), out_tx).await;
+        server
+            .process_raw_message(&ping_req.to_string(), out_tx)
+            .await;
 
         let response_str = out_rx.recv().await.expect("Expected ping response");
         let resp: JsonRpcResponse = serde_json::from_str(&response_str).unwrap();
@@ -113,11 +118,14 @@ mod tests {
         });
 
         let (out_tx, mut out_rx) = tokio::sync::mpsc::unbounded_channel();
-        server.process_raw_message(&new_session_req.to_string(), out_tx.clone()).await;
+        server
+            .process_raw_message(&new_session_req.to_string(), out_tx.clone())
+            .await;
 
         let response_str = out_rx.recv().await.expect("Expected new session response");
         let resp: JsonRpcResponse = serde_json::from_str(&response_str).unwrap();
-        let new_session_res: NewSessionResult = serde_json::from_value(resp.result.unwrap()).unwrap();
+        let new_session_res: NewSessionResult =
+            serde_json::from_value(resp.result.unwrap()).unwrap();
         let session_id = new_session_res.session_id;
         assert!(!session_id.is_empty());
 
@@ -127,10 +135,13 @@ mod tests {
             "id": 3,
             "method": "session/list"
         });
-        server.process_raw_message(&list_req.to_string(), out_tx.clone()).await;
+        server
+            .process_raw_message(&list_req.to_string(), out_tx.clone())
+            .await;
         let list_str = out_rx.recv().await.expect("Expected list response");
         let list_resp: JsonRpcResponse = serde_json::from_str(&list_str).unwrap();
-        let list_res: ListSessionsResult = serde_json::from_value(list_resp.result.unwrap()).unwrap();
+        let list_res: ListSessionsResult =
+            serde_json::from_value(list_resp.result.unwrap()).unwrap();
         assert!(list_res.sessions.iter().any(|s| s.session_id == session_id));
 
         // 3. Close session
@@ -142,7 +153,9 @@ mod tests {
                 "sessionId": session_id
             }
         });
-        server.process_raw_message(&close_req.to_string(), out_tx.clone()).await;
+        server
+            .process_raw_message(&close_req.to_string(), out_tx.clone())
+            .await;
         let close_str = out_rx.recv().await.expect("Expected close response");
         let close_resp: JsonRpcResponse = serde_json::from_str(&close_str).unwrap();
         assert_eq!(close_resp.result.unwrap(), json!({ "success": true }));
@@ -154,7 +167,9 @@ mod tests {
         let (out_tx, mut out_rx) = tokio::sync::mpsc::unbounded_channel();
 
         // Malformed JSON
-        server.process_raw_message("not valid json", out_tx.clone()).await;
+        server
+            .process_raw_message("not valid json", out_tx.clone())
+            .await;
         let err_str = out_rx.recv().await.unwrap();
         let err_resp: JsonRpcResponse = serde_json::from_str(&err_str).unwrap();
         assert!(err_resp.error.is_some());
@@ -166,11 +181,16 @@ mod tests {
             "id": 99,
             "method": "unknown/method"
         });
-        server.process_raw_message(&unknown_req.to_string(), out_tx.clone()).await;
+        server
+            .process_raw_message(&unknown_req.to_string(), out_tx.clone())
+            .await;
         let unknown_str = out_rx.recv().await.unwrap();
         let unknown_resp: JsonRpcResponse = serde_json::from_str(&unknown_str).unwrap();
         assert!(unknown_resp.error.is_some());
-        assert_eq!(unknown_resp.error.unwrap().code, error_codes::METHOD_NOT_FOUND);
+        assert_eq!(
+            unknown_resp.error.unwrap().code,
+            error_codes::METHOD_NOT_FOUND
+        );
     }
 
     #[tokio::test]
@@ -180,11 +200,15 @@ mod tests {
         assert_eq!(p1.to_text(), "Write hello world");
 
         // Array of content blocks
-        let p2: PromptInput = serde_json::from_str(r#"[{"type": "text", "text": "First line"}, {"type": "text", "text": "Second line"}]"#).unwrap();
+        let p2: PromptInput = serde_json::from_str(
+            r#"[{"type": "text", "text": "First line"}, {"type": "text", "text": "Second line"}]"#,
+        )
+        .unwrap();
         assert_eq!(p2.to_text(), "First line\nSecond line");
 
         // Single object content block
-        let p3: PromptInput = serde_json::from_str(r#"{"type": "text", "text": "Single block text"}"#).unwrap();
+        let p3: PromptInput =
+            serde_json::from_str(r#"{"type": "text", "text": "Single block text"}"#).unwrap();
         assert_eq!(p3.to_text(), "Single block text");
     }
 
@@ -213,7 +237,10 @@ mod tests {
             }
         });
 
-        client_write.write_all(init_req.to_string().as_bytes()).await.unwrap();
+        client_write
+            .write_all(init_req.to_string().as_bytes())
+            .await
+            .unwrap();
         client_write.write_all(b"\n").await.unwrap();
         client_write.flush().await.unwrap();
 

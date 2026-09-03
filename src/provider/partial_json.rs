@@ -1,6 +1,6 @@
-use std::collections::BTreeMap;
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use serde_json::Value;
+use std::collections::BTreeMap;
 
 use crate::provider::types::{StreamChunk, ToolCall};
 
@@ -561,9 +561,7 @@ pub fn repair_partial_json(
         }
 
         // Numbers (or leading dot like .5)
-        if b.is_ascii_digit()
-            || b == b'-'
-            || (options.lenient_numbers && (b == b'+' || b == b'.'))
+        if b.is_ascii_digit() || b == b'-' || (options.lenient_numbers && (b == b'+' || b == b'.'))
         {
             if b == b'.' && (pos + 1 >= len || !bytes[pos + 1].is_ascii_digit()) {
                 pos += 1;
@@ -637,13 +635,19 @@ pub fn repair_partial_json(
                 continue;
             }
 
-            if options.autocomplete_literals && lower.starts_with('t') && "true".starts_with(&lower) {
+            if options.autocomplete_literals && lower.starts_with('t') && "true".starts_with(&lower)
+            {
                 out.push_str("true");
                 on_value_completed(&mut stack);
-            } else if options.autocomplete_literals && lower.starts_with('f') && "false".starts_with(&lower) {
+            } else if options.autocomplete_literals
+                && lower.starts_with('f')
+                && "false".starts_with(&lower)
+            {
                 out.push_str("false");
                 on_value_completed(&mut stack);
-            } else if (options.autocomplete_literals && lower.starts_with('n') && "null".starts_with(&lower))
+            } else if (options.autocomplete_literals
+                && lower.starts_with('n')
+                && "null".starts_with(&lower))
                 || lower == "none"
                 || lower == "nil"
                 || lower == "undefined"
@@ -780,8 +784,7 @@ pub fn deserialize_partial_json_with_options<T: DeserializeOwned>(
     options: &PartialJsonOptions,
 ) -> Result<T, PartialJsonError> {
     let value = parse_partial_json_with_options(raw, options)?;
-    serde_json::from_value(value)
-        .map_err(|e| PartialJsonError::DeserializationError(e.to_string()))
+    serde_json::from_value(value).map_err(|e| PartialJsonError::DeserializationError(e.to_string()))
 }
 
 /// Streaming partial JSON parser that accumulates SSE chunks and provides live parsed state.
@@ -1088,7 +1091,11 @@ impl StreamingToolCallAccumulator {
         arguments_delta: &str,
     ) {
         let entry = self.parsers.entry(index).or_insert_with(|| {
-            (None, None, StreamingJsonParser::with_options(self.options.clone()))
+            (
+                None,
+                None,
+                StreamingJsonParser::with_options(self.options.clone()),
+            )
         });
 
         if let Some(new_id) = id {
@@ -1230,7 +1237,10 @@ mod tests {
         assert_eq!(parse_partial_json("123").unwrap(), json!(123));
         assert_eq!(parse_partial_json("-456").unwrap(), json!(-456));
         assert_eq!(parse_partial_json("3.1415").unwrap(), json!(3.1415));
-        assert_eq!(parse_partial_json("\"hello world\"").unwrap(), json!("hello world"));
+        assert_eq!(
+            parse_partial_json("\"hello world\"").unwrap(),
+            json!("hello world")
+        );
     }
 
     #[test]
@@ -1261,15 +1271,42 @@ mod tests {
 
     #[test]
     fn test_truncated_and_lenient_numbers() {
-        assert_eq!(parse_partial_json(r#"{"num": 42."#).unwrap(), json!({"num": 42.0}));
-        assert_eq!(parse_partial_json(r#"{"num": 1e"#).unwrap(), json!({"num": 1.0}));
-        assert_eq!(parse_partial_json(r#"{"num": 1e+"#).unwrap(), json!({"num": 1.0}));
-        assert_eq!(parse_partial_json(r#"{"num": 1e-"#).unwrap(), json!({"num": 1.0}));
-        assert_eq!(parse_partial_json(r#"{"num": -"#).unwrap(), json!({"num": 0}));
-        assert_eq!(parse_partial_json(r#"{"num": +"#).unwrap(), json!({"num": 0}));
-        assert_eq!(parse_partial_json(r#"{"num": +42"#).unwrap(), json!({"num": 42}));
-        assert_eq!(parse_partial_json(r#"{"num": .5"#).unwrap(), json!({"num": 0.5}));
-        assert_eq!(parse_partial_json(r#"{"num": -.5"#).unwrap(), json!({"num": -0.5}));
+        assert_eq!(
+            parse_partial_json(r#"{"num": 42."#).unwrap(),
+            json!({"num": 42.0})
+        );
+        assert_eq!(
+            parse_partial_json(r#"{"num": 1e"#).unwrap(),
+            json!({"num": 1.0})
+        );
+        assert_eq!(
+            parse_partial_json(r#"{"num": 1e+"#).unwrap(),
+            json!({"num": 1.0})
+        );
+        assert_eq!(
+            parse_partial_json(r#"{"num": 1e-"#).unwrap(),
+            json!({"num": 1.0})
+        );
+        assert_eq!(
+            parse_partial_json(r#"{"num": -"#).unwrap(),
+            json!({"num": 0})
+        );
+        assert_eq!(
+            parse_partial_json(r#"{"num": +"#).unwrap(),
+            json!({"num": 0})
+        );
+        assert_eq!(
+            parse_partial_json(r#"{"num": +42"#).unwrap(),
+            json!({"num": 42})
+        );
+        assert_eq!(
+            parse_partial_json(r#"{"num": .5"#).unwrap(),
+            json!({"num": 0.5})
+        );
+        assert_eq!(
+            parse_partial_json(r#"{"num": -.5"#).unwrap(),
+            json!({"num": -0.5})
+        );
     }
 
     #[test]
@@ -1607,7 +1644,12 @@ mod tests {
     fn test_streaming_tool_call_accumulator() {
         let mut acc = StreamingToolCallAccumulator::new();
 
-        acc.process_delta(0, Some("call_1".into()), Some("read_file".into()), "{\"path\": \"");
+        acc.process_delta(
+            0,
+            Some("call_1".into()),
+            Some("read_file".into()),
+            "{\"path\": \"",
+        );
         assert_eq!(acc.len(), 1);
         let partial = acc.get_partial_call(0).unwrap();
         assert_eq!(partial.name.as_deref(), Some("read_file"));
@@ -1625,7 +1667,12 @@ mod tests {
         assert_eq!(tool_calls[0].arguments, "{\"path\": \"README.md\"}");
 
         // Test multiple tool calls
-        acc.process_delta(1, Some("call_2".into()), Some("grep".into()), "{\"pattern\": \"TODO\"");
+        acc.process_delta(
+            1,
+            Some("call_2".into()),
+            Some("grep".into()),
+            "{\"pattern\": \"TODO\"",
+        );
         assert_eq!(acc.len(), 2);
         assert!(!acc.is_all_complete());
 
@@ -1684,10 +1731,8 @@ mod tests {
             }
         );
 
-        let lossy = parse_partial_json_lossy_with_options(
-            "{invalid: ",
-            &PartialJsonOptions::default(),
-        );
+        let lossy =
+            parse_partial_json_lossy_with_options("{invalid: ", &PartialJsonOptions::default());
         assert_eq!(lossy, json!({"invalid": null}));
     }
 

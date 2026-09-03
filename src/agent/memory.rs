@@ -14,13 +14,13 @@
 //! The store automatically saves changes atomically to `~/.fusion/memory.json` and seamlessly
 //! formats relevant memories into the agent's system prompt during conversation turns.
 
-use std::fs;
-use std::path::{Path, PathBuf};
+use async_trait::async_trait;
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
+use std::fs;
+use std::path::{Path, PathBuf};
 use uuid::Uuid;
-use async_trait::async_trait;
 
 use crate::config::Config;
 use crate::tools::types::{Tool, ToolContext};
@@ -34,19 +34,54 @@ use crate::tools::types::{Tool, ToolContext};
 #[serde(rename_all = "snake_case")]
 pub enum MemoryCategory {
     /// User coding preferences, styling choices, preferred idioms, editor settings, and tool habits.
-    #[serde(alias = "preference", alias = "pref", alias = "user_preference", alias = "style", alias = "user_pref", alias = "user_preferences")]
+    #[serde(
+        alias = "preference",
+        alias = "pref",
+        alias = "user_preference",
+        alias = "style",
+        alias = "user_pref",
+        alias = "user_preferences"
+    )]
     UserPreference,
 
     /// Factual knowledge about the project, tech stack, environment, database models, ports, dependencies.
-    #[serde(alias = "project_fact", alias = "fact", alias = "general_fact", alias = "info", alias = "knowledge", alias = "project_info", alias = "facts")]
+    #[serde(
+        alias = "project_fact",
+        alias = "fact",
+        alias = "general_fact",
+        alias = "info",
+        alias = "knowledge",
+        alias = "project_info",
+        alias = "facts"
+    )]
     ProjectFact,
 
     /// Architectural and design decisions, ADRs, invariant patterns, structural rules, and conventions.
-    #[serde(alias = "architecture_decision", alias = "architecture", alias = "arch", alias = "decision", alias = "adr", alias = "project_architecture", alias = "convention", alias = "conventions", alias = "rule", alias = "rules", alias = "standard", alias = "standards")]
+    #[serde(
+        alias = "architecture_decision",
+        alias = "architecture",
+        alias = "arch",
+        alias = "decision",
+        alias = "adr",
+        alias = "project_architecture",
+        alias = "convention",
+        alias = "conventions",
+        alias = "rule",
+        alias = "rules",
+        alias = "standard",
+        alias = "standards"
+    )]
     ArchitectureDecision,
 
     /// State, cached configs, credentials metadata, execution modes, or dynamic parameters of tools.
-    #[serde(alias = "tool_state", alias = "tool", alias = "state", alias = "tool_config", alias = "tools", alias = "tool_status")]
+    #[serde(
+        alias = "tool_state",
+        alias = "tool",
+        alias = "state",
+        alias = "tool_config",
+        alias = "tools",
+        alias = "tool_status"
+    )]
     ToolState,
 
     /// Custom or domain-specific user memory category.
@@ -92,9 +127,15 @@ impl MemoryCategory {
     pub fn description(&self) -> &'static str {
         match self {
             Self::UserPreference => "User coding preferences, tooling habits, and stylistic tastes",
-            Self::ProjectFact => "Project facts, tech stack details, environment settings, and models",
-            Self::ArchitectureDecision => "System architecture decisions, design invariants, ADRs, and conventions",
-            Self::ToolState => "Persistent tool states, cached parameters, and execution configurations",
+            Self::ProjectFact => {
+                "Project facts, tech stack details, environment settings, and models"
+            }
+            Self::ArchitectureDecision => {
+                "System architecture decisions, design invariants, ADRs, and conventions"
+            }
+            Self::ToolState => {
+                "Persistent tool states, cached parameters, and execution configurations"
+            }
             Self::Custom(_) => "Custom user-defined memory domain",
         }
     }
@@ -103,15 +144,27 @@ impl MemoryCategory {
     pub fn from_str_loose(s: &str) -> Self {
         let normalized = s.trim().to_lowercase().replace('-', "_");
         match normalized.as_str() {
-            "user_preference" | "user_pref" | "preference" | "pref" | "style" | "user_preferences" => {
-                Self::UserPreference
-            }
-            "project_fact" | "fact" | "facts" | "general_fact" | "general" | "info" | "knowledge" | "project_info" => {
-                Self::ProjectFact
-            }
-            "architecture_decision" | "architecture" | "arch" | "decision" | "adr" | "project_architecture" | "project_arch" | "tech_stack" | "stack" | "convention" | "conv" | "recurring_convention" | "conventions" | "rule" | "rules" | "standard" | "standards" => {
-                Self::ArchitectureDecision
-            }
+            "user_preference" | "user_pref" | "preference" | "pref" | "style"
+            | "user_preferences" => Self::UserPreference,
+            "project_fact" | "fact" | "facts" | "general_fact" | "general" | "info"
+            | "knowledge" | "project_info" => Self::ProjectFact,
+            "architecture_decision"
+            | "architecture"
+            | "arch"
+            | "decision"
+            | "adr"
+            | "project_architecture"
+            | "project_arch"
+            | "tech_stack"
+            | "stack"
+            | "convention"
+            | "conv"
+            | "recurring_convention"
+            | "conventions"
+            | "rule"
+            | "rules"
+            | "standard"
+            | "standards" => Self::ArchitectureDecision,
             "tool_state" | "tool" | "state" | "tool_config" | "tools" | "tool_status" => {
                 Self::ToolState
             }
@@ -218,7 +271,11 @@ fn default_importance() -> u8 {
 
 impl MemoryEntry {
     /// Creates a new `MemoryEntry` with a freshly generated ID and current timestamps.
-    pub fn new(category: MemoryCategory, key: impl Into<String>, content: impl Into<String>) -> Self {
+    pub fn new(
+        category: MemoryCategory,
+        key: impl Into<String>,
+        content: impl Into<String>,
+    ) -> Self {
         let now = Utc::now().to_rfc3339();
         let short_id = format!("mem_{}", &Uuid::new_v4().to_string()[..8]);
         Self {
@@ -247,26 +304,42 @@ impl MemoryEntry {
     }
 
     /// Creates a project fact memory entry, optionally tied to a workspace.
-    pub fn project_fact(workspace: Option<impl Into<String>>, key: impl Into<String>, content: impl Into<String>) -> Self {
+    pub fn project_fact(
+        workspace: Option<impl Into<String>>,
+        key: impl Into<String>,
+        content: impl Into<String>,
+    ) -> Self {
         let mut entry = Self::new(MemoryCategory::ProjectFact, key, content);
         entry.workspace = workspace.map(|w| w.into());
         entry
     }
 
     /// Creates a project fact memory entry (backward compatibility alias).
-    pub fn fact(workspace: Option<impl Into<String>>, key: impl Into<String>, content: impl Into<String>) -> Self {
+    pub fn fact(
+        workspace: Option<impl Into<String>>,
+        key: impl Into<String>,
+        content: impl Into<String>,
+    ) -> Self {
         Self::project_fact(workspace, key, content)
     }
 
     /// Creates an architecture decision memory entry.
-    pub fn architecture_decision(workspace: Option<impl Into<String>>, key: impl Into<String>, content: impl Into<String>) -> Self {
+    pub fn architecture_decision(
+        workspace: Option<impl Into<String>>,
+        key: impl Into<String>,
+        content: impl Into<String>,
+    ) -> Self {
         let mut entry = Self::new(MemoryCategory::ArchitectureDecision, key, content);
         entry.workspace = workspace.map(|w| w.into());
         entry
     }
 
     /// Creates an architecture decision memory entry (alias).
-    pub fn architecture(workspace: Option<impl Into<String>>, key: impl Into<String>, content: impl Into<String>) -> Self {
+    pub fn architecture(
+        workspace: Option<impl Into<String>>,
+        key: impl Into<String>,
+        content: impl Into<String>,
+    ) -> Self {
         Self::architecture_decision(workspace, key, content)
     }
 
@@ -276,14 +349,22 @@ impl MemoryEntry {
     }
 
     /// Creates a tool state memory entry.
-    pub fn tool_state(workspace: Option<impl Into<String>>, key: impl Into<String>, content: impl Into<String>) -> Self {
+    pub fn tool_state(
+        workspace: Option<impl Into<String>>,
+        key: impl Into<String>,
+        content: impl Into<String>,
+    ) -> Self {
         let mut entry = Self::new(MemoryCategory::ToolState, key, content);
         entry.workspace = workspace.map(|w| w.into());
         entry
     }
 
     /// Creates a custom category memory entry.
-    pub fn custom(category: impl Into<String>, key: impl Into<String>, content: impl Into<String>) -> Self {
+    pub fn custom(
+        category: impl Into<String>,
+        key: impl Into<String>,
+        content: impl Into<String>,
+    ) -> Self {
         Self::new(MemoryCategory::Custom(category.into()), key, content)
     }
 
@@ -350,7 +431,7 @@ impl MemoryEntry {
     /// Global memories always match any target workspace.
     pub fn matches_workspace(&self, target_workspace: Option<&str>) -> bool {
         match (&self.workspace, target_workspace) {
-            (None, _) => true, // Global applies everywhere
+            (None, _) => true,       // Global applies everywhere
             (Some(_), None) => true, // If no workspace specified, match all
             (Some(entry_ws), Some(target_ws)) => {
                 let entry_norm = entry_ws.trim().trim_end_matches(['/', '\\']);
@@ -374,7 +455,11 @@ impl MemoryEntry {
             || self.content.to_lowercase().contains(&q)
             || self.category.as_str().contains(&q)
             || self.tags.iter().any(|t| t.to_lowercase().contains(&q))
-            || self.workspace.as_deref().map(|w| w.to_lowercase().contains(&q)).unwrap_or(false)
+            || self
+                .workspace
+                .as_deref()
+                .map(|w| w.to_lowercase().contains(&q))
+                .unwrap_or(false)
     }
 
     /// Records an access, updating timestamp and count.
@@ -425,7 +510,11 @@ impl MemoryEntry {
     /// - Importance 3: 30 days
     /// - Importance 4: 90 days
     /// - Importance 5: 365 days (high permanence)
-    pub fn compute_decay_factor(&self, now: DateTime<Utc>, half_life_days_override: Option<f64>) -> f64 {
+    pub fn compute_decay_factor(
+        &self,
+        now: DateTime<Utc>,
+        half_life_days_override: Option<f64>,
+    ) -> f64 {
         let half_life_days = half_life_days_override.unwrap_or_else(|| match self.importance {
             1 => 7.0,
             2 => 14.0,
@@ -547,7 +636,11 @@ impl MemoryStore {
         let content = match fs::read_to_string(path) {
             Ok(c) => c,
             Err(e) => {
-                tracing::warn!("Failed to read memory file at {}: {}. Starting with empty store.", path.display(), e);
+                tracing::warn!(
+                    "Failed to read memory file at {}: {}. Starting with empty store.",
+                    path.display(),
+                    e
+                );
                 return Ok(Self::new());
             }
         };
@@ -559,7 +652,11 @@ impl MemoryStore {
         match serde_json::from_str::<MemoryStore>(&content) {
             Ok(store) => Ok(store),
             Err(e) => {
-                tracing::warn!("Failed to parse memory JSON at {}: {}. Starting with empty store.", path.display(), e);
+                tracing::warn!(
+                    "Failed to parse memory JSON at {}: {}. Starting with empty store.",
+                    path.display(),
+                    e
+                );
                 Ok(Self::new())
             }
         }
@@ -608,37 +705,62 @@ impl MemoryStore {
         out.push_str("# 🧠 Fusion Persistent Memory Store\n\n");
         out.push_str(&format!("- **Schema Version**: `{}`\n", self.version));
         out.push_str(&format!("- **Last Modified**: `{}`\n", self.updated_at));
-        out.push_str(&format!("- **Total Memories**: `{}`\n\n", self.entries.len()));
+        out.push_str(&format!(
+            "- **Total Memories**: `{}`\n\n",
+            self.entries.len()
+        ));
 
         let categories = [
             (MemoryCategory::UserPreference, "User Preferences"),
             (MemoryCategory::ProjectFact, "Project Facts"),
-            (MemoryCategory::ArchitectureDecision, "Architecture Decisions"),
+            (
+                MemoryCategory::ArchitectureDecision,
+                "Architecture Decisions",
+            ),
             (MemoryCategory::ToolState, "Tool States"),
         ];
 
         for (cat, title) in &categories {
             let in_cat = self.filter_by_category(cat);
             if !in_cat.is_empty() {
-                out.push_str(&format!("## {} {} ({})\n", cat.emoji(), title, in_cat.len()));
+                out.push_str(&format!(
+                    "## {} {} ({})\n",
+                    cat.emoji(),
+                    title,
+                    in_cat.len()
+                ));
                 out.push_str(&format!("*{}*\n\n", cat.description()));
 
                 for entry in in_cat {
-                    let ws_str = entry.workspace.as_deref().unwrap_or("Global (All workspaces)");
+                    let ws_str = entry
+                        .workspace
+                        .as_deref()
+                        .unwrap_or("Global (All workspaces)");
                     let stars = "★".repeat(entry.importance as usize);
                     let tags_str = if entry.tags.is_empty() {
                         "none".to_string()
                     } else {
-                        entry.tags.iter().map(|t| format!("`{}`", t)).collect::<Vec<_>>().join(", ")
+                        entry
+                            .tags
+                            .iter()
+                            .map(|t| format!("`{}`", t))
+                            .collect::<Vec<_>>()
+                            .join(", ")
                     };
 
                     out.push_str(&format!("### `{}`\n\n", entry.key));
                     out.push_str(&format!("- **ID**: `{}`\n", entry.id));
-                    out.push_str(&format!("- **Importance**: {} ({}/5)\n", stars, entry.importance));
+                    out.push_str(&format!(
+                        "- **Importance**: {} ({}/5)\n",
+                        stars, entry.importance
+                    ));
                     out.push_str(&format!("- **Scope**: `{}`\n", ws_str));
                     out.push_str(&format!("- **Tags**: {}\n", tags_str));
                     out.push_str(&format!("- **Access Count**: `{}`\n", entry.access_count));
-                    out.push_str(&format!("- **Created**: `{}` | **Updated**: `{}`\n\n", entry.created_at, entry.updated_at));
+                    out.push_str(&format!(
+                        "- **Created**: `{}` | **Updated**: `{}`\n\n",
+                        entry.created_at, entry.updated_at
+                    ));
                     out.push_str(&format!("{}\n\n---\n\n", entry.content));
                 }
             }
@@ -655,7 +777,10 @@ impl MemoryStore {
             out.push_str(&format!("## 📌 Custom Categories ({})\n\n", customs.len()));
             for entry in customs {
                 let cat_name = entry.category.as_str();
-                out.push_str(&format!("### `{}` (Category: `{}`)\n\n", entry.key, cat_name));
+                out.push_str(&format!(
+                    "### `{}` (Category: `{}`)\n\n",
+                    entry.key, cat_name
+                ));
                 out.push_str(&format!("- **ID**: `{}`\n", entry.id));
                 out.push_str(&format!("- **Importance**: {}/5\n", entry.importance));
                 out.push_str(&format!("- **Content**: {}\n\n---\n\n", entry.content));
@@ -692,7 +817,10 @@ impl MemoryStore {
                 let header = trimmed.trim_start_matches("## ").to_lowercase();
                 if header.contains("preference") {
                     current_category = MemoryCategory::UserPreference;
-                } else if header.contains("architecture") || header.contains("decision") || header.contains("convention") {
+                } else if header.contains("architecture")
+                    || header.contains("decision")
+                    || header.contains("convention")
+                {
                     current_category = MemoryCategory::ArchitectureDecision;
                 } else if header.contains("tool") {
                     current_category = MemoryCategory::ToolState;
@@ -706,11 +834,7 @@ impl MemoryStore {
             if trimmed.starts_with("- **") || trimmed.starts_with("- `") {
                 let rest = trimmed.trim_start_matches('-').trim();
                 if let Some((raw_key, content)) = rest.split_once(':') {
-                    let key = raw_key
-                        .trim()
-                        .trim_matches('*')
-                        .trim_matches('`')
-                        .trim();
+                    let key = raw_key.trim().trim_matches('*').trim_matches('`').trim();
                     let clean_content = content.trim();
 
                     if !key.is_empty() && !clean_content.is_empty() {
@@ -757,9 +881,11 @@ impl MemoryStore {
         self.updated_at = now.clone();
 
         // Check if matching key already exists
-        if let Some(idx) = self.entries.iter().position(|e| {
-            e.key.eq_ignore_ascii_case(&entry.key) && e.workspace == entry.workspace
-        }) {
+        if let Some(idx) = self
+            .entries
+            .iter()
+            .position(|e| e.key.eq_ignore_ascii_case(&entry.key) && e.workspace == entry.workspace)
+        {
             self.entries[idx].content = entry.content;
             self.entries[idx].category = entry.category;
             if !entry.tags.is_empty() {
@@ -824,7 +950,8 @@ impl MemoryStore {
         key: impl Into<String>,
         content: impl Into<String>,
     ) -> &MemoryEntry {
-        let entry = MemoryEntry::architecture_decision(workspace.map(|s| s.to_string()), key, content);
+        let entry =
+            MemoryEntry::architecture_decision(workspace.map(|s| s.to_string()), key, content);
         self.add(entry)
     }
 
@@ -966,7 +1093,9 @@ impl MemoryStore {
     pub fn architecture_decisions(&self, workspace: Option<&str>) -> Vec<&MemoryEntry> {
         self.entries
             .iter()
-            .filter(|e| e.category == MemoryCategory::ArchitectureDecision && e.matches_workspace(workspace))
+            .filter(|e| {
+                e.category == MemoryCategory::ArchitectureDecision && e.matches_workspace(workspace)
+            })
             .collect()
     }
 
@@ -1123,7 +1252,11 @@ impl MemoryStore {
                 let importance_score = (entry.importance as f64) * 20.0;
 
                 // 3. Workspace specificity boost (scoped workspace > global)
-                let workspace_score = if entry.workspace.is_some() { 40.0 } else { 15.0 };
+                let workspace_score = if entry.workspace.is_some() {
+                    40.0
+                } else {
+                    15.0
+                };
 
                 // 4. Access frequency boost
                 let access_score = (entry.access_count.min(20) as f64) * 3.0;
@@ -1320,7 +1453,12 @@ impl MemoryStore {
         for cat in &categories {
             let in_cat: Vec<&MemoryEntry> = self.filter_by_category(cat);
             if !in_cat.is_empty() {
-                lines.push(format!("### {} {} ({}):", cat.emoji(), cat.display_name(), in_cat.len()));
+                lines.push(format!(
+                    "### {} {} ({}):",
+                    cat.emoji(),
+                    cat.display_name(),
+                    in_cat.len()
+                ));
                 for entry in in_cat {
                     let scope = entry
                         .workspace
@@ -1624,22 +1762,55 @@ impl Tool for MemoryTool {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use tempfile::tempdir;
     use chrono::Duration;
+    use tempfile::tempdir;
 
     #[test]
     fn test_memory_category_loose_parsing() {
-        assert_eq!(MemoryCategory::from_str_loose("preference"), MemoryCategory::UserPreference);
-        assert_eq!(MemoryCategory::from_str_loose("user-pref"), MemoryCategory::UserPreference);
-        assert_eq!(MemoryCategory::from_str_loose("style"), MemoryCategory::UserPreference);
-        assert_eq!(MemoryCategory::from_str_loose("fact"), MemoryCategory::ProjectFact);
-        assert_eq!(MemoryCategory::from_str_loose("project_fact"), MemoryCategory::ProjectFact);
-        assert_eq!(MemoryCategory::from_str_loose("architecture"), MemoryCategory::ArchitectureDecision);
-        assert_eq!(MemoryCategory::from_str_loose("architecture_decision"), MemoryCategory::ArchitectureDecision);
-        assert_eq!(MemoryCategory::from_str_loose("convention"), MemoryCategory::ArchitectureDecision);
-        assert_eq!(MemoryCategory::from_str_loose("adr"), MemoryCategory::ArchitectureDecision);
-        assert_eq!(MemoryCategory::from_str_loose("tool"), MemoryCategory::ToolState);
-        assert_eq!(MemoryCategory::from_str_loose("tool_state"), MemoryCategory::ToolState);
+        assert_eq!(
+            MemoryCategory::from_str_loose("preference"),
+            MemoryCategory::UserPreference
+        );
+        assert_eq!(
+            MemoryCategory::from_str_loose("user-pref"),
+            MemoryCategory::UserPreference
+        );
+        assert_eq!(
+            MemoryCategory::from_str_loose("style"),
+            MemoryCategory::UserPreference
+        );
+        assert_eq!(
+            MemoryCategory::from_str_loose("fact"),
+            MemoryCategory::ProjectFact
+        );
+        assert_eq!(
+            MemoryCategory::from_str_loose("project_fact"),
+            MemoryCategory::ProjectFact
+        );
+        assert_eq!(
+            MemoryCategory::from_str_loose("architecture"),
+            MemoryCategory::ArchitectureDecision
+        );
+        assert_eq!(
+            MemoryCategory::from_str_loose("architecture_decision"),
+            MemoryCategory::ArchitectureDecision
+        );
+        assert_eq!(
+            MemoryCategory::from_str_loose("convention"),
+            MemoryCategory::ArchitectureDecision
+        );
+        assert_eq!(
+            MemoryCategory::from_str_loose("adr"),
+            MemoryCategory::ArchitectureDecision
+        );
+        assert_eq!(
+            MemoryCategory::from_str_loose("tool"),
+            MemoryCategory::ToolState
+        );
+        assert_eq!(
+            MemoryCategory::from_str_loose("tool_state"),
+            MemoryCategory::ToolState
+        );
         assert_eq!(
             MemoryCategory::from_str_loose("custom_domain"),
             MemoryCategory::Custom("custom_domain".to_string())
@@ -1690,10 +1861,13 @@ mod tests {
         let now = Utc::now();
         let thirty_days_ago = now - Duration::days(30);
 
-        let fresh_entry = MemoryEntry::preference("key_fresh", "content")
-            .with_importance(3);
+        let fresh_entry = MemoryEntry::preference("key_fresh", "content").with_importance(3);
         let fresh_decay = fresh_entry.compute_decay_factor(now, None);
-        assert!((fresh_decay - 1.0).abs() < 0.05, "Fresh memory decay should be close to 1.0, got {}", fresh_decay);
+        assert!(
+            (fresh_decay - 1.0).abs() < 0.05,
+            "Fresh memory decay should be close to 1.0, got {}",
+            fresh_decay
+        );
 
         let mut old_entry = MemoryEntry::preference("key_old", "content")
             .with_importance(3)
@@ -1703,7 +1877,11 @@ mod tests {
 
         let old_decay = old_entry.compute_decay_factor(now, None);
         // Half life for importance 3 is 30 days -> 2^(-30/30) = 0.5
-        assert!((old_decay - 0.5).abs() < 0.05, "30-day old imp 3 memory decay should be ~0.5, got {}", old_decay);
+        assert!(
+            (old_decay - 0.5).abs() < 0.05,
+            "30-day old imp 3 memory decay should be ~0.5, got {}",
+            old_decay
+        );
     }
 
     #[test]
@@ -1741,12 +1919,12 @@ mod tests {
         store.remember_project_fact(
             Some("/work/fusion"),
             "core_layer",
-            "src/agent is the core orchestration engine"
+            "src/agent is the core orchestration engine",
         );
         store.remember_tool_state(
             None,
             "browser_viewport",
-            "{\"width\": 1280, \"height\": 720}"
+            "{\"width\": 1280, \"height\": 720}",
         );
 
         assert_eq!(store.len(), 4);
@@ -1784,19 +1962,34 @@ mod tests {
     fn test_associative_fact_retrieval_and_keyword_ranking() {
         let mut store = MemoryStore::new();
         store.add(
-            MemoryEntry::preference("rust_async", "Use tokio mpsc channels for async message passing")
-                .with_tags(vec!["rust".to_string(), "async".to_string(), "tokio".to_string()])
-                .with_importance(4)
+            MemoryEntry::preference(
+                "rust_async",
+                "Use tokio mpsc channels for async message passing",
+            )
+            .with_tags(vec![
+                "rust".to_string(),
+                "async".to_string(),
+                "tokio".to_string(),
+            ])
+            .with_importance(4),
         );
         store.add(
-            MemoryEntry::project_fact(Some("/fusion"), "database", "SQLite embedded database for metadata")
-                .with_tags(vec!["db".to_string(), "sqlite".to_string()])
-                .with_importance(3)
+            MemoryEntry::project_fact(
+                Some("/fusion"),
+                "database",
+                "SQLite embedded database for metadata",
+            )
+            .with_tags(vec!["db".to_string(), "sqlite".to_string()])
+            .with_importance(3),
         );
         store.add(
-            MemoryEntry::architecture_decision(None::<&str>, "error_policy", "Return Result with anyhow for all fallible operations")
-                .with_tags(vec!["rust".to_string(), "errors".to_string()])
-                .with_importance(5)
+            MemoryEntry::architecture_decision(
+                None::<&str>,
+                "error_policy",
+                "Return Result with anyhow for all fallible operations",
+            )
+            .with_tags(vec!["rust".to_string(), "errors".to_string()])
+            .with_importance(5),
         );
 
         // 1. Search for tokio -> should rank rust_async first
@@ -1804,7 +1997,10 @@ mod tests {
         assert!(!results.is_empty());
         assert_eq!(results[0].entry.key, "rust_async");
         assert!(results[0].score.keyword_score > 50.0);
-        assert!(results[0].score.matched_terms.contains(&"tokio".to_string()));
+        assert!(results[0]
+            .score
+            .matched_terms
+            .contains(&"tokio".to_string()));
 
         // 2. Search for sqlite -> should find database
         let results_db = store.retrieve_associative("sqlite", Some("/fusion"), 10);
@@ -1823,17 +2019,21 @@ mod tests {
         store.add(
             MemoryEntry::preference("rust_style", "Write idiomatic Rust code")
                 .with_tags(vec!["rust".to_string(), "idioms".to_string()])
-                .with_importance(4)
+                .with_importance(4),
         );
         store.add(
-            MemoryEntry::architecture_decision(None::<&str>, "rust_errors", "Error handling in Rust")
-                .with_tags(vec!["rust".to_string(), "errors".to_string()])
-                .with_importance(5)
+            MemoryEntry::architecture_decision(
+                None::<&str>,
+                "rust_errors",
+                "Error handling in Rust",
+            )
+            .with_tags(vec!["rust".to_string(), "errors".to_string()])
+            .with_importance(5),
         );
         store.add(
             MemoryEntry::project_fact(None::<&str>, "python_script", "Legacy scripts in Python")
                 .with_tags(vec!["python".to_string()])
-                .with_importance(2)
+                .with_importance(2),
         );
 
         let associated = store.find_associated("rust_style", 5);
@@ -1848,9 +2048,19 @@ mod tests {
         let memory_file = temp_dir.path().join("sub").join("memory.json");
 
         let mut store = MemoryStore::new();
-        store.remember_preference("error_handling", "Use anyhow for application code and thiserror for libraries");
-        store.remember_convention("tests", "Write unit tests in the same file and integration tests in tests/");
-        store.remember_fact(None, "wasm_support", "Fusion compiles to WebAssembly with wasm-bindgen");
+        store.remember_preference(
+            "error_handling",
+            "Use anyhow for application code and thiserror for libraries",
+        );
+        store.remember_convention(
+            "tests",
+            "Write unit tests in the same file and integration tests in tests/",
+        );
+        store.remember_fact(
+            None,
+            "wasm_support",
+            "Fusion compiles to WebAssembly with wasm-bindgen",
+        );
         store.remember_tool_state(None, "editor_theme", "dark_modern");
 
         // Save to disk
@@ -1863,7 +2073,10 @@ mod tests {
 
         let err_pref = loaded.get("error_handling").unwrap();
         assert_eq!(err_pref.category, MemoryCategory::UserPreference);
-        assert_eq!(err_pref.content, "Use anyhow for application code and thiserror for libraries");
+        assert_eq!(
+            err_pref.content,
+            "Use anyhow for application code and thiserror for libraries"
+        );
 
         let fact = loaded.get("wasm_support").unwrap();
         assert_eq!(fact.category, MemoryCategory::ProjectFact);
@@ -1896,15 +2109,19 @@ mod tests {
         store.add(
             MemoryEntry::preference("code_style", "Prefer functional idioms")
                 .with_tags(vec!["rust".to_string()])
-                .with_importance(4)
+                .with_importance(4),
         );
         store.add(
             MemoryEntry::project_fact(None::<&str>, "server_port", "API runs on port 8080")
-                .with_importance(3)
+                .with_importance(3),
         );
         store.add(
-            MemoryEntry::architecture_decision(None::<&str>, "monorepo_layout", "Cargo workspace layout with src/ and crates/")
-                .with_importance(5)
+            MemoryEntry::architecture_decision(
+                None::<&str>,
+                "monorepo_layout",
+                "Cargo workspace layout with src/ and crates/",
+            )
+            .with_importance(5),
         );
 
         // Export markdown string
@@ -1930,22 +2147,35 @@ mod tests {
     fn test_memory_store_system_prompt_formatting() {
         let mut store = MemoryStore::new();
         store.remember_preference("naming", "Use descriptive snake_case for functions");
-        store.remember_project_fact(None, "data_flow", "Uni-directional event stream via tokio channels");
-        store.remember_convention("git_workflow", "Never commit directly to main; use feature branches");
+        store.remember_project_fact(
+            None,
+            "data_flow",
+            "Uni-directional event stream via tokio channels",
+        );
+        store.remember_convention(
+            "git_workflow",
+            "Never commit directly to main; use feature branches",
+        );
 
         let prompt_text = store.format_for_system_prompt(None);
         assert!(prompt_text.contains("### User Coding Preferences:"));
         assert!(prompt_text.contains("- **naming**: Use descriptive snake_case for functions"));
         assert!(prompt_text.contains("### Project Architecture & Design Facts:"));
-        assert!(prompt_text.contains("- **data_flow**: Uni-directional event stream via tokio channels"));
+        assert!(prompt_text
+            .contains("- **data_flow**: Uni-directional event stream via tokio channels"));
         assert!(prompt_text.contains("### Recurring Conventions & Guidelines:"));
-        assert!(prompt_text.contains("- **git_workflow**: Never commit directly to main; use feature branches"));
+        assert!(prompt_text
+            .contains("- **git_workflow**: Never commit directly to main; use feature branches"));
     }
 
     #[test]
     fn test_memory_store_workspace_filtering() {
         let mut store = MemoryStore::new();
-        store.remember_project_fact(Some("/projects/frontend"), "ui_framework", "React + Tailwind");
+        store.remember_project_fact(
+            Some("/projects/frontend"),
+            "ui_framework",
+            "React + Tailwind",
+        );
         store.remember_project_fact(Some("/projects/backend"), "db_engine", "PostgreSQL + Sqlx");
         store.remember_preference("editor", "VSCode with Vim mode"); // Global
 

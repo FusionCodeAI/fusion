@@ -61,6 +61,7 @@ pub mod cli;
 pub mod config;
 pub mod provider;
 pub mod tools;
+#[cfg(not(target_arch = "wasm32"))]
 pub mod ui;
 
 #[cfg(any(target_arch = "wasm32", feature = "wasm"))]
@@ -96,7 +97,6 @@ pub mod prelude {
         default_registry, CatTool, CreateTool, McpClient, McpManager, McpServerConfig, McpTool,
         StrReplaceEditorTool, TerminalTool, Tool, ToolContext, ToolRegistry, ViewTool,
     };
-    pub use crate::ui::sound::{SoundConfig, SoundCue, SoundPlayer};
     pub use crate::ui::diff_view::{
         run_interactive_diff_viewer, DiffFile, DiffHunk, DiffLine, DiffLineType, DiffViewMode,
         DiffViewResult, DiffViewState, DiffViewerWidget, HunkStatus, SyntaxLanguage,
@@ -106,6 +106,7 @@ pub mod prelude {
         AdaptiveDiffConfig, DiffBorderStyle, DiffChangeKind, DiffDisplayMode, DiffStats,
         SideBySideCell, SideBySideDocument, SideBySideHunk, SideBySideRow, SideBySideWidget,
     };
+    pub use crate::ui::sound::{SoundConfig, SoundCue, SoundPlayer};
     pub use crate::ui::stats_card::{
         render_stats_card_ansi, render_stats_card_markdown, render_stats_card_plain,
         render_stats_compact_ansi, SessionStats, SessionStatsBuilder, SessionStatsCardState,

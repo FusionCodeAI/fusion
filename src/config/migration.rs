@@ -1,6 +1,6 @@
-use std::path::{Path, PathBuf};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
+use std::path::{Path, PathBuf};
 
 use crate::config::Config;
 
@@ -37,7 +37,9 @@ pub enum MigrationError {
     #[error("IO error during config migration: {0}")]
     Io(#[from] std::io::Error),
 
-    #[error("Config schema version {version} is newer than maximum supported version {max_supported}")]
+    #[error(
+        "Config schema version {version} is newer than maximum supported version {max_supported}"
+    )]
     FutureVersion { version: u32, max_supported: u32 },
 
     #[error("Config schema migration step from v{from} to v{to} failed: {reason}")]
@@ -81,7 +83,10 @@ pub fn migrate_v0_to_v1(val: &mut Value, changes: &mut Vec<String>) -> Result<()
         for alias in &["provider", "model_provider", "defaultProvider"] {
             if let Some(old_val) = obj.remove(*alias) {
                 obj.insert("default_provider".to_string(), old_val);
-                changes.push(format!("Renamed legacy field '{}' to 'default_provider'", alias));
+                changes.push(format!(
+                    "Renamed legacy field '{}' to 'default_provider'",
+                    alias
+                ));
                 break;
             }
         }
@@ -92,7 +97,10 @@ pub fn migrate_v0_to_v1(val: &mut Value, changes: &mut Vec<String>) -> Result<()
         for alias in &["model", "selected_model", "defaultModel"] {
             if let Some(old_val) = obj.remove(*alias) {
                 obj.insert("default_model".to_string(), old_val);
-                changes.push(format!("Renamed legacy field '{}' to 'default_model'", alias));
+                changes.push(format!(
+                    "Renamed legacy field '{}' to 'default_model'",
+                    alias
+                ));
                 break;
             }
         }
@@ -103,7 +111,10 @@ pub fn migrate_v0_to_v1(val: &mut Value, changes: &mut Vec<String>) -> Result<()
         for alias in &["temperature", "temp", "defaultTemperature"] {
             if let Some(old_val) = obj.remove(*alias) {
                 obj.insert("default_temperature".to_string(), old_val);
-                changes.push(format!("Renamed legacy field '{}' to 'default_temperature'", alias));
+                changes.push(format!(
+                    "Renamed legacy field '{}' to 'default_temperature'",
+                    alias
+                ));
                 break;
             }
         }
@@ -112,7 +123,10 @@ pub fn migrate_v0_to_v1(val: &mut Value, changes: &mut Vec<String>) -> Result<()
         if let Some(s) = temp_val.as_str().map(|s| s.to_string()) {
             if let Ok(f) = s.trim().parse::<f64>() {
                 *temp_val = Value::from(f);
-                changes.push(format!("Coerced string temperature \"{}\" to float {}", s, f));
+                changes.push(format!(
+                    "Coerced string temperature \"{}\" to float {}",
+                    s, f
+                ));
             }
         }
     }
@@ -131,18 +145,41 @@ pub fn migrate_v0_to_v1(val: &mut Value, changes: &mut Vec<String>) -> Result<()
         if let Some(s) = tok_val.as_str().map(|s| s.to_string()) {
             if let Ok(i) = s.trim().parse::<u64>() {
                 *tok_val = Value::from(i);
-                changes.push(format!("Coerced string max_tokens \"{}\" to integer {}", s, i));
+                changes.push(format!(
+                    "Coerced string max_tokens \"{}\" to integer {}",
+                    s, i
+                ));
             }
         }
     }
 
     // 5. Provider API key aliases
     let key_aliases = [
-        ("openai_api_key", &["openai_key", "open_ai_api_key", "openAiApiKey"][..]),
-        ("anthropic_api_key", &["anthropic_key", "claude_api_key", "claude_key", "anthropicApiKey"]),
-        ("deepseek_api_key", &["deepseek_key", "deep_seek_api_key", "deepSeekApiKey"]),
-        ("xai_api_key", &["xai_key", "grok_api_key", "grok_key", "xaiApiKey"]),
-        ("openrouter_api_key", &["openrouter_key", "open_router_api_key", "openRouterApiKey"]),
+        (
+            "openai_api_key",
+            &["openai_key", "open_ai_api_key", "openAiApiKey"][..],
+        ),
+        (
+            "anthropic_api_key",
+            &[
+                "anthropic_key",
+                "claude_api_key",
+                "claude_key",
+                "anthropicApiKey",
+            ],
+        ),
+        (
+            "deepseek_api_key",
+            &["deepseek_key", "deep_seek_api_key", "deepSeekApiKey"],
+        ),
+        (
+            "xai_api_key",
+            &["xai_key", "grok_api_key", "grok_key", "xaiApiKey"],
+        ),
+        (
+            "openrouter_api_key",
+            &["openrouter_key", "open_router_api_key", "openRouterApiKey"],
+        ),
     ];
 
     for (canonical, aliases) in &key_aliases {
@@ -150,7 +187,10 @@ pub fn migrate_v0_to_v1(val: &mut Value, changes: &mut Vec<String>) -> Result<()
             for alias in *aliases {
                 if let Some(v) = obj.remove(*alias) {
                     obj.insert(canonical.to_string(), v);
-                    changes.push(format!("Renamed legacy API key field '{}' to '{}'", alias, canonical));
+                    changes.push(format!(
+                        "Renamed legacy API key field '{}' to '{}'",
+                        alias, canonical
+                    ));
                     break;
                 }
             }
@@ -159,12 +199,35 @@ pub fn migrate_v0_to_v1(val: &mut Value, changes: &mut Vec<String>) -> Result<()
 
     // 6. Provider Base URL aliases
     let url_aliases = [
-        ("openai_base_url", &["openai_url", "openai_endpoint", "openAiBaseUrl"][..]),
-        ("anthropic_base_url", &["anthropic_url", "anthropic_endpoint", "anthropicBaseUrl"]),
-        ("deepseek_base_url", &["deepseek_url", "deepseek_endpoint", "deepSeekBaseUrl"]),
-        ("xai_base_url", &["xai_url", "grok_url", "grok_endpoint", "xaiBaseUrl"]),
-        ("openrouter_base_url", &["openrouter_url", "openrouter_endpoint", "openRouterBaseUrl"]),
-        ("ollama_base_url", &["ollama_url", "ollama_host", "ollama_endpoint", "ollamaBaseUrl"]),
+        (
+            "openai_base_url",
+            &["openai_url", "openai_endpoint", "openAiBaseUrl"][..],
+        ),
+        (
+            "anthropic_base_url",
+            &["anthropic_url", "anthropic_endpoint", "anthropicBaseUrl"],
+        ),
+        (
+            "deepseek_base_url",
+            &["deepseek_url", "deepseek_endpoint", "deepSeekBaseUrl"],
+        ),
+        (
+            "xai_base_url",
+            &["xai_url", "grok_url", "grok_endpoint", "xaiBaseUrl"],
+        ),
+        (
+            "openrouter_base_url",
+            &["openrouter_url", "openrouter_endpoint", "openRouterBaseUrl"],
+        ),
+        (
+            "ollama_base_url",
+            &[
+                "ollama_url",
+                "ollama_host",
+                "ollama_endpoint",
+                "ollamaBaseUrl",
+            ],
+        ),
     ];
 
     for (canonical, aliases) in &url_aliases {
@@ -172,7 +235,10 @@ pub fn migrate_v0_to_v1(val: &mut Value, changes: &mut Vec<String>) -> Result<()
             for alias in *aliases {
                 if let Some(v) = obj.remove(*alias) {
                     obj.insert(canonical.to_string(), v);
-                    changes.push(format!("Renamed legacy base URL field '{}' to '{}'", alias, canonical));
+                    changes.push(format!(
+                        "Renamed legacy base URL field '{}' to '{}'",
+                        alias, canonical
+                    ));
                     break;
                 }
             }
@@ -183,7 +249,8 @@ pub fn migrate_v0_to_v1(val: &mut Value, changes: &mut Vec<String>) -> Result<()
     if let Some(generic_key) = obj.remove("api_key").or_else(|| obj.remove("llm_api_key")) {
         if let Some(k_str) = generic_key.as_str() {
             if !k_str.trim().is_empty() {
-                let provider = obj.get("default_provider")
+                let provider = obj
+                    .get("default_provider")
                     .and_then(|p| p.as_str())
                     .unwrap_or("deepseek")
                     .to_lowercase();
@@ -197,7 +264,10 @@ pub fn migrate_v0_to_v1(val: &mut Value, changes: &mut Vec<String>) -> Result<()
                 };
 
                 if !obj.contains_key(target_field) {
-                    obj.insert(target_field.to_string(), Value::String(k_str.trim().to_string()));
+                    obj.insert(
+                        target_field.to_string(),
+                        Value::String(k_str.trim().to_string()),
+                    );
                     changes.push(format!("Mapped generic 'api_key' to '{}'", target_field));
                 }
             }
@@ -208,7 +278,8 @@ pub fn migrate_v0_to_v1(val: &mut Value, changes: &mut Vec<String>) -> Result<()
     if let Some(generic_url) = obj.remove("base_url").or_else(|| obj.remove("api_base")) {
         if let Some(u_str) = generic_url.as_str() {
             if !u_str.trim().is_empty() {
-                let provider = obj.get("default_provider")
+                let provider = obj
+                    .get("default_provider")
                     .and_then(|p| p.as_str())
                     .unwrap_or("deepseek")
                     .to_lowercase();
@@ -223,7 +294,10 @@ pub fn migrate_v0_to_v1(val: &mut Value, changes: &mut Vec<String>) -> Result<()
                 };
 
                 if !obj.contains_key(target_field) {
-                    obj.insert(target_field.to_string(), Value::String(u_str.trim().to_string()));
+                    obj.insert(
+                        target_field.to_string(),
+                        Value::String(u_str.trim().to_string()),
+                    );
                     changes.push(format!("Mapped generic 'base_url' to '{}'", target_field));
                 }
             }
@@ -235,7 +309,10 @@ pub fn migrate_v0_to_v1(val: &mut Value, changes: &mut Vec<String>) -> Result<()
         for alias in &["advisors", "enable_advisors", "advisorsEnabled"] {
             if let Some(old_val) = obj.remove(*alias) {
                 obj.insert("advisors_enabled".to_string(), old_val);
-                changes.push(format!("Renamed legacy field '{}' to 'advisors_enabled'", alias));
+                changes.push(format!(
+                    "Renamed legacy field '{}' to 'advisors_enabled'",
+                    alias
+                ));
                 break;
             }
         }
@@ -245,7 +322,10 @@ pub fn migrate_v0_to_v1(val: &mut Value, changes: &mut Vec<String>) -> Result<()
             let lower = s.trim().to_lowercase();
             let b = matches!(lower.as_str(), "true" | "1" | "yes" | "on");
             *adv_val = Value::Bool(b);
-            changes.push(format!("Coerced string advisors_enabled \"{}\" to boolean {}", s, b));
+            changes.push(format!(
+                "Coerced string advisors_enabled \"{}\" to boolean {}",
+                s, b
+            ));
         }
     }
 
@@ -278,22 +358,34 @@ pub fn migrate_v1_to_v2(val: &mut Value, changes: &mut Vec<String>) -> Result<()
             let lower = p.trim().to_lowercase();
             if lower != p {
                 *prov_val = Value::String(lower.clone());
-                changes.push(format!("Normalized default_provider '{}' to lowercase '{}'", p, lower));
+                changes.push(format!(
+                    "Normalized default_provider '{}' to lowercase '{}'",
+                    p, lower
+                ));
             }
         }
     }
 
     // 2. Canonicalize model shorthand if present
-    let current_prov = obj.get("default_provider").and_then(|p| p.as_str()).map(|s| s.to_string());
+    let current_prov = obj
+        .get("default_provider")
+        .and_then(|p| p.as_str())
+        .map(|s| s.to_string());
     let mut resolved_provider_to_set = None;
     if let Some(model_val) = obj.get_mut("default_model") {
         if let Some(m) = model_val.as_str().map(|s| s.to_string()) {
-            let (resolved_prov, resolved_model) = Config::resolve_model(&m, current_prov.as_deref());
+            let (resolved_prov, resolved_model) =
+                Config::resolve_model(&m, current_prov.as_deref());
             if resolved_model != m {
                 *model_val = Value::String(resolved_model.clone());
-                changes.push(format!("Resolved model shorthand '{}' to canonical '{}'", m, resolved_model));
+                changes.push(format!(
+                    "Resolved model shorthand '{}' to canonical '{}'",
+                    m, resolved_model
+                ));
             }
-            if current_prov.is_none() || current_prov.as_deref() == Some("deepseek") && resolved_prov != "deepseek" {
+            if current_prov.is_none()
+                || current_prov.as_deref() == Some("deepseek") && resolved_prov != "deepseek"
+            {
                 resolved_provider_to_set = Some(resolved_prov);
             }
         }
@@ -319,7 +411,10 @@ pub fn migrate_v1_to_v2(val: &mut Value, changes: &mut Vec<String>) -> Result<()
                 if let Some(normalized) = crate::config::sanitize_base_url(&s) {
                     if normalized != s {
                         *v = Value::String(normalized.clone());
-                        changes.push(format!("Normalized base URL '{}' in field '{}' to '{}'", s, field, normalized));
+                        changes.push(format!(
+                            "Normalized base URL '{}' in field '{}' to '{}'",
+                            s, field, normalized
+                        ));
                     }
                 } else if s.trim().is_empty() {
                     // Empty string URL: remove field to use defaults
@@ -333,7 +428,10 @@ pub fn migrate_v1_to_v2(val: &mut Value, changes: &mut Vec<String>) -> Result<()
     // Sane Ollama default URL if missing or null
     match obj.get("ollama_base_url") {
         None | Some(Value::Null) => {
-            obj.insert("ollama_base_url".to_string(), Value::String("http://localhost:11434".to_string()));
+            obj.insert(
+                "ollama_base_url".to_string(),
+                Value::String("http://localhost:11434".to_string()),
+            );
             changes.push("Configured default Ollama URL 'http://localhost:11434'".to_string());
         }
         _ => {}
@@ -359,14 +457,18 @@ pub fn migrate_v1_to_v2(val: &mut Value, changes: &mut Vec<String>) -> Result<()
                 } else {
                     // Empty or placeholder key: remove or set null
                     *v = Value::Null;
-                    changes.push(format!("Removed invalid placeholder API key in field '{}'", field));
+                    changes.push(format!(
+                        "Removed invalid placeholder API key in field '{}'",
+                        field
+                    ));
                 }
             }
         }
     }
 
     // Clean null fields so serde doesn't serialize empty nulls unnecessarily
-    let null_keys: Vec<String> = obj.iter()
+    let null_keys: Vec<String> = obj
+        .iter()
         .filter(|(_, v)| v.is_null())
         .map(|(k, _)| k.clone())
         .collect();
@@ -458,7 +560,10 @@ pub fn preview_migration(json_str: &str) -> Result<(Value, MigrationOutcome), Mi
 /// Migrates a configuration file on disk to the latest schema version.
 ///
 /// When `backup` is true and changes are made, creates a backup file (`config.json.v{from_version}.bak`).
-pub fn migrate_file(path: &Path, backup: bool) -> Result<(Config, MigrationOutcome), MigrationError> {
+pub fn migrate_file(
+    path: &Path,
+    backup: bool,
+) -> Result<(Config, MigrationOutcome), MigrationError> {
     let content = std::fs::read_to_string(path)?;
     let mut val: Value = serde_json::from_str(&content)?;
     let mut outcome = migrate_value(&mut val)?;
@@ -468,7 +573,9 @@ pub fn migrate_file(path: &Path, backup: bool) -> Result<(Config, MigrationOutco
         if backup {
             let backup_file_name = format!(
                 "{}.v{}.bak",
-                path.file_name().and_then(|n| n.to_str()).unwrap_or("config.json"),
+                path.file_name()
+                    .and_then(|n| n.to_str())
+                    .unwrap_or("config.json"),
                 outcome.from_version
             );
             let backup_path = path.with_file_name(backup_file_name);
@@ -512,7 +619,10 @@ mod tests {
         assert_eq!(detect_version(&serde_json::json!({"version": 1})), 1);
         assert_eq!(detect_version(&serde_json::json!({"version": 2})), 2);
         assert_eq!(detect_version(&serde_json::json!({"schema_version": 1})), 1);
-        assert_eq!(detect_version(&serde_json::json!({"version": "invalid"})), 0);
+        assert_eq!(
+            detect_version(&serde_json::json!({"version": "invalid"})),
+            0
+        );
     }
 
     #[test]
@@ -536,11 +646,17 @@ mod tests {
 
         let obj = val.as_object().unwrap();
         assert_eq!(obj.get("version").unwrap().as_u64(), Some(2));
-        assert_eq!(obj.get("default_provider").unwrap().as_str(), Some("openai"));
+        assert_eq!(
+            obj.get("default_provider").unwrap().as_str(),
+            Some("openai")
+        );
         assert_eq!(obj.get("default_model").unwrap().as_str(), Some("gpt-4o"));
         assert_eq!(obj.get("default_temperature").unwrap().as_f64(), Some(0.7));
         assert_eq!(obj.get("max_tokens").unwrap().as_u64(), Some(4096));
-        assert_eq!(obj.get("openai_api_key").unwrap().as_str(), Some("sk-test-key"));
+        assert_eq!(
+            obj.get("openai_api_key").unwrap().as_str(),
+            Some("sk-test-key")
+        );
         assert_eq!(obj.get("advisors_enabled").unwrap().as_bool(), Some(true));
 
         // Old keys must be cleaned up
@@ -565,8 +681,14 @@ mod tests {
         assert!(outcome.performed_migration);
 
         let obj = val.as_object().unwrap();
-        assert_eq!(obj.get("anthropic_api_key").unwrap().as_str(), Some("sk-ant-test"));
-        assert_eq!(obj.get("anthropic_base_url").unwrap().as_str(), Some("https://custom.anthropic.proxy/v1"));
+        assert_eq!(
+            obj.get("anthropic_api_key").unwrap().as_str(),
+            Some("sk-ant-test")
+        );
+        assert_eq!(
+            obj.get("anthropic_base_url").unwrap().as_str(),
+            Some("https://custom.anthropic.proxy/v1")
+        );
         assert!(!obj.contains_key("api_key"));
         assert!(!obj.contains_key("base_url"));
     }
@@ -593,19 +715,34 @@ mod tests {
 
         let obj = val.as_object().unwrap();
         assert_eq!(obj.get("version").unwrap().as_u64(), Some(2));
-        assert_eq!(obj.get("default_provider").unwrap().as_str(), Some("deepseek"));
+        assert_eq!(
+            obj.get("default_provider").unwrap().as_str(),
+            Some("deepseek")
+        );
         // "r1" resolved to "deepseek-reasoner"
-        assert_eq!(obj.get("default_model").unwrap().as_str(), Some("deepseek-reasoner"));
+        assert_eq!(
+            obj.get("default_model").unwrap().as_str(),
+            Some("deepseek-reasoner")
+        );
         // Base URL trailing slash removed
-        assert_eq!(obj.get("deepseek_base_url").unwrap().as_str(), Some("https://api.deepseek.com/v1"));
+        assert_eq!(
+            obj.get("deepseek_base_url").unwrap().as_str(),
+            Some("https://api.deepseek.com/v1")
+        );
         // API key trimmed
-        assert_eq!(obj.get("deepseek_api_key").unwrap().as_str(), Some("sk-ds-key-123"));
+        assert_eq!(
+            obj.get("deepseek_api_key").unwrap().as_str(),
+            Some("sk-ds-key-123")
+        );
         // Placeholder openai key removed
         assert!(!obj.contains_key("openai_api_key"));
         // Temperature clamped to 2.0
         assert_eq!(obj.get("default_temperature").unwrap().as_f64(), Some(2.0));
         // Default ollama url added
-        assert_eq!(obj.get("ollama_base_url").unwrap().as_str(), Some("http://localhost:11434"));
+        assert_eq!(
+            obj.get("ollama_base_url").unwrap().as_str(),
+            Some("http://localhost:11434")
+        );
     }
 
     #[test]
@@ -635,7 +772,10 @@ mod tests {
 
         let err = migrate_value(&mut raw).expect_err("future version should fail");
         match err {
-            MigrationError::FutureVersion { version, max_supported } => {
+            MigrationError::FutureVersion {
+                version,
+                max_supported,
+            } => {
                 assert_eq!(version, 999);
                 assert_eq!(max_supported, CURRENT_SCHEMA_VERSION);
             }
@@ -663,7 +803,8 @@ mod tests {
 
     #[test]
     fn test_migrate_file_with_backup_and_restore() {
-        let tmp_dir = std::env::temp_dir().join(format!("fusion_mig_test_{}", uuid::Uuid::new_v4()));
+        let tmp_dir =
+            std::env::temp_dir().join(format!("fusion_mig_test_{}", uuid::Uuid::new_v4()));
         std::fs::create_dir_all(&tmp_dir).unwrap();
         let config_file = tmp_dir.join("config.json");
 

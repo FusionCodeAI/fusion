@@ -43,9 +43,7 @@ pub const BOUNCE_FRAMES: &[&str] = &[
 ];
 
 /// Lunar phase frames (requires emoji-capable terminal).
-pub const MOON_FRAMES: &[&str] = &[
-    "🌑", "🌒", "🌓", "🌔", "🌕", "🌖", "🌗", "🌘",
-];
+pub const MOON_FRAMES: &[&str] = &["🌑", "🌒", "🌓", "🌔", "🌕", "🌖", "🌗", "🌘"];
 
 /// 7-bit ASCII spinner frames for terminals without UTF-8 support.
 pub const ASCII_FRAMES: &[&str] = &["|", "/", "-", "\\"];
@@ -641,10 +639,7 @@ mod tests {
     #[test]
     fn test_visible_width() {
         assert_eq!(visible_width("hello world"), 11);
-        assert_eq!(
-            visible_width("\x1b[1;34m[bash]\x1b[0m cargo build..."),
-            21
-        );
+        assert_eq!(visible_width("\x1b[1;34m[bash]\x1b[0m cargo build..."), 21);
         assert_eq!(
             visible_width("\x1b[1;32m✓\x1b[0m success \x1b[2;37m(1.2s)\x1b[0m"),
             16
@@ -741,9 +736,15 @@ mod style_tests {
 
     #[test]
     fn test_from_name_case_insensitive_and_aliases() {
-        assert_eq!(SpinnerStyle::from_name("BRAILLE"), Some(SpinnerStyle::Braille));
+        assert_eq!(
+            SpinnerStyle::from_name("BRAILLE"),
+            Some(SpinnerStyle::Braille)
+        );
         assert_eq!(SpinnerStyle::from_name("  Dots "), Some(SpinnerStyle::Dots));
-        assert_eq!(SpinnerStyle::from_name("default"), Some(SpinnerStyle::Braille));
+        assert_eq!(
+            SpinnerStyle::from_name("default"),
+            Some(SpinnerStyle::Braille)
+        );
         assert_eq!(SpinnerStyle::from_name("block"), Some(SpinnerStyle::Pulse));
         assert_eq!(SpinnerStyle::from_name("bar"), Some(SpinnerStyle::Line));
         assert_eq!(SpinnerStyle::from_name("arrow"), Some(SpinnerStyle::Arrows));

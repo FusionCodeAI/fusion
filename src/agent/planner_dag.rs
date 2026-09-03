@@ -120,13 +120,9 @@ pub enum DagTaskStatus {
         retry_count: usize,
     },
     /// Task was skipped (e.g. upstream failure in strict mode or conditional bypass).
-    Skipped {
-        reason: String,
-    },
+    Skipped { reason: String },
     /// Task is blocked by external constraint or manual hold.
-    Blocked {
-        reason: String,
-    },
+    Blocked { reason: String },
 }
 
 impl DagTaskStatus {
@@ -1263,7 +1259,8 @@ impl TaskDecomposer {
                 )?;
 
                 // Stage 4: Review & Security
-                let mut review_deps = vec!["tester_unit".to_string(), "tester_integration".to_string()];
+                let mut review_deps =
+                    vec!["tester_unit".to_string(), "tester_integration".to_string()];
                 dag.add_task(
                     DagTask::new(
                         "reviewer_quality",
@@ -1634,13 +1631,8 @@ impl TaskDecomposer {
 
             DecompositionStrategy::Custom { ref name } => {
                 dag.add_task(
-                    DagTask::new(
-                        "task_main",
-                        name.as_str(),
-                        SubagentRole::General,
-                        goal,
-                    )
-                    .with_priority(DagTaskPriority::Normal),
+                    DagTask::new("task_main", name.as_str(), SubagentRole::General, goal)
+                        .with_priority(DagTaskPriority::Normal),
                 )?;
             }
         }
@@ -1784,12 +1776,16 @@ fn extract_json_block(text: &str) -> String {
     if let Some(start) = trimmed.find("```json") {
         let content_start = start + 7;
         if let Some(end) = trimmed[content_start..].find("```") {
-            return trimmed[content_start..content_start + end].trim().to_string();
+            return trimmed[content_start..content_start + end]
+                .trim()
+                .to_string();
         }
     } else if let Some(start) = trimmed.find("```") {
         let content_start = start + 3;
         if let Some(end) = trimmed[content_start..].find("```") {
-            return trimmed[content_start..content_start + end].trim().to_string();
+            return trimmed[content_start..content_start + end]
+                .trim()
+                .to_string();
         }
     }
     trimmed.to_string()
@@ -1931,11 +1927,7 @@ impl Default for DagExecutionConfig {
 /// Abstraction for executing individual subagent tasks.
 #[async_trait]
 pub trait TaskExecutor: Send + Sync {
-    async fn execute_task(
-        &self,
-        task: &DagTask,
-        resolved_prompt: &str,
-    ) -> Result<String, String>;
+    async fn execute_task(&self, task: &DagTask, resolved_prompt: &str) -> Result<String, String>;
 }
 
 /// Mock task executor for deterministic unit tests and simulated runs.
@@ -1954,7 +1946,11 @@ impl MockTaskExecutor {
         }
     }
 
-    pub fn with_task_result(mut self, task_id: impl Into<String>, result: Result<String, String>) -> Self {
+    pub fn with_task_result(
+        mut self,
+        task_id: impl Into<String>,
+        result: Result<String, String>,
+    ) -> Self {
         self.task_responses.insert(task_id.into(), result);
         self
     }
@@ -1962,11 +1958,7 @@ impl MockTaskExecutor {
 
 #[async_trait]
 impl TaskExecutor for MockTaskExecutor {
-    async fn execute_task(
-        &self,
-        task: &DagTask,
-        _resolved_prompt: &str,
-    ) -> Result<String, String> {
+    async fn execute_task(&self, task: &DagTask, _resolved_prompt: &str) -> Result<String, String> {
         if !self.simulated_delay.is_zero() {
             tokio::time::sleep(self.simulated_delay).await;
         }
@@ -1992,11 +1984,7 @@ impl SubagentManagerExecutor {
 
 #[async_trait]
 impl TaskExecutor for SubagentManagerExecutor {
-    async fn execute_task(
-        &self,
-        task: &DagTask,
-        resolved_prompt: &str,
-    ) -> Result<String, String> {
+    async fn execute_task(&self, task: &DagTask, resolved_prompt: &str) -> Result<String, String> {
         let subagent_task = SubagentTask::new(task.role.clone(), resolved_prompt);
         let mut handle = self.manager.spawn(subagent_task);
 
@@ -2046,7 +2034,10 @@ impl DagExecutionSummary {
     /// Formats the summary into a readable markdown report.
     pub fn format_markdown_report(&self) -> String {
         let mut out = String::new();
-        out.push_str(&format!("# Subagent DAG Execution Report: {}\n\n", self.dag_name));
+        out.push_str(&format!(
+            "# Subagent DAG Execution Report: {}\n\n",
+            self.dag_name
+        ));
         out.push_str(&format!("- **DAG ID:** `{}`\n", self.dag_id));
         out.push_str(&format!("- **Goal:** {}\n", self.goal));
         out.push_str(&format!("- **Status:** {}\n", self.overall_status));
@@ -2054,8 +2045,14 @@ impl DagExecutionSummary {
             "- **Tasks:** {} completed, {} failed, {} skipped (Total: {})\n",
             self.completed_tasks, self.failed_tasks, self.skipped_tasks, self.total_tasks
         ));
-        out.push_str(&format!("- **Total Stages (Waves):** {}\n", self.total_stages));
-        out.push_str(&format!("- **Wall Clock Time:** {}ms\n", self.wall_duration_ms));
+        out.push_str(&format!(
+            "- **Total Stages (Waves):** {}\n",
+            self.total_stages
+        ));
+        out.push_str(&format!(
+            "- **Wall Clock Time:** {}ms\n",
+            self.wall_duration_ms
+        ));
         out.push_str(&format!(
             "- **Cumulative Subagent Time:** {}ms\n",
             self.cumulative_task_duration_ms
@@ -2073,11 +2070,21 @@ impl DagExecutionSummary {
         sorted_tasks.sort_by(|a, b| a.id.cmp(&b.id));
 
         for t in sorted_tasks {
-            let dur = t.duration_ms.map(|d| format!("{}ms", d)).unwrap_or_else(|| "-".to_string());
+            let dur = t
+                .duration_ms
+                .map(|d| format!("{}ms", d))
+                .unwrap_or_else(|| "-".to_string());
             let outcome = if let Some(err) = &t.error {
-                format!("Err: {}", err.replace('|', "\\|").lines().next().unwrap_or(""))
+                format!(
+                    "Err: {}",
+                    err.replace('|', "\\|").lines().next().unwrap_or("")
+                )
             } else if let Some(snip) = &t.output_snippet {
-                snip.replace('|', "\\|").lines().next().unwrap_or("").to_string()
+                snip.replace('|', "\\|")
+                    .lines()
+                    .next()
+                    .unwrap_or("")
+                    .to_string()
             } else {
                 "-".to_string()
             };
@@ -2195,7 +2202,10 @@ impl DagExecutor {
                     let mut last_err = String::new();
 
                     while attempts <= max_retries {
-                        match task_executor.execute_task(&task_cloned, &resolved_prompt).await {
+                        match task_executor
+                            .execute_task(&task_cloned, &resolved_prompt)
+                            .await
+                        {
                             Ok(output) => {
                                 let dur = t_start.elapsed().as_millis() as u64;
                                 return (task_id_cloned, Ok((output, dur)));
@@ -2481,10 +2491,7 @@ impl Tool for PlanSubagentDagTool {
             },
         };
 
-        let format = args
-            .get("format")
-            .and_then(|v| v.as_str())
-            .unwrap_or("all");
+        let format = args.get("format").and_then(|v| v.as_str()).unwrap_or("all");
 
         let mut dag = TaskDecomposer::decompose(goal, strategy)
             .map_err(|e| anyhow::anyhow!("Decomposition error: {}", e))?;
@@ -2522,8 +2529,10 @@ mod tests {
     fn test_dag_creation_and_topological_sort() {
         let mut dag = SubagentDag::new("Test DAG", "Implement feature");
         let t1 = DagTask::new("t1", "Scout", SubagentRole::Scout, "Explore codebase");
-        let t2 = DagTask::new("t2", "Backend", SubagentRole::Coder, "Implement backend").with_dependency("t1");
-        let t3 = DagTask::new("t3", "Frontend", SubagentRole::Coder, "Implement frontend").with_dependency("t1");
+        let t2 = DagTask::new("t2", "Backend", SubagentRole::Coder, "Implement backend")
+            .with_dependency("t1");
+        let t3 = DagTask::new("t3", "Frontend", SubagentRole::Coder, "Implement frontend")
+            .with_dependency("t1");
         let t4 = DagTask::new("t4", "Test", SubagentRole::Tester, "Run tests")
             .with_dependency("t2")
             .with_dependency("t3");
@@ -2568,12 +2577,15 @@ mod tests {
     fn test_stage_wave_partitioning() {
         let mut dag = SubagentDag::new("Waves DAG", "Build system");
         let t1 = DagTask::new("scout", "Scout", SubagentRole::Scout, "Scout");
-        let t2 = DagTask::new("coder_a", "Coder A", SubagentRole::Coder, "Coder A").with_dependency("scout");
-        let t3 = DagTask::new("coder_b", "Coder B", SubagentRole::Coder, "Coder B").with_dependency("scout");
+        let t2 = DagTask::new("coder_a", "Coder A", SubagentRole::Coder, "Coder A")
+            .with_dependency("scout");
+        let t3 = DagTask::new("coder_b", "Coder B", SubagentRole::Coder, "Coder B")
+            .with_dependency("scout");
         let t4 = DagTask::new("tester", "Tester", SubagentRole::Tester, "Tester")
             .with_dependency("coder_a")
             .with_dependency("coder_b");
-        let t5 = DagTask::new("reviewer", "Reviewer", SubagentRole::Reviewer, "Reviewer").with_dependency("tester");
+        let t5 = DagTask::new("reviewer", "Reviewer", SubagentRole::Reviewer, "Reviewer")
+            .with_dependency("tester");
 
         dag.add_task(t1).unwrap();
         dag.add_task(t2).unwrap();
@@ -2631,7 +2643,9 @@ mod tests {
     fn test_heuristic_bugfix_decomposition() {
         let dag = TaskDecomposer::decompose(
             "Fix deadlock in async connection pool",
-            DecompositionStrategy::BugFix { deep_reproduction: true },
+            DecompositionStrategy::BugFix {
+                deep_reproduction: true,
+            },
         )
         .unwrap();
 
@@ -2689,8 +2703,13 @@ mod tests {
         let mut dag = SubagentDag::new("Exec Test", "Run parallel tasks");
         let t1 = DagTask::new("s1", "Scout 1", SubagentRole::Scout, "Explore A");
         let t2 = DagTask::new("s2", "Scout 2", SubagentRole::Scout, "Explore B");
-        let t3 = DagTask::new("c1", "Coder", SubagentRole::Coder, "Combine {{upstream.s1.output}} and {{upstream.s2.output}}")
-            .with_dependencies(vec!["s1", "s2"]);
+        let t3 = DagTask::new(
+            "c1",
+            "Coder",
+            SubagentRole::Coder,
+            "Combine {{upstream.s1.output}} and {{upstream.s2.output}}",
+        )
+        .with_dependencies(vec!["s1", "s2"]);
 
         dag.add_task(t1).unwrap();
         dag.add_task(t2).unwrap();
@@ -2717,7 +2736,8 @@ mod tests {
     async fn test_dag_executor_failure_cascade_and_skip() {
         let mut dag = SubagentDag::new("Failure Test", "Check skip cascade");
         let t1 = DagTask::new("t1", "Task 1", SubagentRole::Coder, "Failing step");
-        let t2 = DagTask::new("t2", "Task 2", SubagentRole::Tester, "Should be skipped").with_dependency("t1");
+        let t2 = DagTask::new("t2", "Task 2", SubagentRole::Tester, "Should be skipped")
+            .with_dependency("t1");
 
         dag.add_task(t1).unwrap();
         dag.add_task(t2).unwrap();

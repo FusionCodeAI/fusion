@@ -1,3 +1,4 @@
+use crate::ui::theme::Theme;
 use crossterm::{cursor, execute, terminal};
 use ratatui::{
     backend::CrosstermBackend,
@@ -9,7 +10,6 @@ use ratatui::{
     Frame, Terminal, TerminalOptions, Viewport,
 };
 use std::io::{stdout, Stdout, Write};
-use crate::ui::theme::Theme;
 
 /// Information displayed in the inline status bar.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
@@ -274,7 +274,11 @@ impl InlineTerminal {
     }
 
     /// Insert any Ratatui `Widget` before the viewport into scrollback.
-    pub fn insert_before_widget<W: Widget>(&mut self, height: u16, widget: W) -> std::io::Result<()> {
+    pub fn insert_before_widget<W: Widget>(
+        &mut self,
+        height: u16,
+        widget: W,
+    ) -> std::io::Result<()> {
         self.insert_before(height, |buf| {
             let area = buf.area;
             widget.render(area, buf);
@@ -345,7 +349,11 @@ impl InlineTerminal {
     }
 
     /// Insert a status line snapshot into scrollback using a specific theme.
-    pub fn insert_before_status_themed(&mut self, info: &StatusInfo, theme: &Theme) -> std::io::Result<()> {
+    pub fn insert_before_status_themed(
+        &mut self,
+        info: &StatusInfo,
+        theme: &Theme,
+    ) -> std::io::Result<()> {
         let (cols, _) = Self::terminal_size();
         let is_compact = cols < 60;
         let spans = theme.build_status_spans(info, is_compact);
@@ -363,7 +371,11 @@ impl InlineTerminal {
     }
 
     /// Render a status bar in the inline area with an explicit theme override.
-    pub fn render_status_themed(&mut self, info: &StatusInfo, theme: &Theme) -> std::io::Result<()> {
+    pub fn render_status_themed(
+        &mut self,
+        info: &StatusInfo,
+        theme: &Theme,
+    ) -> std::io::Result<()> {
         self.draw(|f| {
             let size = f.area();
             theme.render_status_bar(f, size, info);
@@ -458,7 +470,10 @@ pub fn render_critique_card(
         (Color::Yellow, "!", "CRITIQUE")
     };
 
-    let title = format!(" [Advisor: {}] {} {} ", advisor_name, status_icon, status_text);
+    let title = format!(
+        " [Advisor: {}] {} {} ",
+        advisor_name, status_icon, status_text
+    );
 
     let block = Block::default()
         .title(title)
@@ -541,13 +556,14 @@ mod tests {
         let backend = TestBackend::new(80, 2);
         let mut terminal = Terminal::new(backend).unwrap();
 
-        let info = StatusInfo::new("deepseek", "deepseek-chat")
-            .with_status("Ready");
+        let info = StatusInfo::new("deepseek", "deepseek-chat").with_status("Ready");
 
-        terminal.draw(|f| {
-            let area = f.area();
-            render_status_bar(f, area, &info);
-        }).unwrap();
+        terminal
+            .draw(|f| {
+                let area = f.area();
+                render_status_bar(f, area, &info);
+            })
+            .unwrap();
 
         let buffer = terminal.backend().buffer();
         assert!(buffer.content().iter().any(|cell| cell.symbol() == "✦"));
@@ -558,13 +574,24 @@ mod tests {
         let backend = TestBackend::new(60, 4);
         let mut terminal = Terminal::new(backend).unwrap();
 
-        terminal.draw(|f| {
-            let area = f.area();
-            render_card(f, area, "Advisor Notice", "Looks good to proceed.", Color::Cyan);
-        }).unwrap();
+        terminal
+            .draw(|f| {
+                let area = f.area();
+                render_card(
+                    f,
+                    area,
+                    "Advisor Notice",
+                    "Looks good to proceed.",
+                    Color::Cyan,
+                );
+            })
+            .unwrap();
 
         let buffer = terminal.backend().buffer();
-        assert!(buffer.content().iter().any(|cell| cell.symbol() == "A" || cell.symbol() == "Notice"));
+        assert!(buffer
+            .content()
+            .iter()
+            .any(|cell| cell.symbol() == "A" || cell.symbol() == "Notice"));
     }
 
     #[test]
@@ -572,13 +599,24 @@ mod tests {
         let backend = TestBackend::new(70, 5);
         let mut terminal = Terminal::new(backend).unwrap();
 
-        terminal.draw(|f| {
-            let area = f.area();
-            render_critique_card(f, area, "SecurityAdvisor", false, "Avoid hardcoded credentials.");
-        }).unwrap();
+        terminal
+            .draw(|f| {
+                let area = f.area();
+                render_critique_card(
+                    f,
+                    area,
+                    "SecurityAdvisor",
+                    false,
+                    "Avoid hardcoded credentials.",
+                );
+            })
+            .unwrap();
 
         let buffer = terminal.backend().buffer();
-        assert!(buffer.content().iter().any(|cell| cell.symbol() == "!" || cell.symbol() == "SecurityAdvisor"));
+        assert!(buffer
+            .content()
+            .iter()
+            .any(|cell| cell.symbol() == "!" || cell.symbol() == "SecurityAdvisor"));
     }
 
     #[test]
@@ -598,10 +636,12 @@ mod tests {
             .with_agent("Coder")
             .with_status("Working");
 
-        terminal.draw(|f| {
-            let area = f.area();
-            render_status_bar_themed(f, area, &info, &theme);
-        }).unwrap();
+        terminal
+            .draw(|f| {
+                let area = f.area();
+                render_status_bar_themed(f, area, &info, &theme);
+            })
+            .unwrap();
 
         let buffer = terminal.backend().buffer();
         let text: String = buffer.content().iter().map(|c| c.symbol()).collect();
@@ -615,13 +655,14 @@ mod tests {
         let mut terminal = Terminal::new(backend).unwrap();
 
         let theme = Theme::high_contrast_dark();
-        let info = StatusInfo::new("openai", "gpt-4o")
-            .with_status("Generating");
+        let info = StatusInfo::new("openai", "gpt-4o").with_status("Generating");
 
-        terminal.draw(|f| {
-            let area = f.area();
-            render_status_bar_themed(f, area, &info, &theme);
-        }).unwrap();
+        terminal
+            .draw(|f| {
+                let area = f.area();
+                render_status_bar_themed(f, area, &info, &theme);
+            })
+            .unwrap();
 
         let buffer = terminal.backend().buffer();
         let text: String = buffer.content().iter().map(|c| c.symbol()).collect();
@@ -635,10 +676,12 @@ mod tests {
         let mut terminal = Terminal::new(backend).unwrap();
 
         let theme = Theme::monokai();
-        terminal.draw(|f| {
-            let area = f.area();
-            render_card_themed(f, area, "Monokai Note", "Testing themed card", &theme, None);
-        }).unwrap();
+        terminal
+            .draw(|f| {
+                let area = f.area();
+                render_card_themed(f, area, "Monokai Note", "Testing themed card", &theme, None);
+            })
+            .unwrap();
 
         let buffer = terminal.backend().buffer();
         let text: String = buffer.content().iter().map(|c| c.symbol()).collect();
@@ -652,10 +695,12 @@ mod tests {
         let mut terminal = Terminal::new(backend).unwrap();
 
         let theme = Theme::dracula();
-        terminal.draw(|f| {
-            let area = f.area();
-            render_critique_card_themed(f, area, "DraculaAdvisor", true, "LGTM", &theme);
-        }).unwrap();
+        terminal
+            .draw(|f| {
+                let area = f.area();
+                render_critique_card_themed(f, area, "DraculaAdvisor", true, "LGTM", &theme);
+            })
+            .unwrap();
 
         let buffer = terminal.backend().buffer();
         let text: String = buffer.content().iter().map(|c| c.symbol()).collect();

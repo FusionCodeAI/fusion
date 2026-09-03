@@ -400,7 +400,10 @@ impl OllamaClient {
         for m in models {
             if m.name.eq_ignore_ascii_case(target)
                 || m.name.eq_ignore_ascii_case(&target_with_tag)
-                || m.model.as_deref().unwrap_or("").eq_ignore_ascii_case(target)
+                || m.model
+                    .as_deref()
+                    .unwrap_or("")
+                    .eq_ignore_ascii_case(target)
                 || m.model
                     .as_deref()
                     .unwrap_or("")
@@ -637,9 +640,11 @@ impl OllamaClient {
                                                         match segment {
                                                             ParsedSegment::Content(c) => {
                                                                 let _ = tx
-                                                                    .send(StreamChunk::ContentDelta(
-                                                                        c,
-                                                                    ))
+                                                                    .send(
+                                                                        StreamChunk::ContentDelta(
+                                                                            c,
+                                                                        ),
+                                                                    )
                                                                     .await;
                                                             }
                                                             ParsedSegment::Thinking(t) => {
@@ -660,16 +665,23 @@ impl OllamaClient {
                                             if let Some(tool_calls) = msg.tool_calls {
                                                 for (idx, tc) in tool_calls.into_iter().enumerate()
                                                 {
-                                                    let args_str = if tc.function.arguments.is_string() {
-                                                        tc.function.arguments.as_str().unwrap_or("").to_string()
-                                                    } else {
-                                                        tc.function.arguments.to_string()
-                                                    };
+                                                    let args_str =
+                                                        if tc.function.arguments.is_string() {
+                                                            tc.function
+                                                                .arguments
+                                                                .as_str()
+                                                                .unwrap_or("")
+                                                                .to_string()
+                                                        } else {
+                                                            tc.function.arguments.to_string()
+                                                        };
 
                                                     let _ = tx
                                                         .send(StreamChunk::ToolCallDelta {
                                                             index: idx,
-                                                            id: Some(uuid::Uuid::new_v4().to_string()),
+                                                            id: Some(
+                                                                uuid::Uuid::new_v4().to_string(),
+                                                            ),
                                                             name: Some(tc.function.name),
                                                             arguments_delta: args_str,
                                                         })
@@ -1341,11 +1353,17 @@ mod tests {
 
         // Standard text without thinking
         let res1 = parser.feed("Hello there! ");
-        assert_eq!(res1, vec![ParsedSegment::Content("Hello there! ".to_string())]);
+        assert_eq!(
+            res1,
+            vec![ParsedSegment::Content("Hello there! ".to_string())]
+        );
 
         // Beginning think tag
         let res2 = parser.feed("<think>I should check files");
-        assert_eq!(res2, vec![ParsedSegment::Thinking("I should check files".to_string())]);
+        assert_eq!(
+            res2,
+            vec![ParsedSegment::Thinking("I should check files".to_string())]
+        );
 
         // Ending think tag and content
         let res3 = parser.feed(" right now.</think>Here is the file.");
@@ -1368,7 +1386,10 @@ mod tests {
         assert_eq!(r1, vec![ParsedSegment::Content("Before ".to_string())]);
 
         let r2 = parser.feed("nk>Inside thought");
-        assert_eq!(r2, vec![ParsedSegment::Thinking("Inside thought".to_string())]);
+        assert_eq!(
+            r2,
+            vec![ParsedSegment::Thinking("Inside thought".to_string())]
+        );
 
         let r3 = parser.feed("</th");
         assert!(r3.is_empty());

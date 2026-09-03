@@ -117,7 +117,7 @@ impl AnthropicCacheControl {
 pub struct AnthropicImageSource {
     #[serde(rename = "type")]
     pub source_type: String, // "base64"
-    pub media_type: String,  // e.g. "image/jpeg", "image/png", "image/gif", "image/webp"
+    pub media_type: String, // e.g. "image/jpeg", "image/png", "image/gif", "image/webp"
     pub data: String,
 }
 
@@ -437,12 +437,7 @@ impl AnthropicStreamAccumulator {
     pub fn get_tool_calls(&self) -> Vec<ToolCall> {
         let mut tools = Vec::new();
         for state in self.blocks.values() {
-            if let BlockState::ToolUse {
-                id,
-                name,
-                json_buf,
-            } = state
-            {
+            if let BlockState::ToolUse { id, name, json_buf } = state {
                 tools.push(ToolCall {
                     id: if id.is_empty() {
                         uuid::Uuid::new_v4().to_string()
@@ -619,7 +614,12 @@ impl AnthropicClient {
         if !response.status().is_success() {
             let status = response.status();
             let body = response.text().await.unwrap_or_default();
-            anyhow::bail!("Anthropic API request to {} failed ({}): {}", url, status, body);
+            anyhow::bail!(
+                "Anthropic API request to {} failed ({}): {}",
+                url,
+                status,
+                body
+            );
         }
 
         let (tx, rx) = mpsc::channel(256);
@@ -704,7 +704,12 @@ impl AnthropicClient {
         if !response.status().is_success() {
             let status = response.status();
             let body = response.text().await.unwrap_or_default();
-            anyhow::bail!("Anthropic API request to {} failed ({}): {}", url, status, body);
+            anyhow::bail!(
+                "Anthropic API request to {} failed ({}): {}",
+                url,
+                status,
+                body
+            );
         }
 
         let resp: AnthropicResponse = response
@@ -798,7 +803,9 @@ pub fn construct_anthropic_url(base_url: &str) -> String {
 }
 
 /// Convert generic Message list into (Option<system_json>, Vec<AnthropicMessage>)
-pub fn convert_messages_to_anthropic(messages: &[Message]) -> (Option<Value>, Vec<AnthropicMessage>) {
+pub fn convert_messages_to_anthropic(
+    messages: &[Message],
+) -> (Option<Value>, Vec<AnthropicMessage>) {
     // 1. Extract system messages
     let system_prompts: Vec<&str> = messages
         .iter()
@@ -923,7 +930,9 @@ mod tests {
             "https://api.anthropic.com/v1/messages"
         );
         assert_eq!(
-            construct_anthropic_url("https://gateway.ai.cloudflare.com/v1/account/gateway/anthropic"),
+            construct_anthropic_url(
+                "https://gateway.ai.cloudflare.com/v1/account/gateway/anthropic"
+            ),
             "https://gateway.ai.cloudflare.com/v1/account/gateway/anthropic/v1/messages"
         );
     }
@@ -945,10 +954,7 @@ mod tests {
         ];
 
         let (system, conv) = convert_messages_to_anthropic(&messages);
-        assert_eq!(
-            system,
-            Some(json!("You are a helpful coding assistant."))
-        );
+        assert_eq!(system, Some(json!("You are a helpful coding assistant.")));
         assert_eq!(conv.len(), 3);
 
         // User message
@@ -993,7 +999,10 @@ mod tests {
                         ..
                     } => {
                         assert_eq!(tool_use_id, "toolu_01");
-                        assert_eq!(content, &Value::String("fn main() { println!(\"hello\"); }".to_string()));
+                        assert_eq!(
+                            content,
+                            &Value::String("fn main() { println!(\"hello\"); }".to_string())
+                        );
                     }
                     _ => panic!("Expected tool_result block"),
                 }
@@ -1068,7 +1077,12 @@ mod tests {
         let c3 = acc.process_event(&cb_start_1);
         assert_eq!(c3.len(), 1);
         match &c3[0] {
-            StreamChunk::ToolCallDelta { index, id, name, arguments_delta } => {
+            StreamChunk::ToolCallDelta {
+                index,
+                id,
+                name,
+                arguments_delta,
+            } => {
                 assert_eq!(*index, 1);
                 assert_eq!(id.as_deref(), Some("toolu_abc"));
                 assert_eq!(name.as_deref(), Some("grep_files"));
@@ -1089,7 +1103,9 @@ mod tests {
         let c4 = acc.process_event(&cb_delta_1_1);
         assert_eq!(c4.len(), 1);
         match &c4[0] {
-            StreamChunk::ToolCallDelta { arguments_delta, .. } => {
+            StreamChunk::ToolCallDelta {
+                arguments_delta, ..
+            } => {
                 assert_eq!(arguments_delta, "{\"pattern\":");
             }
             _ => panic!("Expected ToolCallDelta"),
@@ -1125,7 +1141,11 @@ mod tests {
         let c6 = acc.process_event(&msg_stop);
         assert_eq!(c6.len(), 1);
         match &c6[0] {
-            StreamChunk::Done { finish_reason, prompt_tokens, completion_tokens } => {
+            StreamChunk::Done {
+                finish_reason,
+                prompt_tokens,
+                completion_tokens,
+            } => {
                 assert_eq!(finish_reason.as_deref(), Some("tool_use"));
                 assert_eq!(*prompt_tokens, Some(42));
                 assert_eq!(*completion_tokens, Some(58));
@@ -1165,6 +1185,9 @@ mod tests {
             _ => panic!("Expected ThinkingDelta"),
         }
 
-        assert_eq!(acc.get_thinking(), Some("Let's analyze the problem...".to_string()));
+        assert_eq!(
+            acc.get_thinking(),
+            Some("Let's analyze the problem...".to_string())
+        );
     }
 }

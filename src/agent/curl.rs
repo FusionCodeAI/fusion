@@ -243,10 +243,7 @@ pub enum HttpAuth {
         password: Option<String>,
     },
     /// Custom API key header (e.g. `X-API-Key: <key>` or `api-key: <key>`).
-    ApiKey {
-        header_name: String,
-        key: String,
-    },
+    ApiKey { header_name: String, key: String },
     /// Custom raw header pair.
     Custom {
         header_name: String,
@@ -619,8 +616,9 @@ impl ResponseStream {
     /// Collects the remaining stream as a UTF-8 string with size limit checks.
     pub async fn collect_text(self) -> anyhow::Result<String> {
         let bytes = self.collect_body().await?;
-        String::from_utf8(bytes)
-            .map_err(|e| anyhow::anyhow!("Failed to decode streamed response as valid UTF-8: {}", e))
+        String::from_utf8(bytes).map_err(|e| {
+            anyhow::anyhow!("Failed to decode streamed response as valid UTF-8: {}", e)
+        })
     }
 
     /// Collects the remaining stream and parses as JSON with size limit checks.
@@ -1049,7 +1047,11 @@ pub async fn execute_http_request(
 
     let duration = start_time.elapsed();
     let status = response.status().as_u16();
-    let status_text = response.status().canonical_reason().unwrap_or("").to_string();
+    let status_text = response
+        .status()
+        .canonical_reason()
+        .unwrap_or("")
+        .to_string();
     let resp_url = response.url().to_string();
 
     let mut headers = HashMap::new();
@@ -1075,9 +1077,7 @@ pub async fn execute_http_request(
     }
 
     // Stream response chunks while enforcing size limit
-    let initial_cap = content_length
-        .unwrap_or(0)
-        .min(request.max_response_bytes);
+    let initial_cap = content_length.unwrap_or(0).min(request.max_response_bytes);
     let mut body_bytes = Vec::with_capacity(initial_cap);
     let mut total_read = 0usize;
 
@@ -1164,7 +1164,11 @@ pub async fn execute_http_stream(
         .map_err(|e| anyhow::anyhow!("HTTP stream request to '{}' failed: {}", full_url, e))?;
 
     let status = response.status().as_u16();
-    let status_text = response.status().canonical_reason().unwrap_or("").to_string();
+    let status_text = response
+        .status()
+        .canonical_reason()
+        .unwrap_or("")
+        .to_string();
     let resp_url = response.url().to_string();
 
     let mut headers = HashMap::new();
@@ -1567,7 +1571,9 @@ impl CurlCommand {
     pub fn render_for_shell(&self, shell: CurlShell) -> String {
         match (shell, self.options.formatting) {
             (CurlShell::Bash | CurlShell::Fish, CurlFormatting::Multiline) => self.to_bash(),
-            (CurlShell::Bash | CurlShell::Fish, CurlFormatting::SingleLine) => self.to_single_line(),
+            (CurlShell::Bash | CurlShell::Fish, CurlFormatting::SingleLine) => {
+                self.to_single_line()
+            }
             (CurlShell::PowerShell, CurlFormatting::Multiline) => self.to_powershell(),
             (CurlShell::PowerShell, CurlFormatting::SingleLine) => self.to_powershell_single_line(),
             (CurlShell::Cmd, CurlFormatting::Multiline) => self.to_cmd(),
@@ -1834,14 +1840,18 @@ impl CurlCommand {
     pub fn to_script(&self) -> String {
         let mut out = String::new();
         out.push_str("#!/usr/bin/env bash\n");
-        out.push_str("# =============================================================================\n");
+        out.push_str(
+            "# =============================================================================\n",
+        );
         out.push_str("# Fusion LLM Request Reproduction Script\n");
         out.push_str(&format!("# Provider: {}\n", self.provider));
         out.push_str(&format!("# Model:    {}\n", self.model));
         if let Some(t) = self.turn_index {
             out.push_str(&format!("# Turn:     {}\n", t));
         }
-        out.push_str("# =============================================================================\n");
+        out.push_str(
+            "# =============================================================================\n",
+        );
         out.push_str("set -euo pipefail\n\n");
 
         // Environment variable check for API key
@@ -1865,7 +1875,10 @@ impl CurlCommand {
 
     fn format_comment_header(&self, comment_prefix: &str) -> String {
         let mut out = String::new();
-        out.push_str(&format!("{} -----------------------------------------------------------------------------\n", comment_prefix));
+        out.push_str(&format!(
+            "{} -----------------------------------------------------------------------------\n",
+            comment_prefix
+        ));
         out.push_str(&format!("{} Fusion Turn-to-cURL Export\n", comment_prefix));
         if let Some(t) = self.turn_index {
             out.push_str(&format!("{} Turn:     {}\n", comment_prefix, t));
@@ -1873,7 +1886,10 @@ impl CurlCommand {
         out.push_str(&format!("{} Provider: {}\n", comment_prefix, self.provider));
         out.push_str(&format!("{} Model:    {}\n", comment_prefix, self.model));
         out.push_str(&format!("{} Endpoint: {}\n", comment_prefix, self.url));
-        out.push_str(&format!("{} -----------------------------------------------------------------------------\n", comment_prefix));
+        out.push_str(&format!(
+            "{} -----------------------------------------------------------------------------\n",
+            comment_prefix
+        ));
         out
     }
 }
@@ -1978,15 +1994,9 @@ pub fn generate_turn_curl(
 
     let (default_key, default_url) = config.get_key_and_url(&provider);
 
-    let base_url = options
-        .custom_base_url
-        .clone()
-        .unwrap_or(default_url);
+    let base_url = options.custom_base_url.clone().unwrap_or(default_url);
 
-    let api_key = options
-        .custom_api_key
-        .as_deref()
-        .or(default_key.as_deref());
+    let api_key = options.custom_api_key.as_deref().or(default_key.as_deref());
 
     // Extract tool definitions
     let tools = if options.include_tools {
@@ -1996,19 +2006,19 @@ pub fn generate_turn_curl(
     };
 
     let mut command = generate_curl_from_messages(
-        &messages,
-        &tools,
-        &provider,
-        &model,
-        &base_url,
-        api_key,
-        options,
+        &messages, &tools, &provider, &model, &base_url, api_key, options,
     )?;
 
     command.turn_index = Some(turn_index);
-    command.metadata.insert("turn_index".to_string(), turn_index.to_string());
-    command.metadata.insert("total_turns".to_string(), total_turns.to_string());
-    command.metadata.insert("scope".to_string(), format!("{:?}", options.scope));
+    command
+        .metadata
+        .insert("turn_index".to_string(), turn_index.to_string());
+    command
+        .metadata
+        .insert("total_turns".to_string(), total_turns.to_string());
+    command
+        .metadata
+        .insert("scope".to_string(), format!("{:?}", options.scope));
 
     Ok(command)
 }
@@ -2068,7 +2078,15 @@ pub fn generate_curl_from_messages(
         build_openrouter_request(messages, tools, model, base_url, api_key, options)
     } else {
         // OpenAI and OpenAI-compatible endpoints (DeepSeek, Groq, xAI, Mistral, Together, etc.)
-        build_openai_compatible_request(&prov_lower, messages, tools, model, base_url, api_key, options)
+        build_openai_compatible_request(
+            &prov_lower,
+            messages,
+            tools,
+            model,
+            base_url,
+            api_key,
+            options,
+        )
     };
 
     let mut metadata = HashMap::new();
@@ -2411,8 +2429,8 @@ fn build_anthropic_request(
                             }));
                         }
                         for tc in tool_calls {
-                            let input_val: Value = serde_json::from_str(&tc.arguments)
-                                .unwrap_or_else(|_| json!({}));
+                            let input_val: Value =
+                                serde_json::from_str(&tc.arguments).unwrap_or_else(|_| json!({}));
                             content_arr.push(json!({
                                 "type": "tool_use",
                                 "id": tc.id,
@@ -2518,8 +2536,8 @@ fn build_ollama_request(
                 let tc_json: Vec<Value> = tool_calls
                     .iter()
                     .map(|tc| {
-                        let args_val: Value = serde_json::from_str(&tc.arguments)
-                            .unwrap_or_else(|_| json!({}));
+                        let args_val: Value =
+                            serde_json::from_str(&tc.arguments).unwrap_or_else(|_| json!({}));
                         json!({
                             "function": {
                                 "name": tc.name,
@@ -2607,13 +2625,21 @@ pub fn construct_anthropic_url(base_url: &str) -> String {
 // ============================================================================
 
 /// Formats the `Authorization: Bearer <...>` header value based on visibility mode.
-pub fn format_auth_bearer(provider: &str, api_key: Option<&str>, visibility: ApiKeyVisibility) -> String {
+pub fn format_auth_bearer(
+    provider: &str,
+    api_key: Option<&str>,
+    visibility: ApiKeyVisibility,
+) -> String {
     let key_str = format_api_key_value(provider, api_key, visibility);
     format!("Bearer {}", key_str)
 }
 
 /// Formats the raw API key string based on visibility mode.
-pub fn format_api_key_value(provider: &str, api_key: Option<&str>, visibility: ApiKeyVisibility) -> String {
+pub fn format_api_key_value(
+    provider: &str,
+    api_key: Option<&str>,
+    visibility: ApiKeyVisibility,
+) -> String {
     match visibility {
         ApiKeyVisibility::EnvVar => {
             let env_var = provider_env_var_name(provider);
@@ -2695,7 +2721,10 @@ pub fn escape_cmd_double_quote(input: &str) -> String {
 
 /// Extracts host and path components from a full URL.
 fn parse_url_host_and_path(url: &str) -> (String, String) {
-    if let Some(stripped) = url.strip_prefix("http://").or_else(|| url.strip_prefix("https://")) {
+    if let Some(stripped) = url
+        .strip_prefix("http://")
+        .or_else(|| url.strip_prefix("https://"))
+    {
         if let Some(slash_idx) = stripped.find('/') {
             let host = &stripped[..slash_idx];
             let path = &stripped[slash_idx..];
@@ -2713,9 +2742,7 @@ fn capitalize_method(method: &str) -> String {
     let mut chars = method.chars();
     match chars.next() {
         None => String::new(),
-        Some(first) => {
-            first.to_uppercase().collect::<String>() + &chars.as_str().to_lowercase()
-        }
+        Some(first) => first.to_uppercase().collect::<String>() + &chars.as_str().to_lowercase(),
     }
 }
 
@@ -2803,13 +2830,17 @@ mod tests {
         session.system_prompt = Some("You are a helpful Rust assistant.".to_string());
 
         // Turn 1
-        session.messages.push(Message::user("What is the speed of light?"));
         session
             .messages
-            .push(Message::assistant("The speed of light is ~299,792,458 m/s."));
+            .push(Message::user("What is the speed of light?"));
+        session.messages.push(Message::assistant(
+            "The speed of light is ~299,792,458 m/s.",
+        ));
 
         // Turn 2 with tool calls
-        session.messages.push(Message::user("Read Cargo.toml for me"));
+        session
+            .messages
+            .push(Message::user("Read Cargo.toml for me"));
         session.messages.push(Message::assistant_with_tools(
             "",
             vec![ToolCall {
@@ -2818,9 +2849,10 @@ mod tests {
                 arguments: r#"{"path":"Cargo.toml"}"#.to_string(),
             }],
         ));
-        session
-            .messages
-            .push(Message::tool_result("call_123", "[package]\nname = \"fusion\"\n"));
+        session.messages.push(Message::tool_result(
+            "call_123",
+            "[package]\nname = \"fusion\"\n",
+        ));
         session
             .messages
             .push(Message::assistant("The package name is 'fusion'."));
@@ -2842,7 +2874,10 @@ mod tests {
         assert!(cmd.url.contains("/chat/completions"));
         assert!(cmd.has_header("Content-Type"));
         assert_eq!(cmd.header_value("Content-Type"), Some("application/json"));
-        assert_eq!(cmd.header_value("Authorization"), Some("Bearer $OPENAI_API_KEY"));
+        assert_eq!(
+            cmd.header_value("Authorization"),
+            Some("Bearer $OPENAI_API_KEY")
+        );
 
         let body = &cmd.body;
         assert_eq!(body["model"], "gpt-4o");
@@ -2883,10 +2918,7 @@ mod tests {
         assert!(cmd.header_value("x-api-key").unwrap().contains("-***"));
 
         // Anthropic system prompt should be in root "system" property, not in messages array
-        assert_eq!(
-            cmd.body["system"],
-            "You are a helpful Rust assistant."
-        );
+        assert_eq!(cmd.body["system"], "You are a helpful Rust assistant.");
 
         let messages = cmd.body["messages"].as_array().expect("messages array");
         assert!(messages.iter().all(|m| m["role"] != "system"));
@@ -2924,20 +2956,41 @@ mod tests {
 
         let cmd = generate_turn_curl(&session, 1, &config, &options).expect("generate openrouter");
 
-        assert_eq!(cmd.header_value("HTTP-Referer"), Some("https://github.com/theaungmyatmoe/fusion"));
+        assert_eq!(
+            cmd.header_value("HTTP-Referer"),
+            Some("https://github.com/theaungmyatmoe/fusion")
+        );
         assert_eq!(cmd.header_value("X-Title"), Some("Fusion AI Assistant"));
-        assert_eq!(cmd.header_value("Authorization"), Some("Bearer $OPENROUTER_API_KEY"));
+        assert_eq!(
+            cmd.header_value("Authorization"),
+            Some("Bearer $OPENROUTER_API_KEY")
+        );
     }
 
     #[test]
     fn test_api_key_visibility_modes() {
         let key = "sk-proj-1234567890abcdef12345678";
 
-        assert_eq!(format_api_key_value("openai", Some(key), ApiKeyVisibility::EnvVar), "$OPENAI_API_KEY");
-        assert_eq!(format_api_key_value("anthropic", Some(key), ApiKeyVisibility::EnvVar), "$ANTHROPIC_API_KEY");
-        assert_eq!(format_api_key_value("openai", Some(key), ApiKeyVisibility::Redacted), "[REDACTED]");
-        assert_eq!(format_api_key_value("openai", Some(key), ApiKeyVisibility::Placeholder), "YOUR_OPENAI_API_KEY");
-        assert_eq!(format_api_key_value("openai", Some(key), ApiKeyVisibility::Plain), key);
+        assert_eq!(
+            format_api_key_value("openai", Some(key), ApiKeyVisibility::EnvVar),
+            "$OPENAI_API_KEY"
+        );
+        assert_eq!(
+            format_api_key_value("anthropic", Some(key), ApiKeyVisibility::EnvVar),
+            "$ANTHROPIC_API_KEY"
+        );
+        assert_eq!(
+            format_api_key_value("openai", Some(key), ApiKeyVisibility::Redacted),
+            "[REDACTED]"
+        );
+        assert_eq!(
+            format_api_key_value("openai", Some(key), ApiKeyVisibility::Placeholder),
+            "YOUR_OPENAI_API_KEY"
+        );
+        assert_eq!(
+            format_api_key_value("openai", Some(key), ApiKeyVisibility::Plain),
+            key
+        );
         assert_eq!(mask_api_key(key), "sk-proj-***5678");
     }
 
@@ -2945,15 +2998,17 @@ mod tests {
     fn test_bash_single_quote_escaping() {
         let payload = r#"{"prompt":"don't fail on 'single quotes'!"}"#;
         let escaped = escape_bash_single_quote(payload);
-        assert_eq!(escaped, r#"{"prompt":"don'\''t fail on '\''single quotes'\''!"}"#);
+        assert_eq!(
+            escaped,
+            r#"{"prompt":"don'\''t fail on '\''single quotes'\''!"}"#
+        );
     }
 
     #[test]
     fn test_single_line_curl() {
         let session = make_test_session();
         let config = Config::default();
-        let options = CurlExportOptions::default()
-            .with_formatting(CurlFormatting::SingleLine);
+        let options = CurlExportOptions::default().with_formatting(CurlFormatting::SingleLine);
 
         let cmd = generate_turn_curl(&session, 1, &config, &options).expect("generate turn 1");
         let single = cmd.to_single_line();
@@ -3061,7 +3116,9 @@ mod tests {
         assert!(!bundle.python_script.is_empty());
         assert!(!bundle.fetch_js.is_empty());
         assert!(bundle.estimated_tokens > 0);
-        assert!(bundle.reproduction_guide.contains("Reproduction Guide for Turn 1"));
+        assert!(bundle
+            .reproduction_guide
+            .contains("Reproduction Guide for Turn 1"));
     }
 
     #[test]
@@ -3187,12 +3244,27 @@ mod tests {
         assert_eq!(HttpMethod::Options.as_str(), "OPTIONS");
 
         assert_eq!("get".parse::<HttpMethod>().expect("parse"), HttpMethod::Get);
-        assert_eq!("POST".parse::<HttpMethod>().expect("parse"), HttpMethod::Post);
+        assert_eq!(
+            "POST".parse::<HttpMethod>().expect("parse"),
+            HttpMethod::Post
+        );
         assert_eq!("put".parse::<HttpMethod>().expect("parse"), HttpMethod::Put);
-        assert_eq!("delete".parse::<HttpMethod>().expect("parse"), HttpMethod::Delete);
-        assert_eq!("patch".parse::<HttpMethod>().expect("parse"), HttpMethod::Patch);
-        assert_eq!("head".parse::<HttpMethod>().expect("parse"), HttpMethod::Head);
-        assert_eq!("options".parse::<HttpMethod>().expect("parse"), HttpMethod::Options);
+        assert_eq!(
+            "delete".parse::<HttpMethod>().expect("parse"),
+            HttpMethod::Delete
+        );
+        assert_eq!(
+            "patch".parse::<HttpMethod>().expect("parse"),
+            HttpMethod::Patch
+        );
+        assert_eq!(
+            "head".parse::<HttpMethod>().expect("parse"),
+            HttpMethod::Head
+        );
+        assert_eq!(
+            "options".parse::<HttpMethod>().expect("parse"),
+            HttpMethod::Options
+        );
 
         assert!("invalid_method".parse::<HttpMethod>().is_err());
     }
@@ -3249,8 +3321,12 @@ mod tests {
         assert!(resolved_url.contains("limit=25"));
 
         let headers = req.resolved_headers();
-        assert!(headers.iter().any(|(k, v)| k == "Accept" && v == "application/json"));
-        assert!(headers.iter().any(|(k, v)| k == "Authorization" && v == "Bearer token_xyz"));
+        assert!(headers
+            .iter()
+            .any(|(k, v)| k == "Accept" && v == "application/json"));
+        assert!(headers
+            .iter()
+            .any(|(k, v)| k == "Authorization" && v == "Bearer token_xyz"));
     }
 
     #[test]
@@ -3270,7 +3346,9 @@ mod tests {
         assert_eq!(req.body, HttpBody::Json(payload));
 
         let headers = req.resolved_headers();
-        assert!(headers.iter().any(|(k, v)| k.eq_ignore_ascii_case("content-type") && v == "application/json"));
+        assert!(headers
+            .iter()
+            .any(|(k, v)| k.eq_ignore_ascii_case("content-type") && v == "application/json"));
     }
 
     #[test]
@@ -3282,10 +3360,15 @@ mod tests {
             .expect("build put request");
 
         assert_eq!(req.method, HttpMethod::Put);
-        assert_eq!(req.body, HttpBody::Text("raw updated text payload".to_string()));
+        assert_eq!(
+            req.body,
+            HttpBody::Text("raw updated text payload".to_string())
+        );
 
         let headers = req.resolved_headers();
-        assert!(headers.iter().any(|(k, v)| k == "Content-Type" && v == "text/markdown"));
+        assert!(headers
+            .iter()
+            .any(|(k, v)| k == "Content-Type" && v == "text/markdown"));
     }
 
     #[test]
@@ -3298,7 +3381,9 @@ mod tests {
         assert_eq!(req.method, HttpMethod::Delete);
         assert_eq!(req.auth, Some(HttpAuth::api_key("X-Auth", "admin_secret")));
         let headers = req.resolved_headers();
-        assert!(headers.iter().any(|(k, v)| k == "X-Auth" && v == "admin_secret"));
+        assert!(headers
+            .iter()
+            .any(|(k, v)| k == "X-Auth" && v == "admin_secret"));
     }
 
     #[test]
@@ -3317,7 +3402,10 @@ mod tests {
         assert_eq!(req.body, HttpBody::Form(form_data));
 
         let headers = req.resolved_headers();
-        assert!(headers.iter().any(|(k, v)| k.eq_ignore_ascii_case("content-type") && v == "application/x-www-form-urlencoded"));
+        assert!(headers
+            .iter()
+            .any(|(k, v)| k.eq_ignore_ascii_case("content-type")
+                && v == "application/x-www-form-urlencoded"));
     }
 
     #[test]

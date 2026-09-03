@@ -55,11 +55,10 @@ use crate::config::Config;
 use crate::provider::client::LlmClient;
 use crate::provider::types::{Message, StreamChunk};
 use crate::ui::bench_cmd::{
-    discover_benchmark_targets, format_duration_compact,
-    format_rankings_and_recommendation, format_tps_colored, format_troubleshooting_and_unconfigured,
-    format_ttft_colored, BenchmarkOptions, BenchmarkRunResult,
-    BenchmarkTarget, PerformanceRating, ProviderBenchmarkSummary,
-    DEFAULT_BENCHMARK_PROMPT, DEFAULT_BENCHMARK_TIMEOUT_SECS,
+    discover_benchmark_targets, format_duration_compact, format_rankings_and_recommendation,
+    format_tps_colored, format_troubleshooting_and_unconfigured, format_ttft_colored,
+    BenchmarkOptions, BenchmarkRunResult, BenchmarkTarget, PerformanceRating,
+    ProviderBenchmarkSummary, DEFAULT_BENCHMARK_PROMPT, DEFAULT_BENCHMARK_TIMEOUT_SECS,
     DEFAULT_PING_PROMPT,
 };
 use crate::ui::prompt::RawModeGuard;
@@ -123,10 +122,18 @@ impl StreamPhase {
     pub fn style(&self) -> Style {
         match self {
             Self::Idle => Style::default().fg(Color::DarkGray),
-            Self::Connecting => Style::default().fg(Color::Blue).add_modifier(Modifier::BOLD),
-            Self::WaitingForFirstToken => Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD),
-            Self::Streaming => Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD),
-            Self::Completed => Style::default().fg(Color::Green).add_modifier(Modifier::BOLD),
+            Self::Connecting => Style::default()
+                .fg(Color::Blue)
+                .add_modifier(Modifier::BOLD),
+            Self::WaitingForFirstToken => Style::default()
+                .fg(Color::Yellow)
+                .add_modifier(Modifier::BOLD),
+            Self::Streaming => Style::default()
+                .fg(Color::Cyan)
+                .add_modifier(Modifier::BOLD),
+            Self::Completed => Style::default()
+                .fg(Color::Green)
+                .add_modifier(Modifier::BOLD),
             Self::Failed => Style::default().fg(Color::Red).add_modifier(Modifier::BOLD),
             Self::Skipped => Style::default().fg(Color::DarkGray),
         }
@@ -261,7 +268,8 @@ impl LiveStreamMetrics {
                 self.max_chunk_interval_ms = interval;
             }
             let n = self.chunk_count as f64;
-            self.avg_chunk_interval_ms = ((self.avg_chunk_interval_ms * (n - 1.0)) + interval as f64) / n;
+            self.avg_chunk_interval_ms =
+                ((self.avg_chunk_interval_ms * (n - 1.0)) + interval as f64) / n;
         }
 
         // Rolling throughput calculation
@@ -278,8 +286,10 @@ impl LiveStreamMetrics {
             // Compute instantaneous tok/s over the last 5 chunks
             let window_chunks = self.recent_chunks.iter().rev().take(5).collect::<Vec<_>>();
             if !window_chunks.is_empty() {
-                let window_tokens: usize = window_chunks.iter().map(|c| c.token_count).sum::<usize>() + chunk.token_count;
-                let window_ms: u64 = window_chunks.iter().map(|c| c.interval_ms).sum::<u64>() + chunk.interval_ms;
+                let window_tokens: usize =
+                    window_chunks.iter().map(|c| c.token_count).sum::<usize>() + chunk.token_count;
+                let window_ms: u64 =
+                    window_chunks.iter().map(|c| c.interval_ms).sum::<u64>() + chunk.interval_ms;
                 let window_secs = window_ms as f64 / 1000.0;
                 if window_secs > 0.01 {
                     self.live_tokens_per_sec = window_tokens as f64 / window_secs;
@@ -563,7 +573,12 @@ impl BenchTargetState {
             &self.completed_rounds,
         ));
         if self.completed_rounds.len() >= self.total_rounds {
-            if self.summary.as_ref().map(|s| s.success_rate() > 0.0).unwrap_or(false) {
+            if self
+                .summary
+                .as_ref()
+                .map(|s| s.success_rate() > 0.0)
+                .unwrap_or(false)
+            {
                 self.phase = StreamPhase::Completed;
             } else {
                 self.phase = StreamPhase::Failed;
@@ -718,7 +733,10 @@ impl BenchRunnerState {
 
     /// Returns completed summaries across all targets.
     pub fn get_completed_summaries(&self) -> Vec<ProviderBenchmarkSummary> {
-        self.targets.iter().filter_map(|t| t.summary.clone()).collect()
+        self.targets
+            .iter()
+            .filter_map(|t| t.summary.clone())
+            .collect()
     }
 
     /// Returns sorted indices according to active sort column and direction.
@@ -754,9 +772,7 @@ impl BenchRunnerState {
                         .as_ref()
                         .map(|s| s.avg_tokens_per_second)
                         .unwrap_or(0.0);
-                    tps_b
-                        .partial_cmp(&tps_a)
-                        .unwrap_or(Ordering::Equal)
+                    tps_b.partial_cmp(&tps_a).unwrap_or(Ordering::Equal)
                 }
                 BenchSortColumn::Latency => {
                     let lat_a = state_a
@@ -874,7 +890,9 @@ where
 
     let messages = vec![Message::user(prompt.to_string())];
 
-    on_event(LiveStreamEvent::PhaseChanged(StreamPhase::WaitingForFirstToken));
+    on_event(LiveStreamEvent::PhaseChanged(
+        StreamPhase::WaitingForFirstToken,
+    ));
 
     let stream_fut = async {
         let mut stream = client
@@ -901,7 +919,9 @@ where
                 let recorded_ttft = now.duration_since(start_instant);
                 first_token_time = Some(now);
                 ttft = recorded_ttft;
-                on_event(LiveStreamEvent::FirstToken { ttft: recorded_ttft });
+                on_event(LiveStreamEvent::FirstToken {
+                    ttft: recorded_ttft,
+                });
                 on_event(LiveStreamEvent::PhaseChanged(StreamPhase::Streaming));
             }
 
@@ -1028,7 +1048,11 @@ pub fn render_live_status_ansi(state: &BenchRunnerState, color: bool) -> String 
 
     // Config line
     let prompt_name = state.prompt_preset.label();
-    let mode_str = if state.is_parallel { "Parallel" } else { "Sequential" };
+    let mode_str = if state.is_parallel {
+        "Parallel"
+    } else {
+        "Sequential"
+    };
     if color {
         out.push_str(&format!(
             "\x1b[2;37mPreset: \x1b[0m\x1b[1;37m{}\x1b[0m \x1b[2;37m| Mode: \x1b[0m\x1b[1;37m{}\x1b[0m \x1b[2;37m| Rounds: \x1b[0m\x1b[1;37m{}\x1b[0m \x1b[2;37m| Max Tokens: \x1b[0m\x1b[1;37m{}\x1b[0m\n",
@@ -1047,7 +1071,12 @@ pub fn render_live_status_ansi(state: &BenchRunnerState, color: bool) -> String 
     let filled = (pct * bar_width as f64).round() as usize;
     let unfilled = bar_width.saturating_sub(filled);
 
-    let bar_str = format!("[{}{}] {:.0}%", "█".repeat(filled), "░".repeat(unfilled), pct * 100.0);
+    let bar_str = format!(
+        "[{}{}] {:.0}%",
+        "█".repeat(filled),
+        "░".repeat(unfilled),
+        pct * 100.0
+    );
     if color {
         out.push_str(&format!("\x1b[1;32m{}\x1b[0m\n\n", bar_str));
     } else {
@@ -1058,7 +1087,11 @@ pub fn render_live_status_ansi(state: &BenchRunnerState, color: bool) -> String 
     if let Some(active_idx) = state.active_running_target_idx {
         if let Some(target_state) = state.targets.get(active_idx) {
             let phase_badge = target_state.phase.badge_ansi(color);
-            let round_str = format!("Round {}/{}", target_state.current_round.max(1), target_state.total_rounds);
+            let round_str = format!(
+                "Round {}/{}",
+                target_state.current_round.max(1),
+                target_state.total_rounds
+            );
 
             if color {
                 out.push_str(&format!(
@@ -1101,7 +1134,10 @@ pub fn render_live_status_ansi(state: &BenchRunnerState, color: bool) -> String 
                 if !metrics.preview_buffer.is_empty() {
                     let preview = sanitize_preview_text(&metrics.preview_buffer, 80);
                     if color {
-                        out.push_str(&format!("    \x1b[2;37mStream Preview: \x1b[0;32m\"{}\"\x1b[0m\n", preview));
+                        out.push_str(&format!(
+                            "    \x1b[2;37mStream Preview: \x1b[0;32m\"{}\"\x1b[0m\n",
+                            preview
+                        ));
                     } else {
                         out.push_str(&format!("    Stream Preview: \"{}\"\n", preview));
                     }
@@ -1123,7 +1159,12 @@ pub fn render_live_status_ansi(state: &BenchRunnerState, color: bool) -> String 
         let status_desc = match &t.summary {
             Some(s) if s.success_rate() > 0.0 => {
                 let ttft_str = s.avg_ttft.map(format_duration_compact).unwrap_or_default();
-                format!("TTFT: {}, {:.1} tok/s ({})", ttft_str, s.avg_tokens_per_second, s.rating.badge_text())
+                format!(
+                    "TTFT: {}, {:.1} tok/s ({})",
+                    ttft_str,
+                    s.avg_tokens_per_second,
+                    s.rating.badge_text()
+                )
             }
             Some(_) => "Failed".to_string(),
             None => match t.phase {
@@ -1166,7 +1207,10 @@ pub fn render_charts_ansi(summaries: &[ProviderBenchmarkSummary], color: bool) -
         return "No benchmark data available to render charts.\n".to_string();
     }
 
-    let successful: Vec<&ProviderBenchmarkSummary> = summaries.iter().filter(|s| s.success_rate() > 0.0).collect();
+    let successful: Vec<&ProviderBenchmarkSummary> = summaries
+        .iter()
+        .filter(|s| s.success_rate() > 0.0)
+        .collect();
     if successful.is_empty() {
         return "All benchmark targets failed.\n".to_string();
     }
@@ -1188,7 +1232,12 @@ pub fn render_charts_ansi(summaries: &[ProviderBenchmarkSummary], color: bool) -
         .fold(0.0, f64::max)
         .max(10.0);
 
-    let max_label_len = successful.iter().map(|s| s.provider.len()).max().unwrap_or(8).max(8);
+    let max_label_len = successful
+        .iter()
+        .map(|s| s.provider.len())
+        .max()
+        .unwrap_or(8)
+        .max(8);
 
     for s in &successful {
         let ttft_ms = s.avg_ttft.map(|d| d.as_millis() as f64).unwrap_or(0.0);
@@ -1209,12 +1258,21 @@ pub fn render_charts_ansi(summaries: &[ProviderBenchmarkSummary], color: bool) -
             };
             out.push_str(&format!(
                 "  {:>width$} │ {}{}\x1b[0m {:<6}{}\n",
-                s.provider, bar_color, bar_str, duration_str, badge, width = max_label_len
+                s.provider,
+                bar_color,
+                bar_str,
+                duration_str,
+                badge,
+                width = max_label_len
             ));
         } else {
             out.push_str(&format!(
                 "  {:>width$} │ {} {:<6}{}\n",
-                s.provider, bar_str, duration_str, badge, width = max_label_len
+                s.provider,
+                bar_str,
+                duration_str,
+                badge,
+                width = max_label_len
             ));
         }
     }
@@ -1251,12 +1309,21 @@ pub fn render_charts_ansi(summaries: &[ProviderBenchmarkSummary], color: bool) -
             };
             out.push_str(&format!(
                 "  {:>width$} │ {}{}\x1b[0m {:>5.1} tok/s{}\n",
-                s.provider, bar_color, bar_str, tps, badge, width = max_label_len
+                s.provider,
+                bar_color,
+                bar_str,
+                tps,
+                badge,
+                width = max_label_len
             ));
         } else {
             out.push_str(&format!(
                 "  {:>width$} │ {} {:>5.1} tok/s{}\n",
-                s.provider, bar_str, tps, badge, width = max_label_len
+                s.provider,
+                bar_str,
+                tps,
+                badge,
+                width = max_label_len
             ));
         }
     }
@@ -1285,7 +1352,14 @@ pub fn render_inspector_ansi(target: &BenchTargetState, color: bool) -> String {
     }
 
     let mut tbl = Table::new()
-        .with_headers(["Round", "TTFT", "Stream Speed", "Latency", "Tokens", "Status"])
+        .with_headers([
+            "Round",
+            "TTFT",
+            "Stream Speed",
+            "Latency",
+            "Tokens",
+            "Status",
+        ])
         .with_alignments([
             ColumnAlign::Right,
             ColumnAlign::Right,
@@ -1338,7 +1412,10 @@ pub fn render_inspector_ansi(target: &BenchTargetState, color: bool) -> String {
                     last_run.response_preview
                 ));
             } else {
-                out.push_str(&format!("  Generated Sample: \"{}\"\n", last_run.response_preview));
+                out.push_str(&format!(
+                    "  Generated Sample: \"{}\"\n",
+                    last_run.response_preview
+                ));
             }
         }
     }
@@ -1399,15 +1476,33 @@ impl<'a> Widget for BenchRunnerWidget<'a> {
 impl<'a> BenchRunnerWidget<'a> {
     fn render_header(&self, area: Rect, buf: &mut Buffer) {
         let title_spans = vec![
-            Span::styled("✦ LLM Provider Benchmark Runner ", Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD)),
+            Span::styled(
+                "✦ LLM Provider Benchmark Runner ",
+                Style::default()
+                    .fg(Color::Cyan)
+                    .add_modifier(Modifier::BOLD),
+            ),
             Span::styled("• TTFT & Throughput", Style::default().fg(Color::DarkGray)),
         ];
 
-        let mode_str = if self.state.is_parallel { "Parallel" } else { "Sequential" };
+        let mode_str = if self.state.is_parallel {
+            "Parallel"
+        } else {
+            "Sequential"
+        };
         let right_spans = vec![
-            Span::styled(format!("Mode: {} ", mode_str), Style::default().fg(Color::Yellow)),
-            Span::styled(format!("Rounds: {} ", self.state.rounds), Style::default().fg(Color::White)),
-            Span::styled(format!("Max: {} tok", self.state.max_tokens), Style::default().fg(Color::DarkGray)),
+            Span::styled(
+                format!("Mode: {} ", mode_str),
+                Style::default().fg(Color::Yellow),
+            ),
+            Span::styled(
+                format!("Rounds: {} ", self.state.rounds),
+                Style::default().fg(Color::White),
+            ),
+            Span::styled(
+                format!("Max: {} tok", self.state.max_tokens),
+                Style::default().fg(Color::DarkGray),
+            ),
         ];
 
         let line = Line::from(title_spans);
@@ -1416,7 +1511,12 @@ impl<'a> BenchRunnerWidget<'a> {
         let right_line = Line::from(right_spans);
         let right_width = right_line.width() as u16;
         if area.width > right_width {
-            buf.set_line(area.x + area.width - right_width, area.y, &right_line, right_width);
+            buf.set_line(
+                area.x + area.width - right_width,
+                area.y,
+                &right_line,
+                right_width,
+            );
         }
     }
 
@@ -1453,10 +1553,24 @@ impl<'a> BenchRunnerWidget<'a> {
         // Progress Gauge
         let pct = (self.state.progress_fraction() * 100.0) as u16;
         let gauge = Gauge::default()
-            .block(Block::default().borders(Borders::ALL).border_type(BorderType::Rounded).title(" Overall Benchmark Progress "))
+            .block(
+                Block::default()
+                    .borders(Borders::ALL)
+                    .border_type(BorderType::Rounded)
+                    .title(" Overall Benchmark Progress "),
+            )
             .gauge_style(Style::default().fg(Color::Green).bg(Color::DarkGray))
             .percent(pct)
-            .label(format!("{}% ({} / {} targets completed)", pct, self.state.targets.iter().filter(|t| t.phase == StreamPhase::Completed).count(), self.state.targets.len()));
+            .label(format!(
+                "{}% ({} / {} targets completed)",
+                pct,
+                self.state
+                    .targets
+                    .iter()
+                    .filter(|t| t.phase == StreamPhase::Completed)
+                    .count(),
+                self.state.targets.len()
+            ));
         gauge.render(chunks[0], buf);
 
         // Split view
@@ -1486,14 +1600,29 @@ impl<'a> BenchRunnerWidget<'a> {
 
                 lines.push(Line::from(vec![
                     Span::styled("Provider: ", Style::default().fg(Color::DarkGray)),
-                    Span::styled(&target_state.target.provider, Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD)),
-                    Span::styled(format!(" ({})", target_state.target.model), Style::default().fg(Color::White)),
+                    Span::styled(
+                        &target_state.target.provider,
+                        Style::default()
+                            .fg(Color::Cyan)
+                            .add_modifier(Modifier::BOLD),
+                    ),
+                    Span::styled(
+                        format!(" ({})", target_state.target.model),
+                        Style::default().fg(Color::White),
+                    ),
                 ]));
 
                 lines.push(Line::from(vec![
                     Span::styled("Phase: ", Style::default().fg(Color::DarkGray)),
                     Span::styled(target_state.phase.label(), target_state.phase.style()),
-                    Span::styled(format!("  Round: {}/{}", target_state.current_round.max(1), target_state.total_rounds), Style::default().fg(Color::Yellow)),
+                    Span::styled(
+                        format!(
+                            "  Round: {}/{}",
+                            target_state.current_round.max(1),
+                            target_state.total_rounds
+                        ),
+                        Style::default().fg(Color::Yellow),
+                    ),
                 ]));
 
                 lines.push(Line::raw(""));
@@ -1505,24 +1634,52 @@ impl<'a> BenchRunnerWidget<'a> {
                         .unwrap_or_else(|| "measuring...".to_string());
                     lines.push(Line::from(vec![
                         Span::styled("TTFT: ", Style::default().fg(Color::DarkGray)),
-                        Span::styled(ttft_val, Style::default().fg(Color::Green).add_modifier(Modifier::BOLD)),
+                        Span::styled(
+                            ttft_val,
+                            Style::default()
+                                .fg(Color::Green)
+                                .add_modifier(Modifier::BOLD),
+                        ),
                         Span::styled("   Stream Speed: ", Style::default().fg(Color::DarkGray)),
-                        Span::styled(format!("{:.1} tok/s", metrics.live_tokens_per_sec), Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD)),
+                        Span::styled(
+                            format!("{:.1} tok/s", metrics.live_tokens_per_sec),
+                            Style::default()
+                                .fg(Color::Cyan)
+                                .add_modifier(Modifier::BOLD),
+                        ),
                     ]));
 
                     lines.push(Line::from(vec![
                         Span::styled("Tokens: ", Style::default().fg(Color::DarkGray)),
-                        Span::styled(metrics.total_tokens.to_string(), Style::default().fg(Color::White)),
+                        Span::styled(
+                            metrics.total_tokens.to_string(),
+                            Style::default().fg(Color::White),
+                        ),
                         Span::styled("   Jitter: ", Style::default().fg(Color::DarkGray)),
-                        Span::styled(format!("{:.1} ms", metrics.jitter_ms), Style::default().fg(Color::Yellow)),
+                        Span::styled(
+                            format!("{:.1} ms", metrics.jitter_ms),
+                            Style::default().fg(Color::Yellow),
+                        ),
                     ]));
 
                     lines.push(Line::raw(""));
-                    lines.push(Line::styled("Live Stream Preview:", Style::default().fg(Color::DarkGray)));
-                    let preview = sanitize_preview_text(&metrics.preview_buffer, inner.width.saturating_sub(4) as usize);
-                    lines.push(Line::styled(format!("\"{}\"", preview), Style::default().fg(Color::Green)));
+                    lines.push(Line::styled(
+                        "Live Stream Preview:",
+                        Style::default().fg(Color::DarkGray),
+                    ));
+                    let preview = sanitize_preview_text(
+                        &metrics.preview_buffer,
+                        inner.width.saturating_sub(4) as usize,
+                    );
+                    lines.push(Line::styled(
+                        format!("\"{}\"", preview),
+                        Style::default().fg(Color::Green),
+                    ));
                 } else {
-                    lines.push(Line::styled("Waiting for stream events...", Style::default().fg(Color::DarkGray)));
+                    lines.push(Line::styled(
+                        "Waiting for stream events...",
+                        Style::default().fg(Color::DarkGray),
+                    ));
                 }
 
                 Paragraph::new(lines).render(inner, buf);
@@ -1531,11 +1688,25 @@ impl<'a> BenchRunnerWidget<'a> {
         }
 
         let idle_text = vec![
-            Line::styled("Benchmark Runner Idle", Style::default().fg(Color::White).add_modifier(Modifier::BOLD)),
+            Line::styled(
+                "Benchmark Runner Idle",
+                Style::default()
+                    .fg(Color::White)
+                    .add_modifier(Modifier::BOLD),
+            ),
             Line::raw(""),
-            Line::styled("Press [Space] or [r] to start benchmarking.", Style::default().fg(Color::Cyan)),
-            Line::styled("Press [m] to cycle test prompt presets.", Style::default().fg(Color::DarkGray)),
-            Line::styled("Press [p] to toggle parallel mode.", Style::default().fg(Color::DarkGray)),
+            Line::styled(
+                "Press [Space] or [r] to start benchmarking.",
+                Style::default().fg(Color::Cyan),
+            ),
+            Line::styled(
+                "Press [m] to cycle test prompt presets.",
+                Style::default().fg(Color::DarkGray),
+            ),
+            Line::styled(
+                "Press [p] to toggle parallel mode.",
+                Style::default().fg(Color::DarkGray),
+            ),
         ];
         Paragraph::new(idle_text).render(inner, buf);
     }
@@ -1554,7 +1725,9 @@ impl<'a> BenchRunnerWidget<'a> {
             let pointer = if is_selected { "▶ " } else { "  " };
             let icon = t.phase.icon();
             let style = if is_selected {
-                Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD)
+                Style::default()
+                    .fg(Color::Cyan)
+                    .add_modifier(Modifier::BOLD)
             } else {
                 Style::default().fg(Color::White)
             };
@@ -1571,8 +1744,14 @@ impl<'a> BenchRunnerWidget<'a> {
                 Span::styled(pointer, Style::default().fg(Color::Cyan)),
                 Span::styled(format!("{} ", icon), t.phase.style()),
                 Span::styled(&t.target.provider, style),
-                Span::styled(format!(" ({})", t.target.model), Style::default().fg(Color::DarkGray)),
-                Span::styled(format!(" [{}]", status_badge), Style::default().fg(Color::Yellow)),
+                Span::styled(
+                    format!(" ({})", t.target.model),
+                    Style::default().fg(Color::DarkGray),
+                ),
+                Span::styled(
+                    format!(" [{}]", status_badge),
+                    Style::default().fg(Color::Yellow),
+                ),
             ]));
         }
 
@@ -1598,7 +1777,11 @@ impl<'a> BenchRunnerWidget<'a> {
             "Rating",
             "Status",
         ])
-        .style(Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD));
+        .style(
+            Style::default()
+                .fg(Color::Cyan)
+                .add_modifier(Modifier::BOLD),
+        );
 
         let rows: Vec<Row> = sorted_indices
             .iter()
@@ -1623,7 +1806,10 @@ impl<'a> BenchRunnerWidget<'a> {
                 };
 
                 let row_style = if is_cursor {
-                    Style::default().fg(Color::White).bg(Color::DarkGray).add_modifier(Modifier::BOLD)
+                    Style::default()
+                        .fg(Color::White)
+                        .bg(Color::DarkGray)
+                        .add_modifier(Modifier::BOLD)
                 } else {
                     Style::default().fg(Color::White)
                 };
@@ -1670,7 +1856,10 @@ impl<'a> BenchRunnerWidget<'a> {
 
         let summaries = self.state.get_completed_summaries();
         let chart_text = render_charts_ansi(&summaries, false);
-        let lines: Vec<Line> = chart_text.lines().map(|l| Line::raw(l.to_string())).collect();
+        let lines: Vec<Line> = chart_text
+            .lines()
+            .map(|l| Line::raw(l.to_string()))
+            .collect();
         Paragraph::new(lines).render(inner, buf);
     }
 
@@ -1684,7 +1873,10 @@ impl<'a> BenchRunnerWidget<'a> {
 
         if let Some(target) = self.state.targets.get(self.state.selected_target_idx) {
             let inspector_text = render_inspector_ansi(target, false);
-            let lines: Vec<Line> = inspector_text.lines().map(|l| Line::raw(l.to_string())).collect();
+            let lines: Vec<Line> = inspector_text
+                .lines()
+                .map(|l| Line::raw(l.to_string()))
+                .collect();
             Paragraph::new(lines).render(inner, buf);
         } else {
             Paragraph::new("No provider selected.").render(inner, buf);
@@ -1700,7 +1892,8 @@ impl<'a> BenchRunnerWidget<'a> {
         block.render(area, buf);
 
         let summaries = self.state.get_completed_summaries();
-        let recs = format_rankings_and_recommendation(&summaries, &self.state.active_provider, false);
+        let recs =
+            format_rankings_and_recommendation(&summaries, &self.state.active_provider, false);
         let unconf = format_troubleshooting_and_unconfigured(&summaries, false);
 
         let mut lines = Vec::new();
@@ -1718,7 +1911,10 @@ impl<'a> BenchRunnerWidget<'a> {
     fn render_status_bar(&self, area: Rect, buf: &mut Buffer) {
         let line = Line::from(vec![
             Span::styled(" Status: ", Style::default().fg(Color::DarkGray)),
-            Span::styled(&self.state.status_message, Style::default().fg(Color::Yellow)),
+            Span::styled(
+                &self.state.status_message,
+                Style::default().fg(Color::Yellow),
+            ),
         ]);
         buf.set_line(area.x, area.y, &line, area.width);
     }
@@ -1762,12 +1958,8 @@ pub async fn run_interactive_benchmark(
         BenchPromptPreset::Haiku
     };
 
-    let mut state = BenchRunnerState::new(
-        targets,
-        &config.default_provider,
-        options.rounds,
-        preset,
-    );
+    let mut state =
+        BenchRunnerState::new(targets, &config.default_provider, options.rounds, preset);
     state.is_parallel = options.parallel;
 
     let mut terminal_guard = match RawModeGuard::enter() {
@@ -1826,7 +2018,13 @@ pub async fn run_interactive_benchmark(
                         }
                         KeyCode::Char(' ') | KeyCode::Char('r') => {
                             if !state.is_running {
-                                execute_benchmark_run(&mut state, client, &mut terminal, theme.clone()).await;
+                                execute_benchmark_run(
+                                    &mut state,
+                                    client,
+                                    &mut terminal,
+                                    theme.clone(),
+                                )
+                                .await;
                             }
                         }
                         _ => {}
@@ -1957,7 +2155,13 @@ fn current_timestamp() -> u64 {
 fn sanitize_preview_text(s: &str, max_len: usize) -> String {
     let clean = s
         .chars()
-        .map(|c| if c == '\n' || c == '\r' || c == '\t' { ' ' } else { c })
+        .map(|c| {
+            if c == '\n' || c == '\r' || c == '\t' {
+                ' '
+            } else {
+                c
+            }
+        })
         .collect::<String>();
     let trimmed = clean.trim();
     if trimmed.chars().count() > max_len {
@@ -1980,7 +2184,11 @@ mod tests {
         BenchmarkTarget {
             provider: provider.to_string(),
             model: model.to_string(),
-            api_key: if configured { Some("test_key".to_string()) } else { None },
+            api_key: if configured {
+                Some("test_key".to_string())
+            } else {
+                None
+            },
             base_url: "https://api.example.com".to_string(),
             is_configured: configured,
             setup_hint: None,
@@ -2037,7 +2245,9 @@ mod tests {
         assert_eq!(metrics.min_chunk_interval_ms, 50);
         assert_eq!(metrics.max_chunk_interval_ms, 60);
         assert_eq!(metrics.avg_chunk_interval_ms, 55.0);
-        assert!(metrics.preview_buffer.contains("Hello world from Rust benchmarks"));
+        assert!(metrics
+            .preview_buffer
+            .contains("Hello world from Rust benchmarks"));
     }
 
     #[test]

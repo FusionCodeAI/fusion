@@ -172,8 +172,12 @@ impl ThrottleDecision {
     /// Returns the required or suggested wait duration in milliseconds, if any.
     pub fn wait_duration_ms(&self) -> Option<u64> {
         match self {
-            Self::Allowed { pacing_delay_ms, .. } => *pacing_delay_ms,
-            Self::Throttled { wait_duration_ms, .. } => Some(*wait_duration_ms),
+            Self::Allowed {
+                pacing_delay_ms, ..
+            } => *pacing_delay_ms,
+            Self::Throttled {
+                wait_duration_ms, ..
+            } => Some(*wait_duration_ms),
             Self::HardExhausted { reset_in_ms, .. } => *reset_in_ms,
         }
     }
@@ -212,15 +216,10 @@ pub enum ThrottleError {
     },
 
     #[error("Cost budget limit exceeded: limit=${limit_usd:.4}, spent=${spent_usd:.4}")]
-    CostLimitExceeded {
-        limit_usd: f64,
-        spent_usd: f64,
-    },
+    CostLimitExceeded { limit_usd: f64, spent_usd: f64 },
 
     #[error("Token reservation ticket #{ticket_id} was not found or has expired")]
-    ReservationNotFound {
-        ticket_id: u64,
-    },
+    ReservationNotFound { ticket_id: u64 },
 
     #[error("Concurrency limit exceeded: maximum {max_concurrency} in-flight requests reached (currently {active_in_flight} active)")]
     ConcurrencyLimitExceeded {
@@ -236,10 +235,7 @@ pub enum ThrottleError {
     },
 
     #[error("Priority queue is full: capacity={capacity}, current={current}")]
-    QueueFull {
-        capacity: usize,
-        current: usize,
-    },
+    QueueFull { capacity: usize, current: usize },
 }
 
 // ===========================================================================
@@ -416,7 +412,12 @@ impl TokenQuotaConfig {
     }
 
     /// Sets Financial Cost Limits (USD).
-    pub fn with_cost_limits(mut self, session: Option<f64>, hourly: Option<f64>, daily: Option<f64>) -> Self {
+    pub fn with_cost_limits(
+        mut self,
+        session: Option<f64>,
+        hourly: Option<f64>,
+        daily: Option<f64>,
+    ) -> Self {
         self.cost_limit_usd = session;
         self.cost_per_hour_usd = hourly;
         self.cost_per_day_usd = daily;
@@ -968,10 +969,13 @@ impl ConcurrencyLimiter {
 
     /// Attempts to acquire a concurrency permit immediately.
     pub fn try_acquire(&self) -> Result<ConcurrencyPermit, ThrottleError> {
-        let mut count = self.in_flight.lock().map_err(|_| ThrottleError::ConcurrencyLimitExceeded {
-            max_concurrency: self.max_concurrency,
-            active_in_flight: self.max_concurrency,
-        })?;
+        let mut count =
+            self.in_flight
+                .lock()
+                .map_err(|_| ThrottleError::ConcurrencyLimitExceeded {
+                    max_concurrency: self.max_concurrency,
+                    active_in_flight: self.max_concurrency,
+                })?;
 
         if *count < self.max_concurrency {
             *count += 1;
@@ -1133,7 +1137,10 @@ impl RpmTpmRateLimiter {
             }
         }
 
-        let remaining = self.tpm_bucket.as_mut().map(|b| b.available_tokens() as u64);
+        let remaining = self
+            .tpm_bucket
+            .as_mut()
+            .map(|b| b.available_tokens() as u64);
         ThrottleDecision::Allowed {
             remaining_tokens: remaining,
             pacing_delay_ms: None,
@@ -1336,7 +1343,10 @@ impl ExponentialBackoff {
                 let prev = (config.initial_delay_ms as f64)
                     * config.multiplier.powi(attempt.saturating_sub(1) as i32);
                 let upper = (prev * 3.0).min(config.max_delay_ms as f64);
-                rng.gen_range(config.initial_delay_ms as f64, upper.max(config.initial_delay_ms as f64))
+                rng.gen_range(
+                    config.initial_delay_ms as f64,
+                    upper.max(config.initial_delay_ms as f64),
+                )
             }
             JitterStrategy::Proportional => {
                 let factor = rng.gen_range(0.75, 1.25);
@@ -1350,7 +1360,11 @@ impl ExponentialBackoff {
     }
 
     /// Deterministic calculation with explicit seed (ideal for unit testing).
-    pub fn calculate_delay_deterministic(attempt: u32, config: &BackoffConfig, seed: u64) -> Duration {
+    pub fn calculate_delay_deterministic(
+        attempt: u32,
+        config: &BackoffConfig,
+        seed: u64,
+    ) -> Duration {
         let mut rng = FastRng::new(seed);
         Self::calculate_delay(attempt, config, &mut rng)
     }
@@ -1410,7 +1424,11 @@ impl Http429Handler {
     }
 
     /// Computes effective backoff delay considering retry attempt and optional HTTP 429 Retry-After header.
-    pub fn compute_backoff(attempt: u32, retry_after_header: Option<&str>, config: &BackoffConfig) -> Duration {
+    pub fn compute_backoff(
+        attempt: u32,
+        retry_after_header: Option<&str>,
+        config: &BackoffConfig,
+    ) -> Duration {
         if config.respect_retry_after {
             if let Some(header) = retry_after_header {
                 if let Some(parsed_duration) = Self::parse_retry_after(header) {
@@ -1563,7 +1581,11 @@ impl<T> PriorityThrottleQueue<T> {
     }
 
     /// Calculates effective rank for ordering, factoring in priority and aging.
-    fn effective_rank(&self, req: &QueuedRequest<T>, now: Instant) -> (u32, std::cmp::Reverse<Instant>) {
+    fn effective_rank(
+        &self,
+        req: &QueuedRequest<T>,
+        now: Instant,
+    ) -> (u32, std::cmp::Reverse<Instant>) {
         let base_rank = req.priority.rank();
         let elapsed_ms = now.duration_since(req.enqueued_at).as_millis() as u64;
         let aging_steps = (elapsed_ms / self.aging_threshold_ms) as u32;
@@ -1574,7 +1596,9 @@ impl<T> PriorityThrottleQueue<T> {
     /// Peeks the highest priority item ready for execution.
     pub fn peek(&self) -> Option<&QueuedRequest<T>> {
         let now = Instant::now();
-        self.requests.iter().max_by_key(|req| self.effective_rank(req, now))
+        self.requests
+            .iter()
+            .max_by_key(|req| self.effective_rank(req, now))
     }
 
     /// Dequeues and returns the highest priority request.
@@ -1644,7 +1668,10 @@ impl<T> PriorityThrottleQueue<T> {
 
     /// Returns count of requests per priority tier.
     pub fn count_by_priority(&self, priority: RequestPriority) -> usize {
-        self.requests.iter().filter(|r| r.priority == priority).count()
+        self.requests
+            .iter()
+            .filter(|r| r.priority == priority)
+            .count()
     }
 
     /// Clears all queued requests.
@@ -1926,7 +1953,11 @@ impl TokenQuotaManager {
 
     /// Evaluates current token and cost budgets against an estimated token request.
     pub fn check_budget(&mut self, estimated_tokens: u64) -> ThrottleDecision {
-        let pending_reserved: u64 = self.active_reservations.iter().map(|r| r.estimated_tokens).sum();
+        let pending_reserved: u64 = self
+            .active_reservations
+            .iter()
+            .map(|r| r.estimated_tokens)
+            .sum();
         let effective_tokens = estimated_tokens + pending_reserved;
 
         // 1. Session Token Budget Hard Limit
@@ -2110,12 +2141,18 @@ impl TokenQuotaManager {
         completion_tokens: u64,
         cost_usd: Option<f64>,
     ) -> Result<(), ThrottleError> {
-        if let Some(pos) = self.active_reservations.iter().position(|r| r.id == ticket.id) {
+        if let Some(pos) = self
+            .active_reservations
+            .iter()
+            .position(|r| r.id == ticket.id)
+        {
             self.active_reservations.remove(pos);
             self.record_usage(prompt_tokens, completion_tokens, cost_usd);
             Ok(())
         } else {
-            Err(ThrottleError::ReservationNotFound { ticket_id: ticket.id })
+            Err(ThrottleError::ReservationNotFound {
+                ticket_id: ticket.id,
+            })
         }
     }
 
@@ -2317,7 +2354,10 @@ impl ThrottleStatusReport {
 
         parts.push(format!("Level: {}", self.metrics.quota_level));
         parts.push(format!("Turns: {}", self.metrics.total_turns));
-        parts.push(format!("Tokens: {}", format_number(self.metrics.total_tokens)));
+        parts.push(format!(
+            "Tokens: {}",
+            format_number(self.metrics.total_tokens)
+        ));
 
         if self.metrics.total_cost_usd > 0.0 {
             parts.push(format!("Cost: ${:.4}", self.metrics.total_cost_usd));
@@ -2344,8 +2384,14 @@ impl ThrottleStatusReport {
         // Turn Budget
         out.push_str("1. Turns:\n");
         out.push_str(&format!("   - Total:       {}\n", self.metrics.total_turns));
-        out.push_str(&format!("   - Last Minute: {}\n", self.metrics.turns_last_minute));
-        out.push_str(&format!("   - Last Hour:   {}\n", self.metrics.turns_last_hour));
+        out.push_str(&format!(
+            "   - Last Minute: {}\n",
+            self.metrics.turns_last_minute
+        ));
+        out.push_str(&format!(
+            "   - Last Hour:   {}\n",
+            self.metrics.turns_last_hour
+        ));
         if let (Some(pct), Some(max)) = (self.turn_budget_pct, self.max_turns_per_session) {
             out.push_str(&format!(
                 "   - Session Cap: {}/{} {}\n",
@@ -2357,11 +2403,26 @@ impl ThrottleStatusReport {
 
         // Token Budget
         out.push_str("\n2. Tokens:\n");
-        out.push_str(&format!("   - Total:       {}\n", format_number(self.metrics.total_tokens)));
-        out.push_str(&format!("   - Prompt:      {}\n", format_number(self.metrics.prompt_tokens)));
-        out.push_str(&format!("   - Completion:  {}\n", format_number(self.metrics.completion_tokens)));
-        out.push_str(&format!("   - Last Minute: {}\n", format_number(self.metrics.tokens_last_minute)));
-        out.push_str(&format!("   - Last Hour:   {}\n", format_number(self.metrics.tokens_last_hour)));
+        out.push_str(&format!(
+            "   - Total:       {}\n",
+            format_number(self.metrics.total_tokens)
+        ));
+        out.push_str(&format!(
+            "   - Prompt:      {}\n",
+            format_number(self.metrics.prompt_tokens)
+        ));
+        out.push_str(&format!(
+            "   - Completion:  {}\n",
+            format_number(self.metrics.completion_tokens)
+        ));
+        out.push_str(&format!(
+            "   - Last Minute: {}\n",
+            format_number(self.metrics.tokens_last_minute)
+        ));
+        out.push_str(&format!(
+            "   - Last Hour:   {}\n",
+            format_number(self.metrics.tokens_last_hour)
+        ));
         if let (Some(pct), Some(budget)) = (self.token_budget_pct, self.session_token_budget) {
             out.push_str(&format!(
                 "   - Budget:      {}/{} {}\n",
@@ -2374,7 +2435,10 @@ impl ThrottleStatusReport {
         // Financial Cost
         if self.metrics.total_cost_usd > 0.0 || self.session_cost_limit_usd.is_some() {
             out.push_str("\n3. Financial (USD):\n");
-            out.push_str(&format!("   - Total Cost:  ${:.4}\n", self.metrics.total_cost_usd));
+            out.push_str(&format!(
+                "   - Total Cost:  ${:.4}\n",
+                self.metrics.total_cost_usd
+            ));
             if let (Some(pct), Some(limit)) = (self.cost_budget_pct, self.session_cost_limit_usd) {
                 out.push_str(&format!(
                     "   - Cost Limit:  ${:.4}/${:.2} {}\n",
@@ -2388,8 +2452,14 @@ impl ThrottleStatusReport {
         // Throttle statistics
         if self.metrics.throttle_events_count > 0 {
             out.push_str("\n4. Throttle Events:\n");
-            out.push_str(&format!("   - Throttled Count: {}\n", self.metrics.throttle_events_count));
-            out.push_str(&format!("   - Total Wait Time: {}ms\n", self.metrics.cumulative_wait_ms));
+            out.push_str(&format!(
+                "   - Throttled Count: {}\n",
+                self.metrics.throttle_events_count
+            ));
+            out.push_str(&format!(
+                "   - Total Wait Time: {}ms\n",
+                self.metrics.cumulative_wait_ms
+            ));
         }
 
         out
@@ -2434,7 +2504,10 @@ impl ThrottleEngine {
 
     /// Creates a strict budget engine with given session tokens and USD cap.
     pub fn strict_budget(session_tokens: u64, session_cost_usd: f64) -> Self {
-        Self::new(ThrottleConfig::strict_budget(session_tokens, session_cost_usd))
+        Self::new(ThrottleConfig::strict_budget(
+            session_tokens,
+            session_cost_usd,
+        ))
     }
 
     /// Returns a reference to the configuration.
@@ -2454,7 +2527,10 @@ impl ThrottleEngine {
         // 1. Check turn rate limits
         let turn_decision = self.turn_limiter.check_turn();
         if !turn_decision.is_allowed() {
-            if let ThrottleDecision::Throttled { wait_duration_ms, .. } = &turn_decision {
+            if let ThrottleDecision::Throttled {
+                wait_duration_ms, ..
+            } = &turn_decision
+            {
                 self.throttle_events_count += 1;
                 self.cumulative_wait_ms += wait_duration_ms;
             }
@@ -2464,7 +2540,10 @@ impl ThrottleEngine {
         // 2. Check token budget
         let token_decision = self.token_manager.check_budget(estimated_tokens);
         if !token_decision.is_allowed() {
-            if let ThrottleDecision::Throttled { wait_duration_ms, .. } = &token_decision {
+            if let ThrottleDecision::Throttled {
+                wait_duration_ms, ..
+            } = &token_decision
+            {
                 self.throttle_events_count += 1;
                 self.cumulative_wait_ms += wait_duration_ms;
             }
@@ -2512,11 +2591,15 @@ impl ThrottleEngine {
         completion_tokens: u64,
         cost_usd: Option<f64>,
     ) {
-        self.token_manager.record_usage(prompt_tokens, completion_tokens, cost_usd);
+        self.token_manager
+            .record_usage(prompt_tokens, completion_tokens, cost_usd);
     }
 
     /// Reserves speculative token allowance.
-    pub fn reserve_tokens(&mut self, estimated_tokens: u64) -> Result<ReservationTicket, ThrottleError> {
+    pub fn reserve_tokens(
+        &mut self,
+        estimated_tokens: u64,
+    ) -> Result<ReservationTicket, ThrottleError> {
         self.token_manager.reserve(estimated_tokens)
     }
 
@@ -2610,23 +2693,29 @@ impl ThrottleEngine {
     pub fn status_report(&mut self) -> ThrottleStatusReport {
         let metrics = self.metrics();
 
-        let turn_budget_pct = self
-            .config
-            .turns
-            .max_turns_per_session
-            .map(|m| if m > 0 { (metrics.total_turns as f32 / m as f32) * 100.0 } else { 0.0 });
+        let turn_budget_pct = self.config.turns.max_turns_per_session.map(|m| {
+            if m > 0 {
+                (metrics.total_turns as f32 / m as f32) * 100.0
+            } else {
+                0.0
+            }
+        });
 
-        let token_budget_pct = self
-            .config
-            .tokens
-            .session_token_budget
-            .map(|b| if b > 0 { (metrics.total_tokens as f32 / b as f32) * 100.0 } else { 0.0 });
+        let token_budget_pct = self.config.tokens.session_token_budget.map(|b| {
+            if b > 0 {
+                (metrics.total_tokens as f32 / b as f32) * 100.0
+            } else {
+                0.0
+            }
+        });
 
-        let cost_budget_pct = self
-            .config
-            .tokens
-            .cost_limit_usd
-            .map(|c| if c > 0.0 { (metrics.total_cost_usd as f32 / c as f32) * 100.0 } else { 0.0 });
+        let cost_budget_pct = self.config.tokens.cost_limit_usd.map(|c| {
+            if c > 0.0 {
+                (metrics.total_cost_usd as f32 / c as f32) * 100.0
+            } else {
+                0.0
+            }
+        });
 
         ThrottleStatusReport {
             timestamp: Utc::now().timestamp() as u64,
@@ -2707,7 +2796,8 @@ impl<T: Clone> LlmThrottleController<T> {
         caller_id: impl Into<String>,
     ) -> u64 {
         self.metrics.total_enqueued += 1;
-        self.queue.enqueue(payload, priority, estimated_tokens, caller_id)
+        self.queue
+            .enqueue(payload, priority, estimated_tokens, caller_id)
     }
 
     /// Attempts to dequeue the next eligible request and acquire its concurrency permit and rate tokens.
@@ -2716,31 +2806,48 @@ impl<T: Clone> LlmThrottleController<T> {
         let avail_rpm = self.rate_limiter.available_rpm().unwrap_or(1000.0);
         let avail_tpm = self.rate_limiter.available_tpm().unwrap_or(1_000_000.0);
 
-        let req = self.queue.dequeue_matching_capacity(avail_rpm, avail_tpm, has_concurrency)?;
+        let req = self
+            .queue
+            .dequeue_matching_capacity(avail_rpm, avail_tpm, has_concurrency)?;
 
-        match self.rate_limiter.try_acquire(req.estimated_requests, req.estimated_tokens) {
+        match self
+            .rate_limiter
+            .try_acquire(req.estimated_requests, req.estimated_tokens)
+        {
             Ok(permit) => {
                 self.metrics.total_dispatched += 1;
                 Some((req, permit))
             }
             Err(_) => {
                 // Put back in queue if acquisition failed due to race
-                self.queue.enqueue(req.payload, req.priority, req.estimated_tokens, req.caller_id);
+                self.queue.enqueue(
+                    req.payload,
+                    req.priority,
+                    req.estimated_tokens,
+                    req.caller_id,
+                );
                 None
             }
         }
     }
 
     /// Records completion of a dispatched request with actual token usage and frees the concurrency permit.
-    pub fn on_success(&mut self, permit: ConcurrencyPermit, estimated_tokens: u64, actual_tokens: u64) {
+    pub fn on_success(
+        &mut self,
+        permit: ConcurrencyPermit,
+        estimated_tokens: u64,
+        actual_tokens: u64,
+    ) {
         permit.release();
         self.metrics.total_completed += 1;
         self.metrics.total_tokens_used += actual_tokens;
 
         if actual_tokens < estimated_tokens {
-            self.rate_limiter.refund(0, estimated_tokens - actual_tokens);
+            self.rate_limiter
+                .refund(0, estimated_tokens - actual_tokens);
         } else if actual_tokens > estimated_tokens {
-            self.rate_limiter.record_usage(0, actual_tokens - estimated_tokens);
+            self.rate_limiter
+                .record_usage(0, actual_tokens - estimated_tokens);
         }
     }
 
@@ -2762,9 +2869,15 @@ impl<T: Clone> LlmThrottleController<T> {
         let mut m = self.metrics.clone();
         m.active_in_flight = self.rate_limiter.concurrency_limiter().in_flight();
         m.queued_count = self.queue.len();
-        m.user_interactive_queued = self.queue.count_by_priority(RequestPriority::UserInteractive);
-        m.subagent_queued = self.queue.count_by_priority(RequestPriority::SubagentWorker);
-        m.background_queued = self.queue.count_by_priority(RequestPriority::BackgroundBatch);
+        m.user_interactive_queued = self
+            .queue
+            .count_by_priority(RequestPriority::UserInteractive);
+        m.subagent_queued = self
+            .queue
+            .count_by_priority(RequestPriority::SubagentWorker);
+        m.background_queued = self
+            .queue
+            .count_by_priority(RequestPriority::BackgroundBatch);
         m
     }
 
@@ -2806,7 +2919,10 @@ pub fn new_shared_llm_throttle_controller<T: Clone>(
     rpm_tpm_config: RpmTpmConfig,
     backoff_config: BackoffConfig,
 ) -> SharedLlmThrottleController<T> {
-    Arc::new(Mutex::new(LlmThrottleController::new(rpm_tpm_config, backoff_config)))
+    Arc::new(Mutex::new(LlmThrottleController::new(
+        rpm_tpm_config,
+        backoff_config,
+    )))
 }
 
 /// Asynchronously enforces quota checks and sleeps if throttling or adaptive pacing is requested.
@@ -2815,27 +2931,33 @@ pub async fn enforce_throttle_async(
     estimated_tokens: u64,
 ) -> Result<ThrottleDecision, ThrottleError> {
     let decision = {
-        let mut guard = engine.lock().map_err(|_| ThrottleError::SessionQuotaExhausted {
-            quota_type: QuotaType::SessionTurns,
-            limit: 0,
-            used: 0,
-        })?;
+        let mut guard = engine
+            .lock()
+            .map_err(|_| ThrottleError::SessionQuotaExhausted {
+                quota_type: QuotaType::SessionTurns,
+                limit: 0,
+                used: 0,
+            })?;
         guard.pre_turn_check(estimated_tokens)
     };
 
     match &decision {
-        ThrottleDecision::Allowed { pacing_delay_ms, .. } => {
+        ThrottleDecision::Allowed {
+            pacing_delay_ms, ..
+        } => {
             if let Some(delay_ms) = pacing_delay_ms {
                 if *delay_ms > 0 {
                     tokio::time::sleep(Duration::from_millis(*delay_ms)).await;
                 }
             }
             // Record turn start
-            let mut guard = engine.lock().map_err(|_| ThrottleError::SessionQuotaExhausted {
-                quota_type: QuotaType::SessionTurns,
-                limit: 0,
-                used: 0,
-            })?;
+            let mut guard = engine
+                .lock()
+                .map_err(|_| ThrottleError::SessionQuotaExhausted {
+                    quota_type: QuotaType::SessionTurns,
+                    limit: 0,
+                    used: 0,
+                })?;
             guard.record_turn_start()?;
             Ok(decision)
         }
@@ -2845,56 +2967,64 @@ pub async fn enforce_throttle_async(
             ..
         } => {
             let policy = {
-                let guard = engine.lock().map_err(|_| ThrottleError::SessionQuotaExhausted {
-                    quota_type: QuotaType::SessionTurns,
-                    limit: 0,
-                    used: 0,
-                })?;
+                let guard = engine
+                    .lock()
+                    .map_err(|_| ThrottleError::SessionQuotaExhausted {
+                        quota_type: QuotaType::SessionTurns,
+                        limit: 0,
+                        used: 0,
+                    })?;
                 guard.config().policy
             };
 
             match policy {
                 ThrottlePolicy::WaitAndRetry => {
                     tokio::time::sleep(Duration::from_millis(*wait_duration_ms)).await;
-                    let mut guard = engine.lock().map_err(|_| ThrottleError::SessionQuotaExhausted {
-                        quota_type: QuotaType::SessionTurns,
-                        limit: 0,
-                        used: 0,
-                    })?;
+                    let mut guard =
+                        engine
+                            .lock()
+                            .map_err(|_| ThrottleError::SessionQuotaExhausted {
+                                quota_type: QuotaType::SessionTurns,
+                                limit: 0,
+                                used: 0,
+                            })?;
                     guard.record_turn_start()?;
                     Ok(decision)
                 }
                 ThrottlePolicy::WarnOnly => {
-                    let mut guard = engine.lock().map_err(|_| ThrottleError::SessionQuotaExhausted {
-                        quota_type: QuotaType::SessionTurns,
-                        limit: 0,
-                        used: 0,
-                    })?;
+                    let mut guard =
+                        engine
+                            .lock()
+                            .map_err(|_| ThrottleError::SessionQuotaExhausted {
+                                quota_type: QuotaType::SessionTurns,
+                                limit: 0,
+                                used: 0,
+                            })?;
                     guard.record_turn_start()?;
                     Ok(decision)
                 }
-                ThrottlePolicy::StrictReject | ThrottlePolicy::AdaptivePacing => {
-                    match quota_type {
-                        QuotaType::MinimumTurnInterval => Err(ThrottleError::MinimumIntervalViolation {
+                ThrottlePolicy::StrictReject | ThrottlePolicy::AdaptivePacing => match quota_type {
+                    QuotaType::MinimumTurnInterval => {
+                        Err(ThrottleError::MinimumIntervalViolation {
                             required_interval_ms: 0,
                             elapsed_ms: 0,
                             wait_ms: *wait_duration_ms,
-                        }),
-                        QuotaType::TurnsPerMinute | QuotaType::TurnsPerHour => {
-                            Err(ThrottleError::TurnRateLimitExceeded {
-                                limit: 0,
-                                window_secs: 60,
-                                retry_after_ms: *wait_duration_ms,
-                            })
-                        }
-                        _ => Err(ThrottleError::TokenRateLimitExceeded {
-                            quota_type: *quota_type,
-                            limit: 0,
-                            requested: estimated_tokens,
-                            retry_after_ms: *wait_duration_ms,
-                        }),
+                        })
                     }
-                }
+                    QuotaType::TurnsPerMinute | QuotaType::TurnsPerHour => {
+                        Err(ThrottleError::TurnRateLimitExceeded {
+                            limit: 0,
+                            window_secs: 60,
+                            retry_after_ms: *wait_duration_ms,
+                        })
+                    }
+                    _ => Err(ThrottleError::TokenRateLimitExceeded {
+                        quota_type: *quota_type,
+                        limit: 0,
+                        requested: estimated_tokens,
+                        retry_after_ms: *wait_duration_ms,
+                    }),
+                },
             }
         }
         ThrottleDecision::HardExhausted {
@@ -2904,20 +3034,25 @@ pub async fn enforce_throttle_async(
             ..
         } => {
             let policy = {
-                let guard = engine.lock().map_err(|_| ThrottleError::SessionQuotaExhausted {
-                    quota_type: QuotaType::SessionTurns,
-                    limit: 0,
-                    used: 0,
-                })?;
+                let guard = engine
+                    .lock()
+                    .map_err(|_| ThrottleError::SessionQuotaExhausted {
+                        quota_type: QuotaType::SessionTurns,
+                        limit: 0,
+                        used: 0,
+                    })?;
                 guard.config().policy
             };
 
             if policy == ThrottlePolicy::WarnOnly {
-                let mut guard = engine.lock().map_err(|_| ThrottleError::SessionQuotaExhausted {
-                    quota_type: QuotaType::SessionTurns,
-                    limit: 0,
-                    used: 0,
-                })?;
+                let mut guard =
+                    engine
+                        .lock()
+                        .map_err(|_| ThrottleError::SessionQuotaExhausted {
+                            quota_type: QuotaType::SessionTurns,
+                            limit: 0,
+                            used: 0,
+                        })?;
                 let _ = guard.record_turn_start();
                 Ok(decision)
             } else {
@@ -2976,7 +3111,10 @@ mod tests {
         // Turn 4 exceeds max_turns_per_minute (3)
         let res = limiter.record_turn();
         assert!(res.is_err());
-        assert!(matches!(res.unwrap_err(), ThrottleError::TurnRateLimitExceeded { .. }));
+        assert!(matches!(
+            res.unwrap_err(),
+            ThrottleError::TurnRateLimitExceeded { .. }
+        ));
     }
 
     #[test]
@@ -2995,7 +3133,10 @@ mod tests {
         // Immediate subsequent turn should violate minimum interval
         let res = limiter.record_turn();
         assert!(res.is_err());
-        assert!(matches!(res.unwrap_err(), ThrottleError::MinimumIntervalViolation { .. }));
+        assert!(matches!(
+            res.unwrap_err(),
+            ThrottleError::MinimumIntervalViolation { .. }
+        ));
 
         // Wait out the cooldown
         std::thread::sleep(Duration::from_millis(60));
@@ -3018,7 +3159,10 @@ mod tests {
 
         let res = limiter.record_turn();
         assert!(res.is_err());
-        assert!(matches!(res.unwrap_err(), ThrottleError::SessionQuotaExhausted { .. }));
+        assert!(matches!(
+            res.unwrap_err(),
+            ThrottleError::SessionQuotaExhausted { .. }
+        ));
     }
 
     #[test]
@@ -3059,8 +3203,8 @@ mod tests {
     #[test]
     fn test_rpm_tpm_rate_limiter_dual_enforcement() {
         let config = RpmTpmConfig {
-            max_rpm: Some(60),       // 1 req/s, burst 2
-            max_tpm: Some(60_000),   // 1000 tok/s, burst 2000
+            max_rpm: Some(60),     // 1 req/s, burst 2
+            max_tpm: Some(60_000), // 1000 tok/s, burst 2000
             rpm_burst: Some(2),
             tpm_burst: Some(2000),
             max_concurrency: Some(3),
@@ -3081,7 +3225,10 @@ mod tests {
         assert!(permit3.is_err());
         assert!(matches!(
             permit3.unwrap_err(),
-            ThrottleDecision::Throttled { quota_type: QuotaType::RequestsPerMinute, .. }
+            ThrottleDecision::Throttled {
+                quota_type: QuotaType::RequestsPerMinute,
+                ..
+            }
         ));
 
         // Release permits
@@ -3115,7 +3262,9 @@ mod tests {
         assert_eq!(limiter.in_flight(), 1);
         assert!(limiter.has_capacity());
 
-        let p3 = limiter.try_acquire().expect("Permit 3 should acquire after drop");
+        let p3 = limiter
+            .try_acquire()
+            .expect("Permit 3 should acquire after drop");
         assert_eq!(limiter.in_flight(), 2);
 
         // Explicit release
@@ -3203,7 +3352,10 @@ mod tests {
 
         // When Retry-After header is provided:
         let delay_header = Http429Handler::compute_backoff(0, Some("3"), &config);
-        assert!(delay_header >= Duration::from_millis(2900) && delay_header <= Duration::from_millis(3500));
+        assert!(
+            delay_header >= Duration::from_millis(2900)
+                && delay_header <= Duration::from_millis(3500)
+        );
 
         // When no Retry-After header is provided:
         let delay_calc = Http429Handler::compute_backoff(0, None, &config);
@@ -3222,10 +3374,30 @@ mod tests {
         let mut queue = PriorityThrottleQueue::<String>::new();
 
         // Enqueue items in reverse order of priority
-        let id_bg = queue.enqueue("batch job".into(), RequestPriority::BackgroundBatch, 500, "indexer");
-        let id_sub = queue.enqueue("subagent query".into(), RequestPriority::SubagentWorker, 1000, "worker-1");
-        let id_tool = queue.enqueue("tool invocation".into(), RequestPriority::DirectTool, 800, "tool-exec");
-        let id_user = queue.enqueue("user chat message".into(), RequestPriority::UserInteractive, 1200, "user");
+        let id_bg = queue.enqueue(
+            "batch job".into(),
+            RequestPriority::BackgroundBatch,
+            500,
+            "indexer",
+        );
+        let id_sub = queue.enqueue(
+            "subagent query".into(),
+            RequestPriority::SubagentWorker,
+            1000,
+            "worker-1",
+        );
+        let id_tool = queue.enqueue(
+            "tool invocation".into(),
+            RequestPriority::DirectTool,
+            800,
+            "tool-exec",
+        );
+        let id_user = queue.enqueue(
+            "user chat message".into(),
+            RequestPriority::UserInteractive,
+            1200,
+            "user",
+        );
 
         assert_eq!(queue.len(), 4);
 
@@ -3255,13 +3427,23 @@ mod tests {
         let mut queue = PriorityThrottleQueue::<String>::with_aging(20, 35);
 
         // Enqueue a background batch job (base rank: 10)
-        let id_bg = queue.enqueue("old batch job".into(), RequestPriority::BackgroundBatch, 500, "indexer");
+        let id_bg = queue.enqueue(
+            "old batch job".into(),
+            RequestPriority::BackgroundBatch,
+            500,
+            "indexer",
+        );
 
         // Sleep 50ms so aging steps >= 2 -> effective rank = 10 + (2 * 35) = 80
         std::thread::sleep(Duration::from_millis(50));
 
         // Enqueue a new user interactive job (base rank: 40, aging: 0 -> effective rank: 40)
-        let _id_user = queue.enqueue("new user prompt".into(), RequestPriority::UserInteractive, 500, "user");
+        let _id_user = queue.enqueue(
+            "new user prompt".into(),
+            RequestPriority::UserInteractive,
+            500,
+            "user",
+        );
 
         // The aged background job should now preempt the newer user prompt!
         let next = queue.dequeue_next().expect("Should dequeue next");
@@ -3274,14 +3456,26 @@ mod tests {
         let mut queue = PriorityThrottleQueue::<String>::new();
 
         // 1. High priority user prompt requesting 5000 tokens
-        queue.enqueue("large user prompt".into(), RequestPriority::UserInteractive, 5000, "user");
+        queue.enqueue(
+            "large user prompt".into(),
+            RequestPriority::UserInteractive,
+            5000,
+            "user",
+        );
 
         // 2. Lower priority subagent request requesting 500 tokens
-        queue.enqueue("small subagent query".into(), RequestPriority::SubagentWorker, 500, "worker");
+        queue.enqueue(
+            "small subagent query".into(),
+            RequestPriority::SubagentWorker,
+            500,
+            "worker",
+        );
 
         // Available token budget is only 1000 tokens.
         // User prompt is too large, so subagent query should be dequeued!
-        let dequeued = queue.dequeue_matching_capacity(10.0, 1000.0, true).expect("Should find matching item");
+        let dequeued = queue
+            .dequeue_matching_capacity(10.0, 1000.0, true)
+            .expect("Should find matching item");
         assert_eq!(dequeued.payload, "small subagent query");
     }
 
@@ -3306,15 +3500,29 @@ mod tests {
 
         let mut controller = LlmThrottleController::<String>::new(rpm_tpm_config, backoff_config);
 
-        controller.enqueue("user prompt 1".into(), RequestPriority::UserInteractive, 2000, "user");
-        controller.enqueue("subagent task 1".into(), RequestPriority::SubagentWorker, 1500, "agent-1");
+        controller.enqueue(
+            "user prompt 1".into(),
+            RequestPriority::UserInteractive,
+            2000,
+            "user",
+        );
+        controller.enqueue(
+            "subagent task 1".into(),
+            RequestPriority::SubagentWorker,
+            1500,
+            "agent-1",
+        );
 
         // Dispatch 1
-        let (req1, permit1) = controller.try_dispatch().expect("Dispatch 1 should succeed");
+        let (req1, permit1) = controller
+            .try_dispatch()
+            .expect("Dispatch 1 should succeed");
         assert_eq!(req1.payload, "user prompt 1");
 
         // Dispatch 2
-        let (req2, permit2) = controller.try_dispatch().expect("Dispatch 2 should succeed");
+        let (req2, permit2) = controller
+            .try_dispatch()
+            .expect("Dispatch 2 should succeed");
         assert_eq!(req2.payload, "subagent task 1");
 
         // Active in-flight should now be 2 (max concurrency)
@@ -3404,7 +3612,9 @@ mod tests {
         assert_eq!(manager.session_total_tokens(), 600);
 
         // Now reserving another 800 succeeds (600 + 800 = 1400 <= 1500)
-        let ticket2 = manager.reserve(800).expect("Second reservation should now succeed");
+        let ticket2 = manager
+            .reserve(800)
+            .expect("Second reservation should now succeed");
         manager.cancel_reservation(ticket2);
     }
 

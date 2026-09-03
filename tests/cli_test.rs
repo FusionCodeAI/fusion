@@ -42,8 +42,8 @@ use fusion::ui::prompt::{Prompt, PromptResult};
 use fusion::ui::repl::handle_command;
 use fusion::ui::slash::{
     execute_slash_command, get_command_palette, handle_slash_command, tokenize_command,
-    CommandCategory, CommandDescriptor, CommandResult, ConfigCommand, ExportFormat,
-    PromptCommand, SessionCommand, SkillsCommand, SlashCommand, COMMAND_PALETTE,
+    CommandCategory, CommandDescriptor, CommandResult, ConfigCommand, ExportFormat, PromptCommand,
+    SessionCommand, SkillsCommand, SlashCommand, COMMAND_PALETTE,
 };
 
 // ===========================================================================
@@ -285,8 +285,7 @@ impl MockLlmServer {
         }
 
         let body_bytes = &buf[header_end..header_end + content_length];
-        let body_json: Value =
-            serde_json::from_slice(body_bytes).unwrap_or(Value::Null);
+        let body_json: Value = serde_json::from_slice(body_bytes).unwrap_or(Value::Null);
 
         let response = handler(&body_json);
 
@@ -310,10 +309,7 @@ impl MockLlmServer {
                     "usage": { "prompt_tokens": 20, "completion_tokens": 15 }
                 });
 
-                let sse_body = format!(
-                    "data: {}\n\ndata: {}\n\ndata: [DONE]\n\n",
-                    delta, stop
-                );
+                let sse_body = format!("data: {}\n\ndata: {}\n\ndata: [DONE]\n\n", delta, stop);
                 let http_resp = format!(
                     "HTTP/1.1 200 OK\r\ncontent-type: text/event-stream\r\ncache-control: no-cache\r\nconnection: close\r\n\r\n{}",
                     sse_body
@@ -341,10 +337,7 @@ impl MockLlmServer {
                     "usage": { "prompt_tokens": 30, "completion_tokens": 25 }
                 });
 
-                let sse_body = format!(
-                    "data: {}\n\ndata: {}\n\ndata: [DONE]\n\n",
-                    delta, stop
-                );
+                let sse_body = format!("data: {}\n\ndata: {}\n\ndata: [DONE]\n\n", delta, stop);
                 let http_resp = format!(
                     "HTTP/1.1 200 OK\r\ncontent-type: text/event-stream\r\ncache-control: no-cache\r\nconnection: close\r\n\r\n{}",
                     sse_body
@@ -352,7 +345,11 @@ impl MockLlmServer {
                 let _ = socket.write_all(http_resp.as_bytes()).await;
                 let _ = socket.flush().await;
             }
-            MockResponse::ToolCall { id, name, arguments } => {
+            MockResponse::ToolCall {
+                id,
+                name,
+                arguments,
+            } => {
                 let call_delta = json!({
                     "id": "chatcmpl-cli-tc",
                     "choices": [{
@@ -379,10 +376,8 @@ impl MockLlmServer {
                     }]
                 });
 
-                let sse_body = format!(
-                    "data: {}\n\ndata: {}\n\ndata: [DONE]\n\n",
-                    call_delta, stop
-                );
+                let sse_body =
+                    format!("data: {}\n\ndata: {}\n\ndata: [DONE]\n\n", call_delta, stop);
                 let http_resp = format!(
                     "HTTP/1.1 200 OK\r\ncontent-type: text/event-stream\r\ncache-control: no-cache\r\nconnection: close\r\n\r\n{}",
                     sse_body
@@ -588,7 +583,9 @@ fn test_cli_slash_help_output() {
     assert!(output.status.success());
     let stdout = String::from_utf8_lossy(&output.stdout);
     assert!(
-        stdout.contains("Fusion REPL Commands") || stdout.contains("/tools") || stdout.contains("/session"),
+        stdout.contains("Fusion REPL Commands")
+            || stdout.contains("/tools")
+            || stdout.contains("/session"),
         "Expected /help to print command list. Got:\n{}",
         stdout
     );
@@ -604,7 +601,9 @@ fn test_cli_slash_palette_output() {
     assert!(output.status.success());
     let stdout = String::from_utf8_lossy(&output.stdout);
     assert!(
-        stdout.contains("Command Palette") || stdout.contains("Session Management") || stdout.contains("Tools & Environment"),
+        stdout.contains("Command Palette")
+            || stdout.contains("Session Management")
+            || stdout.contains("Tools & Environment"),
         "Expected /palette to print command palette. Got:\n{}",
         stdout
     );
@@ -636,7 +635,9 @@ fn test_cli_slash_config_output() {
     assert!(output.status.success());
     let stdout = String::from_utf8_lossy(&output.stdout);
     assert!(
-        stdout.contains("Configuration") || stdout.contains("Default Model") || stdout.contains("advisors_enabled"),
+        stdout.contains("Configuration")
+            || stdout.contains("Default Model")
+            || stdout.contains("advisors_enabled"),
         "Expected /config to print active configuration. Got:\n{}",
         stdout
     );
@@ -1035,7 +1036,8 @@ fn test_cli_slash_model_shorthands_binary_execution() {
     assert!(out_info.status.success());
     let stdout_info = String::from_utf8_lossy(&out_info.stdout);
     assert!(
-        stdout_info.contains("Active Model:") && stdout_info.contains("Suggested Models per Provider:"),
+        stdout_info.contains("Active Model:")
+            && stdout_info.contains("Suggested Models per Provider:"),
         "Expected model overview table. Got:\n{}",
         stdout_info
     );
@@ -1058,19 +1060,44 @@ fn test_cli_slash_model_shorthands_binary_execution() {
 fn test_slash_command_model_parsing_and_resolution() {
     // Verify parsing of /model variants
     let cmd_sonnet = SlashCommand::parse("/model sonnet").unwrap();
-    assert_eq!(cmd_sonnet, SlashCommand::Model { name: Some("sonnet".to_string()) });
+    assert_eq!(
+        cmd_sonnet,
+        SlashCommand::Model {
+            name: Some("sonnet".to_string())
+        }
+    );
 
     let cmd_r1 = SlashCommand::parse("/model r1").unwrap();
-    assert_eq!(cmd_r1, SlashCommand::Model { name: Some("r1".to_string()) });
+    assert_eq!(
+        cmd_r1,
+        SlashCommand::Model {
+            name: Some("r1".to_string())
+        }
+    );
 
     let cmd_4o = SlashCommand::parse("/model 4o").unwrap();
-    assert_eq!(cmd_4o, SlashCommand::Model { name: Some("4o".to_string()) });
+    assert_eq!(
+        cmd_4o,
+        SlashCommand::Model {
+            name: Some("4o".to_string())
+        }
+    );
 
     let cmd_haiku = SlashCommand::parse("/model haiku").unwrap();
-    assert_eq!(cmd_haiku, SlashCommand::Model { name: Some("haiku".to_string()) });
+    assert_eq!(
+        cmd_haiku,
+        SlashCommand::Model {
+            name: Some("haiku".to_string())
+        }
+    );
 
     let cmd_m_alias = SlashCommand::parse("/m claude-3-5-sonnet").unwrap();
-    assert_eq!(cmd_m_alias, SlashCommand::Model { name: Some("claude-3-5-sonnet".to_string()) });
+    assert_eq!(
+        cmd_m_alias,
+        SlashCommand::Model {
+            name: Some("claude-3-5-sonnet".to_string())
+        }
+    );
 
     let cmd_empty = SlashCommand::parse("/model").unwrap();
     assert_eq!(cmd_empty, SlashCommand::Model { name: None });
@@ -1221,7 +1248,8 @@ fn test_cli_slash_provider_switches_binary_execution() {
     assert!(out_deepseek.status.success());
     let stdout_deepseek = String::from_utf8_lossy(&out_deepseek.stdout);
     assert!(
-        stdout_deepseek.contains("Switched active provider to") && stdout_deepseek.contains("deepseek"),
+        stdout_deepseek.contains("Switched active provider to")
+            && stdout_deepseek.contains("deepseek"),
         "Expected confirmation for deepseek switch. Got:\n{}",
         stdout_deepseek
     );
@@ -1234,7 +1262,8 @@ fn test_cli_slash_provider_switches_binary_execution() {
     assert!(out_anthropic.status.success());
     let stdout_anthropic = String::from_utf8_lossy(&out_anthropic.stdout);
     assert!(
-        stdout_anthropic.contains("Switched active provider to") && stdout_anthropic.contains("anthropic"),
+        stdout_anthropic.contains("Switched active provider to")
+            && stdout_anthropic.contains("anthropic"),
         "Expected confirmation for anthropic switch. Got:\n{}",
         stdout_anthropic
     );
@@ -1286,7 +1315,8 @@ fn test_cli_slash_provider_switches_binary_execution() {
     assert!(out_invalid.status.success());
     let stdout_invalid = String::from_utf8_lossy(&out_invalid.stdout);
     assert!(
-        stdout_invalid.contains("Unknown provider:") && stdout_invalid.contains("Supported providers:"),
+        stdout_invalid.contains("Unknown provider:")
+            && stdout_invalid.contains("Supported providers:"),
         "Expected unknown provider notice. Got:\n{}",
         stdout_invalid
     );
@@ -1299,7 +1329,8 @@ fn test_cli_slash_provider_switches_binary_execution() {
     assert!(out_p_deepseek.status.success());
     let stdout_p_deepseek = String::from_utf8_lossy(&out_p_deepseek.stdout);
     assert!(
-        stdout_p_deepseek.contains("Switched active provider to") && stdout_p_deepseek.contains("deepseek"),
+        stdout_p_deepseek.contains("Switched active provider to")
+            && stdout_p_deepseek.contains("deepseek"),
         "Expected /p alias to switch provider. Got:\n{}",
         stdout_p_deepseek
     );
@@ -1308,16 +1339,36 @@ fn test_cli_slash_provider_switches_binary_execution() {
 #[test]
 fn test_slash_command_provider_parsing_and_dispatch() {
     let cmd_deepseek = SlashCommand::parse("/provider deepseek").unwrap();
-    assert_eq!(cmd_deepseek, SlashCommand::Provider { name: Some("deepseek".to_string()) });
+    assert_eq!(
+        cmd_deepseek,
+        SlashCommand::Provider {
+            name: Some("deepseek".to_string())
+        }
+    );
 
     let cmd_anthropic = SlashCommand::parse("/provider anthropic").unwrap();
-    assert_eq!(cmd_anthropic, SlashCommand::Provider { name: Some("anthropic".to_string()) });
+    assert_eq!(
+        cmd_anthropic,
+        SlashCommand::Provider {
+            name: Some("anthropic".to_string())
+        }
+    );
 
     let cmd_ollama = SlashCommand::parse("/provider ollama").unwrap();
-    assert_eq!(cmd_ollama, SlashCommand::Provider { name: Some("ollama".to_string()) });
+    assert_eq!(
+        cmd_ollama,
+        SlashCommand::Provider {
+            name: Some("ollama".to_string())
+        }
+    );
 
     let cmd_p_alias = SlashCommand::parse("/p openai").unwrap();
-    assert_eq!(cmd_p_alias, SlashCommand::Provider { name: Some("openai".to_string()) });
+    assert_eq!(
+        cmd_p_alias,
+        SlashCommand::Provider {
+            name: Some("openai".to_string())
+        }
+    );
 
     let cmd_empty = SlashCommand::parse("/provider").unwrap();
     assert_eq!(cmd_empty, SlashCommand::Provider { name: None });
@@ -1388,12 +1439,14 @@ fn test_cli_slash_advisors_binary_execution() {
     assert!(out_status.status.success());
     let stdout_status = String::from_utf8_lossy(&out_status.stdout);
     assert!(
-        stdout_status.contains("Advisor Critique Subsystem:") && stdout_status.contains("Active Domains:"),
+        stdout_status.contains("Advisor Critique Subsystem:")
+            && stdout_status.contains("Active Domains:"),
         "Expected advisor status and domains listing. Got:\n{}",
         stdout_status
     );
     assert!(
-        stdout_status.contains("Security Advisor") && stdout_status.contains("Architecture Advisor"),
+        stdout_status.contains("Security Advisor")
+            && stdout_status.contains("Architecture Advisor"),
         "Expected core advisors listed. Got:\n{}",
         stdout_status
     );
@@ -1428,19 +1481,44 @@ fn test_cli_slash_advisors_binary_execution() {
 #[test]
 fn test_slash_command_advisors_parsing_and_state_transitions() {
     let cmd_on = SlashCommand::parse("/advisors on").unwrap();
-    assert_eq!(cmd_on, SlashCommand::Advisors { state: Some("on".to_string()) });
+    assert_eq!(
+        cmd_on,
+        SlashCommand::Advisors {
+            state: Some("on".to_string())
+        }
+    );
 
     let cmd_off = SlashCommand::parse("/advisors off").unwrap();
-    assert_eq!(cmd_off, SlashCommand::Advisors { state: Some("off".to_string()) });
+    assert_eq!(
+        cmd_off,
+        SlashCommand::Advisors {
+            state: Some("off".to_string())
+        }
+    );
 
     let cmd_status = SlashCommand::parse("/advisors status").unwrap();
-    assert_eq!(cmd_status, SlashCommand::Advisors { state: Some("status".to_string()) });
+    assert_eq!(
+        cmd_status,
+        SlashCommand::Advisors {
+            state: Some("status".to_string())
+        }
+    );
 
     let cmd_toggle = SlashCommand::parse("/advisors toggle").unwrap();
-    assert_eq!(cmd_toggle, SlashCommand::Advisors { state: Some("toggle".to_string()) });
+    assert_eq!(
+        cmd_toggle,
+        SlashCommand::Advisors {
+            state: Some("toggle".to_string())
+        }
+    );
 
     let cmd_adv = SlashCommand::parse("/adv enable").unwrap();
-    assert_eq!(cmd_adv, SlashCommand::Advisors { state: Some("enable".to_string()) });
+    assert_eq!(
+        cmd_adv,
+        SlashCommand::Advisors {
+            state: Some("enable".to_string())
+        }
+    );
 
     let cmd_empty = SlashCommand::parse("/advisors").unwrap();
     assert_eq!(cmd_empty, SlashCommand::Advisors { state: None });
@@ -1520,7 +1598,10 @@ fn test_prompt_history_navigation_and_duplicate_suppression() {
     // Add previous entry non-consecutively - should be appended
     prompt.add_history("Explain Rust ownership model");
     assert_eq!(prompt.history().len(), 4);
-    assert_eq!(prompt.history().last().unwrap(), "Explain Rust ownership model");
+    assert_eq!(
+        prompt.history().last().unwrap(),
+        "Explain Rust ownership model"
+    );
 
     // Empty and whitespace-only entries should be ignored
     prompt.add_history("");
@@ -1532,7 +1613,10 @@ fn test_prompt_history_navigation_and_duplicate_suppression() {
 #[test]
 fn test_prompt_builder_and_custom_options() {
     let prompt = Prompt::new()
-        .with_history(vec!["history item 1".to_string(), "history item 2".to_string()])
+        .with_history(vec![
+            "history item 1".to_string(),
+            "history item 2".to_string(),
+        ])
         .with_prompt_symbol(">>> ")
         .with_multiline_symbol("... ")
         .with_placeholder("Enter instructions...")
@@ -1556,7 +1640,9 @@ fn test_multi_turn_session_message_history_and_token_accumulation() {
         session.title(),
         Some("Hello, can you help me write Rust code?")
     );
-    session.add_message(Message::assistant("Certainly! What would you like to build?"));
+    session.add_message(Message::assistant(
+        "Certainly! What would you like to build?",
+    ));
     session.record_tokens(Some(15), Some(12));
 
     assert_eq!(session.total_messages(), 2);
@@ -1608,7 +1694,9 @@ fn test_slash_command_tokenization() {
     assert_eq!(tokens, vec!["/model", "deepseek-chat"]);
 
     // Quoted strings with spaces
-    let tokens_quotes = tokenize_command("/prompt save \"Unit Test Generator\" \"Write tests for the given Rust code.\"");
+    let tokens_quotes = tokenize_command(
+        "/prompt save \"Unit Test Generator\" \"Write tests for the given Rust code.\"",
+    );
     assert_eq!(
         tokens_quotes,
         vec![
@@ -1644,7 +1732,9 @@ fn test_slash_command_full_catalog_parsing() {
     // Core & Navigation
     assert_eq!(
         SlashCommand::parse("/help model"),
-        Some(SlashCommand::Help { command: Some("model".to_string()) })
+        Some(SlashCommand::Help {
+            command: Some("model".to_string())
+        })
     );
     assert_eq!(
         SlashCommand::parse("/?"),
@@ -1652,7 +1742,9 @@ fn test_slash_command_full_catalog_parsing() {
     );
     assert_eq!(
         SlashCommand::parse("/palette cost"),
-        Some(SlashCommand::Palette { filter: Some("cost".to_string()) })
+        Some(SlashCommand::Palette {
+            filter: Some("cost".to_string())
+        })
     );
     assert_eq!(SlashCommand::parse("/clear"), Some(SlashCommand::Clear));
     assert_eq!(SlashCommand::parse("/cls"), Some(SlashCommand::Clear));
@@ -1664,7 +1756,9 @@ fn test_slash_command_full_catalog_parsing() {
     assert_eq!(SlashCommand::parse("/st"), Some(SlashCommand::Status));
     assert_eq!(
         SlashCommand::parse("/file main.rs"),
-        Some(SlashCommand::File { query: Some("main.rs".to_string()) })
+        Some(SlashCommand::File {
+            query: Some("main.rs".to_string())
+        })
     );
 
     // Session Management & History
@@ -1678,11 +1772,15 @@ fn test_slash_command_full_catalog_parsing() {
     );
     assert_eq!(
         SlashCommand::parse("/session new gpt-4o"),
-        Some(SlashCommand::Session(SessionCommand::New { model: Some("gpt-4o".to_string()) }))
+        Some(SlashCommand::Session(SessionCommand::New {
+            model: Some("gpt-4o".to_string())
+        }))
     );
     assert_eq!(
         SlashCommand::parse("/session load session-123"),
-        Some(SlashCommand::Session(SessionCommand::Load { id_or_prefix: "session-123".to_string() }))
+        Some(SlashCommand::Session(SessionCommand::Load {
+            id_or_prefix: "session-123".to_string()
+        }))
     );
     assert_eq!(
         SlashCommand::parse("/session save"),
@@ -1690,7 +1788,9 @@ fn test_slash_command_full_catalog_parsing() {
     );
     assert_eq!(
         SlashCommand::parse("/session delete session-456"),
-        Some(SlashCommand::Session(SessionCommand::Delete { id_or_prefix: "session-456".to_string() }))
+        Some(SlashCommand::Session(SessionCommand::Delete {
+            id_or_prefix: "session-456".to_string()
+        }))
     );
     assert_eq!(
         SlashCommand::parse("/session clear"),
@@ -1698,11 +1798,16 @@ fn test_slash_command_full_catalog_parsing() {
     );
     assert_eq!(
         SlashCommand::parse("/session search query_term"),
-        Some(SlashCommand::Session(SessionCommand::Search { query: "query_term".to_string() }))
+        Some(SlashCommand::Session(SessionCommand::Search {
+            query: "query_term".to_string()
+        }))
     );
     assert_eq!(
         SlashCommand::parse("/fork my-branch 3"),
-        Some(SlashCommand::Fork { title: Some("my-branch".to_string()), turn: Some(3) })
+        Some(SlashCommand::Fork {
+            title: Some("my-branch".to_string()),
+            turn: Some(3)
+        })
     );
     assert_eq!(
         SlashCommand::parse("/rewind 2"),
@@ -1719,7 +1824,9 @@ fn test_slash_command_full_catalog_parsing() {
     );
     assert_eq!(
         SlashCommand::parse("/trace trace.md"),
-        Some(SlashCommand::Trace { path: Some("trace.md".to_string()) })
+        Some(SlashCommand::Trace {
+            path: Some("trace.md".to_string())
+        })
     );
 
     // Config, Tools & Customization
@@ -1740,7 +1847,9 @@ fn test_slash_command_full_catalog_parsing() {
     );
     assert_eq!(
         SlashCommand::parse("/preset coding-fast"),
-        Some(SlashCommand::Preset { name: Some("coding-fast".to_string()) })
+        Some(SlashCommand::Preset {
+            name: Some("coding-fast".to_string())
+        })
     );
     assert_eq!(SlashCommand::parse("/tools"), Some(SlashCommand::Tools));
     assert_eq!(
@@ -1749,19 +1858,27 @@ fn test_slash_command_full_catalog_parsing() {
     );
     assert_eq!(
         SlashCommand::parse("/skills enable git-helper"),
-        Some(SlashCommand::Skills(SkillsCommand::Enable { name: "git-helper".to_string() }))
+        Some(SlashCommand::Skills(SkillsCommand::Enable {
+            name: "git-helper".to_string()
+        }))
     );
     assert_eq!(
         SlashCommand::parse("/snippet list"),
-        Some(SlashCommand::Snippet { args: vec!["list".to_string()] })
+        Some(SlashCommand::Snippet {
+            args: vec!["list".to_string()]
+        })
     );
     assert_eq!(
         SlashCommand::parse("/tag add important"),
-        Some(SlashCommand::Tag { args: vec!["add".to_string(), "important".to_string()] })
+        Some(SlashCommand::Tag {
+            args: vec!["add".to_string(), "important".to_string()]
+        })
     );
     assert_eq!(
         SlashCommand::parse("/benchmark deepseek"),
-        Some(SlashCommand::Benchmark { args: vec!["deepseek".to_string()] })
+        Some(SlashCommand::Benchmark {
+            args: vec!["deepseek".to_string()]
+        })
     );
 
     // Unknown command
@@ -1802,11 +1919,18 @@ fn test_slash_command_dispatch_and_command_results() {
 
     // 5. /session clear returns CommandResult::SessionCleared
     let res_sess_clear = handle_slash_command("/session clear", &mut runner, &mut session);
-    assert!(matches!(res_sess_clear, Some(CommandResult::SessionCleared)));
+    assert!(matches!(
+        res_sess_clear,
+        Some(CommandResult::SessionCleared)
+    ));
 
     // 6. /session new returns CommandResult::SessionSwitched
-    let res_sess_new = handle_slash_command("/session new deepseek-chat", &mut runner, &mut session);
-    assert!(matches!(res_sess_new, Some(CommandResult::SessionSwitched(_))));
+    let res_sess_new =
+        handle_slash_command("/session new deepseek-chat", &mut runner, &mut session);
+    assert!(matches!(
+        res_sess_new,
+        Some(CommandResult::SessionSwitched(_))
+    ));
 
     // 7. General slash commands return CommandResult::Continue
     let res_help = handle_slash_command("/help", &mut runner, &mut session);
@@ -1858,7 +1982,9 @@ fn test_command_palette_registry_coverage() {
     ];
 
     for req in &required_commands {
-        let found = palette.iter().any(|desc| desc.name == *req || desc.aliases.contains(req));
+        let found = palette
+            .iter()
+            .any(|desc| desc.name == *req || desc.aliases.contains(req));
         assert!(
             found,
             "Expected command '{}' or its alias to be present in COMMAND_PALETTE",

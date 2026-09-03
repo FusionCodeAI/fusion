@@ -27,8 +27,8 @@ use wasm_bindgen::prelude::*;
 use crate::acp::types::{
     AgentCapabilities, AgentInfo, ContentBlock, InitializeRequest, InitializeResult, JsonRpcError,
     JsonRpcRequest, JsonRpcResponse, ListSessionsResult, LoadSessionRequest, LoadSessionResult,
-    NewSessionRequest, NewSessionResult, PromptRequest, PromptResponse, PROTOCOL_VERSION,
-    RequestId, SessionSummaryItem, StopReason, TokenStatsInfo,
+    NewSessionRequest, NewSessionResult, PromptRequest, PromptResponse, RequestId,
+    SessionSummaryItem, StopReason, TokenStatsInfo, PROTOCOL_VERSION,
 };
 use crate::agent::session::Session;
 use crate::config::Config;
@@ -76,7 +76,9 @@ impl VirtualFs {
 
     /// Normalizes a path by stripping leading `./` and `/` prefixes.
     fn normalize_path(path: &str) -> String {
-        path.trim_start_matches("./").trim_start_matches('/').to_string()
+        path.trim_start_matches("./")
+            .trim_start_matches('/')
+            .to_string()
     }
 
     /// Reads content of a file from the virtual file system.
@@ -108,7 +110,10 @@ impl VirtualFs {
             .ok_or_else(|| format!("File not found: {}", path))?;
 
         if !content.contains(old_str) {
-            return Err(format!("Target string to replace was not found in {}", path));
+            return Err(format!(
+                "Target string to replace was not found in {}",
+                path
+            ));
         }
 
         *content = content.replacen(old_str, new_str, 1);
@@ -224,7 +229,10 @@ impl VirtualFs {
                 if self.delete(parts[1]) {
                     (true, format!("Removed {}", parts[1]))
                 } else {
-                    (false, format!("rm: cannot remove '{}': No such file", parts[1]))
+                    (
+                        false,
+                        format!("rm: cannot remove '{}': No such file", parts[1]),
+                    )
                 }
             }
             "wc" => {
@@ -243,7 +251,10 @@ impl VirtualFs {
             }
             _ => (
                 true,
-                format!("[virtual-bash] Executed `{}` successfully in sandbox", trimmed),
+                format!(
+                    "[virtual-bash] Executed `{}` successfully in sandbox",
+                    trimmed
+                ),
             ),
         }
     }
@@ -273,7 +284,9 @@ static GLOBAL_AGENT: Mutex<Option<WasmFusionAgent>> = Mutex::new(None);
 
 /// Locks the global agent singleton, recovering gracefully from a poisoned mutex.
 fn global_lock() -> std::sync::MutexGuard<'static, Option<WasmFusionAgent>> {
-    GLOBAL_AGENT.lock().unwrap_or_else(|poisoned| poisoned.into_inner())
+    GLOBAL_AGENT
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner())
 }
 
 // ============================================================================
@@ -378,7 +391,13 @@ fn tool_started_event(id: &str, name: &str, args: &Value) -> Value {
 }
 
 /// Builds a `tool_finished` streaming event.
-fn tool_finished_event(id: &str, name: &str, success: bool, output: &str, duration_ms: u64) -> Value {
+fn tool_finished_event(
+    id: &str,
+    name: &str,
+    success: bool,
+    output: &str,
+    duration_ms: u64,
+) -> Value {
     json!({
         "type": "tool_finished",
         "id": id,
@@ -423,7 +442,11 @@ fn detect_tool_intent(input: &str) -> ToolIntent {
 /// Executes a detected tool intent against the virtual file system.
 ///
 /// Returns `None` when the intent requires no tool (pure conversation turn).
-fn execute_tool_intent(vfs: &VirtualFs, intent: &ToolIntent, turn_num: usize) -> Option<ToolExecutionResult> {
+fn execute_tool_intent(
+    vfs: &VirtualFs,
+    intent: &ToolIntent,
+    turn_num: usize,
+) -> Option<ToolExecutionResult> {
     match intent {
         ToolIntent::ListFiles => {
             let call_id = format!("call_glob_{}", turn_num);
@@ -441,7 +464,11 @@ fn execute_tool_intent(vfs: &VirtualFs, intent: &ToolIntent, turn_num: usize) ->
                 summary: format!(
                     "I inspected the workspace and found {} files:\n{}",
                     matched.len(),
-                    matched.iter().map(|f| format!("- `{}`", f)).collect::<Vec<_>>().join("\n")
+                    matched
+                        .iter()
+                        .map(|f| format!("- `{}`", f))
+                        .collect::<Vec<_>>()
+                        .join("\n")
                 ),
                 started_event: tool_started_event(&call_id, "glob", &args),
                 finished_event: tool_finished_event(&call_id, "glob", true, &output, 2),
@@ -495,7 +522,11 @@ fn execute_tool_intent(vfs: &VirtualFs, intent: &ToolIntent, turn_num: usize) ->
                     pattern,
                     hits.len(),
                     if hits.len() == 1 { "" } else { "es" },
-                    if formatted.is_empty() { "No matches found" } else { &formatted }
+                    if formatted.is_empty() {
+                        "No matches found"
+                    } else {
+                        &formatted
+                    }
                 ),
                 started_event: tool_started_event(&call_id, "grep", &args),
                 finished_event: tool_finished_event(&call_id, "grep", true, &formatted, 4),
@@ -554,7 +585,11 @@ async fn try_browser_fetch(
         .map_err(|e| format!("Invalid Response object: {:?}", e))?;
 
     if !resp.ok() {
-        return Err(format!("HTTP status {}: {}", resp.status(), resp.status_text()));
+        return Err(format!(
+            "HTTP status {}: {}",
+            resp.status(),
+            resp.status_text()
+        ));
     }
 
     let text_promise = resp.text().map_err(|e| format!("text error: {:?}", e))?;
@@ -732,10 +767,7 @@ impl WasmFusionAgent {
     /// Reads content of a file from the agent's virtual filesystem.
     #[wasm_bindgen]
     pub fn fs_read(&self, path: &str) -> Result<String, JsValue> {
-        self.lock_inner()
-            .vfs
-            .read(path)
-            .map_err(JsValue::from_str)
+        self.lock_inner().vfs.read(path).map_err(JsValue::from_str)
     }
 
     /// Returns true when the file exists in the virtual filesystem.
@@ -837,8 +869,9 @@ impl WasmFusionAgent {
             lock.session = session;
         } else if parsed.get("messages").is_some() {
             // Direct Session JSON compatibility
-            let session: Session = serde_json::from_value(parsed.clone())
-                .map_err(|e| JsValue::from_str(&format!("Failed to deserialize direct session: {}", e)))?;
+            let session: Session = serde_json::from_value(parsed.clone()).map_err(|e| {
+                JsValue::from_str(&format!("Failed to deserialize direct session: {}", e))
+            })?;
             lock.session = session;
         }
 
@@ -879,10 +912,13 @@ impl WasmFusionAgent {
         let request: JsonRpcRequest = match serde_json::from_str(request_json) {
             Ok(req) => req,
             Err(e) => {
-                let response =
-                    JsonRpcResponse::error(RequestId::Null, JsonRpcError::parse_error(e.to_string()));
-                return serde_json::to_string(&response)
-                    .map_err(|err| JsValue::from_str(&format!("Failed to serialize error response: {}", err)));
+                let response = JsonRpcResponse::error(
+                    RequestId::Null,
+                    JsonRpcError::parse_error(e.to_string()),
+                );
+                return serde_json::to_string(&response).map_err(|err| {
+                    JsValue::from_str(&format!("Failed to serialize error response: {}", err))
+                });
             }
         };
 
@@ -911,17 +947,24 @@ impl WasmFusionAgent {
 impl WasmFusionAgent {
     /// Locks the inner agent state, recovering gracefully from a poisoned mutex.
     fn lock_inner(&self) -> std::sync::MutexGuard<'_, AgentInner> {
-        self.inner.lock().unwrap_or_else(|poisoned| poisoned.into_inner())
+        self.inner
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner())
     }
 
     /// Synchronously dispatches an ACP method against the in-browser agent.
-    fn acp_dispatch(&mut self, method: &str, params: Option<&Value>) -> Result<Value, JsonRpcError> {
+    fn acp_dispatch(
+        &mut self,
+        method: &str,
+        params: Option<&Value>,
+    ) -> Result<Value, JsonRpcError> {
         match method {
             // Protocol Handshake
             "initialize" => {
                 let _req: InitializeRequest = match params {
-                    Some(v) => serde_json::from_value(v.clone())
-                        .map_err(|e| JsonRpcError::invalid_params(format!("Invalid initialize params: {}", e)))?,
+                    Some(v) => serde_json::from_value(v.clone()).map_err(|e| {
+                        JsonRpcError::invalid_params(format!("Invalid initialize params: {}", e))
+                    })?,
                     None => return Err(JsonRpcError::invalid_params("Missing initialize params")),
                 };
 
@@ -931,8 +974,12 @@ impl WasmFusionAgent {
                     agent_info: AgentInfo::default(),
                     auth_methods: Vec::new(),
                 };
-                serde_json::to_value(result)
-                    .map_err(|e| JsonRpcError::internal_error(format!("Failed to serialize initialize result: {}", e)))
+                serde_json::to_value(result).map_err(|e| {
+                    JsonRpcError::internal_error(format!(
+                        "Failed to serialize initialize result: {}",
+                        e
+                    ))
+                })
             }
             // Handshake acknowledged by client
             "initialized" => Ok(Value::Null),
@@ -941,8 +988,9 @@ impl WasmFusionAgent {
             // Session Lifecycle
             "session/new" => {
                 let _req: NewSessionRequest = match params {
-                    Some(v) => serde_json::from_value(v.clone())
-                        .map_err(|e| JsonRpcError::invalid_params(format!("Invalid session/new params: {}", e)))?,
+                    Some(v) => serde_json::from_value(v.clone()).map_err(|e| {
+                        JsonRpcError::invalid_params(format!("Invalid session/new params: {}", e))
+                    })?,
                     None => NewSessionRequest::default(),
                 };
 
@@ -955,14 +1003,21 @@ impl WasmFusionAgent {
                         models: None,
                     }
                 };
-                serde_json::to_value(result)
-                    .map_err(|e| JsonRpcError::internal_error(format!("Failed to serialize session result: {}", e)))
+                serde_json::to_value(result).map_err(|e| {
+                    JsonRpcError::internal_error(format!(
+                        "Failed to serialize session result: {}",
+                        e
+                    ))
+                })
             }
             "session/load" | "session/resume" => {
                 let req: LoadSessionRequest = match params {
-                    Some(v) => serde_json::from_value(v.clone())
-                        .map_err(|e| JsonRpcError::invalid_params(format!("Invalid session/load params: {}", e)))?,
-                    None => return Err(JsonRpcError::invalid_params("Missing session/load params")),
+                    Some(v) => serde_json::from_value(v.clone()).map_err(|e| {
+                        JsonRpcError::invalid_params(format!("Invalid session/load params: {}", e))
+                    })?,
+                    None => {
+                        return Err(JsonRpcError::invalid_params("Missing session/load params"))
+                    }
                 };
 
                 let result = {
@@ -977,8 +1032,9 @@ impl WasmFusionAgent {
                         title: lock.session.title.clone(),
                     }
                 };
-                serde_json::to_value(result)
-                    .map_err(|e| JsonRpcError::internal_error(format!("Failed to serialize load result: {}", e)))
+                serde_json::to_value(result).map_err(|e| {
+                    JsonRpcError::internal_error(format!("Failed to serialize load result: {}", e))
+                })
             }
             "session/list" => {
                 let result = {
@@ -1000,8 +1056,9 @@ impl WasmFusionAgent {
                         }],
                     }
                 };
-                serde_json::to_value(result)
-                    .map_err(|e| JsonRpcError::internal_error(format!("Failed to serialize session list: {}", e)))
+                serde_json::to_value(result).map_err(|e| {
+                    JsonRpcError::internal_error(format!("Failed to serialize session list: {}", e))
+                })
             }
             // No in-flight async turns exist in the synchronous bridge
             "session/cancel" => Ok(json!({ "cancelled": true })),
@@ -1018,9 +1075,11 @@ impl WasmFusionAgent {
     /// Runs an offline `session/prompt` turn: sandboxed tool execution plus a
     /// simulated assistant response, updating session state and token stats.
     fn acp_session_prompt(&mut self, params: Option<&Value>) -> Result<Value, JsonRpcError> {
-        let params = params.ok_or_else(|| JsonRpcError::invalid_params("Missing session/prompt params"))?;
-        let req: PromptRequest = serde_json::from_value(params.clone())
-            .map_err(|e| JsonRpcError::invalid_params(format!("Invalid session/prompt params: {}", e)))?;
+        let params =
+            params.ok_or_else(|| JsonRpcError::invalid_params("Missing session/prompt params"))?;
+        let req: PromptRequest = serde_json::from_value(params.clone()).map_err(|e| {
+            JsonRpcError::invalid_params(format!("Invalid session/prompt params: {}", e))
+        })?;
 
         let active_session_id = self.lock_inner().session.id_str();
         if req.session_id != active_session_id {
@@ -1051,7 +1110,9 @@ impl WasmFusionAgent {
 
             let prompt_tokens = (input.len() / 4) as u64 + 48;
             let completion_tokens = (response_text.len() / 4) as u64 + 16;
-            lock.session.token_stats.add(prompt_tokens, completion_tokens);
+            lock.session
+                .token_stats
+                .add(prompt_tokens, completion_tokens);
             if tool_calls.is_empty() {
                 lock.session.add_assistant_message(&response_text);
             } else {
@@ -1072,8 +1133,9 @@ impl WasmFusionAgent {
             }),
         };
 
-        serde_json::to_value(response)
-            .map_err(|e| JsonRpcError::internal_error(format!("Failed to serialize prompt response: {}", e)))
+        serde_json::to_value(response).map_err(|e| {
+            JsonRpcError::internal_error(format!("Failed to serialize prompt response: {}", e))
+        })
     }
 }
 
@@ -1120,7 +1182,9 @@ pub fn checkpoint() -> Result<String, JsValue> {
     let lock = global_lock();
     match lock.as_ref() {
         Some(a) => a.checkpoint(),
-        None => Err(JsValue::from_str("No active agent. Call create_agent() first.")),
+        None => Err(JsValue::from_str(
+            "No active agent. Call create_agent() first.",
+        )),
     }
 }
 
@@ -1171,7 +1235,10 @@ mod tests {
         assert_eq!(vfs.read("test.txt").unwrap(), "hello world\nfusion wasm\n");
 
         assert!(vfs.edit("test.txt", "world", "browser").is_ok());
-        assert_eq!(vfs.read("test.txt").unwrap(), "hello browser\nfusion wasm\n");
+        assert_eq!(
+            vfs.read("test.txt").unwrap(),
+            "hello browser\nfusion wasm\n"
+        );
 
         assert!(vfs.edit("test.txt", "nonexistent", "x").is_err());
         assert!(vfs.edit("missing.txt", "a", "b").is_err());
@@ -1263,9 +1330,18 @@ mod tests {
 
     #[test]
     fn test_detect_tool_intent() {
-        assert!(matches!(detect_tool_intent("list files"), ToolIntent::ListFiles));
-        assert!(matches!(detect_tool_intent("What files exist?"), ToolIntent::ListFiles));
-        assert!(matches!(detect_tool_intent("show files please"), ToolIntent::ListFiles));
+        assert!(matches!(
+            detect_tool_intent("list files"),
+            ToolIntent::ListFiles
+        ));
+        assert!(matches!(
+            detect_tool_intent("What files exist?"),
+            ToolIntent::ListFiles
+        ));
+        assert!(matches!(
+            detect_tool_intent("show files please"),
+            ToolIntent::ListFiles
+        ));
         assert!(matches!(detect_tool_intent("ls"), ToolIntent::ListFiles));
 
         match detect_tool_intent("read README.md") {
@@ -1284,7 +1360,10 @@ mod tests {
             ToolIntent::Grep { pattern } => assert_eq!(pattern, "for"),
             _ => panic!("expected Grep intent"),
         }
-        assert!(matches!(detect_tool_intent("hello there"), ToolIntent::None));
+        assert!(matches!(
+            detect_tool_intent("hello there"),
+            ToolIntent::None
+        ));
     }
 
     #[test]
@@ -1298,20 +1377,37 @@ mod tests {
         assert_eq!(exec.finished_event["type"], "tool_finished");
         assert_eq!(exec.finished_event["success"], true);
 
-        let exec = execute_tool_intent(&vfs, &ToolIntent::Read { path: "README.md".into() }, 2)
-            .expect("read result");
+        let exec = execute_tool_intent(
+            &vfs,
+            &ToolIntent::Read {
+                path: "README.md".into(),
+            },
+            2,
+        )
+        .expect("read result");
         assert_eq!(exec.call.name, "read");
         assert!(exec.summary.contains("Fusion Web Agent"));
         assert_eq!(exec.finished_event["success"], true);
 
-        let exec =
-            execute_tool_intent(&vfs, &ToolIntent::Read { path: "missing.txt".into() }, 3)
-                .expect("read result");
+        let exec = execute_tool_intent(
+            &vfs,
+            &ToolIntent::Read {
+                path: "missing.txt".into(),
+            },
+            3,
+        )
+        .expect("read result");
         assert_eq!(exec.finished_event["success"], false);
         assert!(exec.summary.contains("Could not read"));
 
-        let exec = execute_tool_intent(&vfs, &ToolIntent::Grep { pattern: "Fusion".into() }, 4)
-            .expect("grep result");
+        let exec = execute_tool_intent(
+            &vfs,
+            &ToolIntent::Grep {
+                pattern: "Fusion".into(),
+            },
+            4,
+        )
+        .expect("grep result");
         assert_eq!(exec.call.name, "grep");
         assert!(exec.summary.contains("match"));
 
@@ -1324,10 +1420,9 @@ mod tests {
 
     #[test]
     fn test_wasm_agent_creation_and_checkpoint() {
-        let agent = create_agent(
-            r#"{"default_provider": "fusion", "default_model": "fusion-coder"}"#,
-        )
-        .expect("Failed to create agent");
+        let agent =
+            create_agent(r#"{"default_provider": "fusion", "default_model": "fusion-coder"}"#)
+                .expect("Failed to create agent");
 
         assert_eq!(agent.get_active_model(), "fusion-coder");
         assert_eq!(agent.get_provider(), "fusion");
@@ -1351,7 +1446,10 @@ mod tests {
         let mut agent = create_agent("{}").expect("Failed to create agent");
 
         agent.set_session_title("Browser Session");
-        assert_eq!(agent.get_session_title().as_deref(), Some("Browser Session"));
+        assert_eq!(
+            agent.get_session_title().as_deref(),
+            Some("Browser Session")
+        );
 
         agent.set_system_prompt("You are a browser coding assistant.");
         assert_eq!(
@@ -1391,9 +1489,7 @@ mod tests {
         assert!(agent.fs_exists("notes.txt"));
         assert_eq!(agent.fs_read("notes.txt").expect("read"), "alpha beta");
 
-        let edited = agent
-            .fs_edit("notes.txt", "alpha", "gamma")
-            .expect("edit");
+        let edited = agent.fs_edit("notes.txt", "alpha", "gamma").expect("edit");
         assert!(edited.contains("Successfully"));
         assert_eq!(agent.fs_read("notes.txt").expect("read"), "gamma beta");
 
@@ -1421,7 +1517,9 @@ mod tests {
         let mut agent = create_agent("{}").expect("Failed to create agent");
 
         let resp = agent
-            .handle_acp_message(r#"{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":1}}"#)
+            .handle_acp_message(
+                r#"{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":1}}"#,
+            )
             .expect("initialize response");
         let parsed: Value = serde_json::from_str(&resp).expect("parse");
         assert_eq!(parsed["jsonrpc"], "2.0");
@@ -1474,15 +1572,27 @@ mod tests {
         // Capture the current session id via checkpoint JSON
         let cp = agent.checkpoint().expect("checkpoint");
         let cp_val: Value = serde_json::from_str(&cp).expect("parse checkpoint");
-        let session_id = cp_val["session"]["id"].as_str().expect("session id").to_string();
+        let session_id = cp_val["session"]["id"]
+            .as_str()
+            .expect("session id")
+            .to_string();
 
         // session/list includes the active session
         let resp = agent
             .handle_acp_message(r#"{"jsonrpc":"2.0","id":10,"method":"session/list"}"#)
             .expect("list response");
         let parsed: Value = serde_json::from_str(&resp).expect("parse");
-        assert_eq!(parsed["result"]["sessions"].as_array().expect("sessions").len(), 1);
-        assert_eq!(parsed["result"]["sessions"][0]["sessionId"], session_id.as_str());
+        assert_eq!(
+            parsed["result"]["sessions"]
+                .as_array()
+                .expect("sessions")
+                .len(),
+            1
+        );
+        assert_eq!(
+            parsed["result"]["sessions"][0]["sessionId"],
+            session_id.as_str()
+        );
 
         // session/load with matching id
         let load_req = format!(
@@ -1530,20 +1640,33 @@ mod tests {
         // Establish session id
         let cp = agent.checkpoint().expect("checkpoint");
         let cp_val: Value = serde_json::from_str(&cp).expect("parse checkpoint");
-        let session_id = cp_val["session"]["id"].as_str().expect("session id").to_string();
+        let session_id = cp_val["session"]["id"]
+            .as_str()
+            .expect("session id")
+            .to_string();
 
         let prompt_req = format!(
             r#"{{"jsonrpc":"2.0","id":20,"method":"session/prompt","params":{{"sessionId":"{}","prompt":"list files"}}}}"#,
             session_id
         );
-        let resp = agent.handle_acp_message(&prompt_req).expect("prompt response");
+        let resp = agent
+            .handle_acp_message(&prompt_req)
+            .expect("prompt response");
         let parsed: Value = serde_json::from_str(&resp).expect("parse");
 
         assert_eq!(parsed["result"]["stopReason"], "end_turn");
         let content = parsed["result"]["content"].as_array().expect("content");
         assert_eq!(content[0]["type"], "text");
-        assert!(content[0]["text"].as_str().expect("text").contains("README.md"));
-        assert!(parsed["result"]["stats"]["totalTokens"].as_u64().expect("tokens") > 0);
+        assert!(content[0]["text"]
+            .as_str()
+            .expect("text")
+            .contains("README.md"));
+        assert!(
+            parsed["result"]["stats"]["totalTokens"]
+                .as_u64()
+                .expect("tokens")
+                > 0
+        );
         assert_eq!(agent.get_turn_count(), 1);
 
         // Unknown session id -> session_not_found

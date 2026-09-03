@@ -12,7 +12,9 @@ use serde::{Deserialize, Serialize};
 use tokio::sync::broadcast;
 use tokio::sync::mpsc::{UnboundedReceiver, UnboundedSender};
 
-use crate::acp::types::{AgentMessageContent, JsonRpcNotification, SessionUpdate, SessionUpdateParams};
+use crate::acp::types::{
+    AgentMessageContent, JsonRpcNotification, SessionUpdate, SessionUpdateParams,
+};
 use crate::agent::loop_runner::AgentEvent;
 
 fn now_ms() -> u64 {
@@ -442,7 +444,11 @@ impl AcpSessionEvent {
             output: Some(output_str),
             duration_ms: Some(duration_ms),
             success: Some(success),
-            error: if success { None } else { Some("Tool execution failed".to_string()) },
+            error: if success {
+                None
+            } else {
+                Some("Tool execution failed".to_string())
+            },
             timestamp_ms: now_ms(),
         })
     }
@@ -619,7 +625,8 @@ impl AdvisorFeedbackAggregator {
 
     /// Records that an advisor review has initiated.
     pub fn record_started(&mut self, advisor: &str, role: &str) -> AdvisorFeedbackUpdate {
-        self.active_advisors.insert(advisor.to_string(), role.to_string());
+        self.active_advisors
+            .insert(advisor.to_string(), role.to_string());
         AdvisorFeedbackUpdate {
             advisor: advisor.to_string(),
             role: role.to_string(),
@@ -674,10 +681,7 @@ impl AdvisorFeedbackAggregator {
         let mut suggestions = Vec::new();
         for line in critique.lines() {
             let trimmed = line.trim();
-            if trimmed.starts_with("- ")
-                || trimmed.starts_with("* ")
-                || trimmed.starts_with("+ ")
-            {
+            if trimmed.starts_with("- ") || trimmed.starts_with("* ") || trimmed.starts_with("+ ") {
                 let text = trimmed[2..].trim();
                 if !text.is_empty() {
                     suggestions.push(text.to_string());
@@ -745,7 +749,12 @@ impl AdvisorFeedbackAggregator {
         let warning_count = self
             .reviews
             .iter()
-            .filter(|r| matches!(r.severity, AdvisorSeverity::Warning | AdvisorSeverity::Critical))
+            .filter(|r| {
+                matches!(
+                    r.severity,
+                    AdvisorSeverity::Warning | AdvisorSeverity::Critical
+                )
+            })
             .count();
 
         let overall_approved = rejected_count == 0;
@@ -756,7 +765,10 @@ impl AdvisorFeedbackAggregator {
                 "All advisors approved without objections".to_string()
             }
         } else {
-            format!("{}/{} advisors rejected proposed actions", rejected_count, total)
+            format!(
+                "{}/{} advisors rejected proposed actions",
+                rejected_count, total
+            )
         };
 
         Some(AdvisorConsensus {
@@ -990,11 +1002,12 @@ impl AcpEventBridge {
                     id
                 };
 
-                let computed_duration_ms = if let Some((_, start)) = self.active_tools.remove(&call_id) {
-                    start.elapsed().as_millis() as u64
-                } else {
-                    duration.as_millis() as u64
-                };
+                let computed_duration_ms =
+                    if let Some((_, start)) = self.active_tools.remove(&call_id) {
+                        start.elapsed().as_millis() as u64
+                    } else {
+                        duration.as_millis() as u64
+                    };
 
                 let status = if success {
                     format!("Tool `{}` completed in {}ms", name, computed_duration_ms)
@@ -1017,7 +1030,11 @@ impl AcpEventBridge {
                     output: Some(output),
                     duration_ms: Some(computed_duration_ms),
                     success: Some(success),
-                    error: if success { None } else { Some("Tool execution failed".to_string()) },
+                    error: if success {
+                        None
+                    } else {
+                        Some("Tool execution failed".to_string())
+                    },
                     timestamp_ms: now_ms(),
                 };
 
@@ -1061,7 +1078,11 @@ impl AcpEventBridge {
                 events.push(AcpSessionEvent::Subagent(SubagentStatusUpdate {
                     name,
                     task: None,
-                    status: if success { "completed".to_string() } else { "failed".to_string() },
+                    status: if success {
+                        "completed".to_string()
+                    } else {
+                        "failed".to_string()
+                    },
                     output: Some(output),
                     success: Some(success),
                     timestamp_ms: now_ms(),
@@ -1228,10 +1249,7 @@ mod tests {
 
         let json_val = serde_json::to_value(&notif).unwrap();
         assert_eq!(json_val["params"]["sessionId"], "sess-123");
-        assert_eq!(
-            json_val["params"]["update"]["kind"],
-            "agent_message_chunk"
-        );
+        assert_eq!(json_val["params"]["update"]["kind"], "agent_message_chunk");
         assert_eq!(
             json_val["params"]["update"]["content"]["content"][0]["text"],
             "Hello"
@@ -1342,10 +1360,7 @@ mod tests {
                 assert_eq!(adv.role, "Security Auditor");
                 assert!(adv.approved);
                 assert_eq!(adv.suggestions.len(), 2);
-                assert_eq!(
-                    adv.suggestions[0],
-                    "Sanitize environment variables"
-                );
+                assert_eq!(adv.suggestions[0], "Sanitize environment variables");
                 assert_eq!(
                     adv.suggestions[1],
                     "Use read-only filesystem where possible"
@@ -1400,7 +1415,9 @@ mod tests {
         // Stream a turn:
         // 1. Thinking
         event_tx
-            .send(AgentEvent::ThinkingDelta("Let's look into the file.".to_string()))
+            .send(AgentEvent::ThinkingDelta(
+                "Let's look into the file.".to_string(),
+            ))
             .unwrap();
 
         // 2. Token chunks

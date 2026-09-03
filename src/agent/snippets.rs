@@ -133,7 +133,11 @@ impl Snippet {
 
     /// Appends tags to this snippet.
     pub fn with_tags(mut self, tags: &[&str]) -> Self {
-        self.tags = tags.iter().map(|s| s.trim().to_lowercase()).filter(|s| !s.is_empty()).collect();
+        self.tags = tags
+            .iter()
+            .map(|s| s.trim().to_lowercase())
+            .filter(|s| !s.is_empty())
+            .collect();
         self
     }
 
@@ -226,7 +230,9 @@ pub fn is_valid_snippet_name(name: &str) -> bool {
     if trimmed.is_empty() || trimmed.len() > 128 {
         return false;
     }
-    trimmed.chars().all(|c| c.is_alphanumeric() || c == '-' || c == '_' || c == '.')
+    trimmed
+        .chars()
+        .all(|c| c.is_alphanumeric() || c == '-' || c == '_' || c == '.')
 }
 
 /// Sanitizes a snippet name for safe filesystem storage.
@@ -271,14 +277,22 @@ pub fn save_snippet_to(dir: &Path, snippet: &Snippet) -> Result<PathBuf, Snippet
     snippet.validate()?;
     if !dir.exists() {
         fs::create_dir_all(dir).map_err(|e| {
-            SnippetError::Io(format!("Failed to create snippet directory '{}': {}", dir.display(), e))
+            SnippetError::Io(format!(
+                "Failed to create snippet directory '{}': {}",
+                dir.display(),
+                e
+            ))
         })?;
     }
 
     let path = snippet_file_path(dir, &snippet.name);
     let json_data = serde_json::to_string_pretty(snippet)?;
     fs::write(&path, json_data).map_err(|e| {
-        SnippetError::Io(format!("Failed to write snippet file '{}': {}", path.display(), e))
+        SnippetError::Io(format!(
+            "Failed to write snippet file '{}': {}",
+            path.display(),
+            e
+        ))
     })?;
 
     Ok(path)
@@ -297,7 +311,11 @@ pub fn load_snippet_from(dir: &Path, name: &str) -> Result<Snippet, SnippetError
     }
 
     let content = fs::read_to_string(&path).map_err(|e| {
-        SnippetError::Io(format!("Failed to read snippet file '{}': {}", path.display(), e))
+        SnippetError::Io(format!(
+            "Failed to read snippet file '{}': {}",
+            path.display(),
+            e
+        ))
     })?;
 
     let snippet: Snippet = serde_json::from_str(&content)?;
@@ -323,7 +341,11 @@ pub fn delete_snippet_from(dir: &Path, name: &str) -> Result<bool, SnippetError>
     let path = snippet_file_path(dir, name);
     if path.exists() {
         fs::remove_file(&path).map_err(|e| {
-            SnippetError::Io(format!("Failed to delete snippet file '{}': {}", path.display(), e))
+            SnippetError::Io(format!(
+                "Failed to delete snippet file '{}': {}",
+                path.display(),
+                e
+            ))
         })?;
         Ok(true)
     } else {
@@ -344,7 +366,11 @@ pub fn list_snippets_from(dir: &Path) -> Result<Vec<Snippet>, SnippetError> {
 
     let mut snippets = Vec::new();
     let entries = fs::read_dir(dir).map_err(|e| {
-        SnippetError::Io(format!("Failed to read snippet directory '{}': {}", dir.display(), e))
+        SnippetError::Io(format!(
+            "Failed to read snippet directory '{}': {}",
+            dir.display(),
+            e
+        ))
     })?;
 
     for entry_res in entries {
@@ -430,14 +456,22 @@ pub fn export_snippets_json(path: &Path) -> Result<usize, SnippetError> {
     if let Some(parent) = path.parent() {
         if !parent.exists() {
             fs::create_dir_all(parent).map_err(|e| {
-                SnippetError::Io(format!("Failed to create export directory '{}': {}", parent.display(), e))
+                SnippetError::Io(format!(
+                    "Failed to create export directory '{}': {}",
+                    parent.display(),
+                    e
+                ))
             })?;
         }
     }
 
     let data = serde_json::to_string_pretty(&snippets)?;
     fs::write(path, data).map_err(|e| {
-        SnippetError::Io(format!("Failed to write export file '{}': {}", path.display(), e))
+        SnippetError::Io(format!(
+            "Failed to write export file '{}': {}",
+            path.display(),
+            e
+        ))
     })?;
 
     Ok(count)
@@ -446,11 +480,18 @@ pub fn export_snippets_json(path: &Path) -> Result<usize, SnippetError> {
 /// Imports snippets from a JSON file into global storage.
 pub fn import_snippets_json(path: &Path) -> Result<usize, SnippetError> {
     if !path.exists() {
-        return Err(SnippetError::Io(format!("Import file not found: {}", path.display())));
+        return Err(SnippetError::Io(format!(
+            "Import file not found: {}",
+            path.display()
+        )));
     }
 
     let content = fs::read_to_string(path).map_err(|e| {
-        SnippetError::Io(format!("Failed to read import file '{}': {}", path.display(), e))
+        SnippetError::Io(format!(
+            "Failed to read import file '{}': {}",
+            path.display(),
+            e
+        ))
     })?;
 
     let snippets: Vec<Snippet> = serde_json::from_str(&content)?;
@@ -685,14 +726,22 @@ impl SnippetManager {
         if let Some(parent) = path.parent() {
             if !parent.exists() {
                 fs::create_dir_all(parent).map_err(|e| {
-                    SnippetError::Io(format!("Failed to create directory '{}': {}", parent.display(), e))
+                    SnippetError::Io(format!(
+                        "Failed to create directory '{}': {}",
+                        parent.display(),
+                        e
+                    ))
                 })?;
             }
         }
 
         let data = serde_json::to_string_pretty(&snippets)?;
         fs::write(path, data).map_err(|e| {
-            SnippetError::Io(format!("Failed to write export file '{}': {}", path.display(), e))
+            SnippetError::Io(format!(
+                "Failed to write export file '{}': {}",
+                path.display(),
+                e
+            ))
         })?;
 
         Ok(count)
@@ -701,11 +750,18 @@ impl SnippetManager {
     /// Imports snippets from a JSON file into manager storage.
     pub fn import_json(&mut self, path: &Path) -> Result<usize, SnippetError> {
         if !path.exists() {
-            return Err(SnippetError::Io(format!("File not found: {}", path.display())));
+            return Err(SnippetError::Io(format!(
+                "File not found: {}",
+                path.display()
+            )));
         }
 
         let content = fs::read_to_string(path).map_err(|e| {
-            SnippetError::Io(format!("Failed to read import file '{}': {}", path.display(), e))
+            SnippetError::Io(format!(
+                "Failed to read import file '{}': {}",
+                path.display(),
+                e
+            ))
         })?;
 
         let snippets: Vec<Snippet> = serde_json::from_str(&content)?;
@@ -802,7 +858,8 @@ pub fn detect_code_language(code: &str) -> Option<String> {
         || trimmed.contains("std::cout")
         || trimmed.contains("printf(")
     {
-        if trimmed.contains("std::") || trimmed.contains("class ") || trimmed.contains("template<") {
+        if trimmed.contains("std::") || trimmed.contains("class ") || trimmed.contains("template<")
+        {
             return Some("cpp".to_string());
         }
         return Some("c".to_string());
@@ -861,8 +918,14 @@ pub fn extract_code_blocks(text: &str) -> Vec<(Option<String>, String)> {
     let re = Regex::new(r"(?s)```([a-zA-Z0-9_-]*)\r?\n(.*?)\r?\n```").unwrap();
 
     for cap in re.captures_iter(text) {
-        let lang = cap.get(1).map(|m| m.as_str().trim().to_string()).filter(|s| !s.is_empty());
-        let code = cap.get(2).map(|m| m.as_str().to_string()).unwrap_or_default();
+        let lang = cap
+            .get(1)
+            .map(|m| m.as_str().trim().to_string())
+            .filter(|s| !s.is_empty());
+        let code = cap
+            .get(2)
+            .map(|m| m.as_str().to_string())
+            .unwrap_or_default();
         if !code.trim().is_empty() {
             blocks.push((lang, code));
         }
@@ -909,7 +972,11 @@ pub fn format_snippet_table(snippets: &[Snippet]) -> String {
     ));
     out.push_str(&format!(
         "  \x1b[2;37m{:<20} {:<12} {:>8}  {:<16} {}\x1b[0m\n",
-        "--------------------", "------------", "--------", "----------------", "------------------------------"
+        "--------------------",
+        "------------",
+        "--------",
+        "----------------",
+        "------------------------------"
     ));
 
     for s in snippets {
@@ -918,7 +985,12 @@ pub fn format_snippet_table(snippets: &[Snippet]) -> String {
         let updated_short = s.updated_at.split('T').next().unwrap_or(&s.updated_at);
         let mut desc_tags = s.description.clone().unwrap_or_default();
         if !s.tags.is_empty() {
-            let tag_str = s.tags.iter().map(|t| format!("#{}", t)).collect::<Vec<_>>().join(" ");
+            let tag_str = s
+                .tags
+                .iter()
+                .map(|t| format!("#{}", t))
+                .collect::<Vec<_>>()
+                .join(" ");
             if desc_tags.is_empty() {
                 desc_tags = format!("\x1b[2;37m{}\x1b[0m", tag_str);
             } else {
@@ -941,11 +1013,26 @@ pub fn format_snippet_detail(snippet: &Snippet) -> String {
     let mut out = String::new();
     let lang = snippet.detect_or_language();
 
-    out.push_str(&format!("\n\x1b[1;36mSnippet:\x1b[0m \x1b[1;37m{}\x1b[0m\n", snippet.name));
-    out.push_str(&format!("  \x1b[2;37m• Language:\x1b[0m \x1b[1;33m{}\x1b[0m\n", lang));
-    out.push_str(&format!("  \x1b[2;37m• Lines:\x1b[0m    {}\n", snippet.line_count()));
-    out.push_str(&format!("  \x1b[2;37m• Bytes:\x1b[0m    {} B\n", snippet.byte_size()));
-    out.push_str(&format!("  \x1b[2;37m• Updated:\x1b[0m  {}\n", snippet.updated_at));
+    out.push_str(&format!(
+        "\n\x1b[1;36mSnippet:\x1b[0m \x1b[1;37m{}\x1b[0m\n",
+        snippet.name
+    ));
+    out.push_str(&format!(
+        "  \x1b[2;37m• Language:\x1b[0m \x1b[1;33m{}\x1b[0m\n",
+        lang
+    ));
+    out.push_str(&format!(
+        "  \x1b[2;37m• Lines:\x1b[0m    {}\n",
+        snippet.line_count()
+    ));
+    out.push_str(&format!(
+        "  \x1b[2;37m• Bytes:\x1b[0m    {} B\n",
+        snippet.byte_size()
+    ));
+    out.push_str(&format!(
+        "  \x1b[2;37m• Updated:\x1b[0m  {}\n",
+        snippet.updated_at
+    ));
 
     if let Some(desc) = &snippet.description {
         out.push_str(&format!("  \x1b[2;37m• Memo:\x1b[0m     {}\n", desc));
@@ -1108,8 +1195,14 @@ pub fn handle_snippet_command(args: &[String], session: &mut Session) -> String 
             }
             let name = &args[1];
             match delete_snippet(name) {
-                Ok(true) => format!("\x1b[1;32m✓ Deleted snippet:\x1b[0m \x1b[1;37m{}\x1b[0m", name),
-                Ok(false) => format!("\x1b[1;33mSnippet not found:\x1b[0m \x1b[1;37m{}\x1b[0m", name),
+                Ok(true) => format!(
+                    "\x1b[1;32m✓ Deleted snippet:\x1b[0m \x1b[1;37m{}\x1b[0m",
+                    name
+                ),
+                Ok(false) => format!(
+                    "\x1b[1;33mSnippet not found:\x1b[0m \x1b[1;37m{}\x1b[0m",
+                    name
+                ),
                 Err(e) => format!("\x1b[1;31mFailed to delete snippet:\x1b[0m {}", e),
             }
         }
@@ -1123,12 +1216,13 @@ pub fn handle_snippet_command(args: &[String], session: &mut Session) -> String 
                 Err(e) => format!("\x1b[1;31mSearch failed:\x1b[0m {}", e),
             }
         }
-        "clear" => {
-            match clear_snippets() {
-                Ok(count) => format!("\x1b[1;32m✓ Cleared {} snippet(s) from storage.\x1b[0m", count),
-                Err(e) => format!("\x1b[1;31mFailed to clear snippets:\x1b[0m {}", e),
-            }
-        }
+        "clear" => match clear_snippets() {
+            Ok(count) => format!(
+                "\x1b[1;32m✓ Cleared {} snippet(s) from storage.\x1b[0m",
+                count
+            ),
+            Err(e) => format!("\x1b[1;31mFailed to clear snippets:\x1b[0m {}", e),
+        },
         "export" => {
             let export_path = if args.len() > 1 {
                 PathBuf::from(&args[1])
@@ -1186,15 +1280,21 @@ mod tests {
 
     #[test]
     fn test_snippet_creation_and_builder() {
-        let snippet = Snippet::new("auth-fn", "fn authenticate(token: &str) -> bool {\n    !token.is_empty()\n}")
-            .with_description("Simple token validator")
-            .with_language("rust")
-            .with_tags(&["auth", "security"])
-            .with_metadata("author", "fusion");
+        let snippet = Snippet::new(
+            "auth-fn",
+            "fn authenticate(token: &str) -> bool {\n    !token.is_empty()\n}",
+        )
+        .with_description("Simple token validator")
+        .with_language("rust")
+        .with_tags(&["auth", "security"])
+        .with_metadata("author", "fusion");
 
         assert_eq!(snippet.name, "auth-fn");
         assert_eq!(snippet.language.as_deref(), Some("rust"));
-        assert_eq!(snippet.description.as_deref(), Some("Simple token validator"));
+        assert_eq!(
+            snippet.description.as_deref(),
+            Some("Simple token validator")
+        );
         assert_eq!(snippet.tags, vec!["auth", "security"]);
         assert_eq!(snippet.metadata.get("author").unwrap(), "fusion");
         assert_eq!(snippet.line_count(), 3);
@@ -1204,14 +1304,38 @@ mod tests {
 
     #[test]
     fn test_detect_code_language() {
-        assert_eq!(detect_code_language("pub struct User { id: u64 }"), Some("rust".to_string()));
-        assert_eq!(detect_code_language("def calculate_sum(a, b):\n    return a + b"), Some("python".to_string()));
-        assert_eq!(detect_code_language("const greet = (name: string): void => console.log(name);"), Some("typescript".to_string()));
-        assert_eq!(detect_code_language("func main() {\n    fmt.Println(\"Hello\")\n}"), Some("go".to_string()));
-        assert_eq!(detect_code_language("#include <iostream>\nint main() { return 0; }"), Some("cpp".to_string()));
-        assert_eq!(detect_code_language("SELECT * FROM users WHERE active = 1;"), Some("sql".to_string()));
-        assert_eq!(detect_code_language("{\"key\": \"value\", \"count\": 42}"), Some("json".to_string()));
-        assert_eq!(detect_code_language("#!/bin/bash\necho 'hello world'"), Some("bash".to_string()));
+        assert_eq!(
+            detect_code_language("pub struct User { id: u64 }"),
+            Some("rust".to_string())
+        );
+        assert_eq!(
+            detect_code_language("def calculate_sum(a, b):\n    return a + b"),
+            Some("python".to_string())
+        );
+        assert_eq!(
+            detect_code_language("const greet = (name: string): void => console.log(name);"),
+            Some("typescript".to_string())
+        );
+        assert_eq!(
+            detect_code_language("func main() {\n    fmt.Println(\"Hello\")\n}"),
+            Some("go".to_string())
+        );
+        assert_eq!(
+            detect_code_language("#include <iostream>\nint main() { return 0; }"),
+            Some("cpp".to_string())
+        );
+        assert_eq!(
+            detect_code_language("SELECT * FROM users WHERE active = 1;"),
+            Some("sql".to_string())
+        );
+        assert_eq!(
+            detect_code_language("{\"key\": \"value\", \"count\": 42}"),
+            Some("json".to_string())
+        );
+        assert_eq!(
+            detect_code_language("#!/bin/bash\necho 'hello world'"),
+            Some("bash".to_string())
+        );
     }
 
     #[test]
@@ -1256,7 +1380,8 @@ def add(x, y):
         let temp = tempdir().unwrap();
         let dir = temp.path().to_path_buf();
 
-        let s1 = Snippet::new("quick-sort", "fn quick_sort(arr: &mut [i32]) {}").with_language("rust");
+        let s1 =
+            Snippet::new("quick-sort", "fn quick_sort(arr: &mut [i32]) {}").with_language("rust");
         let path = save_snippet_to(&dir, &s1).expect("save snippet");
         assert!(path.exists());
 
@@ -1282,9 +1407,12 @@ def add(x, y):
         assert!(mgr.is_empty());
         assert_eq!(mgr.len(), 0);
 
-        let s1 = Snippet::new("fib", "def fib(n):\n    return n if n <= 1 else fib(n-1) + fib(n-2)")
-            .with_description("Recursive fibonacci")
-            .with_tags(&["math", "recursion"]);
+        let s1 = Snippet::new(
+            "fib",
+            "def fib(n):\n    return n if n <= 1 else fib(n-1) + fib(n-2)",
+        )
+        .with_description("Recursive fibonacci")
+        .with_tags(&["math", "recursion"]);
         let s2 = Snippet::new("merge-sort", "fn merge_sort(slice: &mut [i32]) {}")
             .with_tags(&["algorithm", "sorting"]);
 
@@ -1335,12 +1463,17 @@ def add(x, y):
         let temp = tempdir().unwrap();
         let mut mgr = SnippetManager::with_dir(temp.path().to_path_buf());
 
-        let snippet = Snippet::new("tokio-server", "async fn run_server() -> Result<(), Box<dyn Error>> {\n    Ok(())\n}")
-            .with_language("rust");
+        let snippet = Snippet::new(
+            "tokio-server",
+            "async fn run_server() -> Result<(), Box<dyn Error>> {\n    Ok(())\n}",
+        )
+        .with_language("rust");
         mgr.save(snippet).unwrap();
 
         let mut session = Session::new("gpt-4o");
-        let formatted = mgr.insert("tokio-server", &mut session).expect("insert snippet");
+        let formatted = mgr
+            .insert("tokio-server", &mut session)
+            .expect("insert snippet");
 
         assert!(formatted.contains("tokio-server"));
         assert!(formatted.contains("async fn run_server"));
@@ -1355,7 +1488,9 @@ def add(x, y):
         let _ = fs::create_dir_all(temp.path());
 
         let mut session = Session::new("gpt-4o");
-        session.add_assistant_message("Here is the code:\n```rust\nfn test_helper() -> i32 { 42 }\n```");
+        session.add_assistant_message(
+            "Here is the code:\n```rust\nfn test_helper() -> i32 { 42 }\n```",
+        );
 
         // 1. Save with auto-extracted code
         let save_args = vec!["save".to_string(), "test-snippet".to_string()];
@@ -1376,7 +1511,10 @@ def add(x, y):
         let insert_args = vec!["insert".to_string(), "test-snippet".to_string()];
         let insert_res = handle_snippet_command(&insert_args, &mut session);
         assert!(insert_res.contains("Injected snippet"));
-        assert!(session.messages().iter().any(|m| m.content.contains("test-snippet")));
+        assert!(session
+            .messages()
+            .iter()
+            .any(|m| m.content.contains("test-snippet")));
 
         // 5. Search
         let search_args = vec!["search".to_string(), "helper".to_string()];

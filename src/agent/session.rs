@@ -255,7 +255,10 @@ impl Session {
     }
 
     /// Estimates the monetary cost (USD) of the tokens consumed in this session so far.
-    pub fn estimate_cost(&self, default_provider: Option<&str>) -> crate::agent::cost::CostBreakdown {
+    pub fn estimate_cost(
+        &self,
+        default_provider: Option<&str>,
+    ) -> crate::agent::cost::CostBreakdown {
         crate::agent::cost::estimate_session_cost(self, default_provider)
     }
 
@@ -332,7 +335,11 @@ impl Session {
     }
 
     /// Adds an assistant message containing tool calls.
-    pub fn add_assistant_with_tools(&mut self, content: impl Into<String>, tool_calls: Vec<ToolCall>) {
+    pub fn add_assistant_with_tools(
+        &mut self,
+        content: impl Into<String>,
+        tool_calls: Vec<ToolCall>,
+    ) {
         self.add_message(Message::assistant_with_tools(content, tool_calls));
     }
 
@@ -372,7 +379,10 @@ impl Session {
 
     /// Returns `true` if the session's messages exceed the context budget
     /// (by default 80% of the active model's context window limit).
-    pub fn needs_compaction(&self, compactor: Option<&crate::agent::compaction::Compactor>) -> bool {
+    pub fn needs_compaction(
+        &self,
+        compactor: Option<&crate::agent::compaction::Compactor>,
+    ) -> bool {
         if let Some(c) = compactor {
             c.needs_compaction(&self.messages, &self.active_model)
         } else {
@@ -383,7 +393,10 @@ impl Session {
 
     /// Intelligently compacts the conversation history in-place using the specified
     /// or default Compactor.
-    pub fn compact(&mut self, compactor: &crate::agent::compaction::Compactor) -> crate::agent::compaction::CompactionResult {
+    pub fn compact(
+        &mut self,
+        compactor: &crate::agent::compaction::Compactor,
+    ) -> crate::agent::compaction::CompactionResult {
         let res = compactor.compact_session(self);
         if res.compacted {
             self.touch();
@@ -597,7 +610,10 @@ impl Session {
         md.push_str(&format!("- **Model:** `{}`\n", self.active_model));
         md.push_str(&format!("- **Created:** {}\n", self.created_at));
         md.push_str(&format!("- **Updated:** {}\n", self.updated_at));
-        md.push_str(&format!("- **Tokens:** {}\n\n", self.token_stats.format_summary()));
+        md.push_str(&format!(
+            "- **Tokens:** {}\n\n",
+            self.token_stats.format_summary()
+        ));
         md.push_str("---\n\n");
 
         for msg in &self.messages {
@@ -618,7 +634,10 @@ impl Session {
                     md.push_str("\n\n");
                     if let Some(calls) = &msg.tool_calls {
                         for call in calls {
-                            md.push_str(&format!("> 🛠️ **Tool Call:** `{}` (`{}`)\n", call.name, call.id));
+                            md.push_str(&format!(
+                                "> 🛠️ **Tool Call:** `{}` (`{}`)\n",
+                                call.name, call.id
+                            ));
                             md.push_str("```json\n");
                             md.push_str(&call.arguments);
                             md.push_str("\n```\n\n");
@@ -785,7 +804,8 @@ mod tests {
         session.set_title("Rust Architecture Discussion");
         session.set_metadata("provider", "deepseek");
         session.add_user_message("How do we structure subagents in Rust?");
-        session.add_assistant_message("By using decoupled asynchronous runners and message passing.");
+        session
+            .add_assistant_message("By using decoupled asynchronous runners and message passing.");
         session.record_usage(250, 100);
 
         let file_path = temp_dir.join(format!("{}.json", id));
@@ -809,7 +829,6 @@ mod tests {
         assert!(md.contains("### 👤 User"));
         assert!(md.contains("### 🤖 Assistant"));
         assert!(md.contains("deepseek-chat"));
-
 
         // HTML export test
         let html = loaded.export_html();

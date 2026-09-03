@@ -89,11 +89,8 @@ pub const BANNER_ART_STANDARD: &[&str] = &[
 ];
 
 /// Compact 3-line unicode box art for mobile / Termux / narrow terminals.
-pub const BANNER_ART_COMPACT: &[&str] = &[
-    "┌─┐┬ ┬┌─┐┬┌─┐┌┐┌",
-    "├┤ │ │└─┐││ ││││",
-    "└  └─┘└─┘┴└─┘┘└┘",
-];
+pub const BANNER_ART_COMPACT: &[&str] =
+    &["┌─┐┬ ┬┌─┐┬┌─┐┌┐┌", "├┤ │ │└─┐││ ││││", "└  └─┘└─┘┴└─┘┘└┘"];
 
 /// Subtitle text for Fusion Code AI.
 pub const DEFAULT_SUBTITLE: &str = "PURE-RUST AI CODING ASSISTANT";
@@ -274,14 +271,14 @@ impl GradientPreset {
                 (1.0, (189, 147, 249)), // Purple #bd93f9
             ],
             Self::CyberNeon => &[
-                (0.0, (0, 255, 159)),   // Emerald #00ff9f
-                (0.5, (0, 184, 255)),   // Cyan #00b8ff
-                (1.0, (214, 0, 255)),   // Purple #d600ff
+                (0.0, (0, 255, 159)), // Emerald #00ff9f
+                (0.5, (0, 184, 255)), // Cyan #00b8ff
+                (1.0, (214, 0, 255)), // Purple #d600ff
             ],
             Self::Sunset => &[
-                (0.0, (255, 122, 89)),  // Coral #ff7a59
-                (0.5, (255, 78, 80)),   // Rose #ff4e50
-                (1.0, (249, 212, 35)),  // Amber #f9d423
+                (0.0, (255, 122, 89)), // Coral #ff7a59
+                (0.5, (255, 78, 80)),  // Rose #ff4e50
+                (1.0, (249, 212, 35)), // Amber #f9d423
             ],
             Self::Emerald => &[
                 (0.0, (26, 188, 156)),  // Teal #1abc9c
@@ -778,7 +775,12 @@ pub fn apply_diagonal_gradient(lines: &[&str], stops: &[(f32, (u8, u8, u8))]) ->
     }
 
     let num_rows = lines.len();
-    let max_cols = lines.iter().map(|l| l.chars().count()).max().unwrap_or(1).max(1);
+    let max_cols = lines
+        .iter()
+        .map(|l| l.chars().count())
+        .max()
+        .unwrap_or(1)
+        .max(1);
 
     lines
         .iter()
@@ -832,12 +834,23 @@ pub fn render_banner(info: &BannerInfo, config: &BannerConfig) -> String {
             render_oneline_header(&mut out, info, config, &pad_str, color_cap);
         }
         _ => {
-            render_art_logo(&mut out, info, config, resolved_style, &pad_str, color_cap, term_width);
+            render_art_logo(
+                &mut out,
+                info,
+                config,
+                resolved_style,
+                &pad_str,
+                color_cap,
+                term_width,
+            );
         }
     }
 
     // 2. Render Subtitle & Tagline
-    if config.show_tagline && resolved_style != BannerStyle::OneLine && resolved_style != BannerStyle::Minimal {
+    if config.show_tagline
+        && resolved_style != BannerStyle::OneLine
+        && resolved_style != BannerStyle::Minimal
+    {
         render_tagline(&mut out, info, config, &pad_str, color_cap);
     }
 
@@ -847,7 +860,10 @@ pub fn render_banner(info: &BannerInfo, config: &BannerConfig) -> String {
     }
 
     // 4. Render System & Workspace Info (Git Branch, Dir)
-    if config.show_system_info && resolved_style != BannerStyle::OneLine && resolved_style != BannerStyle::Minimal {
+    if config.show_system_info
+        && resolved_style != BannerStyle::OneLine
+        && resolved_style != BannerStyle::Minimal
+    {
         render_system_info_block(&mut out, info, config, &pad_str, color_cap, term_width);
     }
 
@@ -897,7 +913,11 @@ fn render_art_logo(
     } else if color_cap.has_color() {
         // ANSI 16 or 256 colors: vibrant cyan/magenta
         for (i, line) in art_lines.iter().enumerate() {
-            let color_code = if i % 2 == 0 { "\x1b[1;36m" } else { "\x1b[1;35m" };
+            let color_code = if i % 2 == 0 {
+                "\x1b[1;36m"
+            } else {
+                "\x1b[1;35m"
+            };
             let _ = writeln!(out, "{}{}{}\x1b[0m", center_pad, color_code, line);
         }
     } else {
@@ -916,10 +936,7 @@ fn render_tagline(
     pad: &str,
     color_cap: ColorCapability,
 ) {
-    let tagline = info
-        .custom_tagline
-        .as_deref()
-        .unwrap_or(DEFAULT_SUBTITLE);
+    let tagline = info.custom_tagline.as_deref().unwrap_or(DEFAULT_SUBTITLE);
 
     if color_cap.has_color() {
         let _ = writeln!(
@@ -1033,7 +1050,10 @@ fn render_system_info_block(
     let mut parts = Vec::new();
     if let Some(branch) = &info.git_branch {
         if color_cap.has_color() {
-            parts.push(format!("\x1b[2;37mBranch:\x1b[0m \x1b[1;35m⎇ {}\x1b[0m", branch));
+            parts.push(format!(
+                "\x1b[2;37mBranch:\x1b[0m \x1b[1;35m⎇ {}\x1b[0m",
+                branch
+            ));
         } else {
             parts.push(format!("Branch: {}", branch));
         }
@@ -1046,7 +1066,10 @@ fn render_system_info_block(
             .unwrap_or_else(|| dir.to_str().unwrap_or("."));
 
         if color_cap.has_color() {
-            parts.push(format!("\x1b[2;37mWorkspace:\x1b[0m \x1b[1;34m📁 {}\x1b[0m", dir_str));
+            parts.push(format!(
+                "\x1b[2;37mWorkspace:\x1b[0m \x1b[1;34m📁 {}\x1b[0m",
+                dir_str
+            ));
         } else {
             parts.push(format!("Workspace: {}", dir_str));
         }
@@ -1054,7 +1077,10 @@ fn render_system_info_block(
 
     for (label, value) in &info.custom_badges {
         if color_cap.has_color() {
-            parts.push(format!("\x1b[2;37m{}:\x1b[0m \x1b[1;36m{}\x1b[0m", label, value));
+            parts.push(format!(
+                "\x1b[2;37m{}:\x1b[0m \x1b[1;36m{}\x1b[0m",
+                label, value
+            ));
         } else {
             parts.push(format!("{}: {}", label, value));
         }
@@ -1080,11 +1106,7 @@ fn render_tips_block(
         .unwrap_or("Type prompt, /help for commands, /model to switch, or Ctrl+D to quit.");
 
     if color_cap.has_color() {
-        let _ = writeln!(
-            out,
-            "{}\x1b[2;37mTip:\x1b[0m \x1b[36m{}\x1b[0m",
-            pad, tip
-        );
+        let _ = writeln!(out, "{}\x1b[2;37mTip:\x1b[0m \x1b[36m{}\x1b[0m", pad, tip);
     } else {
         let _ = writeln!(out, "{}Tip: {}", pad, tip);
     }
@@ -1284,7 +1306,11 @@ impl<'a> Widget for BannerWidget<'a> {
         let art_lines = resolved_style.lines();
         if !art_lines.is_empty() && current_y < area.bottom() {
             let stops = self.config.gradient.stops();
-            let max_cols = art_lines.iter().map(|l| l.chars().count()).max().unwrap_or(1);
+            let max_cols = art_lines
+                .iter()
+                .map(|l| l.chars().count())
+                .max()
+                .unwrap_or(1);
             let num_rows = art_lines.len();
 
             for (row_idx, line) in art_lines.iter().enumerate() {
@@ -1334,7 +1360,12 @@ impl<'a> Widget for BannerWidget<'a> {
                 area.x + self.config.left_margin as u16
             };
 
-            buf.set_string(x_start, current_y, &text, Style::default().fg(theme.primary));
+            buf.set_string(
+                x_start,
+                current_y,
+                &text,
+                Style::default().fg(theme.primary),
+            );
             current_y += 1;
         }
 
@@ -1348,7 +1379,12 @@ impl<'a> Widget for BannerWidget<'a> {
             );
 
             let x_start = area.x + self.config.left_margin as u16;
-            buf.set_string(x_start, current_y, &meta_text, Style::default().fg(theme.muted));
+            buf.set_string(
+                x_start,
+                current_y,
+                &meta_text,
+                Style::default().fg(theme.muted),
+            );
             current_y += 1;
         }
 
@@ -1362,7 +1398,12 @@ impl<'a> Widget for BannerWidget<'a> {
 
             let tip_text = format!("Tip: {}", tip);
             let x_start = area.x + self.config.left_margin as u16;
-            buf.set_string(x_start, current_y, &tip_text, Style::default().fg(theme.accent));
+            buf.set_string(
+                x_start,
+                current_y,
+                &tip_text,
+                Style::default().fg(theme.accent),
+            );
         }
     }
 }
@@ -1484,10 +1525,22 @@ mod tests {
     fn test_banner_style_resolution_for_width() {
         assert_eq!(BannerStyle::Auto.resolve_for_width(100), BannerStyle::Cyber);
         assert_eq!(BannerStyle::Auto.resolve_for_width(65), BannerStyle::Sleek);
-        assert_eq!(BannerStyle::Auto.resolve_for_width(50), BannerStyle::Standard);
-        assert_eq!(BannerStyle::Auto.resolve_for_width(35), BannerStyle::Compact);
-        assert_eq!(BannerStyle::Auto.resolve_for_width(25), BannerStyle::Minimal);
-        assert_eq!(BannerStyle::Auto.resolve_for_width(15), BannerStyle::OneLine);
+        assert_eq!(
+            BannerStyle::Auto.resolve_for_width(50),
+            BannerStyle::Standard
+        );
+        assert_eq!(
+            BannerStyle::Auto.resolve_for_width(35),
+            BannerStyle::Compact
+        );
+        assert_eq!(
+            BannerStyle::Auto.resolve_for_width(25),
+            BannerStyle::Minimal
+        );
+        assert_eq!(
+            BannerStyle::Auto.resolve_for_width(15),
+            BannerStyle::OneLine
+        );
 
         // Fixed styles should not change
         assert_eq!(BannerStyle::Sleek.resolve_for_width(20), BannerStyle::Sleek);
@@ -1575,7 +1628,11 @@ mod tests {
                 .build();
 
             let rendered = render_banner(&info, &config);
-            assert!(rendered.contains("Fusion") || rendered.contains("Provider:") || rendered.contains("DeepSeek"));
+            assert!(
+                rendered.contains("Fusion")
+                    || rendered.contains("Provider:")
+                    || rendered.contains("DeepSeek")
+            );
         }
     }
 

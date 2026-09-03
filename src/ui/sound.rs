@@ -4,9 +4,9 @@
 //! events such as turn completion or errors. These cues can be globally or
 //! granularly enabled/disabled via configuration, environment variables, or REPL commands.
 
+use serde::{Deserialize, Serialize};
 use std::fmt;
 use std::io::{stderr, IsTerminal, Write};
-use serde::{Deserialize, Serialize};
 
 /// Standard ASCII bell control character (`BEL`, `\x07`).
 pub const TERMINAL_BELL: &str = "\x07";
@@ -107,13 +107,22 @@ impl SoundConfig {
         let mut enabled = false;
 
         // Check master sound / bell env vars
-        for var in &["FUSION_SOUND", "FUSION_BELL", "FUSION_AUDIO_CUES", "SOUND_ENABLED"] {
+        for var in &[
+            "FUSION_SOUND",
+            "FUSION_BELL",
+            "FUSION_AUDIO_CUES",
+            "SOUND_ENABLED",
+        ] {
             if let Ok(val) = std::env::var(var) {
                 let trimmed = val.trim().to_lowercase();
                 if trimmed == "1" || trimmed == "true" || trimmed == "on" || trimmed == "yes" {
                     enabled = true;
                     break;
-                } else if trimmed == "0" || trimmed == "false" || trimmed == "off" || trimmed == "no" {
+                } else if trimmed == "0"
+                    || trimmed == "false"
+                    || trimmed == "off"
+                    || trimmed == "no"
+                {
                     enabled = false;
                     break;
                 }

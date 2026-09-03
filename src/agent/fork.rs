@@ -232,10 +232,9 @@ pub fn rewind_session_in_place(session: &mut Session, turns_to_rewind: usize) ->
     // Record rewind in session metadata
     let now = Utc::now().to_rfc3339();
     session.metadata.insert("last_rewound_at".to_string(), now);
-    session.metadata.insert(
-        "last_rewound_turns".to_string(),
-        turns_reverted.to_string(),
-    );
+    session
+        .metadata
+        .insert("last_rewound_turns".to_string(), turns_reverted.to_string());
     session.touch();
 
     turns_reverted
@@ -343,7 +342,10 @@ pub fn fork_session(session_id: Uuid, at_turn: Option<usize>) -> anyhow::Result<
 }
 
 /// Forks a session identified by UUID string or prefix.
-pub fn fork_session_from_str(id_or_prefix: &str, at_turn: Option<usize>) -> anyhow::Result<Session> {
+pub fn fork_session_from_str(
+    id_or_prefix: &str,
+    at_turn: Option<usize>,
+) -> anyhow::Result<Session> {
     let original = Session::load_from_str(id_or_prefix)?;
     let forked = fork_session_in_memory(&original, at_turn);
     forked.save()?;
@@ -508,14 +510,8 @@ pub fn preview_branch_tree(session_id: Uuid) -> anyhow::Result<String> {
                 let child_prefix = if is_last { "    " } else { "│   " };
 
                 let child_sess = Session::load(child.id).ok();
-                let turns = child_sess
-                    .as_ref()
-                    .map(|s| count_turns(s))
-                    .unwrap_or(0);
-                let title = child
-                    .title
-                    .as_deref()
-                    .unwrap_or("Untitled Branch");
+                let turns = child_sess.as_ref().map(|s| count_turns(s)).unwrap_or(0);
+                let title = child.title.as_deref().unwrap_or("Untitled Branch");
                 let is_active = if child.id == active_id { " [*]" } else { "" };
 
                 output.push_str(&format!(

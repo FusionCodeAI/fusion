@@ -305,10 +305,9 @@ impl FileState {
             (FileState::Absent, Ok(FileState::Absent)) => true,
             (FileState::Directory, Ok(FileState::Directory)) => true,
             (FileState::Symlink { target: t1 }, Ok(FileState::Symlink { target: t2 })) => *t1 == t2,
-            (
-                FileState::Present { hash: h1, .. },
-                Ok(FileState::Present { hash: h2, .. }),
-            ) => h1 == &h2,
+            (FileState::Present { hash: h1, .. }, Ok(FileState::Present { hash: h2, .. })) => {
+                h1 == &h2
+            }
             _ => false,
         }
     }
@@ -356,10 +355,7 @@ impl FileChangeType {
         match (before, after) {
             (FileState::Absent, FileState::Present { .. }) => FileChangeType::Created,
             (FileState::Present { .. }, FileState::Absent) => FileChangeType::Deleted,
-            (
-                FileState::Present { hash: h1, .. },
-                FileState::Present { hash: h2, .. },
-            ) => {
+            (FileState::Present { hash: h1, .. }, FileState::Present { hash: h2, .. }) => {
                 if h1 == h2 {
                     FileChangeType::Unchanged
                 } else {
@@ -460,7 +456,11 @@ impl DiffStats {
             self.insertions,
             self.deletions,
             self.files_changed,
-            if self.files_changed == 1 { "file" } else { "files" }
+            if self.files_changed == 1 {
+                "file"
+            } else {
+                "files"
+            }
         )
     }
 
@@ -555,7 +555,11 @@ pub struct FileSnapshot {
 
 impl FileSnapshot {
     /// Creates a new `FileSnapshot` capturing the current state before tool execution.
-    pub fn capture_before(path: PathBuf, original_path: String, cwd: &Path) -> std::io::Result<Self> {
+    pub fn capture_before(
+        path: PathBuf,
+        original_path: String,
+        cwd: &Path,
+    ) -> std::io::Result<Self> {
         let full_path = resolve_target_path(&original_path, cwd);
         let state_before = FileState::from_path(&full_path)?;
         Ok(Self {
@@ -709,7 +713,10 @@ impl FileSnapshot {
             return None;
         };
 
-        if before_text == after_text && self.state_before.is_present() == (self.state_after.as_ref().map_or(false, |s| s.is_present())) {
+        if before_text == after_text
+            && self.state_before.is_present()
+                == (self.state_after.as_ref().map_or(false, |s| s.is_present()))
+        {
             return None;
         }
 
@@ -1084,7 +1091,11 @@ impl Checkpoint {
                 .values_mut()
                 .find(|s| s.original_path == path.to_string_lossy())
                 .ok_or_else(|| {
-                    anyhow::anyhow!("File '{}' not found in checkpoint '{}'", path.display(), self.id)
+                    anyhow::anyhow!(
+                        "File '{}' not found in checkpoint '{}'",
+                        path.display(),
+                        self.id
+                    )
                 })?,
         };
 
@@ -1123,12 +1134,14 @@ impl Checkpoint {
                 Ok(FileActionTaken::RecreatedDir) => {
                     result.recreated_files.push(snapshot.path.clone());
                 }
-                Ok(FileActionTaken::Unchanged | FileActionTaken::Skipped | FileActionTaken::ConflictRefused) => {}
+                Ok(
+                    FileActionTaken::Unchanged
+                    | FileActionTaken::Skipped
+                    | FileActionTaken::ConflictRefused,
+                ) => {}
                 Err(e) => {
                     result.success = false;
-                    result
-                        .errors
-                        .push((snapshot.path.clone(), e.to_string()));
+                    result.errors.push((snapshot.path.clone(), e.to_string()));
                 }
             }
         }
@@ -1166,7 +1179,10 @@ impl Checkpoint {
                 .unwrap_or_default();
             let stats = snapshot.diff_stats(cwd);
             let is_binary = snapshot.state_before.is_binary()
-                || snapshot.state_after.as_ref().map_or(false, |s| s.is_binary());
+                || snapshot
+                    .state_after
+                    .as_ref()
+                    .map_or(false, |s| s.is_binary());
 
             diffs.push(FileDiff {
                 path: snapshot.path.clone(),
@@ -1202,7 +1218,11 @@ impl Checkpoint {
 
     /// Computes approximate in-memory byte size of this checkpoint.
     pub fn memory_size(&self) -> usize {
-        self.snapshots.values().map(|s| s.memory_size()).sum::<usize>() + 512
+        self.snapshots
+            .values()
+            .map(|s| s.memory_size())
+            .sum::<usize>()
+            + 512
     }
 }
 
@@ -1290,7 +1310,10 @@ impl UndoResult {
             parts.push(format!("{} deleted", self.deleted_files.len()));
         }
         if !self.recreated_dirs.is_empty() {
-            parts.push(format!("{} directories recreated", self.recreated_dirs.len()));
+            parts.push(format!(
+                "{} directories recreated",
+                self.recreated_dirs.len()
+            ));
         }
         if parts.is_empty() {
             if !self.unchanged_files.is_empty() {
@@ -1365,11 +1388,7 @@ pub struct SurgicalRevertResult {
 // ---------------------------------------------------------------------------
 
 /// Intelligently extracts file paths targeted by a tool invocation from its name and JSON arguments.
-pub fn extract_target_paths(
-    tool_name: &str,
-    args: &serde_json::Value,
-    cwd: &Path,
-) -> Vec<PathBuf> {
+pub fn extract_target_paths(tool_name: &str, args: &serde_json::Value, cwd: &Path) -> Vec<PathBuf> {
     let mut paths = Vec::new();
 
     let clean_name = tool_name.to_lowercase();
@@ -1689,11 +1708,7 @@ impl CheckpointManager {
     }
 
     /// Captures the post-execution state of all files in the active checkpoint.
-    pub fn capture_after_tool(
-        &mut self,
-        checkpoint_id: &str,
-        cwd: &Path,
-    ) -> anyhow::Result<()> {
+    pub fn capture_after_tool(&mut self, checkpoint_id: &str, cwd: &Path) -> anyhow::Result<()> {
         if let Some(checkpoint) = self.undo_stack.iter_mut().find(|c| c.id == checkpoint_id) {
             for snapshot in checkpoint.snapshots.values_mut() {
                 let _ = snapshot.capture_after(cwd);
@@ -1813,8 +1828,11 @@ impl CheckpointManager {
         cwd: &Path,
     ) -> anyhow::Result<String> {
         self.counter += 1;
-        let checkpoint_id =
-            format!("chk_manual_{}_{}", self.counter, Utc::now().timestamp_millis());
+        let checkpoint_id = format!(
+            "chk_manual_{}_{}",
+            self.counter,
+            Utc::now().timestamp_millis()
+        );
 
         let mut checkpoint = Checkpoint::new(&checkpoint_id, "manual", description);
 
@@ -1893,7 +1911,9 @@ impl CheckpointManager {
             .undo_stack
             .iter()
             .rposition(|c| c.id == checkpoint_id)
-            .ok_or_else(|| anyhow::anyhow!("Checkpoint '{}' not found on undo stack", checkpoint_id))?;
+            .ok_or_else(|| {
+                anyhow::anyhow!("Checkpoint '{}' not found on undo stack", checkpoint_id)
+            })?;
 
         let count = self.undo_stack.len() - idx;
         self.undo_n(count, cwd)
@@ -1935,7 +1955,9 @@ impl CheckpointManager {
             .redo_stack
             .iter()
             .rposition(|c| c.id == checkpoint_id)
-            .ok_or_else(|| anyhow::anyhow!("Checkpoint '{}' not found on redo stack", checkpoint_id))?;
+            .ok_or_else(|| {
+                anyhow::anyhow!("Checkpoint '{}' not found on redo stack", checkpoint_id)
+            })?;
 
         let count = self.redo_stack.len() - idx;
         self.redo_n(count, cwd)
@@ -1960,15 +1982,13 @@ impl CheckpointManager {
             .find(|c| c.id == checkpoint_id)
             .ok_or_else(|| anyhow::anyhow!("Checkpoint '{}' not found", checkpoint_id))?;
 
-        let snapshot = checkpoint
-            .get_snapshot(file_path)
-            .ok_or_else(|| {
-                anyhow::anyhow!(
-                    "File '{}' not found in checkpoint '{}'",
-                    file_path.display(),
-                    checkpoint_id
-                )
-            })?;
+        let snapshot = checkpoint.get_snapshot(file_path).ok_or_else(|| {
+            anyhow::anyhow!(
+                "File '{}' not found in checkpoint '{}'",
+                file_path.display(),
+                checkpoint_id
+            )
+        })?;
 
         let diff_text = snapshot.unified_diff(Some(cwd), self.diff_context_radius);
         let path_buf = snapshot.path.clone();
@@ -2006,15 +2026,13 @@ impl CheckpointManager {
             .get_checkpoint(checkpoint_id)
             .ok_or_else(|| anyhow::anyhow!("Checkpoint '{}' not found", checkpoint_id))?;
 
-        let snapshot = checkpoint
-            .get_snapshot(file_path)
-            .ok_or_else(|| {
-                anyhow::anyhow!(
-                    "File '{}' not found in checkpoint '{}'",
-                    file_path.display(),
-                    checkpoint_id
-                )
-            })?;
+        let snapshot = checkpoint.get_snapshot(file_path).ok_or_else(|| {
+            anyhow::anyhow!(
+                "File '{}' not found in checkpoint '{}'",
+                file_path.display(),
+                checkpoint_id
+            )
+        })?;
 
         Ok(snapshot.check_revert_safety(cwd))
     }
@@ -2079,15 +2097,13 @@ impl CheckpointManager {
             .get_checkpoint(id)
             .ok_or_else(|| anyhow::anyhow!("Checkpoint '{}' not found", id))?;
 
-        let snapshot = checkpoint
-            .get_snapshot(file_path)
-            .ok_or_else(|| {
-                anyhow::anyhow!(
-                    "File '{}' not found in checkpoint '{}'",
-                    file_path.display(),
-                    id
-                )
-            })?;
+        let snapshot = checkpoint.get_snapshot(file_path).ok_or_else(|| {
+            anyhow::anyhow!(
+                "File '{}' not found in checkpoint '{}'",
+                file_path.display(),
+                id
+            )
+        })?;
 
         let change_type = snapshot.change_type(Some(cwd));
         let unified = snapshot.unified_diff(Some(cwd), self.diff_context_radius);
@@ -2098,7 +2114,10 @@ impl CheckpointManager {
             .unwrap_or_default();
         let stats = snapshot.diff_stats(Some(cwd));
         let is_binary = snapshot.state_before.is_binary()
-            || snapshot.state_after.as_ref().map_or(false, |s| s.is_binary());
+            || snapshot
+                .state_after
+                .as_ref()
+                .map_or(false, |s| s.is_binary());
 
         Ok(FileDiff {
             path: snapshot.path.clone(),
@@ -2713,7 +2732,8 @@ mod tests {
         assert_eq!(paths, vec![cwd.join("src/main.rs")]);
 
         // edit tool
-        let args = serde_json::json!({ "file_path": "lib/utils.rs", "old_text": "a", "new_text": "b" });
+        let args =
+            serde_json::json!({ "file_path": "lib/utils.rs", "old_text": "a", "new_text": "b" });
         let paths = extract_target_paths("edit", &args, &cwd);
         assert_eq!(paths, vec![cwd.join("lib/utils.rs")]);
 
@@ -2997,8 +3017,12 @@ mod tests {
 
         let mut mgr = CheckpointManager::new(dir.clone());
 
-        let args = serde_json::json!({ "path": "diff_test.rs", "old_text": "old", "new_text": "new" });
-        let id = mgr.capture_before_tool("edit", &args, &dir).unwrap().unwrap();
+        let args =
+            serde_json::json!({ "path": "diff_test.rs", "old_text": "old", "new_text": "new" });
+        let id = mgr
+            .capture_before_tool("edit", &args, &dir)
+            .unwrap()
+            .unwrap();
 
         fs::write(&file_path, "fn hello() {\n    println!(\"new\");\n}\n").unwrap();
         mgr.capture_after_tool(&id, &dir).unwrap();
@@ -3072,7 +3096,10 @@ mod tests {
 
         for i in 1..=5 {
             let args = serde_json::json!({ "path": "bounded.txt", "content": format!("v{}", i) });
-            let id = mgr.capture_before_tool("write", &args, &dir).unwrap().unwrap();
+            let id = mgr
+                .capture_before_tool("write", &args, &dir)
+                .unwrap()
+                .unwrap();
             fs::write(&file_path, format!("v{}", i)).unwrap();
             mgr.capture_after_tool(&id, &dir).unwrap();
         }

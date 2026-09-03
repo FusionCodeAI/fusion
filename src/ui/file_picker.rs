@@ -67,7 +67,8 @@ impl FileType {
             .unwrap_or_default()
             .to_ascii_lowercase();
 
-        if file_name.starts_with(".git") || file_name == ".gitignore" || file_name == ".gitmodules" {
+        if file_name.starts_with(".git") || file_name == ".gitignore" || file_name == ".gitmodules"
+        {
             return FileType::Git;
         }
 
@@ -138,19 +139,19 @@ impl FileType {
     /// Color associated with this file category.
     pub fn color(&self) -> Color {
         match self {
-            FileType::Rust => Color::Rgb(222, 100, 50),     // Rust Orange
+            FileType::Rust => Color::Rgb(222, 100, 50), // Rust Orange
             FileType::TypeScript => Color::Rgb(49, 120, 198), // TS Blue
             FileType::JavaScript => Color::Rgb(247, 223, 30), // JS Yellow
-            FileType::Python => Color::Rgb(53, 114, 165),   // Python Blue
-            FileType::Go => Color::Rgb(0, 173, 216),        // Go Cyan
-            FileType::C => Color::Rgb(85, 85, 85),          // C Gray
-            FileType::Cpp => Color::Rgb(243, 75, 125),      // C++ Pink/Red
-            FileType::Markdown => Color::Rgb(140, 180, 240),// Markdown Light Blue
-            FileType::Config => Color::Rgb(220, 170, 70),   // Config Gold
-            FileType::Shell => Color::Rgb(78, 186, 111),    // Shell Green
-            FileType::Web => Color::Rgb(228, 77, 38),       // HTML/CSS Red
-            FileType::Git => Color::Rgb(240, 80, 50),       // Git Red
-            FileType::Sql => Color::Rgb(218, 112, 214),     // SQL Orchid
+            FileType::Python => Color::Rgb(53, 114, 165), // Python Blue
+            FileType::Go => Color::Rgb(0, 173, 216),    // Go Cyan
+            FileType::C => Color::Rgb(85, 85, 85),      // C Gray
+            FileType::Cpp => Color::Rgb(243, 75, 125),  // C++ Pink/Red
+            FileType::Markdown => Color::Rgb(140, 180, 240), // Markdown Light Blue
+            FileType::Config => Color::Rgb(220, 170, 70), // Config Gold
+            FileType::Shell => Color::Rgb(78, 186, 111), // Shell Green
+            FileType::Web => Color::Rgb(228, 77, 38),   // HTML/CSS Red
+            FileType::Git => Color::Rgb(240, 80, 50),   // Git Red
+            FileType::Sql => Color::Rgb(218, 112, 214), // SQL Orchid
             FileType::Directory => Color::Cyan,
             FileType::Other => Color::DarkGray,
         }
@@ -184,7 +185,13 @@ pub struct FileEntry {
 
 impl FileEntry {
     /// Creates a new `FileEntry` with metadata derived from path.
-    pub fn new(path: PathBuf, base_dir: &Path, is_dir: bool, size_bytes: u64, is_hidden: bool) -> Self {
+    pub fn new(
+        path: PathBuf,
+        base_dir: &Path,
+        is_dir: bool,
+        size_bytes: u64,
+        is_hidden: bool,
+    ) -> Self {
         let rel_path = path.strip_prefix(base_dir).unwrap_or(&path);
         let relative_path = rel_path.to_string_lossy().replace('\\', "/");
         let file_name = path
@@ -337,7 +344,7 @@ pub fn fuzzy_match(pattern: &str, candidate: &str) -> Option<FuzzyMatchResult> {
         if pos == filename_start {
             score += 100; // Exact prefix of filename
         } else if pos == 0 {
-            score += 80;  // Exact prefix of entire path
+            score += 80; // Exact prefix of entire path
         }
         score -= (char_pos as i64) * 2;
         score -= candidate_chars.len() as i64 - pat_len as i64;
@@ -383,7 +390,13 @@ pub fn fuzzy_match(pattern: &str, candidate: &str) -> Option<FuzzyMatchResult> {
                     true
                 } else {
                     let prev = candidate_chars[cand_idx - 1];
-                    prev == '/' || prev == '\\' || prev == '_' || prev == '-' || prev == '.' || prev == ' ' || prev == ':'
+                    prev == '/'
+                        || prev == '\\'
+                        || prev == '_'
+                        || prev == '-'
+                        || prev == '.'
+                        || prev == ' '
+                        || prev == ':'
                 };
 
                 if is_boundary {
@@ -566,13 +579,7 @@ impl FileScanner {
             let size_bytes = dir_entry.metadata().map(|m| m.len()).unwrap_or(0);
             let is_hidden = file_name.starts_with('.');
 
-            let entry = FileEntry::new(
-                path.to_path_buf(),
-                root,
-                is_dir,
-                size_bytes,
-                is_hidden,
-            );
+            let entry = FileEntry::new(path.to_path_buf(), root, is_dir, size_bytes, is_hidden);
 
             entries.push(entry);
 
@@ -853,7 +860,8 @@ impl FilePicker {
     /// Move selection down by page size.
     pub fn select_page_down(&mut self, page_size: usize) {
         if !self.filtered_indices.is_empty() {
-            self.selected_index = (self.selected_index + page_size).min(self.filtered_indices.len() - 1);
+            self.selected_index =
+                (self.selected_index + page_size).min(self.filtered_indices.len() - 1);
         }
     }
 
@@ -967,7 +975,11 @@ impl FilePicker {
     // -----------------------------------------------------------------------
 
     /// Handles a single crossterm key event.
-    pub fn handle_key(&mut self, code: KeyCode, modifiers: KeyModifiers) -> Option<FilePickerResult> {
+    pub fn handle_key(
+        &mut self,
+        code: KeyCode,
+        modifiers: KeyModifiers,
+    ) -> Option<FilePickerResult> {
         match (code, modifiers) {
             // Enter: Select current file
             (KeyCode::Enter, _) => {
@@ -1104,8 +1116,13 @@ impl FilePicker {
         }
 
         // Determine layout based on available height and show_border option
-        let (inner_area, _use_border) = if self.show_border && area.height >= 5 && area.width >= 25 {
-            let count_info = format!("{}/{} files", self.matched_files_count(), self.total_files_count());
+        let (inner_area, _use_border) = if self.show_border && area.height >= 5 && area.width >= 25
+        {
+            let count_info = format!(
+                "{}/{} files",
+                self.matched_files_count(),
+                self.total_files_count()
+            );
             let title_text = format!(" 🔍 {}  [{}] ", self.title, count_info);
             let block = Block::default()
                 .title(title_text)
@@ -1156,11 +1173,7 @@ impl FilePicker {
         };
         let list_area = chunks[idx];
         idx += 1;
-        let footer_area = if has_footer {
-            Some(chunks[idx])
-        } else {
-            None
-        };
+        let footer_area = if has_footer { Some(chunks[idx]) } else { None };
 
         // 1. Render Search Input Bar
         self.render_search_bar(search_area, buf);
@@ -1244,8 +1257,11 @@ impl FilePicker {
             } else {
                 "  No matching files."
             };
-            Paragraph::new(Span::styled(empty_msg, Style::default().fg(Color::DarkGray)))
-                .render(area, buf);
+            Paragraph::new(Span::styled(
+                empty_msg,
+                Style::default().fg(Color::DarkGray),
+            ))
+            .render(area, buf);
             return;
         }
 
@@ -1323,7 +1339,10 @@ impl FilePicker {
     ///
     /// Automatically manages raw terminal mode, cursor visibility,
     /// dynamic height clamping, and keyboard event loop.
-    pub fn run_interactive(&mut self, requested_height: Option<u16>) -> std::io::Result<Option<FileEntry>> {
+    pub fn run_interactive(
+        &mut self,
+        requested_height: Option<u16>,
+    ) -> std::io::Result<Option<FileEntry>> {
         let _raw_guard = RawModeGuard::enter()?;
         let _ = execute!(stdout(), cursor::Hide);
 
@@ -1437,11 +1456,12 @@ pub fn format_file_row<'a>(
     let parent_len = entry.parent_dir().chars().count();
 
     // If path is longer than available width on narrow terminals, show tail with ellipsis
-    let (start_offset, show_ellipsis) = if path_chars.len() > available_path_width && available_path_width > 10 {
-        (path_chars.len() - available_path_width + 3, true)
-    } else {
-        (0, false)
-    };
+    let (start_offset, show_ellipsis) =
+        if path_chars.len() > available_path_width && available_path_width > 10 {
+            (path_chars.len() - available_path_width + 3, true)
+        } else {
+            (0, false)
+        };
 
     if show_ellipsis {
         spans.push(Span::styled("...", Style::default().fg(Color::DarkGray)));
@@ -1618,8 +1638,20 @@ mod tests {
     #[test]
     fn test_fuzzy_search_ranking() {
         let files = vec![
-            FileEntry::new(PathBuf::from("src/tools/file.rs"), Path::new("."), false, 100, false),
-            FileEntry::new(PathBuf::from("src/ui/file_picker.rs"), Path::new("."), false, 200, false),
+            FileEntry::new(
+                PathBuf::from("src/tools/file.rs"),
+                Path::new("."),
+                false,
+                100,
+                false,
+            ),
+            FileEntry::new(
+                PathBuf::from("src/ui/file_picker.rs"),
+                Path::new("."),
+                false,
+                200,
+                false,
+            ),
             FileEntry::new(PathBuf::from("README.md"), Path::new("."), false, 50, false),
         ];
 
@@ -1631,9 +1663,27 @@ mod tests {
     #[test]
     fn test_file_picker_query_and_keys() {
         let files = vec![
-            FileEntry::new(PathBuf::from("src/main.rs"), Path::new("."), false, 100, false),
-            FileEntry::new(PathBuf::from("src/ui/mod.rs"), Path::new("."), false, 200, false),
-            FileEntry::new(PathBuf::from("Cargo.toml"), Path::new("."), false, 300, false),
+            FileEntry::new(
+                PathBuf::from("src/main.rs"),
+                Path::new("."),
+                false,
+                100,
+                false,
+            ),
+            FileEntry::new(
+                PathBuf::from("src/ui/mod.rs"),
+                Path::new("."),
+                false,
+                200,
+                false,
+            ),
+            FileEntry::new(
+                PathBuf::from("Cargo.toml"),
+                Path::new("."),
+                false,
+                300,
+                false,
+            ),
         ];
 
         let mut picker = FilePicker::with_files(files);
@@ -1690,8 +1740,20 @@ mod tests {
     #[test]
     fn test_render_buffer_smoke() {
         let files = vec![
-            FileEntry::new(PathBuf::from("src/main.rs"), Path::new("."), false, 1024, false),
-            FileEntry::new(PathBuf::from("src/ui/file_picker.rs"), Path::new("."), false, 2048, false),
+            FileEntry::new(
+                PathBuf::from("src/main.rs"),
+                Path::new("."),
+                false,
+                1024,
+                false,
+            ),
+            FileEntry::new(
+                PathBuf::from("src/ui/file_picker.rs"),
+                Path::new("."),
+                false,
+                2048,
+                false,
+            ),
         ];
 
         let picker = FilePicker::with_files(files);

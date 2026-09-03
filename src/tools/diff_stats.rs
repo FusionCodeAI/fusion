@@ -402,7 +402,11 @@ impl SessionDiffStats {
     /// Formats a concise git-style summary string:
     /// `X files changed, Y insertions(+), Z deletions(-)`
     pub fn summary_string(&self) -> String {
-        format_git_summary_line(self.total_files_changed, self.total_additions, self.total_deletions)
+        format_git_summary_line(
+            self.total_files_changed,
+            self.total_additions,
+            self.total_deletions,
+        )
     }
 
     /// Formats a compact status badge:
@@ -412,7 +416,11 @@ impl SessionDiffStats {
         format!(
             "[Δ {} file{} | +{}/-{} (net {}{})]",
             self.total_files_changed,
-            if self.total_files_changed == 1 { "" } else { "s" },
+            if self.total_files_changed == 1 {
+                ""
+            } else {
+                "s"
+            },
             self.total_additions,
             self.total_deletions,
             sign,
@@ -422,7 +430,14 @@ impl SessionDiffStats {
 
     /// Formats a git-like diffstat table with bar charts.
     pub fn diffstat_string(&self, colorize: bool, max_bar_width: usize) -> String {
-        format_diffstat_table(&self.files, self.total_files_changed, self.total_additions, self.total_deletions, colorize, max_bar_width)
+        format_diffstat_table(
+            &self.files,
+            self.total_files_changed,
+            self.total_additions,
+            self.total_deletions,
+            colorize,
+            max_bar_width,
+        )
     }
 
     /// Formats a comprehensive Markdown report.
@@ -489,7 +504,11 @@ pub fn create_edit_record(
         additions: stats.additions,
         deletions: stats.deletions,
         change_type,
-        unified_diff: if unified.is_empty() { None } else { Some(unified) },
+        unified_diff: if unified.is_empty() {
+            None
+        } else {
+            Some(unified)
+        },
         hunks_count,
         is_binary: false,
         author_agent: agent.map(|s| s.to_string()),
@@ -610,7 +629,10 @@ pub fn parse_unified_diff_to_records(
             }
 
             // Scan headers until hunks or next diff
-            while i < lines.len() && !lines[i].starts_with("diff --git ") && !lines[i].starts_with("@@ ") {
+            while i < lines.len()
+                && !lines[i].starts_with("diff --git ")
+                && !lines[i].starts_with("@@ ")
+            {
                 let hline = lines[i];
                 if hline.starts_with("new file mode") {
                     change_type = DiffChangeType::Added;
@@ -777,7 +799,11 @@ impl DiffAggregator {
     }
 
     /// Parse and record a unified diff in the current turn.
-    pub fn record_diff_text(&mut self, diff_text: &str, agent: Option<&str>) -> Vec<FileDiffRecord> {
+    pub fn record_diff_text(
+        &mut self,
+        diff_text: &str,
+        agent: Option<&str>,
+    ) -> Vec<FileDiffRecord> {
         let records = parse_unified_diff_to_records(diff_text, self.current_turn, agent);
         for record in &records {
             self.record_file_diff(record.clone());
@@ -788,7 +814,7 @@ impl DiffAggregator {
     /// Record a direct `FileDiffRecord` into the aggregator state.
     pub fn record_file_diff(&mut self, record: FileDiffRecord) {
         let turn_id = record.turn_id;
-        
+
         // Update per-turn summary
         let turn_summary = self
             .turns
@@ -833,9 +859,8 @@ impl DiffAggregator {
         path_pattern: Option<&str>,
         agent_filter: Option<&str>,
     ) -> SessionDiffStats {
-        let matcher: Option<GlobMatcher> = path_pattern.and_then(|p| {
-            Glob::new(p).ok().map(|g| g.compile_matcher())
-        });
+        let matcher: Option<GlobMatcher> =
+            path_pattern.and_then(|p| Glob::new(p).ok().map(|g| g.compile_matcher()));
 
         let mut filtered_turns = Vec::new();
         let mut aggregated_files_map: HashMap<String, AggregatedFileStats> = HashMap::new();
@@ -906,7 +931,11 @@ impl DiffAggregator {
         }
 
         let mut files_vec: Vec<AggregatedFileStats> = aggregated_files_map.into_values().collect();
-        files_vec.sort_by(|a, b| b.total_churn.cmp(&a.total_churn).then_with(|| a.path.cmp(&b.path)));
+        files_vec.sort_by(|a, b| {
+            b.total_churn
+                .cmp(&a.total_churn)
+                .then_with(|| a.path.cmp(&b.path))
+        });
 
         let mut files_added = 0;
         let mut files_modified = 0;
@@ -994,8 +1023,16 @@ impl DiffAggregator {
             most_modified_files,
             top_additions_files,
             top_deletions_files,
-            start_timestamp: if earliest_ts == u64::MAX { self.created_at } else { earliest_ts },
-            last_timestamp: if latest_ts == 0 { current_timestamp_millis() } else { latest_ts },
+            start_timestamp: if earliest_ts == u64::MAX {
+                self.created_at
+            } else {
+                earliest_ts
+            },
+            last_timestamp: if latest_ts == 0 {
+                current_timestamp_millis()
+            } else {
+                latest_ts
+            },
         }
     }
 
@@ -1227,9 +1264,18 @@ pub fn format_diffstat_table(
     }
 
     let mut output = String::new();
-    let max_path_len = files.iter().map(|f| f.path.len()).max().unwrap_or(10).min(50);
+    let max_path_len = files
+        .iter()
+        .map(|f| f.path.len())
+        .max()
+        .unwrap_or(10)
+        .min(50);
     let max_churn = files.iter().map(|f| f.total_churn).max().unwrap_or(1);
-    let bar_cap = if max_bar_width == 0 { 30 } else { max_bar_width.min(60) };
+    let bar_cap = if max_bar_width == 0 {
+        30
+    } else {
+        max_bar_width.min(60)
+    };
 
     for file in files {
         let path_display = if file.path.len() > 50 {
@@ -1306,11 +1352,26 @@ pub fn format_markdown_report(stats: &SessionDiffStats) -> String {
 
     // Summary Metric Badges / Table
     md.push_str("### Overview\n\n");
-    md.push_str(&format!("- **Total Turns Recorded**: {}\n", stats.total_turns));
-    md.push_str(&format!("- **Active Mutation Turns**: {}\n", stats.active_turns_count));
-    md.push_str(&format!("- **Files Changed**: {}\n", stats.total_files_changed));
-    md.push_str(&format!("- **Lines Inserted**: +{}\n", stats.total_additions));
-    md.push_str(&format!("- **Lines Deleted**: -{}\n", stats.total_deletions));
+    md.push_str(&format!(
+        "- **Total Turns Recorded**: {}\n",
+        stats.total_turns
+    ));
+    md.push_str(&format!(
+        "- **Active Mutation Turns**: {}\n",
+        stats.active_turns_count
+    ));
+    md.push_str(&format!(
+        "- **Files Changed**: {}\n",
+        stats.total_files_changed
+    ));
+    md.push_str(&format!(
+        "- **Lines Inserted**: +{}\n",
+        stats.total_additions
+    ));
+    md.push_str(&format!(
+        "- **Lines Deleted**: -{}\n",
+        stats.total_deletions
+    ));
     let sign = if stats.net_lines >= 0 { "+" } else { "" };
     md.push_str(&format!("- **Net Lines**: {}{}\n", sign, stats.net_lines));
     md.push_str(&format!("- **Total Churn**: {}\n\n", stats.total_churn));
@@ -1357,16 +1418,16 @@ pub fn format_markdown_report(stats: &SessionDiffStats) -> String {
         for t in &stats.turns {
             let author = t.author_agent.as_deref().unwrap_or("User/Agent");
             let t_sign = if t.net_lines >= 0 { "+" } else { "" };
-            md.push_str(&format!(
-                "#### Turn {} ({})\n",
-                t.turn_id, author
-            ));
+            md.push_str(&format!("#### Turn {} ({})\n", t.turn_id, author));
             md.push_str(&format!(
                 "*{} file(s) changed, +{} / -{} (net {}{})*\n\n",
                 t.files_changed, t.additions, t.deletions, t_sign, t.net_lines
             ));
             for f in &t.files {
-                md.push_str(&format!("- `{}` (+{}/-{}) [{}]\n", f.path, f.additions, f.deletions, f.tool_source));
+                md.push_str(&format!(
+                    "- `{}` (+{}/-{}) [{}]\n",
+                    f.path, f.additions, f.deletions, f.tool_source
+                ));
             }
             md.push('\n');
         }
@@ -1387,7 +1448,10 @@ pub fn format_detailed_terminal(stats: &SessionDiffStats, colorize: bool) -> Str
 
     // Overview lines
     let sign = if stats.net_lines >= 0 { "+" } else { "" };
-    out.push_str(&format!("Turns: {} (active: {})\n", stats.total_turns, stats.active_turns_count));
+    out.push_str(&format!(
+        "Turns: {} (active: {})\n",
+        stats.total_turns, stats.active_turns_count
+    ));
     out.push_str(&format!("Files Changed: {}\n", stats.total_files_changed));
     if colorize {
         out.push_str(&format!(
@@ -1424,7 +1488,13 @@ pub fn format_detailed_terminal(stats: &SessionDiffStats, colorize: bool) -> Str
             } else {
                 out.push_str(&format!(
                     "  Turn {:>2} [{:<8}] {:>2} files | +{:>3} / -{:<3} (net {}{})\n",
-                    t.turn_id, author, t.files_changed, t.additions, t.deletions, t_sign, t.net_lines
+                    t.turn_id,
+                    author,
+                    t.files_changed,
+                    t.additions,
+                    t.deletions,
+                    t_sign,
+                    t.net_lines
                 ));
             }
         }
@@ -1682,7 +1752,10 @@ impl Tool for DiffStatsTool {
             .unwrap_or("summary");
         let format = DiffStatsOutputFormat::from_str_loose(format_str);
 
-        let turn_filter = args.get("turn").and_then(|v| v.as_u64()).map(|n| n as usize);
+        let turn_filter = args
+            .get("turn")
+            .and_then(|v| v.as_u64())
+            .map(|n| n as usize);
         let start_turn = args
             .get("start_turn")
             .and_then(|v| v.as_u64())
@@ -1700,12 +1773,14 @@ impl Tool for DiffStatsTool {
 
         match action {
             DiffStatsAction::RecordDiff => {
-                let diff_text = args
-                    .get("diff")
-                    .and_then(|v| v.as_str())
-                    .ok_or_else(|| anyhow::anyhow!("Missing 'diff' parameter for record_diff action"))?;
+                let diff_text = args.get("diff").and_then(|v| v.as_str()).ok_or_else(|| {
+                    anyhow::anyhow!("Missing 'diff' parameter for record_diff action")
+                })?;
 
-                let mut agg = self.aggregator.write().map_err(|_| anyhow::anyhow!("Aggregator lock poisoned"))?;
+                let mut agg = self
+                    .aggregator
+                    .write()
+                    .map_err(|_| anyhow::anyhow!("Aggregator lock poisoned"))?;
                 if let Some(t) = turn_filter {
                     agg.set_turn(t);
                 }
@@ -1723,11 +1798,21 @@ impl Tool for DiffStatsTool {
             }
 
             DiffStatsAction::RecordEdit => {
-                let path = path_filter.ok_or_else(|| anyhow::anyhow!("Missing 'path' parameter for record_edit"))?;
-                let old_content = args.get("old_content").and_then(|v| v.as_str()).unwrap_or("");
-                let new_content = args.get("new_content").and_then(|v| v.as_str()).unwrap_or("");
+                let path = path_filter
+                    .ok_or_else(|| anyhow::anyhow!("Missing 'path' parameter for record_edit"))?;
+                let old_content = args
+                    .get("old_content")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("");
+                let new_content = args
+                    .get("new_content")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("");
 
-                let mut agg = self.aggregator.write().map_err(|_| anyhow::anyhow!("Aggregator lock poisoned"))?;
+                let mut agg = self
+                    .aggregator
+                    .write()
+                    .map_err(|_| anyhow::anyhow!("Aggregator lock poisoned"))?;
                 if let Some(t) = turn_filter {
                     agg.set_turn(t);
                 }
@@ -1735,19 +1820,23 @@ impl Tool for DiffStatsTool {
 
                 Ok(format!(
                     "Recorded edit on '{}' in Turn {}: +{} / -{}",
-                    record.path,
-                    record.turn_id,
-                    record.additions,
-                    record.deletions
+                    record.path, record.turn_id, record.additions, record.deletions
                 ))
             }
 
             DiffStatsAction::RecordWrite => {
-                let path = path_filter.ok_or_else(|| anyhow::anyhow!("Missing 'path' parameter for record_write"))?;
+                let path = path_filter
+                    .ok_or_else(|| anyhow::anyhow!("Missing 'path' parameter for record_write"))?;
                 let old_content = args.get("old_content").and_then(|v| v.as_str());
-                let new_content = args.get("new_content").and_then(|v| v.as_str()).unwrap_or("");
+                let new_content = args
+                    .get("new_content")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("");
 
-                let mut agg = self.aggregator.write().map_err(|_| anyhow::anyhow!("Aggregator lock poisoned"))?;
+                let mut agg = self
+                    .aggregator
+                    .write()
+                    .map_err(|_| anyhow::anyhow!("Aggregator lock poisoned"))?;
                 if let Some(t) = turn_filter {
                     agg.set_turn(t);
                 }
@@ -1764,14 +1853,21 @@ impl Tool for DiffStatsTool {
             }
 
             DiffStatsAction::Reset => {
-                let mut agg = self.aggregator.write().map_err(|_| anyhow::anyhow!("Aggregator lock poisoned"))?;
+                let mut agg = self
+                    .aggregator
+                    .write()
+                    .map_err(|_| anyhow::anyhow!("Aggregator lock poisoned"))?;
                 agg.clear();
                 Ok("Session diff statistics reset successfully.".to_string())
             }
 
             DiffStatsAction::FileDetail => {
-                let path = path_filter.ok_or_else(|| anyhow::anyhow!("Missing 'path' parameter for file_detail"))?;
-                let agg = self.aggregator.read().map_err(|_| anyhow::anyhow!("Aggregator lock poisoned"))?;
+                let path = path_filter
+                    .ok_or_else(|| anyhow::anyhow!("Missing 'path' parameter for file_detail"))?;
+                let agg = self
+                    .aggregator
+                    .read()
+                    .map_err(|_| anyhow::anyhow!("Aggregator lock poisoned"))?;
                 match agg.aggregate_file(path) {
                     Some(fstats) => {
                         if format == DiffStatsOutputFormat::Json {
@@ -1810,10 +1906,17 @@ impl Tool for DiffStatsTool {
             DiffStatsAction::CompareTurns => {
                 let t1 = start_turn.unwrap_or(1);
                 let t2 = end_turn.unwrap_or(2);
-                let agg = self.aggregator.read().map_err(|_| anyhow::anyhow!("Aggregator lock poisoned"))?;
+                let agg = self
+                    .aggregator
+                    .read()
+                    .map_err(|_| anyhow::anyhow!("Aggregator lock poisoned"))?;
 
-                let s1 = agg.aggregate_turn(t1).unwrap_or_else(|| TurnDiffSummary::new(t1));
-                let s2 = agg.aggregate_turn(t2).unwrap_or_else(|| TurnDiffSummary::new(t2));
+                let s1 = agg
+                    .aggregate_turn(t1)
+                    .unwrap_or_else(|| TurnDiffSummary::new(t1));
+                let s2 = agg
+                    .aggregate_turn(t2)
+                    .unwrap_or_else(|| TurnDiffSummary::new(t2));
 
                 let comparison = json!({
                     "turn_a": {
@@ -1856,13 +1959,23 @@ impl Tool for DiffStatsTool {
             }
 
             DiffStatsAction::Export => {
-                let agg = self.aggregator.read().map_err(|_| anyhow::anyhow!("Aggregator lock poisoned"))?;
+                let agg = self
+                    .aggregator
+                    .read()
+                    .map_err(|_| anyhow::anyhow!("Aggregator lock poisoned"))?;
                 let stats = agg.aggregate_filtered(start_turn, end_turn, path_filter, agent_filter);
                 Ok(serde_json::to_string_pretty(&stats)?)
             }
 
-            DiffStatsAction::Summary | DiffStatsAction::Diffstat | DiffStatsAction::Breakdown | DiffStatsAction::Files | DiffStatsAction::Turns => {
-                let agg = self.aggregator.read().map_err(|_| anyhow::anyhow!("Aggregator lock poisoned"))?;
+            DiffStatsAction::Summary
+            | DiffStatsAction::Diffstat
+            | DiffStatsAction::Breakdown
+            | DiffStatsAction::Files
+            | DiffStatsAction::Turns => {
+                let agg = self
+                    .aggregator
+                    .read()
+                    .map_err(|_| anyhow::anyhow!("Aggregator lock poisoned"))?;
                 let stats = agg.aggregate_filtered(start_turn, end_turn, path_filter, agent_filter);
 
                 // Override format if action was specific
@@ -1880,7 +1993,11 @@ impl Tool for DiffStatsTool {
                     DiffStatsOutputFormat::Json => Ok(serde_json::to_string_pretty(&stats)?),
                     DiffStatsOutputFormat::Compact => Ok(format!(
                         "files: {}, +{}, -{}, net: {:+}, churn: {}",
-                        stats.total_files_changed, stats.total_additions, stats.total_deletions, stats.net_lines, stats.total_churn
+                        stats.total_files_changed,
+                        stats.total_additions,
+                        stats.total_deletions,
+                        stats.net_lines,
+                        stats.total_churn
                     )),
                     DiffStatsOutputFormat::Badge => Ok(stats.badge_string()),
                 }
@@ -1918,7 +2035,8 @@ mod tests {
     fn test_record_single_edit() {
         let mut agg = DiffAggregator::new();
         let old = "fn main() {\n    println!(\"Hello\");\n}\n";
-        let new = "fn main() {\n    println!(\"Hello, World!\");\n    println!(\"Fusion v2\");\n}\n";
+        let new =
+            "fn main() {\n    println!(\"Hello, World!\");\n    println!(\"Fusion v2\");\n}\n";
 
         let rec = agg.record_edit("src/main.rs", old, new, Some("Coder"));
 
@@ -1946,7 +2064,12 @@ mod tests {
 
         // Turn 1: Add new file
         agg.set_turn(1);
-        agg.record_write("src/lib.rs", None, "pub fn add(a: i32, b: i32) -> i32 {\n    a + b\n}\n", Some("Coder"));
+        agg.record_write(
+            "src/lib.rs",
+            None,
+            "pub fn add(a: i32, b: i32) -> i32 {\n    a + b\n}\n",
+            Some("Coder"),
+        );
 
         // Turn 2: Edit existing file
         agg.set_turn(2);
@@ -1962,7 +2085,12 @@ mod tests {
 
         // Turn 3: Modify utils
         agg.set_turn(3);
-        agg.record_edit("src/utils.rs", "pub fn helper() {}\n", "pub fn helper() -> bool {\n    true\n}\n", Some("Reviewer"));
+        agg.record_edit(
+            "src/utils.rs",
+            "pub fn helper() {}\n",
+            "pub fn helper() -> bool {\n    true\n}\n",
+            Some("Reviewer"),
+        );
 
         let stats = agg.aggregate();
         assert_eq!(stats.total_turns, 3);
@@ -2083,13 +2211,22 @@ new file mode 100644
         let mut agg = DiffAggregator::new();
 
         agg.record_write("src/lib.rs", None, "pub fn a() {}\n", None);
-        agg.record_write("web/app.tsx", None, "export const App = () => <div />;\n", None);
+        agg.record_write(
+            "web/app.tsx",
+            None,
+            "export const App = () => <div />;\n",
+            None,
+        );
         agg.record_write("scripts/test.py", None, "print('test')\n", None);
 
         let stats = agg.aggregate();
         assert_eq!(stats.language_breakdown.len(), 3);
 
-        let langs: HashSet<&str> = stats.language_breakdown.iter().map(|l| l.language.as_str()).collect();
+        let langs: HashSet<&str> = stats
+            .language_breakdown
+            .iter()
+            .map(|l| l.language.as_str())
+            .collect();
         assert!(langs.contains("Rust"));
         assert!(langs.contains("TypeScript (React)"));
         assert!(langs.contains("Python"));
@@ -2099,7 +2236,12 @@ new file mode 100644
     fn test_diffstat_formatting() {
         let mut agg = DiffAggregator::new();
 
-        agg.record_edit("src/main.rs", "line1\nline2\n", "line1\nline2_modified\nline3\n", None);
+        agg.record_edit(
+            "src/main.rs",
+            "line1\nline2\n",
+            "line1\nline2_modified\nline3\n",
+            None,
+        );
         agg.record_write("src/lib.rs", None, "1\n2\n3\n4\n5\n", None);
 
         let stats = agg.aggregate();
@@ -2151,7 +2293,10 @@ new file mode 100644
         let ctx = ToolContext::default();
 
         // 1. Reset
-        let res = tool.execute(json!({ "action": "reset" }), &ctx).await.unwrap();
+        let res = tool
+            .execute(json!({ "action": "reset" }), &ctx)
+            .await
+            .unwrap();
         assert!(res.contains("reset successfully"));
 
         // 2. Record edit
@@ -2172,23 +2317,35 @@ new file mode 100644
         assert!(edit_res.contains("Recorded edit on 'src/test.rs'"));
 
         // 3. Query summary
-        let summary_res = tool.execute(json!({ "action": "summary" }), &ctx).await.unwrap();
+        let summary_res = tool
+            .execute(json!({ "action": "summary" }), &ctx)
+            .await
+            .unwrap();
         assert_eq!(summary_res, "1 file changed, 1 insertion(+)");
 
         // 4. Query diffstat
-        let diffstat_res = tool.execute(json!({ "action": "diffstat" }), &ctx).await.unwrap();
+        let diffstat_res = tool
+            .execute(json!({ "action": "diffstat" }), &ctx)
+            .await
+            .unwrap();
         assert!(diffstat_res.contains("src/test.rs"));
 
         // 5. Query file detail
         let detail_res = tool
-            .execute(json!({ "action": "file_detail", "path": "src/test.rs" }), &ctx)
+            .execute(
+                json!({ "action": "file_detail", "path": "src/test.rs" }),
+                &ctx,
+            )
             .await
             .unwrap();
         assert!(detail_res.contains("File: src/test.rs"));
         assert!(detail_res.contains("Language: Rust"));
 
         // 6. Export JSON
-        let export_res = tool.execute(json!({ "action": "export" }), &ctx).await.unwrap();
+        let export_res = tool
+            .execute(json!({ "action": "export" }), &ctx)
+            .await
+            .unwrap();
         let parsed: Value = serde_json::from_str(&export_res).unwrap();
         assert_eq!(parsed["total_files_changed"], 1);
         assert_eq!(parsed["total_additions"], 1);

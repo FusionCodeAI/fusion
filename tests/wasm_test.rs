@@ -213,10 +213,7 @@ mod jsonrpc_acp_message_tests {
             serde_json::from_str(&serialized_success).expect("deserialize success");
         assert_eq!(deserialized_success.id, RequestId::Number(10));
         assert!(deserialized_success.error.is_none());
-        assert_eq!(
-            deserialized_success.result.unwrap()["sessionId"],
-            "sess-99"
-        );
+        assert_eq!(deserialized_success.result.unwrap()["sessionId"], "sess-99");
 
         // Error response
         let error_resp = JsonRpcResponse::error(
@@ -276,10 +273,7 @@ mod jsonrpc_acp_message_tests {
         let init_req: InitializeRequest =
             serde_json::from_str(init_json).expect("deserialize InitializeRequest");
         assert_eq!(init_req.protocol_version, PROTOCOL_VERSION);
-        assert_eq!(
-            init_req.client_info.as_ref().unwrap().name,
-            "Zed Editor"
-        );
+        assert_eq!(init_req.client_info.as_ref().unwrap().name, "Zed Editor");
         assert_eq!(
             init_req.client_info.as_ref().unwrap().version.as_deref(),
             Some("0.180.2")
@@ -313,10 +307,7 @@ mod jsonrpc_acp_message_tests {
         let res_value = serde_json::to_value(&init_res).expect("serialize InitializeResult");
         assert_eq!(res_value["protocolVersion"], 1);
         assert_eq!(res_value["agentInfo"]["name"], "fusion");
-        assert_eq!(
-            res_value["agentCapabilities"]["loadSession"],
-            json!(true)
-        );
+        assert_eq!(res_value["agentCapabilities"]["loadSession"], json!(true));
         assert_eq!(
             res_value["agentCapabilities"]["prompts"]["embeddedContext"],
             json!(true)
@@ -344,7 +335,10 @@ mod jsonrpc_acp_message_tests {
             new_req.model.as_deref(),
             Some("anthropic/claude-3.5-sonnet")
         );
-        assert_eq!(new_req.mcp_servers.as_ref().map(|v| v.len()).unwrap_or(0), 2);
+        assert_eq!(
+            new_req.mcp_servers.as_ref().map(|v| v.len()).unwrap_or(0),
+            2
+        );
 
         let new_res = NewSessionResult {
             session_id: "sess_test_12345".to_string(),
@@ -363,8 +357,8 @@ mod jsonrpc_acp_message_tests {
         );
 
         // session/load
-        let load_req: LoadSessionRequest =
-            serde_json::from_str(r#"{"sessionId": "sess_load_99"}"#).expect("parse LoadSessionRequest");
+        let load_req: LoadSessionRequest = serde_json::from_str(r#"{"sessionId": "sess_load_99"}"#)
+            .expect("parse LoadSessionRequest");
         assert_eq!(load_req.session_id, "sess_load_99");
 
         let load_res = LoadSessionResult {
@@ -411,11 +405,13 @@ mod jsonrpc_acp_message_tests {
 
         // session/close & session/cancel
         let close_req: CloseSessionRequest =
-            serde_json::from_str(r#"{"sessionId": "sess_close_1"}"#).expect("parse CloseSessionRequest");
+            serde_json::from_str(r#"{"sessionId": "sess_close_1"}"#)
+                .expect("parse CloseSessionRequest");
         assert_eq!(close_req.session_id, "sess_close_1");
 
         let cancel_req: CancelSessionRequest =
-            serde_json::from_str(r#"{"sessionId": "sess_cancel_2"}"#).expect("parse CancelSessionRequest");
+            serde_json::from_str(r#"{"sessionId": "sess_cancel_2"}"#)
+                .expect("parse CancelSessionRequest");
         assert_eq!(cancel_req.session_id, "sess_cancel_2");
     }
 
@@ -499,10 +495,7 @@ mod jsonrpc_acp_message_tests {
 
         let resp_val = serde_json::to_value(&prompt_response).expect("serialize PromptResponse");
         assert_eq!(resp_val["stopReason"], "end_turn");
-        assert_eq!(
-            resp_val["content"][0]["text"],
-            "Optimization complete."
-        );
+        assert_eq!(resp_val["content"][0]["text"], "Optimization complete.");
         assert_eq!(resp_val["stats"]["totalTokens"], 450);
     }
 
@@ -561,7 +554,10 @@ mod jsonrpc_acp_message_tests {
             )
             .await
             .expect("session/new dispatch");
-        let sess_id = new_sess_val["sessionId"].as_str().expect("sessionId").to_string();
+        let sess_id = new_sess_val["sessionId"]
+            .as_str()
+            .expect("sessionId")
+            .to_string();
         assert!(!sess_id.is_empty());
 
         // 5. session/list
@@ -739,14 +735,21 @@ mod virtual_filesystem_tests {
                 .ok_or_else(|| format!("File not found: {}", path))?;
 
             if !content.contains(old_str) {
-                return Err(format!("Target string to replace was not found in {}", path));
+                return Err(format!(
+                    "Target string to replace was not found in {}",
+                    path
+                ));
             }
 
             *content = content.replacen(old_str, new_str, 1);
             Ok(format!("Successfully edited {}", path))
         }
 
-        pub fn grep(&self, pattern: &str, path_filter: Option<&str>) -> Vec<(String, usize, String)> {
+        pub fn grep(
+            &self,
+            pattern: &str,
+            path_filter: Option<&str>,
+        ) -> Vec<(String, usize, String)> {
             let mut matches = Vec::new();
             let regex = regex::Regex::new(pattern).ok();
 
@@ -850,7 +853,10 @@ mod virtual_filesystem_tests {
                     if self.delete(parts[1]) {
                         (true, format!("Removed {}", parts[1]))
                     } else {
-                        (false, format!("rm: cannot remove '{}': No such file", parts[1]))
+                        (
+                            false,
+                            format!("rm: cannot remove '{}': No such file", parts[1]),
+                        )
                     }
                 }
                 "wc" => {
@@ -869,7 +875,10 @@ mod virtual_filesystem_tests {
                 }
                 _ => (
                     true,
-                    format!("[virtual-bash] Executed `{}` successfully in sandbox", trimmed),
+                    format!(
+                        "[virtual-bash] Executed `{}` successfully in sandbox",
+                        trimmed
+                    ),
                 ),
             }
         }
@@ -946,7 +955,11 @@ mod virtual_filesystem_tests {
 
         // Target string not found error
         let err_not_found = vfs
-            .edit("src/calculator.rs", "nonexistent code target", "replacement")
+            .edit(
+                "src/calculator.rs",
+                "nonexistent code target",
+                "replacement",
+            )
             .expect_err("should fail on missing target string");
         assert!(err_not_found.contains("Target string to replace was not found"));
 
@@ -1099,10 +1112,7 @@ mod virtual_filesystem_tests {
     #[test]
     fn test_vfs_serialization_checkpoint_roundtrip() {
         let mut vfs = InMemoryVfs::new();
-        vfs.write(
-            "config.json",
-            "{\"theme\": \"dracula\", \"fontSize\": 14}",
-        );
+        vfs.write("config.json", "{\"theme\": \"dracula\", \"fontSize\": 14}");
         vfs.write("src/core.rs", "pub fn core_engine() -> bool { true }");
 
         // Serialize to JSON
@@ -1112,8 +1122,7 @@ mod virtual_filesystem_tests {
         assert!(serialized.contains("README.md"));
 
         // Deserialize from JSON
-        let restored_vfs: InMemoryVfs =
-            serde_json::from_str(&serialized).expect("deserialize VFS");
+        let restored_vfs: InMemoryVfs = serde_json::from_str(&serialized).expect("deserialize VFS");
         assert_eq!(vfs, restored_vfs);
 
         assert_eq!(
@@ -1228,10 +1237,7 @@ mod event_stream_serialization_tests {
         let status_val = serde_json::to_value(&tool_status).expect("serialize ToolStatus");
         assert_eq!(status_val["kind"], "tool_status");
         assert_eq!(status_val["progress"], 0.65);
-        assert_eq!(
-            status_val["partialOutput"],
-            "Building 42/65 targets..."
-        );
+        assert_eq!(status_val["partialOutput"], "Building 42/65 targets...");
 
         // 3. ToolCallResult (Completed Success)
         let tool_result_success = SessionUpdate::ToolCallResult {
@@ -1242,8 +1248,7 @@ mod event_stream_serialization_tests {
             duration_ms: Some(15),
             error: None,
         };
-        let res_val =
-            serde_json::to_value(&tool_result_success).expect("serialize ToolCallResult");
+        let res_val = serde_json::to_value(&tool_result_success).expect("serialize ToolCallResult");
         assert_eq!(res_val["kind"], "tool_call_result");
         assert_eq!(res_val["success"], true);
         assert_eq!(res_val["durationMs"], 15);
@@ -1270,8 +1275,7 @@ mod event_stream_serialization_tests {
             advisor: "Security".to_string(),
             role: "Vulnerability and sanitization inspection".to_string(),
         };
-        let adv_started_val =
-            serde_json::to_value(&adv_started).expect("serialize AdvisorStarted");
+        let adv_started_val = serde_json::to_value(&adv_started).expect("serialize AdvisorStarted");
         assert_eq!(adv_started_val["kind"], "advisor_started");
         assert_eq!(adv_started_val["advisor"], "Security");
 
@@ -1283,11 +1287,10 @@ mod event_stream_serialization_tests {
             role: Some("Vulnerability and sanitization inspection".to_string()),
             severity: Some("warning".to_string()),
             suggestions: Some(vec![
-                "Use prepared statements with parameterized queries".to_string(),
+                "Use prepared statements with parameterized queries".to_string()
             ]),
         };
-        let critique_val =
-            serde_json::to_value(&adv_critique).expect("serialize AdvisorCritique");
+        let critique_val = serde_json::to_value(&adv_critique).expect("serialize AdvisorCritique");
         assert_eq!(critique_val["kind"], "advisor_critique");
         assert_eq!(critique_val["approved"], false);
         assert_eq!(critique_val["severity"], "warning");
@@ -1436,7 +1439,8 @@ mod event_stream_serialization_tests {
         }
 
         // 2. Thinking delta event
-        let ev_think = bridge.handle_agent_event(AgentEvent::ThinkingDelta("Evaluating...".to_string()));
+        let ev_think =
+            bridge.handle_agent_event(AgentEvent::ThinkingDelta("Evaluating...".to_string()));
         assert_eq!(ev_think.len(), 1);
         match &ev_think[0] {
             AcpSessionEvent::ThinkingChunk(chunk) => {
@@ -1506,8 +1510,22 @@ mod event_stream_serialization_tests {
                 Some("openai".to_string()),
                 Some("/workspace".to_string()),
             ),
-            JsonLogEvent::text_delta(2, Some("sess_ndjson_1".to_string()), "Hello ", 1, true, false),
-            JsonLogEvent::text_delta(3, Some("sess_ndjson_1".to_string()), "World!", 2, false, true),
+            JsonLogEvent::text_delta(
+                2,
+                Some("sess_ndjson_1".to_string()),
+                "Hello ",
+                1,
+                true,
+                false,
+            ),
+            JsonLogEvent::text_delta(
+                3,
+                Some("sess_ndjson_1".to_string()),
+                "World!",
+                2,
+                false,
+                true,
+            ),
             JsonLogEvent::tool_start(
                 4,
                 Some("sess_ndjson_1".to_string()),
@@ -1546,10 +1564,7 @@ mod event_stream_serialization_tests {
         // Parse back from NDJSON lines
         let parsed_events = parse_ndjson_lines(&ndjson_str).expect("parse NDJSON lines");
         assert_eq!(parsed_events.len(), 6);
-        assert_eq!(
-            parsed_events[0].kind,
-            JsonLogEventKind::SessionStart
-        );
+        assert_eq!(parsed_events[0].kind, JsonLogEventKind::SessionStart);
         assert_eq!(parsed_events[1].kind, JsonLogEventKind::TextDelta);
         assert_eq!(parsed_events[3].kind, JsonLogEventKind::ToolStart);
         assert_eq!(parsed_events[4].kind, JsonLogEventKind::ToolFinish);
@@ -1585,10 +1600,7 @@ mod event_stream_serialization_tests {
             .expect("read_event")
             .expect("must yield event");
 
-        assert_eq!(
-            read_event.session_id.as_deref(),
-            Some("sess_stream_1")
-        );
+        assert_eq!(read_event.session_id.as_deref(), Some("sess_stream_1"));
         assert_eq!(read_event.kind, JsonLogEventKind::TextDelta);
     }
 

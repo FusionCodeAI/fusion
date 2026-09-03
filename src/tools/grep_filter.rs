@@ -44,36 +44,141 @@ impl Default for FileTypeRegistry {
         let mut type_map = HashMap::new();
 
         type_map.insert("rust".to_string(), vec!["rs".to_string()]);
-        type_map.insert("python".to_string(), vec!["py".to_string(), "pyi".to_string(), "pyx".to_string()]);
-        type_map.insert("javascript".to_string(), vec!["js".to_string(), "mjs".to_string(), "cjs".to_string(), "jsx".to_string()]);
-        type_map.insert("js".to_string(), vec!["js".to_string(), "mjs".to_string(), "cjs".to_string(), "jsx".to_string()]);
-        type_map.insert("typescript".to_string(), vec!["ts".to_string(), "mts".to_string(), "cts".to_string(), "tsx".to_string()]);
-        type_map.insert("ts".to_string(), vec!["ts".to_string(), "mts".to_string(), "cts".to_string(), "tsx".to_string()]);
+        type_map.insert(
+            "python".to_string(),
+            vec!["py".to_string(), "pyi".to_string(), "pyx".to_string()],
+        );
+        type_map.insert(
+            "javascript".to_string(),
+            vec![
+                "js".to_string(),
+                "mjs".to_string(),
+                "cjs".to_string(),
+                "jsx".to_string(),
+            ],
+        );
+        type_map.insert(
+            "js".to_string(),
+            vec![
+                "js".to_string(),
+                "mjs".to_string(),
+                "cjs".to_string(),
+                "jsx".to_string(),
+            ],
+        );
+        type_map.insert(
+            "typescript".to_string(),
+            vec![
+                "ts".to_string(),
+                "mts".to_string(),
+                "cts".to_string(),
+                "tsx".to_string(),
+            ],
+        );
+        type_map.insert(
+            "ts".to_string(),
+            vec![
+                "ts".to_string(),
+                "mts".to_string(),
+                "cts".to_string(),
+                "tsx".to_string(),
+            ],
+        );
         type_map.insert("go".to_string(), vec!["go".to_string()]);
         type_map.insert("c".to_string(), vec!["c".to_string(), "h".to_string()]);
-        type_map.insert("cpp".to_string(), vec!["cpp".to_string(), "cc".to_string(), "cxx".to_string(), "hpp".to_string(), "hh".to_string(), "hxx".to_string()]);
-        type_map.insert("c++".to_string(), vec!["cpp".to_string(), "cc".to_string(), "cxx".to_string(), "hpp".to_string(), "hh".to_string(), "hxx".to_string()]);
+        type_map.insert(
+            "cpp".to_string(),
+            vec![
+                "cpp".to_string(),
+                "cc".to_string(),
+                "cxx".to_string(),
+                "hpp".to_string(),
+                "hh".to_string(),
+                "hxx".to_string(),
+            ],
+        );
+        type_map.insert(
+            "c++".to_string(),
+            vec![
+                "cpp".to_string(),
+                "cc".to_string(),
+                "cxx".to_string(),
+                "hpp".to_string(),
+                "hh".to_string(),
+                "hxx".to_string(),
+            ],
+        );
         type_map.insert("csharp".to_string(), vec!["cs".to_string()]);
         type_map.insert("cs".to_string(), vec!["cs".to_string()]);
         type_map.insert("java".to_string(), vec!["java".to_string()]);
-        type_map.insert("kotlin".to_string(), vec!["kt".to_string(), "kts".to_string()]);
+        type_map.insert(
+            "kotlin".to_string(),
+            vec!["kt".to_string(), "kts".to_string()],
+        );
         type_map.insert("swift".to_string(), vec!["swift".to_string()]);
-        type_map.insert("ruby".to_string(), vec!["rb".to_string(), "rake".to_string()]);
-        type_map.insert("php".to_string(), vec!["php".to_string(), "phtml".to_string()]);
-        type_map.insert("shell".to_string(), vec!["sh".to_string(), "bash".to_string(), "zsh".to_string()]);
-        type_map.insert("sh".to_string(), vec!["sh".to_string(), "bash".to_string(), "zsh".to_string()]);
-        type_map.insert("bash".to_string(), vec!["sh".to_string(), "bash".to_string(), "zsh".to_string()]);
-        type_map.insert("json".to_string(), vec!["json".to_string(), "jsonc".to_string(), "json5".to_string()]);
-        type_map.insert("yaml".to_string(), vec!["yaml".to_string(), "yml".to_string()]);
-        type_map.insert("yml".to_string(), vec!["yaml".to_string(), "yml".to_string()]);
+        type_map.insert(
+            "ruby".to_string(),
+            vec!["rb".to_string(), "rake".to_string()],
+        );
+        type_map.insert(
+            "php".to_string(),
+            vec!["php".to_string(), "phtml".to_string()],
+        );
+        type_map.insert(
+            "shell".to_string(),
+            vec!["sh".to_string(), "bash".to_string(), "zsh".to_string()],
+        );
+        type_map.insert(
+            "sh".to_string(),
+            vec!["sh".to_string(), "bash".to_string(), "zsh".to_string()],
+        );
+        type_map.insert(
+            "bash".to_string(),
+            vec!["sh".to_string(), "bash".to_string(), "zsh".to_string()],
+        );
+        type_map.insert(
+            "json".to_string(),
+            vec!["json".to_string(), "jsonc".to_string(), "json5".to_string()],
+        );
+        type_map.insert(
+            "yaml".to_string(),
+            vec!["yaml".to_string(), "yml".to_string()],
+        );
+        type_map.insert(
+            "yml".to_string(),
+            vec!["yaml".to_string(), "yml".to_string()],
+        );
         type_map.insert("toml".to_string(), vec!["toml".to_string()]);
-        type_map.insert("markdown".to_string(), vec!["md".to_string(), "markdown".to_string()]);
-        type_map.insert("md".to_string(), vec!["md".to_string(), "markdown".to_string()]);
-        type_map.insert("html".to_string(), vec!["html".to_string(), "htm".to_string()]);
-        type_map.insert("css".to_string(), vec!["css".to_string(), "scss".to_string(), "sass".to_string(), "less".to_string()]);
+        type_map.insert(
+            "markdown".to_string(),
+            vec!["md".to_string(), "markdown".to_string()],
+        );
+        type_map.insert(
+            "md".to_string(),
+            vec!["md".to_string(), "markdown".to_string()],
+        );
+        type_map.insert(
+            "html".to_string(),
+            vec!["html".to_string(), "htm".to_string()],
+        );
+        type_map.insert(
+            "css".to_string(),
+            vec![
+                "css".to_string(),
+                "scss".to_string(),
+                "sass".to_string(),
+                "less".to_string(),
+            ],
+        );
         type_map.insert("sql".to_string(), vec!["sql".to_string()]);
-        type_map.insert("xml".to_string(), vec!["xml".to_string(), "svg".to_string(), "plist".to_string()]);
-        type_map.insert("docker".to_string(), vec!["dockerfile".to_string(), "dockerignore".to_string()]);
+        type_map.insert(
+            "xml".to_string(),
+            vec!["xml".to_string(), "svg".to_string(), "plist".to_string()],
+        );
+        type_map.insert(
+            "docker".to_string(),
+            vec!["dockerfile".to_string(), "dockerignore".to_string()],
+        );
 
         Self { type_map }
     }
@@ -315,7 +420,12 @@ impl PathFilter {
     }
 
     /// Check if a given file path meets all filter criteria.
-    pub fn matches_file(&self, path: &Path, base_dir: &Path, metadata: Option<&fs::Metadata>) -> bool {
+    pub fn matches_file(
+        &self,
+        path: &Path,
+        base_dir: &Path,
+        metadata: Option<&fs::Metadata>,
+    ) -> bool {
         // Hidden check
         if !self.include_hidden && is_hidden_path(path, base_dir) {
             return false;
@@ -472,7 +582,11 @@ pub fn truncate_line(line: &str, max_len: usize) -> String {
 }
 
 /// Find all byte offset spans for a literal substring within a haystack.
-pub fn find_substring_spans(haystack: &str, needle: &str, case_sensitive: bool) -> Vec<(usize, usize)> {
+pub fn find_substring_spans(
+    haystack: &str,
+    needle: &str,
+    case_sensitive: bool,
+) -> Vec<(usize, usize)> {
     if needle.is_empty() {
         return Vec::new();
     }
@@ -653,56 +767,115 @@ impl StreamGrepOptions {
             opts.case_sensitive = !i;
         }
 
-        if let Some(inv) = args.get("invert_match").or_else(|| args.get("invert")).or_else(|| args.get("v")).and_then(|v| v.as_bool()) {
+        if let Some(inv) = args
+            .get("invert_match")
+            .or_else(|| args.get("invert"))
+            .or_else(|| args.get("v"))
+            .and_then(|v| v.as_bool())
+        {
             opts.invert_match = inv;
         }
 
-        if let Some(f) = args.get("fixed_strings").or_else(|| args.get("literal")).or_else(|| args.get("F")).and_then(|v| v.as_bool()) {
+        if let Some(f) = args
+            .get("fixed_strings")
+            .or_else(|| args.get("literal"))
+            .or_else(|| args.get("F"))
+            .and_then(|v| v.as_bool())
+        {
             opts.fixed_strings = f;
         }
 
-        if let Some(m) = args.get("multiline").or_else(|| args.get("m")).and_then(|v| v.as_bool()) {
+        if let Some(m) = args
+            .get("multiline")
+            .or_else(|| args.get("m"))
+            .and_then(|v| v.as_bool())
+        {
             opts.multiline = m;
         }
 
-        if let Some(s) = args.get("dot_matches_all").or_else(|| args.get("s")).and_then(|v| v.as_bool()) {
+        if let Some(s) = args
+            .get("dot_matches_all")
+            .or_else(|| args.get("s"))
+            .and_then(|v| v.as_bool())
+        {
             opts.dot_matches_all = s;
         }
 
-        if let Some(ln) = args.get("line_numbers").or_else(|| args.get("show_line_numbers")).or_else(|| args.get("n")).and_then(|v| v.as_bool()) {
+        if let Some(ln) = args
+            .get("line_numbers")
+            .or_else(|| args.get("show_line_numbers"))
+            .or_else(|| args.get("n"))
+            .and_then(|v| v.as_bool())
+        {
             opts.line_numbers = ln;
         }
 
-        if let Some(c) = args.get("context").or_else(|| args.get("C")).and_then(|v| v.as_u64()) {
+        if let Some(c) = args
+            .get("context")
+            .or_else(|| args.get("C"))
+            .and_then(|v| v.as_u64())
+        {
             opts.context_before = c as usize;
             opts.context_after = c as usize;
         }
 
-        if let Some(b) = args.get("context_before").or_else(|| args.get("before_context")).or_else(|| args.get("B")).and_then(|v| v.as_u64()) {
+        if let Some(b) = args
+            .get("context_before")
+            .or_else(|| args.get("before_context"))
+            .or_else(|| args.get("B"))
+            .and_then(|v| v.as_u64())
+        {
             opts.context_before = b as usize;
         }
 
-        if let Some(a) = args.get("context_after").or_else(|| args.get("after_context")).or_else(|| args.get("A")).and_then(|v| v.as_u64()) {
+        if let Some(a) = args
+            .get("context_after")
+            .or_else(|| args.get("after_context"))
+            .or_else(|| args.get("A"))
+            .and_then(|v| v.as_u64())
+        {
             opts.context_after = a as usize;
         }
 
-        if let Some(mr) = args.get("max_results").or_else(|| args.get("max_matches")).or_else(|| args.get("limit")).and_then(|v| v.as_u64()) {
+        if let Some(mr) = args
+            .get("max_results")
+            .or_else(|| args.get("max_matches"))
+            .or_else(|| args.get("limit"))
+            .and_then(|v| v.as_u64())
+        {
             opts.max_matches = mr as usize;
         }
 
-        if let Some(mb) = args.get("max_bytes").or_else(|| args.get("byte_limit")).and_then(|v| v.as_u64()) {
+        if let Some(mb) = args
+            .get("max_bytes")
+            .or_else(|| args.get("byte_limit"))
+            .and_then(|v| v.as_u64())
+        {
             opts.max_bytes = mb as usize;
         }
 
-        if let Some(mll) = args.get("max_line_length").or_else(|| args.get("line_limit")).and_then(|v| v.as_u64()) {
+        if let Some(mll) = args
+            .get("max_line_length")
+            .or_else(|| args.get("line_limit"))
+            .and_then(|v| v.as_u64())
+        {
             opts.max_line_length = mll as usize;
         }
 
-        if let Some(co) = args.get("count_only").or_else(|| args.get("count")).or_else(|| args.get("c")).and_then(|v| v.as_bool()) {
+        if let Some(co) = args
+            .get("count_only")
+            .or_else(|| args.get("count"))
+            .or_else(|| args.get("c"))
+            .and_then(|v| v.as_bool())
+        {
             opts.count_only = co;
         }
 
-        if let Some(src) = args.get("source_name").or_else(|| args.get("source")).and_then(|v| v.as_str()) {
+        if let Some(src) = args
+            .get("source_name")
+            .or_else(|| args.get("source"))
+            .and_then(|v| v.as_str())
+        {
             opts.source_name = Some(src.to_string());
         }
 
@@ -770,18 +943,28 @@ impl StreamFilterResult {
     /// Format stream filter results into a clean string suitable for display.
     pub fn format_output(&self, options: &StreamGrepOptions) -> String {
         if self.is_binary {
-            return format!("Binary file or stream matches pattern '{}' (content omitted)", self.pattern);
+            return format!(
+                "Binary file or stream matches pattern '{}' (content omitted)",
+                self.pattern
+            );
         }
 
         if options.count_only {
-            return format!("Total matches: {} (scanned {} lines, {} bytes)", self.total_matches, self.lines_scanned, self.bytes_scanned);
+            return format!(
+                "Total matches: {} (scanned {} lines, {} bytes)",
+                self.total_matches, self.lines_scanned, self.bytes_scanned
+            );
         }
 
         if self.lines.is_empty() {
-            return format!("No matches found for pattern '{}' (scanned {} lines, {} bytes)", self.pattern, self.lines_scanned, self.bytes_scanned);
+            return format!(
+                "No matches found for pattern '{}' (scanned {} lines, {} bytes)",
+                self.pattern, self.lines_scanned, self.bytes_scanned
+            );
         }
 
-        let show_source = options.source_name.is_some() || self.lines.iter().any(|l| l.source.is_some());
+        let show_source =
+            options.source_name.is_some() || self.lines.iter().any(|l| l.source.is_some());
         let mut out = String::new();
 
         for line in &self.lines {
@@ -878,7 +1061,9 @@ impl StreamGrepFilter {
             .multi_line(options.multiline)
             .dot_matches_new_line(options.dot_matches_all)
             .build()
-            .map_err(|e| anyhow::anyhow!("Invalid regular expression '{}': {e}", options.pattern))?;
+            .map_err(|e| {
+                anyhow::anyhow!("Invalid regular expression '{}': {e}", options.pattern)
+            })?;
 
         Ok(Self { options, regex })
     }
@@ -888,7 +1073,11 @@ impl StreamGrepFilter {
     }
 
     /// Filter an arbitrary `BufRead` stream, outputting matches and context lines.
-    pub fn filter_reader<R: BufRead>(&self, mut reader: R, source_name: Option<&str>) -> anyhow::Result<StreamFilterResult> {
+    pub fn filter_reader<R: BufRead>(
+        &self,
+        mut reader: R,
+        source_name: Option<&str>,
+    ) -> anyhow::Result<StreamFilterResult> {
         let mut byte_buffer = Vec::new();
         let mut line_number = 0;
         let mut total_matches = 0;
@@ -906,7 +1095,9 @@ impl StreamGrepFilter {
         let mut last_emitted_line: Option<usize> = None;
         let mut emitted_lines: Vec<StreamFilteredLine> = Vec::new();
 
-        let src_string = source_name.or(self.options.source_name.as_deref()).map(str::to_string);
+        let src_string = source_name
+            .or(self.options.source_name.as_deref())
+            .map(str::to_string);
 
         while reader.read_until(b'\n', &mut byte_buffer)? > 0 {
             line_number += 1;
@@ -927,7 +1118,9 @@ impl StreamGrepFilter {
                 if self.options.case_sensitive {
                     trimmed_line.contains(&self.options.pattern)
                 } else {
-                    trimmed_line.to_lowercase().contains(&self.options.pattern.to_lowercase())
+                    trimmed_line
+                        .to_lowercase()
+                        .contains(&self.options.pattern.to_lowercase())
                 }
             } else {
                 self.regex.is_match(trimmed_line)
@@ -947,9 +1140,16 @@ impl StreamGrepFilter {
                 if !self.options.count_only {
                     let match_spans = if !self.options.invert_match {
                         if self.options.fixed_strings {
-                            find_substring_spans(trimmed_line, &self.options.pattern, self.options.case_sensitive)
+                            find_substring_spans(
+                                trimmed_line,
+                                &self.options.pattern,
+                                self.options.case_sensitive,
+                            )
                         } else {
-                            self.regex.find_iter(trimmed_line).map(|m| (m.start(), m.end())).collect()
+                            self.regex
+                                .find_iter(trimmed_line)
+                                .map(|m| (m.start(), m.end()))
+                                .collect()
                         }
                     } else {
                         Vec::new()
@@ -958,10 +1158,13 @@ impl StreamGrepFilter {
                     // Emit pending before-context lines
                     if before > 0 {
                         for (b_num, b_line) in before_buffer.drain(..) {
-                            let is_already_emitted = last_emitted_line.map(|l| b_num <= l).unwrap_or(false);
+                            let is_already_emitted =
+                                last_emitted_line.map(|l| b_num <= l).unwrap_or(false);
                             if !is_already_emitted {
-                                let has_gap = last_emitted_line.map(|l| b_num > l + 1).unwrap_or(false);
-                                if has_gap && !emitted_lines.is_empty() && (before > 0 || after > 0) {
+                                let has_gap =
+                                    last_emitted_line.map(|l| b_num > l + 1).unwrap_or(false);
+                                if has_gap && !emitted_lines.is_empty() && (before > 0 || after > 0)
+                                {
                                     emitted_lines.push(StreamFilteredLine {
                                         source: src_string.clone(),
                                         line_number: 0,
@@ -989,7 +1192,9 @@ impl StreamGrepFilter {
                     }
 
                     // Emit match line
-                    let has_gap = last_emitted_line.map(|l| line_number > l + 1).unwrap_or(false);
+                    let has_gap = last_emitted_line
+                        .map(|l| line_number > l + 1)
+                        .unwrap_or(false);
                     if has_gap && !emitted_lines.is_empty() && (before > 0 || after > 0) {
                         emitted_lines.push(StreamFilteredLine {
                             source: src_string.clone(),
@@ -1030,7 +1235,9 @@ impl StreamGrepFilter {
             } else if !self.options.count_only {
                 if after_remaining > 0 {
                     after_remaining -= 1;
-                    let has_gap = last_emitted_line.map(|l| line_number > l + 1).unwrap_or(false);
+                    let has_gap = last_emitted_line
+                        .map(|l| line_number > l + 1)
+                        .unwrap_or(false);
                     if has_gap && !emitted_lines.is_empty() && (before > 0 || after > 0) {
                         emitted_lines.push(StreamFilteredLine {
                             source: src_string.clone(),
@@ -1086,7 +1293,11 @@ impl StreamGrepFilter {
     }
 
     /// Filter an in-memory string slice.
-    pub fn filter_str(&self, input: &str, source_name: Option<&str>) -> anyhow::Result<StreamFilterResult> {
+    pub fn filter_str(
+        &self,
+        input: &str,
+        source_name: Option<&str>,
+    ) -> anyhow::Result<StreamFilterResult> {
         let cursor = Cursor::new(input.as_bytes());
         self.filter_reader(cursor, source_name)
     }
@@ -1098,7 +1309,11 @@ impl StreamGrepFilter {
     }
 
     /// Filter a single file on disk with custom source name prefix.
-    pub fn filter_file_with_source(&self, path: &Path, source_name: Option<&str>) -> anyhow::Result<StreamFilterResult> {
+    pub fn filter_file_with_source(
+        &self,
+        path: &Path,
+        source_name: Option<&str>,
+    ) -> anyhow::Result<StreamFilterResult> {
         let file = File::open(path)
             .map_err(|e| anyhow::anyhow!("Failed to open file '{}': {e}", path.display()))?;
         let reader = BufReader::new(file);
@@ -1106,7 +1321,11 @@ impl StreamGrepFilter {
     }
 
     /// Filter multiple file paths in sequence, merging results and tracking limits.
-    pub fn filter_paths(&self, paths: &[PathBuf], base_dir: Option<&Path>) -> anyhow::Result<StreamFilterResult> {
+    pub fn filter_paths(
+        &self,
+        paths: &[PathBuf],
+        base_dir: Option<&Path>,
+    ) -> anyhow::Result<StreamFilterResult> {
         let mut combined_lines = Vec::new();
         let mut total_matches = 0;
         let mut lines_scanned = 0;
@@ -1117,7 +1336,10 @@ impl StreamGrepFilter {
 
         for path in paths {
             let source_name = if let Some(base) = base_dir {
-                path.strip_prefix(base).unwrap_or(path).to_string_lossy().to_string()
+                path.strip_prefix(base)
+                    .unwrap_or(path)
+                    .to_string_lossy()
+                    .to_string()
             } else {
                 path.to_string_lossy().to_string()
             };
@@ -1272,7 +1494,12 @@ impl GrepOptions {
         }
 
         // Includes: supports string or array of strings (keys: include, includes, glob, filter)
-        if let Some(inc_val) = args.get("include").or_else(|| args.get("includes")).or_else(|| args.get("glob")).or_else(|| args.get("filter")) {
+        if let Some(inc_val) = args
+            .get("include")
+            .or_else(|| args.get("includes"))
+            .or_else(|| args.get("glob"))
+            .or_else(|| args.get("filter"))
+        {
             if let Some(s) = inc_val.as_str() {
                 opts.include_globs.push(s.to_string());
             } else if let Some(arr) = inc_val.as_array() {
@@ -1285,7 +1512,11 @@ impl GrepOptions {
         }
 
         // Excludes: supports string or array of strings (keys: exclude, excludes, ignore)
-        if let Some(exc_val) = args.get("exclude").or_else(|| args.get("excludes")).or_else(|| args.get("ignore")) {
+        if let Some(exc_val) = args
+            .get("exclude")
+            .or_else(|| args.get("excludes"))
+            .or_else(|| args.get("ignore"))
+        {
             if let Some(s) = exc_val.as_str() {
                 opts.exclude_globs.push(s.to_string());
             } else if let Some(arr) = exc_val.as_array() {
@@ -1298,7 +1529,12 @@ impl GrepOptions {
         }
 
         // File types: (keys: type, types, file_type, file_types)
-        if let Some(ft_val) = args.get("type").or_else(|| args.get("types")).or_else(|| args.get("file_type")).or_else(|| args.get("file_types")) {
+        if let Some(ft_val) = args
+            .get("type")
+            .or_else(|| args.get("types"))
+            .or_else(|| args.get("file_type"))
+            .or_else(|| args.get("file_types"))
+        {
             if let Some(s) = ft_val.as_str() {
                 opts.file_types.push(s.to_string());
             } else if let Some(arr) = ft_val.as_array() {
@@ -1311,24 +1547,48 @@ impl GrepOptions {
         }
 
         // Context lines
-        if let Some(c) = args.get("context").or_else(|| args.get("C")).and_then(|v| v.as_u64()) {
+        if let Some(c) = args
+            .get("context")
+            .or_else(|| args.get("C"))
+            .and_then(|v| v.as_u64())
+        {
             opts.context_before = c as usize;
             opts.context_after = c as usize;
         }
-        if let Some(b) = args.get("context_before").or_else(|| args.get("before_context")).or_else(|| args.get("B")).and_then(|v| v.as_u64()) {
+        if let Some(b) = args
+            .get("context_before")
+            .or_else(|| args.get("before_context"))
+            .or_else(|| args.get("B"))
+            .and_then(|v| v.as_u64())
+        {
             opts.context_before = b as usize;
         }
-        if let Some(a) = args.get("context_after").or_else(|| args.get("after_context")).or_else(|| args.get("A")).and_then(|v| v.as_u64()) {
+        if let Some(a) = args
+            .get("context_after")
+            .or_else(|| args.get("after_context"))
+            .or_else(|| args.get("A"))
+            .and_then(|v| v.as_u64())
+        {
             opts.context_after = a as usize;
         }
 
         // Invert match
-        if let Some(inv) = args.get("invert_match").or_else(|| args.get("invert")).or_else(|| args.get("v")).and_then(|v| v.as_bool()) {
+        if let Some(inv) = args
+            .get("invert_match")
+            .or_else(|| args.get("invert"))
+            .or_else(|| args.get("v"))
+            .and_then(|v| v.as_bool())
+        {
             opts.invert_match = inv;
         }
 
         // Fixed strings
-        if let Some(f) = args.get("fixed_strings").or_else(|| args.get("literal")).or_else(|| args.get("F")).and_then(|v| v.as_bool()) {
+        if let Some(f) = args
+            .get("fixed_strings")
+            .or_else(|| args.get("literal"))
+            .or_else(|| args.get("F"))
+            .and_then(|v| v.as_bool())
+        {
             opts.fixed_strings = f;
         }
 
@@ -1338,7 +1598,11 @@ impl GrepOptions {
         }
 
         // Max depth
-        if let Some(d) = args.get("max_depth").or_else(|| args.get("depth")).and_then(|v| v.as_u64()) {
+        if let Some(d) = args
+            .get("max_depth")
+            .or_else(|| args.get("depth"))
+            .and_then(|v| v.as_u64())
+        {
             opts.max_depth = Some(d as usize);
         }
 
@@ -1351,13 +1615,26 @@ impl GrepOptions {
         }
 
         // Output mode flags
-        if let Some(c) = args.get("count_only").or_else(|| args.get("count")).and_then(|v| v.as_bool()) {
+        if let Some(c) = args
+            .get("count_only")
+            .or_else(|| args.get("count"))
+            .and_then(|v| v.as_bool())
+        {
             opts.count_only = c;
         }
-        if let Some(f) = args.get("files_with_matches").or_else(|| args.get("files_only")).or_else(|| args.get("l")).and_then(|v| v.as_bool()) {
+        if let Some(f) = args
+            .get("files_with_matches")
+            .or_else(|| args.get("files_only"))
+            .or_else(|| args.get("l"))
+            .and_then(|v| v.as_bool())
+        {
             opts.files_with_matches = f;
         }
-        if let Some(f) = args.get("files_without_matches").or_else(|| args.get("L")).and_then(|v| v.as_bool()) {
+        if let Some(f) = args
+            .get("files_without_matches")
+            .or_else(|| args.get("L"))
+            .and_then(|v| v.as_bool())
+        {
             opts.files_without_matches = f;
         }
 
@@ -1388,30 +1665,43 @@ pub struct GrepSearchResult {
 
 impl GrepSearchResult {
     /// Format search results into a clean string suitable for tool execution outputs.
-    pub fn format_output(&self, search_path_display: &str, pattern: &str, options: &GrepOptions) -> String {
+    pub fn format_output(
+        &self,
+        search_path_display: &str,
+        pattern: &str,
+        options: &GrepOptions,
+    ) -> String {
         if options.files_with_matches {
             if self.matched_files.is_empty() {
-                return format!("No files matched pattern '{}' in '{}'", pattern, search_path_display);
+                return format!(
+                    "No files matched pattern '{}' in '{}'",
+                    pattern, search_path_display
+                );
             }
             return self.matched_files.join("\n");
         }
 
         if options.files_without_matches {
             if self.matched_files.is_empty() {
-                return format!("All searched files matched pattern '{}' in '{}'", pattern, search_path_display);
+                return format!(
+                    "All searched files matched pattern '{}' in '{}'",
+                    pattern, search_path_display
+                );
             }
             return self.matched_files.join("\n");
         }
 
         if options.count_only {
-            return format!("Total matches: {} across {} files", self.total_matches, self.files_matched);
+            return format!(
+                "Total matches: {} across {} files",
+                self.total_matches, self.files_matched
+            );
         }
 
         if self.matches.is_empty() {
             return format!(
                 "No matches found for regex '{}' in '{}'",
-                pattern,
-                search_path_display
+                pattern, search_path_display
             );
         }
 
@@ -1421,7 +1711,9 @@ impl GrepSearchResult {
 
         for m in &self.matches {
             let file_changed = last_file.map(|f| f != m.file.as_str()).unwrap_or(true);
-            let has_gap = !file_changed && (m.line_number > last_line_num + 1) && (options.context_before > 0 || options.context_after > 0);
+            let has_gap = !file_changed
+                && (m.line_number > last_line_num + 1)
+                && (options.context_before > 0 || options.context_after > 0);
 
             if has_gap && !lines.is_empty() {
                 lines.push("--".to_string());
@@ -1431,7 +1723,10 @@ impl GrepSearchResult {
             let formatted_line = truncate_line(&m.line, 400);
 
             if options.line_numbers {
-                lines.push(format!("{}{}{}: {}", m.file, separator, m.line_number, formatted_line));
+                lines.push(format!(
+                    "{}{}{}: {}",
+                    m.file, separator, m.line_number, formatted_line
+                ));
             } else {
                 lines.push(format!("{}{}: {}", m.file, separator, formatted_line));
             }
@@ -1444,7 +1739,8 @@ impl GrepSearchResult {
         if self.truncated {
             output.push_str(&format!(
                 "\n\n... [{} additional matches truncated; max_results={}]",
-                self.total_matches.saturating_sub(self.matches.iter().filter(|m| !m.is_context).count()),
+                self.total_matches
+                    .saturating_sub(self.matches.iter().filter(|m| !m.is_context).count()),
                 self.max_results
             ));
         }
@@ -1508,7 +1804,9 @@ impl FilterableGrepEngine {
             .case_insensitive(!options.case_sensitive)
             .multi_line(options.multiline)
             .build()
-            .map_err(|e| anyhow::anyhow!("Invalid regular expression '{}': {e}", options.pattern))?;
+            .map_err(|e| {
+                anyhow::anyhow!("Invalid regular expression '{}': {e}", options.pattern)
+            })?;
 
         Ok(Self {
             options,
@@ -1532,16 +1830,28 @@ impl FilterableGrepEngine {
 
         if self.options.search_path.is_file() {
             let metadata = fs::metadata(&self.options.search_path).ok();
-            if self.filter.matches_file(&self.options.search_path, &self.options.cwd, metadata.as_ref()) {
+            if self.filter.matches_file(
+                &self.options.search_path,
+                &self.options.cwd,
+                metadata.as_ref(),
+            ) {
                 files_searched += 1;
                 let (file_matches, count) = self.search_file(&self.options.search_path);
                 total_matches += count;
                 if count > 0 {
-                    let rel = self.options.search_path.strip_prefix(&self.options.cwd).unwrap_or(&self.options.search_path);
+                    let rel = self
+                        .options
+                        .search_path
+                        .strip_prefix(&self.options.cwd)
+                        .unwrap_or(&self.options.search_path);
                     matched_files_set.insert(rel.to_string_lossy().to_string());
                     matches.extend(file_matches);
                 } else {
-                    let rel = self.options.search_path.strip_prefix(&self.options.cwd).unwrap_or(&self.options.search_path);
+                    let rel = self
+                        .options
+                        .search_path
+                        .strip_prefix(&self.options.cwd)
+                        .unwrap_or(&self.options.search_path);
                     non_matched_files.push(rel.to_string_lossy().to_string());
                 }
             }
@@ -1593,7 +1903,10 @@ impl FilterableGrepEngine {
                 let metadata = entry.metadata().ok();
 
                 // Check filter rules
-                if !self.filter.matches_file(path, &self.options.cwd, metadata.as_ref()) {
+                if !self
+                    .filter
+                    .matches_file(path, &self.options.cwd, metadata.as_ref())
+                {
                     continue;
                 }
 
@@ -1607,7 +1920,9 @@ impl FilterableGrepEngine {
                 if count > 0 {
                     matched_files_set.insert(rel_str);
                     for m in file_matches {
-                        if matches.iter().filter(|x| !x.is_context).count() < max_results || m.is_context {
+                        if matches.iter().filter(|x| !x.is_context).count() < max_results
+                            || m.is_context
+                        {
                             matches.push(m);
                         }
                     }
@@ -1616,7 +1931,10 @@ impl FilterableGrepEngine {
                 }
 
                 // If we've collected enough primary matches and don't need all counts or file lists, break early
-                if !self.options.count_only && !self.options.files_with_matches && !self.options.files_without_matches {
+                if !self.options.count_only
+                    && !self.options.files_with_matches
+                    && !self.options.files_without_matches
+                {
                     if matches.iter().filter(|m| !m.is_context).count() >= max_results {
                         break;
                     }
@@ -1661,7 +1979,9 @@ impl FilterableGrepEngine {
             Err(_) => return (Vec::new(), 0),
         };
 
-        let rel_path = file_path.strip_prefix(&self.options.cwd).unwrap_or(file_path);
+        let rel_path = file_path
+            .strip_prefix(&self.options.cwd)
+            .unwrap_or(file_path);
         let rel_path_str = rel_path.to_string_lossy().to_string();
 
         let lines: Vec<&str> = text.lines().collect();
@@ -1920,7 +2240,11 @@ impl Tool for GrepFilterTool {
         if target_path.is_file() {
             let target_path_clone = target_path.clone();
             let mut opts_clone = stream_opts.clone();
-            let rel_display = target_path.strip_prefix(&ctx.cwd).unwrap_or(&target_path).to_string_lossy().to_string();
+            let rel_display = target_path
+                .strip_prefix(&ctx.cwd)
+                .unwrap_or(&target_path)
+                .to_string_lossy()
+                .to_string();
             opts_clone.source_name = Some(rel_display);
 
             let res = tokio::task::spawn_blocking(move || -> anyhow::Result<StreamFilterResult> {
@@ -1943,15 +2267,18 @@ impl Tool for GrepFilterTool {
         let pattern_str = grep_opts.pattern.clone();
         let grep_opts_clone = grep_opts.clone();
 
-        let search_result = tokio::task::spawn_blocking(move || -> anyhow::Result<GrepSearchResult> {
-            let engine = FilterableGrepEngine::new(grep_opts_clone)?;
-            engine.search()
-        })
-        .await
-        .map_err(|e| anyhow::anyhow!("Directory grep filter task join failed: {e}"))??;
+        let search_result =
+            tokio::task::spawn_blocking(move || -> anyhow::Result<GrepSearchResult> {
+                let engine = FilterableGrepEngine::new(grep_opts_clone)?;
+                engine.search()
+            })
+            .await
+            .map_err(|e| anyhow::anyhow!("Directory grep filter task join failed: {e}"))??;
 
         if format_json {
-            Ok(serde_json::to_string_pretty(&search_result.to_json_value())?)
+            Ok(serde_json::to_string_pretty(
+                &search_result.to_json_value(),
+            )?)
         } else {
             Ok(search_result.format_output(&display_path, &pattern_str, &grep_opts))
         }
@@ -2001,8 +2328,12 @@ mod tests {
         let reg = FileTypeRegistry::new();
         assert_eq!(reg.resolve_extensions("rust"), vec!["rs".to_string()]);
         assert_eq!(reg.resolve_extensions(".rs"), vec!["rs".to_string()]);
-        assert!(reg.resolve_extensions("typescript").contains(&"ts".to_string()));
-        assert!(reg.resolve_extensions("typescript").contains(&"tsx".to_string()));
+        assert!(reg
+            .resolve_extensions("typescript")
+            .contains(&"ts".to_string()));
+        assert!(reg
+            .resolve_extensions("typescript")
+            .contains(&"tsx".to_string()));
         assert_eq!(reg.resolve_extensions("custom"), vec!["custom".to_string()]);
     }
 
@@ -2015,10 +2346,7 @@ mod tests {
         let f_node = ws.create_file("node_modules/pkg/index.js", b"module.exports = {};");
 
         // Include only *.rs
-        let filter = PathFilter::builder()
-            .include("*.rs")
-            .build()
-            .unwrap();
+        let filter = PathFilter::builder().include("*.rs").build().unwrap();
 
         assert!(filter.matches_file(&f_rs, &ws.dir, None));
         assert!(filter.matches_file(&f_test, &ws.dir, None));
@@ -2058,8 +2386,14 @@ mod tests {
     #[test]
     fn test_filterable_grep_engine_search() {
         let ws = TestWorkspace::new("engine_search");
-        ws.create_file("src/app.rs", b"use std::sync::Arc;\n// TARGET_TOKEN in app\nfn run() {}\n");
-        ws.create_file("src/util.ts", b"export const x = 1;\n// TARGET_TOKEN in util\n");
+        ws.create_file(
+            "src/app.rs",
+            b"use std::sync::Arc;\n// TARGET_TOKEN in app\nfn run() {}\n",
+        );
+        ws.create_file(
+            "src/util.ts",
+            b"export const x = 1;\n// TARGET_TOKEN in util\n",
+        );
         ws.create_file("src/ignored.rs", b"// TARGET_TOKEN in ignored\n");
         ws.create_file("docs/readme.md", b"# Info\nTARGET_TOKEN in docs\n");
 
@@ -2311,7 +2645,9 @@ mod tests {
         let binary_data = b"hello\x00world\nnext line with target\n";
         let opts = StreamGrepOptions::new("target");
         let filter = StreamGrepFilter::new(opts.clone()).unwrap();
-        let res = filter.filter_reader(Cursor::new(binary_data), None).unwrap();
+        let res = filter
+            .filter_reader(Cursor::new(binary_data), None)
+            .unwrap();
 
         assert!(res.is_binary);
         let output = res.format_output(&opts);
@@ -2333,7 +2669,10 @@ mod tests {
         assert_eq!(res.total_matches, 1);
         assert_eq!(res.lines.len(), 3);
         assert_eq!(res.lines[1].line_number, 2);
-        assert_eq!(res.lines[1].content, "2026-09-02 [ERROR] Database connection lost");
+        assert_eq!(
+            res.lines[1].content,
+            "2026-09-02 [ERROR] Database connection lost"
+        );
     }
 
     #[test]

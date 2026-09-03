@@ -4,11 +4,11 @@
 //! SearXNG JSON endpoints. Designed for lightweight, fast retrieval without
 //! external credentials or complex dependencies.
 
-use std::time::Duration;
 use async_trait::async_trait;
 use regex::Regex;
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
+use std::time::Duration;
 
 use crate::tools::types::{Tool, ToolContext};
 
@@ -86,7 +86,11 @@ impl WebSearchTool {
     }
 
     /// Execute a search against DuckDuckGo HTML, falling back to DuckDuckGo Lite if needed.
-    pub async fn search_duckduckgo(&self, query: &str, limit: usize) -> anyhow::Result<Vec<SearchResult>> {
+    pub async fn search_duckduckgo(
+        &self,
+        query: &str,
+        limit: usize,
+    ) -> anyhow::Result<Vec<SearchResult>> {
         let encoded_query = url_encode(query);
         let ddg_html_url = format!("https://html.duckduckgo.com/html/?q={}", encoded_query);
 
@@ -153,7 +157,11 @@ impl WebSearchTool {
     }
 
     /// Fallback search using Wikipedia Search API.
-    pub async fn search_wikipedia(&self, query: &str, limit: usize) -> anyhow::Result<Vec<SearchResult>> {
+    pub async fn search_wikipedia(
+        &self,
+        query: &str,
+        limit: usize,
+    ) -> anyhow::Result<Vec<SearchResult>> {
         let encoded = url_encode(query);
         let url = format!(
             "https://en.wikipedia.org/w/api.php?action=query&list=search&srsearch={}&format=json&utf8=1",
@@ -176,8 +184,14 @@ impl WebSearchTool {
 
         if let Some(items) = val.pointer("/query/search").and_then(|v| v.as_array()) {
             for item in items.iter().take(limit) {
-                let title = item.get("title").and_then(|v| v.as_str()).unwrap_or_default();
-                let snippet = item.get("snippet").and_then(|v| v.as_str()).unwrap_or_default();
+                let title = item
+                    .get("title")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or_default();
+                let snippet = item
+                    .get("snippet")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or_default();
                 let clean_snippet = decode_html_entities(&strip_html_tags(snippet));
                 let page_url = format!("https://en.wikipedia.org/wiki/{}", url_encode(title));
 
@@ -195,12 +209,20 @@ impl WebSearchTool {
     }
 
     /// Fallback search using GitHub API for developers, organizations, and repositories.
-    pub async fn search_github(&self, query: &str, limit: usize) -> anyhow::Result<Vec<SearchResult>> {
+    pub async fn search_github(
+        &self,
+        query: &str,
+        limit: usize,
+    ) -> anyhow::Result<Vec<SearchResult>> {
         let encoded = url_encode(query);
         let mut results = Vec::new();
 
         // 1. Search GitHub users / orgs
-        let user_url = format!("https://api.github.com/search/users?q={}&per_page={}", encoded, limit.min(5));
+        let user_url = format!(
+            "https://api.github.com/search/users?q={}&per_page={}",
+            encoded,
+            limit.min(5)
+        );
         if let Ok(res) = self
             .client
             .get(&user_url)
@@ -212,14 +234,24 @@ impl WebSearchTool {
                 if let Ok(val) = res.json::<Value>().await {
                     if let Some(items) = val.get("items").and_then(|v| v.as_array()) {
                         for item in items {
-                            let login = item.get("login").and_then(|v| v.as_str()).unwrap_or_default();
-                            let html_url = item.get("html_url").and_then(|v| v.as_str()).unwrap_or_default();
-                            let user_type = item.get("type").and_then(|v| v.as_str()).unwrap_or("User");
+                            let login = item
+                                .get("login")
+                                .and_then(|v| v.as_str())
+                                .unwrap_or_default();
+                            let html_url = item
+                                .get("html_url")
+                                .and_then(|v| v.as_str())
+                                .unwrap_or_default();
+                            let user_type =
+                                item.get("type").and_then(|v| v.as_str()).unwrap_or("User");
                             if !login.is_empty() && !html_url.is_empty() {
                                 results.push(SearchResult {
                                     title: format!("{} ({}) on GitHub", login, user_type),
                                     url: html_url.to_string(),
-                                    snippet: format!("GitHub profile for {} ({}).", login, user_type),
+                                    snippet: format!(
+                                        "GitHub profile for {} ({}).",
+                                        login, user_type
+                                    ),
                                 });
                             }
                         }
@@ -229,7 +261,11 @@ impl WebSearchTool {
         }
 
         // 2. Search GitHub repositories
-        let repo_url = format!("https://api.github.com/search/repositories?q={}&per_page={}", encoded, limit.min(5));
+        let repo_url = format!(
+            "https://api.github.com/search/repositories?q={}&per_page={}",
+            encoded,
+            limit.min(5)
+        );
         if let Ok(res) = self
             .client
             .get(&repo_url)
@@ -241,9 +277,18 @@ impl WebSearchTool {
                 if let Ok(val) = res.json::<Value>().await {
                     if let Some(items) = val.get("items").and_then(|v| v.as_array()) {
                         for item in items {
-                            let full_name = item.get("full_name").and_then(|v| v.as_str()).unwrap_or_default();
-                            let html_url = item.get("html_url").and_then(|v| v.as_str()).unwrap_or_default();
-                            let desc = item.get("description").and_then(|v| v.as_str()).unwrap_or_default();
+                            let full_name = item
+                                .get("full_name")
+                                .and_then(|v| v.as_str())
+                                .unwrap_or_default();
+                            let html_url = item
+                                .get("html_url")
+                                .and_then(|v| v.as_str())
+                                .unwrap_or_default();
+                            let desc = item
+                                .get("description")
+                                .and_then(|v| v.as_str())
+                                .unwrap_or_default();
                             if !full_name.is_empty() && !html_url.is_empty() {
                                 results.push(SearchResult {
                                     title: format!("{} on GitHub", full_name),
@@ -269,7 +314,10 @@ impl WebSearchTool {
     ) -> anyhow::Result<Vec<SearchResult>> {
         let base = instance_url.trim_end_matches('/');
         let encoded_query = url_encode(query);
-        let search_url = format!("{}/search?q={}&format=json&categories=general", base, encoded_query);
+        let search_url = format!(
+            "{}/search?q={}&format=json&categories=general",
+            base, encoded_query
+        );
 
         let res = self
             .client
@@ -328,7 +376,10 @@ impl WebSearchTool {
                 }
                 self.search_duckduckgo(query, limit).await
             }
-            other => anyhow::bail!("Unsupported search engine '{}'. Choose 'auto', 'duckduckgo', or 'searxng'.", other),
+            other => anyhow::bail!(
+                "Unsupported search engine '{}'. Choose 'auto', 'duckduckgo', or 'searxng'.",
+                other
+            ),
         }
     }
 }
@@ -434,10 +485,8 @@ pub fn parse_ddg_html(html_text: &str, limit: usize) -> Vec<SearchResult> {
     )
     .ok();
 
-    let snippet_regex = Regex::new(
-        r#"(?s)<a[^>]*class="[^"]*result__snippet[^"]*"[^>]*>(.*?)</a>"#,
-    )
-    .ok();
+    let snippet_regex =
+        Regex::new(r#"(?s)<a[^>]*class="[^"]*result__snippet[^"]*"[^>]*>(.*?)</a>"#).ok();
 
     if let Some(t_re) = title_regex {
         // Split by result divider or scan blocks
@@ -493,10 +542,7 @@ pub fn parse_ddg_lite(html_text: &str, limit: usize) -> Vec<SearchResult> {
         r#"(?s)<a\s+[^>]*class=['"]result-link['"][^>]*href=['"]([^'"]+)['"][^>]*>(.*?)</a>"#,
     )
     .ok();
-    let snippet_re = Regex::new(
-        r#"(?s)<td[^>]*class=['"]result-snippet['"][^>]*>(.*?)</td>"#,
-    )
-    .ok();
+    let snippet_re = Regex::new(r#"(?s)<td[^>]*class=['"]result-snippet['"][^>]*>(.*?)</td>"#).ok();
 
     if let (Some(l_re), Some(s_re)) = (link_re.or(alt_link_re), snippet_re) {
         // Find positions of result-link
@@ -539,7 +585,6 @@ pub fn parse_ddg_lite(html_text: &str, limit: usize) -> Vec<SearchResult> {
 
     results
 }
-
 
 /// Parse SearXNG JSON API response.
 pub fn parse_searxng_json(json_val: &Value, limit: usize) -> Vec<SearchResult> {
@@ -658,19 +703,15 @@ fn decode_single_entity(entity: &str) -> Option<String> {
         "ndash" => Some("–".to_string()),
         "hellip" => Some("…".to_string()),
         "bull" => Some("•".to_string()),
-        s if s.starts_with("#x") || s.starts_with("#X") => {
-            u32::from_str_radix(&s[2..], 16)
-                .ok()
-                .and_then(char::from_u32)
-                .map(|c| c.to_string())
-        }
-        s if s.starts_with('#') => {
-            s[1..]
-                .parse::<u32>()
-                .ok()
-                .and_then(char::from_u32)
-                .map(|c| c.to_string())
-        }
+        s if s.starts_with("#x") || s.starts_with("#X") => u32::from_str_radix(&s[2..], 16)
+            .ok()
+            .and_then(char::from_u32)
+            .map(|c| c.to_string()),
+        s if s.starts_with('#') => s[1..]
+            .parse::<u32>()
+            .ok()
+            .and_then(char::from_u32)
+            .map(|c| c.to_string()),
         _ => None,
     }
 }
@@ -759,8 +800,14 @@ mod tests {
             decode_html_entities("Rust &amp; &quot;Tokio&quot; &lt;runtime&gt;"),
             "Rust & \"Tokio\" <runtime>"
         );
-        assert_eq!(decode_html_entities("It&#39;s an &#x26; test"), "It's an & test");
-        assert_eq!(decode_html_entities("&copy; 2026 &mdash; Fusion"), "© 2026 — Fusion");
+        assert_eq!(
+            decode_html_entities("It&#39;s an &#x26; test"),
+            "It's an & test"
+        );
+        assert_eq!(
+            decode_html_entities("&copy; 2026 &mdash; Fusion"),
+            "© 2026 — Fusion"
+        );
     }
 
     #[test]
@@ -774,7 +821,8 @@ mod tests {
 
     #[test]
     fn test_extract_ddg_redirect_url() {
-        let raw = "//duckduckgo.com/l/?uddg=https%3A%2F%2Ftokio.rs%2Ftokio%2Ftutorial&amp;rut=12345";
+        let raw =
+            "//duckduckgo.com/l/?uddg=https%3A%2F%2Ftokio.rs%2Ftokio%2Ftutorial&amp;rut=12345";
         assert_eq!(
             extract_ddg_redirect_url(raw),
             "https://tokio.rs/tokio/tutorial"
@@ -917,18 +965,19 @@ mod tests {
 
         let missing_res = tool.execute(json!({}), &ctx).await;
         assert!(missing_res.is_err());
-        assert!(missing_res.unwrap_err().to_string().contains("Missing required parameter"));
+        assert!(missing_res
+            .unwrap_err()
+            .to_string()
+            .contains("Missing required parameter"));
     }
 
     #[test]
     fn test_format_results_text_and_json() {
-        let results = vec![
-            SearchResult {
-                title: "Tokio Async".to_string(),
-                url: "https://tokio.rs".to_string(),
-                snippet: "Async runtime for Rust".to_string(),
-            },
-        ];
+        let results = vec![SearchResult {
+            title: "Tokio Async".to_string(),
+            url: "https://tokio.rs".to_string(),
+            snippet: "Async runtime for Rust".to_string(),
+        }];
 
         let text = WebSearchTool::format_results("tokio", &results);
         assert!(text.contains("Search results for: \"tokio\""));

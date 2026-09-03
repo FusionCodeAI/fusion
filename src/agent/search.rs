@@ -479,7 +479,11 @@ impl SearchReport {
             c_cyan,
             c_reset,
             self.matching_sessions_count,
-            if self.matching_sessions_count == 1 { "" } else { "s" },
+            if self.matching_sessions_count == 1 {
+                ""
+            } else {
+                "s"
+            },
             self.duration_ms
         ));
         out.push_str(&format!(
@@ -674,7 +678,10 @@ fn add_sub_tokens(raw_token: &str, out: &mut Vec<String>) {
 /// Generates character 3-grams and 4-grams for subword semantic vector representation.
 pub fn generate_char_ngrams(text: &str) -> Vec<String> {
     let lower = text.to_lowercase();
-    let chars: Vec<char> = lower.chars().filter(|c| c.is_alphanumeric() || c.is_whitespace()).collect();
+    let chars: Vec<char> = lower
+        .chars()
+        .filter(|c| c.is_alphanumeric() || c.is_whitespace())
+        .collect();
     let mut ngrams = Vec::new();
 
     // 3-grams
@@ -702,65 +709,137 @@ pub fn expand_semantic_synonyms(term: &str) -> Vec<String> {
     match lower.as_str() {
         "auth" | "authentication" | "login" | "jwt" | "token" | "oauth" | "credential" => {
             synonyms.extend(
-                ["auth", "authentication", "login", "jwt", "token", "oauth", "credential", "password"]
-                    .into_iter()
-                    .map(|s| s.to_string()),
+                [
+                    "auth",
+                    "authentication",
+                    "login",
+                    "jwt",
+                    "token",
+                    "oauth",
+                    "credential",
+                    "password",
+                ]
+                .into_iter()
+                .map(|s| s.to_string()),
             );
         }
         "test" | "testing" | "unittest" | "spec" | "assert" | "benchmark" | "fixture" => {
             synonyms.extend(
-                ["test", "testing", "unittest", "spec", "assert", "benchmark", "fixture", "mock"]
-                    .into_iter()
-                    .map(|s| s.to_string()),
+                [
+                    "test",
+                    "testing",
+                    "unittest",
+                    "spec",
+                    "assert",
+                    "benchmark",
+                    "fixture",
+                    "mock",
+                ]
+                .into_iter()
+                .map(|s| s.to_string()),
             );
         }
         "error" | "bug" | "fix" | "panic" | "exception" | "crash" | "issue" | "fault" => {
             synonyms.extend(
-                ["error", "bug", "fix", "panic", "exception", "crash", "issue", "fault", "warn"]
-                    .into_iter()
-                    .map(|s| s.to_string()),
+                [
+                    "error",
+                    "bug",
+                    "fix",
+                    "panic",
+                    "exception",
+                    "crash",
+                    "issue",
+                    "fault",
+                    "warn",
+                ]
+                .into_iter()
+                .map(|s| s.to_string()),
             );
         }
         "db" | "database" | "sql" | "sqlite" | "postgres" | "table" | "schema" | "migration" => {
             synonyms.extend(
-                ["db", "database", "sql", "sqlite", "postgres", "table", "schema", "migration", "query"]
-                    .into_iter()
-                    .map(|s| s.to_string()),
+                [
+                    "db",
+                    "database",
+                    "sql",
+                    "sqlite",
+                    "postgres",
+                    "table",
+                    "schema",
+                    "migration",
+                    "query",
+                ]
+                .into_iter()
+                .map(|s| s.to_string()),
             );
         }
         "http" | "api" | "rest" | "endpoint" | "request" | "response" | "fetch" | "server" => {
             synonyms.extend(
-                ["http", "api", "rest", "endpoint", "request", "response", "fetch", "server", "url"]
-                    .into_iter()
-                    .map(|s| s.to_string()),
+                [
+                    "http", "api", "rest", "endpoint", "request", "response", "fetch", "server",
+                    "url",
+                ]
+                .into_iter()
+                .map(|s| s.to_string()),
             );
         }
         "git" | "commit" | "branch" | "diff" | "merge" | "rebase" | "repo" | "repository" => {
             synonyms.extend(
-                ["git", "commit", "branch", "diff", "merge", "rebase", "repo", "repository"]
-                    .into_iter()
-                    .map(|s| s.to_string()),
+                [
+                    "git",
+                    "commit",
+                    "branch",
+                    "diff",
+                    "merge",
+                    "rebase",
+                    "repo",
+                    "repository",
+                ]
+                .into_iter()
+                .map(|s| s.to_string()),
             );
         }
-        "perf" | "performance" | "fast" | "latency" | "throughput" | "speed" | "alloc" | "profile" => {
+        "perf" | "performance" | "fast" | "latency" | "throughput" | "speed" | "alloc"
+        | "profile" => {
             synonyms.extend(
-                ["perf", "performance", "fast", "latency", "throughput", "speed", "alloc", "profile", "memory"]
-                    .into_iter()
-                    .map(|s| s.to_string()),
+                [
+                    "perf",
+                    "performance",
+                    "fast",
+                    "latency",
+                    "throughput",
+                    "speed",
+                    "alloc",
+                    "profile",
+                    "memory",
+                ]
+                .into_iter()
+                .map(|s| s.to_string()),
             );
         }
         "ui" | "theme" | "color" | "terminal" | "ratatui" | "layout" | "style" | "markdown" => {
             synonyms.extend(
-                ["ui", "theme", "color", "terminal", "ratatui", "layout", "style", "markdown", "render"]
-                    .into_iter()
-                    .map(|s| s.to_string()),
+                [
+                    "ui", "theme", "color", "terminal", "ratatui", "layout", "style", "markdown",
+                    "render",
+                ]
+                .into_iter()
+                .map(|s| s.to_string()),
             );
         }
         "wasm" | "web" | "browser" | "javascript" | "typescript" | "npm" => {
             synonyms.extend(
-                ["wasm", "web", "browser", "javascript", "typescript", "npm", "bindgen"]
-                    .into_iter()
-                    .map(|s| s.to_string()),
+                [
+                    "wasm",
+                    "web",
+                    "browser",
+                    "javascript",
+                    "typescript",
+                    "npm",
+                    "bindgen",
+                ]
+                .into_iter()
+                .map(|s| s.to_string()),
             );
         }
         "termux" | "android" | "mobile" | "arm" | "aarch64" => {
@@ -834,10 +913,12 @@ pub fn levenshtein_distance(s1: &str, s2: &str) -> usize {
     for i in 1..=len1 {
         curr[0] = i;
         for j in 1..=len2 {
-            let cost = if s1_chars[i - 1] == s2_chars[j - 1] { 0 } else { 1 };
-            curr[j] = (prev[j] + 1)
-                .min(curr[j - 1] + 1)
-                .min(prev[j - 1] + cost);
+            let cost = if s1_chars[i - 1] == s2_chars[j - 1] {
+                0
+            } else {
+                1
+            };
+            curr[j] = (prev[j] + 1).min(curr[j - 1] + 1).min(prev[j - 1] + cost);
         }
         prev.copy_from_slice(&curr);
     }
@@ -977,7 +1058,10 @@ pub fn highlight_spans(
 // ============================================================================
 
 /// Searches across all historical session JSON files in the specified directory.
-pub fn search_sessions_dir(dir: impl AsRef<Path>, query: &SearchQuery) -> anyhow::Result<SearchReport> {
+pub fn search_sessions_dir(
+    dir: impl AsRef<Path>,
+    query: &SearchQuery,
+) -> anyhow::Result<SearchReport> {
     let start_time = Instant::now();
     let dir = dir.as_ref();
 
@@ -1120,7 +1204,11 @@ fn passes_metadata_filters(session: &Session, query: &SearchQuery) -> bool {
         let has_tool = session.messages().iter().any(|m| {
             m.tool_calls
                 .as_ref()
-                .map(|calls| calls.iter().any(|c| c.name.to_lowercase().contains(&tool_lower)))
+                .map(|calls| {
+                    calls
+                        .iter()
+                        .any(|c| c.name.to_lowercase().contains(&tool_lower))
+                })
                 .unwrap_or(false)
         });
         if !has_tool {
@@ -1320,7 +1408,8 @@ fn score_session_bm25(
         if field_score > 0.0 {
             total_score += field_score;
             hit_count += 1;
-            let (snippet, spans) = extract_snippet(&message.content, &query_tokens, query.snippet_len);
+            let (snippet, spans) =
+                extract_snippet(&message.content, &query_tokens, query.snippet_len);
             matches.push(MessageMatch {
                 message_index: Some(m_idx),
                 turn_index: Some(turn_counter),
@@ -1371,7 +1460,11 @@ fn score_session_bm25(
 
     // Limit matches per session
     if matches.len() > query.max_matches_per_session {
-        matches.sort_by(|a, b| b.score.partial_cmp(&a.score).unwrap_or(std::cmp::Ordering::Equal));
+        matches.sort_by(|a, b| {
+            b.score
+                .partial_cmp(&a.score)
+                .unwrap_or(std::cmp::Ordering::Equal)
+        });
         matches.truncate(query.max_matches_per_session);
     }
 
@@ -1481,7 +1574,8 @@ fn score_session_semantic(session: &Session, query: &SearchQuery) -> Option<Sess
             let field_score = sim * field_type.boost_weight();
             total_score += field_score;
             hit_count += 1;
-            let (snippet, spans) = extract_snippet(&message.content, &query_terms, query.snippet_len);
+            let (snippet, spans) =
+                extract_snippet(&message.content, &query_terms, query.snippet_len);
             matches.push(MessageMatch {
                 message_index: Some(m_idx),
                 turn_index: None,
@@ -1498,7 +1592,11 @@ fn score_session_semantic(session: &Session, query: &SearchQuery) -> Option<Sess
         return None;
     }
 
-    matches.sort_by(|a, b| b.score.partial_cmp(&a.score).unwrap_or(std::cmp::Ordering::Equal));
+    matches.sort_by(|a, b| {
+        b.score
+            .partial_cmp(&a.score)
+            .unwrap_or(std::cmp::Ordering::Equal)
+    });
     if matches.len() > query.max_matches_per_session {
         matches.truncate(query.max_matches_per_session);
     }
@@ -1533,7 +1631,11 @@ fn score_session_hybrid(
                     matches.push(s_match);
                 }
             }
-            matches.sort_by(|x, y| y.score.partial_cmp(&x.score).unwrap_or(std::cmp::Ordering::Equal));
+            matches.sort_by(|x, y| {
+                y.score
+                    .partial_cmp(&x.score)
+                    .unwrap_or(std::cmp::Ordering::Equal)
+            });
             matches.truncate(query.max_matches_per_session);
 
             Some(SessionSearchResult {
@@ -1813,7 +1915,8 @@ fn score_session_fuzzy(session: &Session, query: &SearchQuery) -> Option<Session
             let score = sim * field_type.boost_weight();
             total_score += score;
             hit_count += 1;
-            let (snippet, spans) = extract_snippet(&message.content, &query_tokens, query.snippet_len);
+            let (snippet, spans) =
+                extract_snippet(&message.content, &query_tokens, query.snippet_len);
             matches.push(MessageMatch {
                 message_index: Some(m_idx),
                 turn_index: None,
@@ -2034,15 +2137,12 @@ impl SessionSearchIndex {
         }
 
         for (term, count) in term_counts {
-            self.postings
-                .entry(term)
-                .or_default()
-                .push(SearchPosting {
-                    session_id,
-                    message_index,
-                    field,
-                    term_frequency: count,
-                });
+            self.postings.entry(term).or_default().push(SearchPosting {
+                session_id,
+                message_index,
+                field,
+                term_frequency: count,
+            });
         }
     }
 
@@ -2065,11 +2165,7 @@ impl SessionSearchIndex {
     }
 
     /// Finds sessions most semantically similar to a given target session.
-    pub fn find_similar_sessions(
-        &self,
-        target_session_id: Uuid,
-        limit: usize,
-    ) -> Vec<(Uuid, f64)> {
+    pub fn find_similar_sessions(&self, target_session_id: Uuid, limit: usize) -> Vec<(Uuid, f64)> {
         let target_vec = match self.semantic_vectors.get(&target_session_id) {
             Some(v) => v,
             None => return Vec::new(),
@@ -2124,7 +2220,10 @@ mod tests {
     fn test_query_parser_quotes_and_modes() {
         let q = SearchQuery::parse("\"database connection error\" mode:semantic after:2026-01-01");
         assert_eq!(q.text, "database connection error");
-        assert_eq!(q.required_phrases, vec!["database connection error".to_string()]);
+        assert_eq!(
+            q.required_phrases,
+            vec!["database connection error".to_string()]
+        );
         assert_eq!(q.mode, SearchMode::Semantic);
         assert!(q.date_from.is_some());
     }
@@ -2250,7 +2349,8 @@ mod tests {
     #[test]
     fn test_snippet_extraction_and_highlighting() {
         let text = "Here is a detailed explanation of how to configure Ratatui inline terminal rendering in Fusion.";
-        let (snippet, spans) = extract_snippet(text, &["Ratatui".to_string(), "Fusion".to_string()], 50);
+        let (snippet, spans) =
+            extract_snippet(text, &["Ratatui".to_string(), "Fusion".to_string()], 50);
         assert!(!snippet.is_empty());
         assert!(!spans.is_empty());
 

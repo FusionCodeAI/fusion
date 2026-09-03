@@ -116,7 +116,6 @@ impl ToolRegistry {
         self.tools.clear();
     }
 
-
     pub fn get(&self, name: &str) -> Option<DynTool> {
         self.tools.get(name).cloned().or_else(|| match name {
             "read_file" | "view" | "cat" | "readFile" | "display_file" | "show_file" => {
@@ -161,12 +160,10 @@ impl ToolRegistry {
             "hex" | "hex_viewer" | "hexdump" | "hex_dump" | "xxd" | "od" | "binary_view" => {
                 self.tools.get("hex_view").cloned()
             }
-            "github" | "gh" | "gh_pr" | "github_pr" | "gh_issue" | "github_issue" | "pull_request" | "pull_requests" => {
-                self.tools.get("github").cloned()
-            }
-            "schema" | "json_schema" | "schema_validator" | "validate_schema" | "json_validator" | "validate_json" => {
-                self.tools.get("json_schema").cloned()
-            }
+            "github" | "gh" | "gh_pr" | "github_pr" | "gh_issue" | "github_issue"
+            | "pull_request" | "pull_requests" => self.tools.get("github").cloned(),
+            "schema" | "json_schema" | "schema_validator" | "validate_schema"
+            | "json_validator" | "validate_json" => self.tools.get("json_schema").cloned(),
             _ => None,
         })
     }
@@ -174,8 +171,15 @@ impl ToolRegistry {
         self.tools.values().map(|t| t.definition()).collect()
     }
 
-    pub async fn execute(&self, name: &str, args: Value, ctx: &ToolContext) -> anyhow::Result<String> {
-        let tool = self.get(name).ok_or_else(|| anyhow::anyhow!("Unknown tool: {}", name))?;
+    pub async fn execute(
+        &self,
+        name: &str,
+        args: Value,
+        ctx: &ToolContext,
+    ) -> anyhow::Result<String> {
+        let tool = self
+            .get(name)
+            .ok_or_else(|| anyhow::anyhow!("Unknown tool: {}", name))?;
         tool.execute(args, ctx).await
     }
 }

@@ -380,7 +380,11 @@ mod tests {
             .unwrap_err();
 
         let elapsed = start.elapsed();
-        assert!(elapsed.as_secs() < 5, "Timeout took too long: {:?}", elapsed);
+        assert!(
+            elapsed.as_secs() < 5,
+            "Timeout took too long: {:?}",
+            elapsed
+        );
         assert!(err.to_string().contains("timed out"));
     }
 
@@ -545,7 +549,8 @@ mod tests {
         #[cfg(not(windows))]
         let cmd_str = "echo OPENAI=$OPENAI_API_KEY ANTHROPIC=$ANTHROPIC_API_KEY SAFE=$SAFE_APP_ENV";
         #[cfg(windows)]
-        let cmd_str = "echo OPENAI=%OPENAI_API_KEY% ANTHROPIC=%ANTHROPIC_API_KEY% SAFE=%SAFE_APP_ENV%";
+        let cmd_str =
+            "echo OPENAI=%OPENAI_API_KEY% ANTHROPIC=%ANTHROPIC_API_KEY% SAFE=%SAFE_APP_ENV%";
 
         let res = tool
             .execute(

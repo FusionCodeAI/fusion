@@ -320,7 +320,12 @@ impl<'a> SourceMap<'a> {
             Err(idx) => idx.saturating_sub(1),
         };
 
-        let line_byte_start = self.line_starts.get(line_idx).copied().unwrap_or(0).min(clamped_offset);
+        let line_byte_start = self
+            .line_starts
+            .get(line_idx)
+            .copied()
+            .unwrap_or(0)
+            .min(clamped_offset);
         let line_slice = self.text.get(line_byte_start..clamped_offset).unwrap_or("");
         let col = line_slice.chars().count() + 1; // 1-indexed column
 
@@ -454,7 +459,9 @@ pub fn explain_pattern(pattern: &str, flags: &RegexFlags) -> RegexExplanation {
                 constructs.push(RegexConstruct {
                     raw: "|".to_string(),
                     kind: ConstructKind::Alternation,
-                    description: "Alternation (OR): Matches expression on left OR expression on right".to_string(),
+                    description:
+                        "Alternation (OR): Matches expression on left OR expression on right"
+                            .to_string(),
                     start,
                     end: i,
                     notes: None,
@@ -474,7 +481,10 @@ pub fn explain_pattern(pattern: &str, flags: &RegexFlags) -> RegexExplanation {
                     break;
                 }
 
-                let esc_ch = pattern.get(i..).and_then(|s| s.chars().next()).unwrap_or('\\');
+                let esc_ch = pattern
+                    .get(i..)
+                    .and_then(|s| s.chars().next())
+                    .unwrap_or('\\');
                 let esc_len = esc_ch.len_utf8();
                 i += esc_len;
 
@@ -753,11 +763,15 @@ pub fn explain_pattern(pattern: &str, flags: &RegexFlags) -> RegexExplanation {
                                 } else {
                                     let name_start = i + 3;
                                     let mut name_end = name_start;
-                                    while name_end < len && bytes[name_end] != b'>' && bytes[name_end] != b')' {
+                                    while name_end < len
+                                        && bytes[name_end] != b'>'
+                                        && bytes[name_end] != b')'
+                                    {
                                         name_end += 1;
                                     }
                                     let name = if name_end < len && bytes[name_end] == b'>' {
-                                        let n = pattern.get(name_start..name_end).unwrap_or("unknown");
+                                        let n =
+                                            pattern.get(name_start..name_end).unwrap_or("unknown");
                                         i = name_end + 1;
                                         n
                                     } else {
@@ -769,7 +783,10 @@ pub fn explain_pattern(pattern: &str, flags: &RegexFlags) -> RegexExplanation {
                                     constructs.push(RegexConstruct {
                                         raw,
                                         kind: ConstructKind::Group,
-                                        description: format!("Named capture group '{}' (#{}): Captures matched text", name, group_counter),
+                                        description: format!(
+                                            "Named capture group '{}' (#{}): Captures matched text",
+                                            name, group_counter
+                                        ),
                                         start,
                                         end: i,
                                         notes: None,
@@ -781,11 +798,15 @@ pub fn explain_pattern(pattern: &str, flags: &RegexFlags) -> RegexExplanation {
                                 if i + 3 < len && bytes[i + 3] == b'<' {
                                     let name_start = i + 4;
                                     let mut name_end = name_start;
-                                    while name_end < len && bytes[name_end] != b'>' && bytes[name_end] != b')' {
+                                    while name_end < len
+                                        && bytes[name_end] != b'>'
+                                        && bytes[name_end] != b')'
+                                    {
                                         name_end += 1;
                                     }
                                     let name = if name_end < len && bytes[name_end] == b'>' {
-                                        let n = pattern.get(name_start..name_end).unwrap_or("unknown");
+                                        let n =
+                                            pattern.get(name_start..name_end).unwrap_or("unknown");
                                         i = name_end + 1;
                                         n
                                     } else {
@@ -797,7 +818,10 @@ pub fn explain_pattern(pattern: &str, flags: &RegexFlags) -> RegexExplanation {
                                     constructs.push(RegexConstruct {
                                         raw,
                                         kind: ConstructKind::Group,
-                                        description: format!("Named capture group '{}' (#{}): Captures matched text", name, group_counter),
+                                        description: format!(
+                                            "Named capture group '{}' (#{}): Captures matched text",
+                                            name, group_counter
+                                        ),
                                         start,
                                         end: i,
                                         notes: None,
@@ -832,10 +856,15 @@ pub fn explain_pattern(pattern: &str, flags: &RegexFlags) -> RegexExplanation {
                                 constructs.push(RegexConstruct {
                                     raw: "(?>".to_string(),
                                     kind: ConstructKind::Group,
-                                    description: "Atomic group: Disallows backtracking once matched".to_string(),
+                                    description:
+                                        "Atomic group: Disallows backtracking once matched"
+                                            .to_string(),
                                     start,
                                     end: i,
-                                    notes: Some("Atomic groups are not supported in standard Rust regex".to_string()),
+                                    notes: Some(
+                                        "Atomic groups are not supported in standard Rust regex"
+                                            .to_string(),
+                                    ),
                                 });
                                 group_stack.push(("atomic_group", start));
                             }
@@ -852,7 +881,10 @@ pub fn explain_pattern(pattern: &str, flags: &RegexFlags) -> RegexExplanation {
                                     constructs.push(RegexConstruct {
                                         raw,
                                         kind: ConstructKind::Group,
-                                        description: format!("Non-capturing group with inline flags '{}'", flag_chars),
+                                        description: format!(
+                                            "Non-capturing group with inline flags '{}'",
+                                            flag_chars
+                                        ),
                                         start,
                                         end: i,
                                         notes: None,
@@ -899,7 +931,10 @@ pub fn explain_pattern(pattern: &str, flags: &RegexFlags) -> RegexExplanation {
                     constructs.push(RegexConstruct {
                         raw: "(".to_string(),
                         kind: ConstructKind::Group,
-                        description: format!("Numbered capture group #{}: Captures matched subexpression", group_counter),
+                        description: format!(
+                            "Numbered capture group #{}: Captures matched subexpression",
+                            group_counter
+                        ),
                         start,
                         end: i,
                         notes: None,
@@ -937,21 +972,27 @@ pub fn explain_pattern(pattern: &str, flags: &RegexFlags) -> RegexExplanation {
                 };
 
                 let desc = match b {
-                    b'*' => if is_lazy {
-                        "Quantifier: Matches preceding element 0 or more times (lazy / non-greedy)"
-                    } else {
-                        "Quantifier: Matches preceding element 0 or more times (greedy)"
-                    },
-                    b'+' => if is_lazy {
-                        "Quantifier: Matches preceding element 1 or more times (lazy / non-greedy)"
-                    } else {
-                        "Quantifier: Matches preceding element 1 or more times (greedy)"
-                    },
-                    b'?' => if is_lazy {
-                        "Quantifier: Matches preceding element 0 or 1 time (optional, lazy)"
-                    } else {
-                        "Quantifier: Matches preceding element 0 or 1 time (optional, greedy)"
-                    },
+                    b'*' => {
+                        if is_lazy {
+                            "Quantifier: Matches preceding element 0 or more times (lazy / non-greedy)"
+                        } else {
+                            "Quantifier: Matches preceding element 0 or more times (greedy)"
+                        }
+                    }
+                    b'+' => {
+                        if is_lazy {
+                            "Quantifier: Matches preceding element 1 or more times (lazy / non-greedy)"
+                        } else {
+                            "Quantifier: Matches preceding element 1 or more times (greedy)"
+                        }
+                    }
+                    b'?' => {
+                        if is_lazy {
+                            "Quantifier: Matches preceding element 0 or 1 time (optional, lazy)"
+                        } else {
+                            "Quantifier: Matches preceding element 0 or 1 time (optional, greedy)"
+                        }
+                    }
                     _ => "Quantifier",
                 };
 
@@ -968,7 +1009,12 @@ pub fn explain_pattern(pattern: &str, flags: &RegexFlags) -> RegexExplanation {
             b'{' => {
                 i += 1;
                 let q_start = i;
-                while i < len && bytes[i] != b'}' && (bytes[i].is_ascii_digit() || bytes[i] == b',' || bytes[i].is_ascii_whitespace()) {
+                while i < len
+                    && bytes[i] != b'}'
+                    && (bytes[i].is_ascii_digit()
+                        || bytes[i] == b','
+                        || bytes[i].is_ascii_whitespace())
+                {
                     i += 1;
                 }
                 if i < len && bytes[i] == b'}' {
@@ -980,7 +1026,8 @@ pub fn explain_pattern(pattern: &str, flags: &RegexFlags) -> RegexExplanation {
                         flags.swap_greed
                     };
 
-                    let inner_end = if is_lazy && pattern.get(start..i).unwrap_or("").ends_with('?') {
+                    let inner_end = if is_lazy && pattern.get(start..i).unwrap_or("").ends_with('?')
+                    {
                         i.saturating_sub(2)
                     } else {
                         i.saturating_sub(1)
@@ -1013,7 +1060,21 @@ pub fn explain_pattern(pattern: &str, flags: &RegexFlags) -> RegexExplanation {
                 let lit_start = i;
                 while i < len {
                     let next_b = bytes[i];
-                    if matches!(next_b, b'^' | b'$' | b'.' | b'|' | b'\\' | b'[' | b']' | b'(' | b')' | b'*' | b'+' | b'?' | b'{') {
+                    if matches!(
+                        next_b,
+                        b'^' | b'$'
+                            | b'.'
+                            | b'|'
+                            | b'\\'
+                            | b'['
+                            | b']'
+                            | b'('
+                            | b')'
+                            | b'*'
+                            | b'+'
+                            | b'?'
+                            | b'{'
+                    ) {
                         break;
                     }
                     if flags.ignore_whitespace && (next_b.is_ascii_whitespace() || next_b == b'#') {
@@ -1093,28 +1154,58 @@ fn explain_character_class_inner(inner: &str, is_negated: bool) -> String {
 
 /// Helper explaining brace quantifiers `{n}`, `{n,}`, `{n,m}`.
 fn explain_brace_quantifier(inner: &str, is_lazy: bool) -> String {
-    let lazy_suffix = if is_lazy { " (lazy / non-greedy)" } else { " (greedy)" };
+    let lazy_suffix = if is_lazy {
+        " (lazy / non-greedy)"
+    } else {
+        " (greedy)"
+    };
     if let Some((min_str, max_str)) = inner.split_once(',') {
         let min_val = min_str.trim();
         let max_val = max_str.trim();
         if max_val.is_empty() {
-            format!("Quantifier: Matches preceding element at least {} times{}", min_val, lazy_suffix)
+            format!(
+                "Quantifier: Matches preceding element at least {} times{}",
+                min_val, lazy_suffix
+            )
         } else {
-            format!("Quantifier: Matches preceding element between {} and {} times{}", min_val, max_val, lazy_suffix)
+            format!(
+                "Quantifier: Matches preceding element between {} and {} times{}",
+                min_val, max_val, lazy_suffix
+            )
         }
     } else {
-        format!("Quantifier: Matches preceding element exactly {} times", inner.trim())
+        format!(
+            "Quantifier: Matches preceding element exactly {} times",
+            inner.trim()
+        )
     }
 }
 
 /// Generates a high-level summary of the parsed regex pattern.
-fn generate_pattern_summary(pattern: &str, constructs: &[RegexConstruct], flags: &RegexFlags) -> String {
-    let is_anchored_start = constructs.first().map_or(false, |c| c.kind == ConstructKind::Anchor && c.raw == "^");
-    let is_anchored_end = constructs.last().map_or(false, |c| c.kind == ConstructKind::Anchor && c.raw == "$");
+fn generate_pattern_summary(
+    pattern: &str,
+    constructs: &[RegexConstruct],
+    flags: &RegexFlags,
+) -> String {
+    let is_anchored_start = constructs
+        .first()
+        .map_or(false, |c| c.kind == ConstructKind::Anchor && c.raw == "^");
+    let is_anchored_end = constructs
+        .last()
+        .map_or(false, |c| c.kind == ConstructKind::Anchor && c.raw == "$");
 
-    let group_count = constructs.iter().filter(|c| c.kind == ConstructKind::Group && c.raw.starts_with('(')).count();
-    let quant_count = constructs.iter().filter(|c| c.kind == ConstructKind::Quantifier).count();
-    let class_count = constructs.iter().filter(|c| c.kind == ConstructKind::CharacterClass).count();
+    let group_count = constructs
+        .iter()
+        .filter(|c| c.kind == ConstructKind::Group && c.raw.starts_with('('))
+        .count();
+    let quant_count = constructs
+        .iter()
+        .filter(|c| c.kind == ConstructKind::Quantifier)
+        .count();
+    let class_count = constructs
+        .iter()
+        .filter(|c| c.kind == ConstructKind::CharacterClass)
+        .count();
 
     let mut summary_parts = Vec::new();
 
@@ -1129,13 +1220,25 @@ fn generate_pattern_summary(pattern: &str, constructs: &[RegexConstruct], flags:
     }
 
     if group_count > 0 {
-        summary_parts.push(format!("{} group{}", group_count, if group_count == 1 { "" } else { "s" }));
+        summary_parts.push(format!(
+            "{} group{}",
+            group_count,
+            if group_count == 1 { "" } else { "s" }
+        ));
     }
     if quant_count > 0 {
-        summary_parts.push(format!("{} quantifier{}", quant_count, if quant_count == 1 { "" } else { "s" }));
+        summary_parts.push(format!(
+            "{} quantifier{}",
+            quant_count,
+            if quant_count == 1 { "" } else { "s" }
+        ));
     }
     if class_count > 0 {
-        summary_parts.push(format!("{} character class{}", class_count, if class_count == 1 { "" } else { "es" }));
+        summary_parts.push(format!(
+            "{} character class{}",
+            class_count,
+            if class_count == 1 { "" } else { "es" }
+        ));
     }
 
     if !flags.to_flag_string().is_empty() {
@@ -1339,7 +1442,10 @@ impl RegexEvaluator {
             for (group_idx, group_match_opt) in caps.iter().enumerate() {
                 if let Some(gm) = group_match_opt {
                     let group_span = source_map.span(gm.start(), gm.end());
-                    let name = capture_names.get(group_idx).and_then(|&n| n).map(|s| s.to_string());
+                    let name = capture_names
+                        .get(group_idx)
+                        .and_then(|&n| n)
+                        .map(|s| s.to_string());
 
                     if let Some(group_name) = &name {
                         named_groups.insert(group_name.clone(), gm.as_str().to_string());
@@ -1375,7 +1481,9 @@ impl RegexEvaluator {
         // Split testing if requested
         let splits = if options.split {
             let segs: Vec<String> = match options.split_limit {
-                Some(limit) if limit > 0 => re.splitn(input, limit).map(|s| s.to_string()).collect(),
+                Some(limit) if limit > 0 => {
+                    re.splitn(input, limit).map(|s| s.to_string()).collect()
+                }
                 _ => re.split(input).map(|s| s.to_string()).collect(),
             };
             Some(segs)
@@ -1431,10 +1539,8 @@ impl RegexEvaluator {
             .map(|opt| opt.map(|s| s.to_string()))
             .collect();
 
-        let named_group_names: Vec<String> = capture_names
-            .iter()
-            .filter_map(|opt| opt.clone())
-            .collect();
+        let named_group_names: Vec<String> =
+            capture_names.iter().filter_map(|opt| opt.clone()).collect();
 
         let capture_group_count = capture_names.len().saturating_sub(1);
         let flags_str = flags.to_flag_string();
@@ -1666,14 +1772,20 @@ fn render_detailed_report(report: &RegexEvaluationReport) -> String {
     out.push_str("─────────────────────────────────────────────────────────────────\n");
 
     if report.results.is_empty() {
-        out.push_str("\n(No test inputs provided for evaluation. Pattern syntax validated successfully.)\n");
+        out.push_str(
+            "\n(No test inputs provided for evaluation. Pattern syntax validated successfully.)\n",
+        );
         return out;
     }
 
     for (idx, res) in report.results.iter().enumerate() {
         out.push_str(&format!("\n▶ Input #{}:\n", idx + 1));
         let display_input = if res.input.len() > 300 {
-            format!("{}... (truncated, total {} chars)", &res.input[..300], res.input.len())
+            format!(
+                "{}... (truncated, total {} chars)",
+                &res.input[..300],
+                res.input.len()
+            )
         } else {
             res.input.clone()
         };
@@ -1727,7 +1839,11 @@ fn render_detailed_report(report: &RegexEvaluationReport) -> String {
         }
 
         if let Some(splits) = &res.splits {
-            out.push_str(&format!("  Split Segments ({}) : {:?}\n", splits.len(), splits));
+            out.push_str(&format!(
+                "  Split Segments ({}) : {:?}\n",
+                splits.len(),
+                splits
+            ));
         }
     }
 
@@ -1864,14 +1980,18 @@ impl Tool for RegexTestTool {
             flags.multiline = m;
         }
 
-        if let Some(s) = args.get("dot_matches_all").and_then(|v| v.as_bool())
+        if let Some(s) = args
+            .get("dot_matches_all")
+            .and_then(|v| v.as_bool())
             .or_else(|| args.get("dot_matches_new_line").and_then(|v| v.as_bool()))
             .or_else(|| args.get("singleline").and_then(|v| v.as_bool()))
         {
             flags.dot_matches_all = s;
         }
 
-        if let Some(x) = args.get("ignore_whitespace").and_then(|v| v.as_bool())
+        if let Some(x) = args
+            .get("ignore_whitespace")
+            .and_then(|v| v.as_bool())
             .or_else(|| args.get("extended").and_then(|v| v.as_bool()))
         {
             flags.ignore_whitespace = x;
@@ -1905,7 +2025,11 @@ impl Tool for RegexTestTool {
         }
 
         // 2. Check "test_strings" or "inputs" array
-        if let Some(arr) = args.get("test_strings").or_else(|| args.get("inputs")).and_then(|v| v.as_array()) {
+        if let Some(arr) = args
+            .get("test_strings")
+            .or_else(|| args.get("inputs"))
+            .and_then(|v| v.as_array())
+        {
             for item in arr {
                 if let Some(s) = item.as_str() {
                     inputs.push(s.to_string());
@@ -1917,30 +2041,47 @@ impl Tool for RegexTestTool {
         if let Some(file_val) = args.get("file").and_then(|v| v.as_str()) {
             let file_path = resolve_path(file_val, &ctx.cwd);
             if file_path.exists() {
-                let file_content = tokio::fs::read_to_string(&file_path).await
-                    .map_err(|e| anyhow::anyhow!("Failed to read test input file '{}': {}", file_val, e))?;
+                let file_content = tokio::fs::read_to_string(&file_path).await.map_err(|e| {
+                    anyhow::anyhow!("Failed to read test input file '{}': {}", file_val, e)
+                })?;
                 inputs.push(file_content);
             } else {
                 anyhow::bail!("Input file does not exist: {}", file_val);
             }
         }
 
-        let replacement = args.get("replacement")
+        let replacement = args
+            .get("replacement")
             .or_else(|| args.get("replace"))
             .or_else(|| args.get("substitute"))
             .and_then(|v| v.as_str())
             .map(|s| s.to_string());
 
-        let replace_all = args.get("replace_all")
+        let replace_all = args
+            .get("replace_all")
             .or_else(|| args.get("all"))
             .and_then(|v| v.as_bool())
             .unwrap_or(true);
 
         let split = args.get("split").and_then(|v| v.as_bool()).unwrap_or(false);
-        let split_limit = args.get("split_limit").and_then(|v| v.as_u64()).map(|u| u as usize);
-        let max_matches = args.get("max_matches").and_then(|v| v.as_u64()).map(|u| u as usize).unwrap_or(100);
-        let explain = args.get("explain").and_then(|v| v.as_bool()).unwrap_or(true);
-        let format = args.get("format").and_then(|v| v.as_str()).unwrap_or("detailed").to_string();
+        let split_limit = args
+            .get("split_limit")
+            .and_then(|v| v.as_u64())
+            .map(|u| u as usize);
+        let max_matches = args
+            .get("max_matches")
+            .and_then(|v| v.as_u64())
+            .map(|u| u as usize)
+            .unwrap_or(100);
+        let explain = args
+            .get("explain")
+            .and_then(|v| v.as_bool())
+            .unwrap_or(true);
+        let format = args
+            .get("format")
+            .and_then(|v| v.as_str())
+            .unwrap_or("detailed")
+            .to_string();
 
         let options = RegexTestOptions {
             pattern,
@@ -2017,7 +2158,10 @@ mod tests {
         let res = &report.results[0];
         let m1 = &res.matches[0];
         assert_eq!(m1.text, "2026-09-02");
-        assert_eq!(m1.named_groups.get("year").map(|s| s.as_str()), Some("2026"));
+        assert_eq!(
+            m1.named_groups.get("year").map(|s| s.as_str()),
+            Some("2026")
+        );
         assert_eq!(m1.named_groups.get("month").map(|s| s.as_str()), Some("09"));
         assert_eq!(m1.named_groups.get("day").map(|s| s.as_str()), Some("02"));
 
@@ -2050,12 +2194,18 @@ mod tests {
         let m1 = &report.results[0].matches[0];
         assert_eq!(m1.span.start_line, 2);
         assert_eq!(m1.span.start_col, 1);
-        assert_eq!(m1.named_groups.get("func_name").map(|s| s.as_str()), Some("calculate"));
+        assert_eq!(
+            m1.named_groups.get("func_name").map(|s| s.as_str()),
+            Some("calculate")
+        );
 
         let m2 = &report.results[0].matches[1];
         assert_eq!(m2.span.start_line, 6);
         assert_eq!(m2.span.start_col, 1);
-        assert_eq!(m2.named_groups.get("func_name").map(|s| s.as_str()), Some("process"));
+        assert_eq!(
+            m2.named_groups.get("func_name").map(|s| s.as_str()),
+            Some("process")
+        );
     }
 
     #[test]
@@ -2077,7 +2227,10 @@ mod tests {
         assert_eq!(m1.text, "🦀 Ferris");
         assert_eq!(m1.span.char_start, 6);
         assert_eq!(m1.span.start_col, 7);
-        assert_eq!(m1.named_groups.get("word").map(|s| s.as_str()), Some("Ferris"));
+        assert_eq!(
+            m1.named_groups.get("word").map(|s| s.as_str()),
+            Some("Ferris")
+        );
     }
 
     #[test]
@@ -2096,7 +2249,10 @@ mod tests {
         let report = RegexEvaluator::evaluate(&options);
         assert!(report.valid);
         let res = &report.results[0];
-        assert_eq!(res.replacement.as_deref(), Some("Start: 09/02/2026, End: 10/15/2026"));
+        assert_eq!(
+            res.replacement.as_deref(),
+            Some("Start: 09/02/2026, End: 10/15/2026")
+        );
     }
 
     #[test]
@@ -2144,7 +2300,9 @@ mod tests {
         assert!(lookahead_warnings.iter().any(|w| w.contains("lookahead")));
 
         let redos_warnings = lint_regex_pattern("^(a+)+$");
-        assert!(redos_warnings.iter().any(|w| w.contains("nested quantifiers")));
+        assert!(redos_warnings
+            .iter()
+            .any(|w| w.contains("nested quantifiers")));
     }
 
     #[test]
@@ -2162,9 +2320,15 @@ mod tests {
         assert!(kinds.contains(&ConstructKind::CharacterClass));
         assert!(kinds.contains(&ConstructKind::Quantifier));
 
-        let user_group = explanation.constructs.iter().find(|c| c.raw.contains("user"));
+        let user_group = explanation
+            .constructs
+            .iter()
+            .find(|c| c.raw.contains("user"));
         assert!(user_group.is_some());
-        assert!(user_group.unwrap().description.contains("Named capture group 'user'"));
+        assert!(user_group
+            .unwrap()
+            .description
+            .contains("Named capture group 'user'"));
     }
 
     #[test]
@@ -2173,14 +2337,23 @@ mod tests {
         let flags = RegexFlags::default();
         let explanation = explain_pattern(pattern, &flags);
 
-        assert!(explanation.constructs.iter().any(|c| c.kind == ConstructKind::Lookaround));
+        assert!(explanation
+            .constructs
+            .iter()
+            .any(|c| c.kind == ConstructKind::Lookaround));
         let pos_lookahead = explanation.constructs.iter().find(|c| c.raw == "(?=");
         assert!(pos_lookahead.is_some());
-        assert!(pos_lookahead.unwrap().description.contains("Positive lookahead"));
+        assert!(pos_lookahead
+            .unwrap()
+            .description
+            .contains("Positive lookahead"));
 
         let neg_lookahead = explanation.constructs.iter().find(|c| c.raw == "(?!");
         assert!(neg_lookahead.is_some());
-        assert!(neg_lookahead.unwrap().description.contains("Negative lookahead"));
+        assert!(neg_lookahead
+            .unwrap()
+            .description
+            .contains("Negative lookahead"));
     }
 
     #[test]

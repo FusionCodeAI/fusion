@@ -488,7 +488,8 @@ impl ModelPricing {
 
         let input_cost = (uncached_prompt as f64 / 1_000_000.0) * self.input_per_million;
         let output_cost = (completion_tokens as f64 / 1_000_000.0) * self.output_per_million;
-        let cache_read_cost = (cache_read_tokens as f64 / 1_000_000.0) * self.cache_read_per_million;
+        let cache_read_cost =
+            (cache_read_tokens as f64 / 1_000_000.0) * self.cache_read_per_million;
         let cache_write_cost =
             (cache_write_tokens as f64 / 1_000_000.0) * self.cache_write_per_million;
 
@@ -700,10 +701,19 @@ impl LifetimeCostStats {
     pub fn format_detailed_report(&self) -> String {
         let mut report = String::new();
         report.push_str("=== Lifetime Cost & Token Usage Report ===\n");
-        report.push_str(&format!("Grand Total Lifetime Cost: {}\n", self.total_breakdown.format_usd()));
-        report.push_str(&format!("Total Sessions Recorded:  {}\n", self.session_count));
+        report.push_str(&format!(
+            "Grand Total Lifetime Cost: {}\n",
+            self.total_breakdown.format_usd()
+        ));
+        report.push_str(&format!(
+            "Total Sessions Recorded:  {}\n",
+            self.session_count
+        ));
         report.push_str(&format!("Total Turns Completed:    {}\n", self.total_turns));
-        report.push_str(&format!("Total Tokens Consumed:    {}\n", self.total_tokens));
+        report.push_str(&format!(
+            "Total Tokens Consumed:    {}\n",
+            self.total_tokens
+        ));
 
         if self.total_breakdown.cache_savings > 1e-5 {
             report.push_str(&format!(
@@ -726,7 +736,11 @@ impl LifetimeCostStats {
 
         report.push_str("\n--- Lifetime Breakdown by Model ---\n");
         let mut sorted_models: Vec<_> = self.model_breakdown.iter().collect();
-        sorted_models.sort_by(|a, b| b.1.total_cost.partial_cmp(&a.1.total_cost).unwrap_or(std::cmp::Ordering::Equal));
+        sorted_models.sort_by(|a, b| {
+            b.1.total_cost
+                .partial_cmp(&a.1.total_cost)
+                .unwrap_or(std::cmp::Ordering::Equal)
+        });
         for (model, cost) in sorted_models {
             report.push_str(&format!(
                 "  • {:<30} {:>10} (In: {}, Out: {})\n",
@@ -739,13 +753,13 @@ impl LifetimeCostStats {
 
         report.push_str("\n--- Lifetime Breakdown by Provider ---\n");
         let mut sorted_provs: Vec<_> = self.provider_breakdown.iter().collect();
-        sorted_provs.sort_by(|a, b| b.1.total_cost.partial_cmp(&a.1.total_cost).unwrap_or(std::cmp::Ordering::Equal));
+        sorted_provs.sort_by(|a, b| {
+            b.1.total_cost
+                .partial_cmp(&a.1.total_cost)
+                .unwrap_or(std::cmp::Ordering::Equal)
+        });
         for (provider, cost) in sorted_provs {
-            report.push_str(&format!(
-                "  • {:<15} {:>10}\n",
-                provider,
-                cost.format_usd()
-            ));
+            report.push_str(&format!("  • {:<15} {:>10}\n", provider, cost.format_usd()));
         }
 
         report
@@ -774,7 +788,11 @@ impl ModelPricingRegistry {
 
     /// Registers or overrides pricing for a specific model key (`"provider:model"` or `"model"`).
     pub fn register(&mut self, pricing: ModelPricing) {
-        let key = format!("{}:{}", pricing.provider.to_lowercase(), pricing.model.to_lowercase());
+        let key = format!(
+            "{}:{}",
+            pricing.provider.to_lowercase(),
+            pricing.model.to_lowercase()
+        );
         self.custom_pricing.insert(key, pricing);
     }
 
@@ -820,27 +838,47 @@ impl ModelPricingRegistry {
 
         // Claude 3.7 Sonnet ($3.00 / $15.00 / $0.30 / $3.75)
         if m.contains("3-7-sonnet") || m.contains("3.7-sonnet") || m == "sonnet-3.7" || m == "3.7" {
-            return Some(ModelPricing::anthropic_tier("claude-3-7-sonnet-20250219", 3.00, 15.00));
+            return Some(ModelPricing::anthropic_tier(
+                "claude-3-7-sonnet-20250219",
+                3.00,
+                15.00,
+            ));
         }
 
         // Claude 3.5 Sonnet ($3.00 / $15.00 / $0.30 / $3.75)
         if m.contains("3-5-sonnet") || m.contains("3.5-sonnet") || m.contains("sonnet") {
-            return Some(ModelPricing::anthropic_tier("claude-3-5-sonnet-20241022", 3.00, 15.00));
+            return Some(ModelPricing::anthropic_tier(
+                "claude-3-5-sonnet-20241022",
+                3.00,
+                15.00,
+            ));
         }
 
         // Claude 3.5 Haiku ($0.80 / $4.00 / $0.08 / $1.00)
         if m.contains("3-5-haiku") || m.contains("3.5-haiku") || m.contains("haiku-3.5") {
-            return Some(ModelPricing::anthropic_tier("claude-3-5-haiku-20241022", 0.80, 4.00));
+            return Some(ModelPricing::anthropic_tier(
+                "claude-3-5-haiku-20241022",
+                0.80,
+                4.00,
+            ));
         }
 
         // Claude 3 Haiku ($0.25 / $1.25 / $0.03 / $0.30)
         if m.contains("haiku") {
-            return Some(ModelPricing::anthropic_tier("claude-3-haiku-20240307", 0.25, 1.25));
+            return Some(ModelPricing::anthropic_tier(
+                "claude-3-haiku-20240307",
+                0.25,
+                1.25,
+            ));
         }
 
         // Claude 3 Opus ($15.00 / $75.00 / $1.50 / $18.75)
         if m.contains("opus") {
-            return Some(ModelPricing::anthropic_tier("claude-3-opus-20240229", 15.00, 75.00));
+            return Some(ModelPricing::anthropic_tier(
+                "claude-3-opus-20240229",
+                15.00,
+                75.00,
+            ));
         }
 
         // Default Anthropic tier (Sonnet pricing)
@@ -907,13 +945,28 @@ impl ModelPricingRegistry {
 
         // Embeddings
         if m.contains("text-embedding-3-small") {
-            return Some(ModelPricing::simple("openai", "text-embedding-3-small", 0.02, 0.00));
+            return Some(ModelPricing::simple(
+                "openai",
+                "text-embedding-3-small",
+                0.02,
+                0.00,
+            ));
         }
         if m.contains("text-embedding-3-large") {
-            return Some(ModelPricing::simple("openai", "text-embedding-3-large", 0.13, 0.00));
+            return Some(ModelPricing::simple(
+                "openai",
+                "text-embedding-3-large",
+                0.13,
+                0.00,
+            ));
         }
         if m.contains("text-embedding-ada-002") {
-            return Some(ModelPricing::simple("openai", "text-embedding-ada-002", 0.10, 0.00));
+            return Some(ModelPricing::simple(
+                "openai",
+                "text-embedding-ada-002",
+                0.10,
+                0.00,
+            ));
         }
 
         // Default OpenAI fallback
@@ -925,17 +978,32 @@ impl ModelPricingRegistry {
 
         // DeepSeek Reasoner / R1 ($0.55 input miss / $0.14 input hit / $2.19 output)
         if m.contains("reasoner") || m.contains("r1") {
-            return Some(ModelPricing::deepseek_tier("deepseek-reasoner", 0.55, 0.14, 2.19));
+            return Some(ModelPricing::deepseek_tier(
+                "deepseek-reasoner",
+                0.55,
+                0.14,
+                2.19,
+            ));
         }
 
         // DeepSeek Chat / V3 ($0.14 input miss / $0.014 input hit / $0.28 output)
         if m.contains("chat") || m.contains("v3") || m == "deepseek" {
-            return Some(ModelPricing::deepseek_tier("deepseek-chat", 0.14, 0.014, 0.28));
+            return Some(ModelPricing::deepseek_tier(
+                "deepseek-chat",
+                0.14,
+                0.014,
+                0.28,
+            ));
         }
 
         // DeepSeek Coder ($0.14 / $0.014 / $0.28)
         if m.contains("coder") {
-            return Some(ModelPricing::deepseek_tier("deepseek-coder", 0.14, 0.014, 0.28));
+            return Some(ModelPricing::deepseek_tier(
+                "deepseek-coder",
+                0.14,
+                0.014,
+                0.28,
+            ));
         }
 
         // Default DeepSeek tier
@@ -963,7 +1031,14 @@ impl ModelPricingRegistry {
 
         // Grok-Beta ($5.00 / $15.00 / $5.00 / $5.00)
         if m.contains("beta") {
-            return Some(ModelPricing::new("xai", "grok-beta", 5.00, 15.00, 5.00, 5.00));
+            return Some(ModelPricing::new(
+                "xai",
+                "grok-beta",
+                5.00,
+                15.00,
+                5.00,
+                5.00,
+            ));
         }
 
         Some(ModelPricing::xai_tier(model, 2.00, 10.00))
@@ -1575,7 +1650,10 @@ impl CostTracker {
     pub fn format_detailed_report(&self) -> String {
         let mut report = String::new();
         report.push_str("=== Session Cost & Token Usage Report ===\n");
-        report.push_str(&format!("Grand Total Cost:  {}\n", self.total_breakdown.format_usd()));
+        report.push_str(&format!(
+            "Grand Total Cost:  {}\n",
+            self.total_breakdown.format_usd()
+        ));
         report.push_str(&format!("Total Tokens:      {}\n", self.total_tokens));
         report.push_str(&format!("Turns Completed:   {}\n", self.turns.len()));
 
@@ -1600,7 +1678,11 @@ impl CostTracker {
 
         report.push_str("\n--- Breakdown by Model ---\n");
         let mut sorted_models: Vec<_> = self.model_breakdown.iter().collect();
-        sorted_models.sort_by(|a, b| b.1.total_cost.partial_cmp(&a.1.total_cost).unwrap_or(std::cmp::Ordering::Equal));
+        sorted_models.sort_by(|a, b| {
+            b.1.total_cost
+                .partial_cmp(&a.1.total_cost)
+                .unwrap_or(std::cmp::Ordering::Equal)
+        });
         for (model, cost) in sorted_models {
             report.push_str(&format!(
                 "  • {:<30} {:>10} (In: {}, Out: {})\n",
@@ -1613,13 +1695,13 @@ impl CostTracker {
 
         report.push_str("\n--- Breakdown by Provider ---\n");
         let mut sorted_provs: Vec<_> = self.provider_breakdown.iter().collect();
-        sorted_provs.sort_by(|a, b| b.1.total_cost.partial_cmp(&a.1.total_cost).unwrap_or(std::cmp::Ordering::Equal));
+        sorted_provs.sort_by(|a, b| {
+            b.1.total_cost
+                .partial_cmp(&a.1.total_cost)
+                .unwrap_or(std::cmp::Ordering::Equal)
+        });
         for (provider, cost) in sorted_provs {
-            report.push_str(&format!(
-                "  • {:<15} {:>10}\n",
-                provider,
-                cost.format_usd()
-            ));
+            report.push_str(&format!("  • {:<15} {:>10}\n", provider, cost.format_usd()));
         }
 
         report
@@ -1928,27 +2010,15 @@ mod tests {
 
         // Turn 1: Spend $0.40 (40% - No alert yet)
         // Using Claude 3.5 Sonnet ($3 in, $15 out): 100k prompt = $0.30, 6667 tokens @ $15/1M = $0.10 => $0.40
-        let (_cost1, alerts1) = tracker.record_turn_with_alerts(
-            "anthropic",
-            "claude-3-5-sonnet",
-            100_000,
-            6_667,
-            0,
-            0,
-        );
+        let (_cost1, alerts1) =
+            tracker.record_turn_with_alerts("anthropic", "claude-3-5-sonnet", 100_000, 6_667, 0, 0);
         assert_eq!(alerts1.len(), 0);
         assert!(!tracker.is_budget_exceeded());
 
         // Turn 2: Spend another $0.15 (Total $0.55 = 55% -> triggers 50% warning)
         // 50k prompt = $0.15
-        let (_cost2, alerts2) = tracker.record_turn_with_alerts(
-            "anthropic",
-            "claude-3-5-sonnet",
-            50_000,
-            0,
-            0,
-            0,
-        );
+        let (_cost2, alerts2) =
+            tracker.record_turn_with_alerts("anthropic", "claude-3-5-sonnet", 50_000, 0, 0, 0);
         assert_eq!(alerts2.len(), 1);
         assert_eq!(alerts2[0].threshold, BudgetThreshold::FiftyPercent);
         assert_eq!(alerts2[0].scope, BudgetScope::Session);
@@ -1957,38 +2027,20 @@ mod tests {
         assert!(alerts2[0].message.contains("50%"));
 
         // Turn 3: Spend another $0.10 (Total $0.65 = 65% -> 50% was already fired, no new alerts)
-        let (_cost3, alerts3) = tracker.record_turn_with_alerts(
-            "anthropic",
-            "claude-3-5-sonnet",
-            33_334,
-            0,
-            0,
-            0,
-        );
+        let (_cost3, alerts3) =
+            tracker.record_turn_with_alerts("anthropic", "claude-3-5-sonnet", 33_334, 0, 0, 0);
         assert_eq!(alerts3.len(), 0);
 
         // Turn 4: Spend another $0.20 (Total $0.85 = 85% -> triggers 80% alert)
-        let (_cost4, alerts4) = tracker.record_turn_with_alerts(
-            "anthropic",
-            "claude-3-5-sonnet",
-            66_667,
-            0,
-            0,
-            0,
-        );
+        let (_cost4, alerts4) =
+            tracker.record_turn_with_alerts("anthropic", "claude-3-5-sonnet", 66_667, 0, 0, 0);
         assert_eq!(alerts4.len(), 1);
         assert_eq!(alerts4[0].threshold, BudgetThreshold::EightyPercent);
         assert!(alerts4[0].message.contains("80%"));
 
         // Turn 5: Spend another $0.20 (Total $1.05 = 105% -> triggers 100% Exceeded alert)
-        let (_cost5, alerts5) = tracker.record_turn_with_alerts(
-            "anthropic",
-            "claude-3-5-sonnet",
-            66_667,
-            0,
-            0,
-            0,
-        );
+        let (_cost5, alerts5) =
+            tracker.record_turn_with_alerts("anthropic", "claude-3-5-sonnet", 66_667, 0, 0, 0);
         assert_eq!(alerts5.len(), 1);
         assert_eq!(alerts5[0].threshold, BudgetThreshold::Exceeded);
         assert!(alerts5[0].is_critical());
@@ -2007,7 +2059,10 @@ mod tests {
         tracker.record_turn("deepseek", "deepseek-chat", 500_000, 50_000, 0, 0); // 500k*0.14/1M + 50k*0.28/1M = 0.07 + 0.014 = 0.084
         assert!((tracker.total_cost() - 0.434).abs() < 1e-6);
         assert!((tracker.lifetime_cost() - 0.434).abs() < 1e-6);
-        assert_eq!(tracker.lifetime_tokens(), 100_000 + 10_000 + 500_000 + 50_000);
+        assert_eq!(
+            tracker.lifetime_tokens(),
+            100_000 + 10_000 + 500_000 + 50_000
+        );
 
         // Start Session 2:
         tracker.start_new_session();

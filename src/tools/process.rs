@@ -132,12 +132,7 @@ impl OutputBuffer {
                     }
                 }
                 if let Some(pat) = text_filter {
-                    if !pat.is_empty()
-                        && !entry
-                            .line
-                            .to_lowercase()
-                            .contains(&pat.to_lowercase())
-                    {
+                    if !pat.is_empty() && !entry.line.to_lowercase().contains(&pat.to_lowercase()) {
                         return false;
                     }
                 }
@@ -311,10 +306,7 @@ impl ProcessInfo {
             .as_deref()
             .map(|n| format!(" ({n})"))
             .unwrap_or_default();
-        let pid_str = self
-            .pid
-            .map(|p| format!(" [PID {p}]"))
-            .unwrap_or_default();
+        let pid_str = self.pid.map(|p| format!(" [PID {p}]")).unwrap_or_default();
         let uptime_str = if self.status.is_running() {
             format!(" | uptime: {}s", self.uptime_secs)
         } else {
@@ -597,16 +589,9 @@ impl ProcessManager {
     }
 
     /// Spawns a background process with a specific ID (used for spawn & restart).
-    async fn spawn_internal(
-        &self,
-        id: &str,
-        config: ProcessConfig,
-    ) -> anyhow::Result<ProcessInfo> {
+    async fn spawn_internal(&self, id: &str, config: ProcessConfig) -> anyhow::Result<ProcessInfo> {
         if !config.cwd.exists() {
-            anyhow::bail!(
-                "Working directory does not exist: {}",
-                config.cwd.display()
-            );
+            anyhow::bail!("Working directory does not exist: {}", config.cwd.display());
         }
 
         if !config.cwd.is_dir() {
@@ -928,8 +913,8 @@ impl ProcessManager {
             }
 
             // Brief wait for forced termination
-            let _ = tokio::time::timeout(Duration::from_millis(300), proc.exit_notify.notified())
-                .await;
+            let _ =
+                tokio::time::timeout(Duration::from_millis(300), proc.exit_notify.notified()).await;
         }
 
         Ok(proc.info().await)
@@ -964,8 +949,7 @@ impl ProcessManager {
                 .status();
         }
 
-        let _ =
-            tokio::time::timeout(Duration::from_millis(500), proc.exit_notify.notified()).await;
+        let _ = tokio::time::timeout(Duration::from_millis(500), proc.exit_notify.notified()).await;
 
         Ok(proc.info().await)
     }
@@ -1502,11 +1486,7 @@ impl Tool for ProcessTool {
                 for (id, res) in results {
                     match res {
                         Ok(info) => {
-                            out.push_str(&format!(
-                                "• [{}] status: {}\n",
-                                id,
-                                info.status.label()
-                            ));
+                            out.push_str(&format!("• [{}] status: {}\n", id, info.status.label()));
                         }
                         Err(e) => {
                             out.push_str(&format!("• [{}] error: {}\n", id, e));
@@ -1527,11 +1507,7 @@ impl Tool for ProcessTool {
                 for (id, res) in results {
                     match res {
                         Ok(info) => {
-                            out.push_str(&format!(
-                                "• [{}] status: {}\n",
-                                id,
-                                info.status.label()
-                            ));
+                            out.push_str(&format!("• [{}] status: {}\n", id, info.status.label()));
                         }
                         Err(e) => {
                             out.push_str(&format!("• [{}] error: {}\n", id, e));
@@ -1590,8 +1566,14 @@ mod tests {
     fn test_output_buffer_filtering() {
         let mut buf = OutputBuffer::new(20);
         buf.push(OutputStream::Stdout, "info: ready on port 3000".to_string());
-        buf.push(OutputStream::Stderr, "warn: deprecated API used".to_string());
-        buf.push(OutputStream::Stdout, "info: connection accepted".to_string());
+        buf.push(
+            OutputStream::Stderr,
+            "warn: deprecated API used".to_string(),
+        );
+        buf.push(
+            OutputStream::Stdout,
+            "info: connection accepted".to_string(),
+        );
         buf.push(OutputStream::System, "Process started".to_string());
 
         let stdout_lines = buf.get_lines(None, None, None, Some(OutputStream::Stdout), None);
@@ -1687,7 +1669,10 @@ mod tests {
         let updated = mgr.get(&info.id).await.unwrap();
         assert!(!updated.status.is_running());
 
-        let logs = mgr.read_logs(&info.id, None, None, None, None, None).await.unwrap();
+        let logs = mgr
+            .read_logs(&info.id, None, None, None, None, None)
+            .await
+            .unwrap();
         assert!(!logs.lines.is_empty());
         let stdout_has_hello = logs.lines.iter().any(|l| l.line.contains("hello_fusion"));
         assert!(stdout_has_hello, "Expected logs to contain 'hello_fusion'");
@@ -1750,7 +1735,10 @@ mod tests {
         assert!(!tool.description().is_empty());
 
         // List initially empty or contains existing
-        let list_res = tool.execute(json!({ "action": "list" }), &ctx).await.unwrap();
+        let list_res = tool
+            .execute(json!({ "action": "list" }), &ctx)
+            .await
+            .unwrap();
         assert!(!list_res.is_empty());
 
         // Spawn a process
@@ -1829,7 +1817,10 @@ mod tests {
 
         // Stop non-existent process
         let err = tool
-            .execute(json!({ "action": "stop", "id": "proc_nonexistent_9999" }), &ctx)
+            .execute(
+                json!({ "action": "stop", "id": "proc_nonexistent_9999" }),
+                &ctx,
+            )
             .await;
         assert!(err.is_err());
     }

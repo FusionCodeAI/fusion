@@ -23,8 +23,6 @@
 //! 20. Queue Up arrow recall (`↑ to edit`) popping from queue back to input buffer.
 //! 21. Multi-prompt queue FIFO execution across turns.
 //! 22. Model persistence across turns, runner config, and session.
-use std::collections::{HashMap, VecDeque};
-use std::time::Duration;
 use crossterm::{
     cursor,
     event::{Event, KeyCode, KeyEvent, KeyModifiers},
@@ -32,6 +30,8 @@ use crossterm::{
     terminal::{self, ClearType},
 };
 use serde_json::json;
+use std::collections::{HashMap, VecDeque};
+use std::time::Duration;
 
 use fusion::agent::loop_runner::AgentRunner;
 use fusion::agent::session::Session;
@@ -39,11 +39,11 @@ use fusion::config::Config;
 use fusion::provider::LlmClient;
 use fusion::tools::{default_registry, ToolContext};
 use fusion::ui::{
-    format_activity_status, format_model_label, format_repl_duration_compact, format_repl_tokens_compact,
-    format_thinking_status, format_tool_tree, format_turn_summary, handle_slash_command,
-    parse_tool_active_label, parse_tool_info, render_thinking_frame_to, render_tool_tree_to,
-    strip_ansi, CommandCategory, MarkdownRenderer, Prompt, PromptResult, ToolCallItem,
-    EFFORT_OPTIONS,
+    format_activity_status, format_model_label, format_repl_duration_compact,
+    format_repl_tokens_compact, format_thinking_status, format_tool_tree, format_turn_summary,
+    handle_slash_command, parse_tool_active_label, parse_tool_info, render_thinking_frame_to,
+    render_tool_tree_to, strip_ansi, CommandCategory, MarkdownRenderer, Prompt, PromptResult,
+    ToolCallItem, EFFORT_OPTIONS,
 };
 // ===========================================================================
 // Contract 1: Screen clearing and cursor reset on startup
@@ -52,12 +52,11 @@ use fusion::ui::{
 #[test]
 fn test_startup_screen_clearing_and_cursor_reset() {
     let mut buf = Vec::new();
-    let res = execute!(
-        buf,
-        terminal::Clear(ClearType::All),
-        cursor::MoveTo(0, 0)
+    let res = execute!(buf, terminal::Clear(ClearType::All), cursor::MoveTo(0, 0));
+    assert!(
+        res.is_ok(),
+        "Startup execute! sequence should succeed on in-memory buffer"
     );
-    assert!(res.is_ok(), "Startup execute! sequence should succeed on in-memory buffer");
 
     let output = String::from_utf8_lossy(&buf);
     // Crossterm Clear(ClearType::All) emits "\x1b[2J" and MoveTo(0,0) emits "\x1b[1;1H" or "\x1b[H"
@@ -98,8 +97,17 @@ fn test_prompt_in_memory_render_rail_and_status_line() {
     let mut last_lines = 0;
     let mut last_cursor = 0;
 
-    let res = prompt.render_to(&mut buf, &buffer_chars, 11, &mut last_lines, &mut last_cursor);
-    assert!(res.is_ok(), "Prompt render_to must succeed on in-memory buffer");
+    let res = prompt.render_to(
+        &mut buf,
+        &buffer_chars,
+        11,
+        &mut last_lines,
+        &mut last_cursor,
+    );
+    assert!(
+        res.is_ok(),
+        "Prompt render_to must succeed on in-memory buffer"
+    );
 
     let raw_out = String::from_utf8_lossy(&buf);
     let plain_out = strip_ansi(&raw_out);
@@ -129,7 +137,13 @@ fn test_prompt_render_multiline_input() {
     let mut last_cursor = 0;
 
     prompt
-        .render_to(&mut buf, &buffer_chars, multiline_text.len(), &mut last_lines, &mut last_cursor)
+        .render_to(
+            &mut buf,
+            &buffer_chars,
+            multiline_text.len(),
+            &mut last_lines,
+            &mut last_cursor,
+        )
         .expect("render_to multiline failed");
 
     let plain = strip_ansi(&String::from_utf8_lossy(&buf));
@@ -141,7 +155,10 @@ fn test_prompt_render_multiline_input() {
 
 #[test]
 fn test_prompt_model_labels_formatting() {
-    assert_eq!(format_model_label("deepseek-ai/DeepSeek-V4-Flash-0731"), "DeepSeek V4 Flash");
+    assert_eq!(
+        format_model_label("deepseek-ai/DeepSeek-V4-Flash-0731"),
+        "DeepSeek V4 Flash"
+    );
     assert_eq!(format_model_label("flash"), "DeepSeek V4 Flash");
     assert_eq!(format_model_label("v4"), "DeepSeek V4 Flash");
     assert_eq!(format_model_label("MiniMaxAI/MiniMax-M2.7"), "MiniMax M2.7");
@@ -202,9 +219,18 @@ fn test_thinking_status_compact_formatting() {
     assert_eq!(format_repl_duration_compact(Duration::from_secs(1)), "1s");
     assert_eq!(format_repl_duration_compact(Duration::from_secs(5)), "5s");
     assert_eq!(format_repl_duration_compact(Duration::from_secs(59)), "59s");
-    assert_eq!(format_repl_duration_compact(Duration::from_secs(67)), "1m7s");
-    assert_eq!(format_repl_duration_compact(Duration::from_secs(70)), "1m10s");
-    assert_eq!(format_repl_duration_compact(Duration::from_secs(3723)), "1h2m3s");
+    assert_eq!(
+        format_repl_duration_compact(Duration::from_secs(67)),
+        "1m7s"
+    );
+    assert_eq!(
+        format_repl_duration_compact(Duration::from_secs(70)),
+        "1m10s"
+    );
+    assert_eq!(
+        format_repl_duration_compact(Duration::from_secs(3723)),
+        "1h2m3s"
+    );
 
     // Token compact formatting
     assert_eq!(format_repl_tokens_compact(0), "0");
@@ -219,12 +245,7 @@ fn test_thinking_status_compact_formatting() {
 
 #[test]
 fn test_thinking_status_full_frame() {
-    let frame = format_thinking_status(
-        Duration::from_secs(1),
-        1,
-        0,
-        "DeepSeek V4 Flash",
-    );
+    let frame = format_thinking_status(Duration::from_secs(1), 1, 0, "DeepSeek V4 Flash");
     let plain = strip_ansi(&frame);
 
     // Must have a single dot and NEVER double dots
@@ -255,37 +276,81 @@ fn test_thinking_status_single_dot_and_500ms_blinking() {
     // 1. At 0ms (even 500ms interval): dot is ON ("• Running")
     let frame_0ms = format_activity_status("Running", Duration::from_millis(0), 10, 20, "auto");
     let plain_0ms = strip_ansi(&frame_0ms);
-    assert!(plain_0ms.contains("• Running (0s) (↑10 ↓20)"), "At 0ms dot should be ON: {}", plain_0ms);
-    assert!(!plain_0ms.contains("• •"), "Must not contain double dot: {}", plain_0ms);
+    assert!(
+        plain_0ms.contains("• Running (0s) (↑10 ↓20)"),
+        "At 0ms dot should be ON: {}",
+        plain_0ms
+    );
+    assert!(
+        !plain_0ms.contains("• •"),
+        "Must not contain double dot: {}",
+        plain_0ms
+    );
 
     // 2. At 500ms (odd 500ms interval): dot is OFF ("  Running")
     let frame_500ms = format_activity_status("Running", Duration::from_millis(500), 10, 20, "auto");
     let plain_500ms = strip_ansi(&frame_500ms);
-    assert!(plain_500ms.contains("  Running (0s) (↑10 ↓20)"), "At 500ms dot should be OFF: {}", plain_500ms);
-    assert!(!plain_500ms.contains("•"), "At 500ms no dot should appear: {}", plain_500ms);
+    assert!(
+        plain_500ms.contains("  Running (0s) (↑10 ↓20)"),
+        "At 500ms dot should be OFF: {}",
+        plain_500ms
+    );
+    assert!(
+        !plain_500ms.contains("•"),
+        "At 500ms no dot should appear: {}",
+        plain_500ms
+    );
 
     // 3. At 1000ms (even 500ms interval): dot is ON ("• Running")
-    let frame_1000ms = format_activity_status("Running", Duration::from_millis(1000), 10, 20, "auto");
+    let frame_1000ms =
+        format_activity_status("Running", Duration::from_millis(1000), 10, 20, "auto");
     let plain_1000ms = strip_ansi(&frame_1000ms);
-    assert!(plain_1000ms.contains("• Running (1s) (↑10 ↓20)"), "At 1000ms dot should be ON: {}", plain_1000ms);
-    assert!(!plain_1000ms.contains("• •"), "Must not contain double dot: {}", plain_1000ms);
+    assert!(
+        plain_1000ms.contains("• Running (1s) (↑10 ↓20)"),
+        "At 1000ms dot should be ON: {}",
+        plain_1000ms
+    );
+    assert!(
+        !plain_1000ms.contains("• •"),
+        "Must not contain double dot: {}",
+        plain_1000ms
+    );
 
     // 4. At 1500ms (odd 500ms interval): dot is OFF ("  Running")
-    let frame_1500ms = format_activity_status("Running", Duration::from_millis(1500), 10, 20, "auto");
+    let frame_1500ms =
+        format_activity_status("Running", Duration::from_millis(1500), 10, 20, "auto");
     let plain_1500ms = strip_ansi(&frame_1500ms);
-    assert!(plain_1500ms.contains("  Running (1s) (↑10 ↓20)"), "At 1500ms dot should be OFF: {}", plain_1500ms);
-    assert!(!plain_1500ms.contains("•"), "At 1500ms no dot should appear: {}", plain_1500ms);
+    assert!(
+        plain_1500ms.contains("  Running (1s) (↑10 ↓20)"),
+        "At 1500ms dot should be OFF: {}",
+        plain_1500ms
+    );
+    assert!(
+        !plain_1500ms.contains("•"),
+        "At 1500ms no dot should appear: {}",
+        plain_1500ms
+    );
 
     // 5. Passing "• Running" or "• • Running" is sanitized so only single blinking dot is produced
-    let frame_prefixed = format_activity_status("• Running", Duration::from_millis(0), 10, 20, "auto");
+    let frame_prefixed =
+        format_activity_status("• Running", Duration::from_millis(0), 10, 20, "auto");
     let plain_prefixed = strip_ansi(&frame_prefixed);
     assert!(plain_prefixed.contains("• Running (0s) (↑10 ↓20)"));
-    assert!(!plain_prefixed.contains("• •"), "Must sanitize leading dot to avoid double dots: {}", plain_prefixed);
+    assert!(
+        !plain_prefixed.contains("• •"),
+        "Must sanitize leading dot to avoid double dots: {}",
+        plain_prefixed
+    );
 
-    let frame_prefixed_off = format_activity_status("• Running", Duration::from_millis(500), 10, 20, "auto");
+    let frame_prefixed_off =
+        format_activity_status("• Running", Duration::from_millis(500), 10, 20, "auto");
     let plain_prefixed_off = strip_ansi(&frame_prefixed_off);
     assert!(plain_prefixed_off.contains("  Running (0s) (↑10 ↓20)"));
-    assert!(!plain_prefixed_off.contains("•"), "Must be off at 500ms even with prefixed input: {}", plain_prefixed_off);
+    assert!(
+        !plain_prefixed_off.contains("•"),
+        "Must be off at 500ms even with prefixed input: {}",
+        plain_prefixed_off
+    );
 }
 
 // ===========================================================================
@@ -337,7 +402,8 @@ fn test_parse_tool_info_action_labels_and_categories() {
     assert_eq!(lbl, "Loaded skill weather");
     assert_eq!(cat, "read");
 
-    let active_lbl = parse_tool_active_label("skill", &json!({"name": "google-search-browser-use"}));
+    let active_lbl =
+        parse_tool_active_label("skill", &json!({"name": "google-search-browser-use"}));
     assert_eq!(active_lbl, "Loading skill google-search-browser-use");
 
     // 2. Glob / Matched
@@ -395,21 +461,21 @@ fn test_parse_tool_info_action_labels_and_categories() {
     assert_eq!(cat, "read");
 
     // 11. Web fetch / Fetched
-    let (lbl, cat) = parse_tool_info("fetch", &json!({"url": "https://crates.io/api/v1/crates/ratatui"}));
+    let (lbl, cat) = parse_tool_info(
+        "fetch",
+        &json!({"url": "https://crates.io/api/v1/crates/ratatui"}),
+    );
     assert_eq!(lbl, "Fetched https://crates.io/api/v1/crates/ratatui");
     assert_eq!(cat, "read");
 }
 
 #[test]
 fn test_tool_tree_single_call_formatting() {
-    let items = vec![
-        ToolCallItem::new("file", "Read src/main.rs", "read"),
-    ];
+    let items = vec![ToolCallItem::new("file", "Read src/main.rs", "read")];
 
     let tree = format_tool_tree(&items);
     assert_eq!(
-        tree,
-        "● 1 tool call · 1 read\n└ Read src/main.rs\n",
+        tree, "● 1 tool call · 1 read\n└ Read src/main.rs\n",
         "Single tool call must start at column 0 and use '└ ' connector"
     );
 }
@@ -437,9 +503,12 @@ fn test_tool_tree_multi_call_aggregation() {
 
 #[test]
 fn test_tool_tree_failed_call_formatting() {
-    let items = vec![
-        ToolCallItem::new("bash", "Exited 1 ls \"/Users/aungmyatmoe/Library/Python/3.9/bin\"", "command").with_failed(true),
-    ];
+    let items = vec![ToolCallItem::new(
+        "bash",
+        "Exited 1 ls \"/Users/aungmyatmoe/Library/Python/3.9/bin\"",
+        "command",
+    )
+    .with_failed(true)];
 
     let tree = format_tool_tree(&items);
     assert_eq!(
@@ -496,7 +565,7 @@ fn test_completed_turn_summary_formatting() {
 fn test_markdown_renderer_indent_and_code_blocks() {
     let mut md = MarkdownRenderer::buffered().with_indent(2);
     let input = "# Heading\nHere is a paragraph.\n```rust\nlet x = 42;\n```\nDone.";
-    
+
     let output = md.push(input);
     let finish = md.finish();
     let total = format!("{}{}", output, finish);
@@ -517,36 +586,79 @@ fn test_markdown_renderer_indent_and_code_blocks() {
     assert!(plain.contains("rust"), "Should contain language tag");
     assert!(plain.contains("let x = 42;"), "Should contain code line");
     // Standard code block should have 2-space indent and no left bar `│`
-    assert!(!plain.contains("│"), "Standard code block lines should not have │ border: {}", plain);
-    assert!(plain.contains("  let x = 42;"), "Standard code block lines should have 2-space indent: {}", plain);
-    assert!(plain.contains("─ rust ──"), "Should contain top border: {}", plain);
-    assert!(plain.contains("────"), "Should contain bottom border: {}", plain);
+    assert!(
+        !plain.contains("│"),
+        "Standard code block lines should not have │ border: {}",
+        plain
+    );
+    assert!(
+        plain.contains("  let x = 42;"),
+        "Standard code block lines should have 2-space indent: {}",
+        plain
+    );
+    assert!(
+        plain.contains("─ rust ──"),
+        "Should contain top border: {}",
+        plain
+    );
+    assert!(
+        plain.contains("────"),
+        "Should contain bottom border: {}",
+        plain
+    );
 }
 
 #[test]
 fn test_markdown_ascii_diagram_rendering_omits_left_border() {
     let mut md = MarkdownRenderer::buffered().with_indent(2);
     let input = "```text\n+-------+      +-------+\n| Client| ---> | Server|\n+-------+      +-------+\n```\n";
-    
+
     let output = md.push(input);
     let finish = md.finish();
     let total = format!("{}{}", output, finish);
     let plain = strip_ansi(&total);
 
     // Verify code block dividers
-    assert!(plain.contains("text"), "Should contain text lang tag in header");
-    assert!(plain.contains("─ text ──"), "Should contain top border: {}", plain);
-    assert!(plain.contains("────"), "Should contain bottom border: {}", plain);
+    assert!(
+        plain.contains("text"),
+        "Should contain text lang tag in header"
+    );
+    assert!(
+        plain.contains("─ text ──"),
+        "Should contain top border: {}",
+        plain
+    );
+    assert!(
+        plain.contains("────"),
+        "Should contain bottom border: {}",
+        plain
+    );
 
     // Diagrams in text/ascii block must NOT have left border `│ ` prepended
-    assert!(!plain.contains("│ +-------+"), "Diagram line should not have left bar │: {}", plain);
-    assert!(plain.contains("+-------+"), "Diagram box should be preserved: {}", plain);
-    assert!(plain.contains("| Client| ---> | Server|"), "Diagram connection should be preserved: {}", plain);
+    assert!(
+        !plain.contains("│ +-------+"),
+        "Diagram line should not have left bar │: {}",
+        plain
+    );
+    assert!(
+        plain.contains("+-------+"),
+        "Diagram box should be preserved: {}",
+        plain
+    );
+    assert!(
+        plain.contains("| Client| ---> | Server|"),
+        "Diagram connection should be preserved: {}",
+        plain
+    );
 
     // Indentation check: all non-empty lines are 2-space indented
     for line in plain.lines() {
         if !line.trim().is_empty() {
-            assert!(line.starts_with("  "), "Every line must be indented with 2 spaces: {:?}", line);
+            assert!(
+                line.starts_with("  "),
+                "Every line must be indented with 2 spaces: {:?}",
+                line
+            );
         }
     }
 }
@@ -555,27 +667,55 @@ fn test_markdown_ascii_diagram_rendering_omits_left_border() {
 fn test_markdown_mermaid_codeblock_rendering_with_borders() {
     let mut md = MarkdownRenderer::buffered().with_indent(2);
     let input = "```mermaid\ngraph TD\n    A[Start] --> B[End]\n```\n";
-    
+
     let output = md.push(input);
     let finish = md.finish();
     let total = format!("{}{}", output, finish);
     let plain = strip_ansi(&total);
 
     // Verify mermaid code block renders with top and bottom borders matching fx
-    assert!(plain.contains("─ mermaid ──"), "Mermaid should have ─ mermaid ── top border: {}", plain);
-    assert!(plain.contains("────"), "Mermaid should have ──── bottom border: {}", plain);
-    assert!(plain.contains("graph TD"), "Mermaid source lines should be preserved: {}", plain);
-    assert!(plain.contains("A[Start] --> B[End]"), "Mermaid connection lines preserved: {}", plain);
+    assert!(
+        plain.contains("─ mermaid ──"),
+        "Mermaid should have ─ mermaid ── top border: {}",
+        plain
+    );
+    assert!(
+        plain.contains("────"),
+        "Mermaid should have ──── bottom border: {}",
+        plain
+    );
+    assert!(
+        plain.contains("graph TD"),
+        "Mermaid source lines should be preserved: {}",
+        plain
+    );
+    assert!(
+        plain.contains("A[Start] --> B[End]"),
+        "Mermaid connection lines preserved: {}",
+        plain
+    );
 
     // Verify ASCII boxes are disabled in favor of clean codeblock borders
-    assert!(!plain.contains("+---------"), "Mermaid should NOT render as ASCII box: {}", plain);
+    assert!(
+        !plain.contains("+---------"),
+        "Mermaid should NOT render as ASCII box: {}",
+        plain
+    );
     // Verify left bar │ is omitted
-    assert!(!plain.contains("│"), "Mermaid code block lines should not have left bar │: {}", plain);
+    assert!(
+        !plain.contains("│"),
+        "Mermaid code block lines should not have left bar │: {}",
+        plain
+    );
 
     // Indentation check: all non-empty lines are 2-space indented
     for line in plain.lines() {
         if !line.trim().is_empty() {
-            assert!(line.starts_with("  "), "Every line must be indented with 2 spaces: {:?}", line);
+            assert!(
+                line.starts_with("  "),
+                "Every line must be indented with 2 spaces: {:?}",
+                line
+            );
         }
     }
 }
@@ -593,18 +733,14 @@ fn test_full_turn_lifecycle_in_memory() {
         session_log,
         terminal::Clear(ClearType::All),
         cursor::MoveTo(0, 0)
-    ).unwrap();
+    )
+    .unwrap();
 
     // 2. User submits prompt: Prompt rail `┃ <prompt>`
     Prompt::render_submitted_prompt_to(&mut session_log, "Find and fix memory leak").unwrap();
 
     // 3. Model is thinking: • Running (1s) (↑120 ↓0) and queue hint
-    let thinking = format_thinking_status(
-        Duration::from_secs(1),
-        120,
-        0,
-        "DeepSeek V4 Flash",
-    );
+    let thinking = format_thinking_status(Duration::from_secs(1), 120, 0, "DeepSeek V4 Flash");
     session_log.extend_from_slice(thinking.as_bytes());
 
     // 4. Tools executed: Tool tree
@@ -683,7 +819,10 @@ fn test_queue_prompt_input_simulation_and_capture() {
     }
 
     assert_eq!(queued_prompt, Some("fix the bugs".to_string()));
-    assert!(queue_buffer.is_empty(), "Queue buffer must be drained on Enter");
+    assert!(
+        queue_buffer.is_empty(),
+        "Queue buffer must be drained on Enter"
+    );
     assert_eq!(queue_cursor, 0, "Queue cursor must reset to 0");
 
     // 4. Simulate hitting Enter on empty / whitespace-only buffer
@@ -694,7 +833,10 @@ fn test_queue_prompt_input_simulation_and_capture() {
     if !empty_trimmed.is_empty() {
         empty_queued = Some(empty_trimmed);
     }
-    assert_eq!(empty_queued, None, "Whitespace-only input should not set queued_prompt");
+    assert_eq!(
+        empty_queued, None,
+        "Whitespace-only input should not set queued_prompt"
+    );
 }
 
 #[test]
@@ -710,12 +852,19 @@ fn test_queue_prompt_rendering_with_active_buffer() {
         "DeepSeek V4 Flash",
         "refactor auth module",
         20,
-    ).unwrap();
+    )
+    .unwrap();
 
     let plain = strip_ansi(&String::from_utf8_lossy(&buf));
     assert!(plain.contains("• Running (2s) (↑150 ↓30)"));
-    assert!(plain.contains("┃ refactor auth module"), "Prompt rail must display the interactive queue buffer text");
-    assert!(plain.contains("enter queue · auto · DeepSeek V4 Flash"), "Status line must display enter queue hint");
+    assert!(
+        plain.contains("┃ refactor auth module"),
+        "Prompt rail must display the interactive queue buffer text"
+    );
+    assert!(
+        plain.contains("enter queue · auto · DeepSeek V4 Flash"),
+        "Status line must display enter queue hint"
+    );
 }
 
 // ===========================================================================
@@ -725,10 +874,22 @@ fn test_queue_prompt_rendering_with_active_buffer() {
 #[test]
 fn test_model_picker_menu_3_column_layout_and_dividers() {
     let models = vec![
-        ("deepseek-ai/DeepSeek-V4-Flash-0731".to_string(), "DeepSeek V4 Flash".to_string()),
-        ("moonshotai/Kimi-K2.6".to_string(), "Kimi K2.6 Reasoning".to_string()),
-        ("MiniMaxAI/MiniMax-M2.7".to_string(), "MiniMax M2.7".to_string()),
-        ("anthropic/claude-3-5-sonnet".to_string(), "Claude 3.5 Sonnet Coding".to_string()),
+        (
+            "deepseek-ai/DeepSeek-V4-Flash-0731".to_string(),
+            "DeepSeek V4 Flash".to_string(),
+        ),
+        (
+            "moonshotai/Kimi-K2.6".to_string(),
+            "Kimi K2.6 Reasoning".to_string(),
+        ),
+        (
+            "MiniMaxAI/MiniMax-M2.7".to_string(),
+            "MiniMax M2.7".to_string(),
+        ),
+        (
+            "anthropic/claude-3-5-sonnet".to_string(),
+            "Claude 3.5 Sonnet Coding".to_string(),
+        ),
         ("openai/gpt-4o".to_string(), "GPT-4o Omnimodel".to_string()),
     ];
 
@@ -742,14 +903,23 @@ fn test_model_picker_menu_3_column_layout_and_dividers() {
     let mut last_cursor = 0;
 
     prompt
-        .render_to(&mut buf, &input_buffer, 0, &mut last_lines, &mut last_cursor)
+        .render_to(
+            &mut buf,
+            &input_buffer,
+            0,
+            &mut last_lines,
+            &mut last_cursor,
+        )
         .expect("render_to model picker failed");
 
     let raw = String::from_utf8_lossy(&buf);
     let plain = strip_ansi(&raw);
 
     // 1. Dividers
-    assert!(plain.contains('─'), "Model picker must render horizontal dividers");
+    assert!(
+        plain.contains('─'),
+        "Model picker must render horizontal dividers"
+    );
 
     // 2. Header
     assert!(
@@ -757,7 +927,10 @@ fn test_model_picker_menu_3_column_layout_and_dividers() {
         "Model picker header must contain 'Models 5 · Type to filter', got:\n{}",
         plain
     );
-    assert!(plain.contains("1-5"), "Header must show pagination range '1-5'");
+    assert!(
+        plain.contains("1-5"),
+        "Header must show pagination range '1-5'"
+    );
 
     // 3. 3-column rows (ID, Description/Name, Category Tag)
     // Fast category
@@ -789,9 +962,15 @@ fn test_model_picker_menu_3_column_layout_and_dividers() {
 #[test]
 fn test_model_picker_menu_filtering_and_selection() {
     let models = vec![
-        ("deepseek-ai/DeepSeek-V4-Flash-0731".to_string(), "DeepSeek V4 Flash".to_string()),
+        (
+            "deepseek-ai/DeepSeek-V4-Flash-0731".to_string(),
+            "DeepSeek V4 Flash".to_string(),
+        ),
         ("moonshotai/Kimi-K2.6".to_string(), "Kimi K2.6".to_string()),
-        ("MiniMaxAI/MiniMax-M2.7".to_string(), "MiniMax M2.7".to_string()),
+        (
+            "MiniMaxAI/MiniMax-M2.7".to_string(),
+            "MiniMax M2.7".to_string(),
+        ),
     ];
 
     let prompt = Prompt::new()
@@ -844,7 +1023,10 @@ fn test_slash_menu_3_column_layout_categories_and_dividers() {
     let plain = strip_ansi(&raw);
 
     // 1. Dividers
-    assert!(plain.contains('─'), "Slash menu must render horizontal dividers");
+    assert!(
+        plain.contains('─'),
+        "Slash menu must render horizontal dividers"
+    );
 
     // 2. Header
     assert!(
@@ -862,9 +1044,13 @@ fn test_slash_menu_3_column_layout_categories_and_dividers() {
     // Check that categories General, Session, Model, Config exist in slash palette
     let palette = &fusion::ui::slash::COMMAND_PALETTE;
     let has_core = palette.iter().any(|c| c.category == CommandCategory::Core);
-    let has_session = palette.iter().any(|c| c.category == CommandCategory::Session);
+    let has_session = palette
+        .iter()
+        .any(|c| c.category == CommandCategory::Session);
     let has_model = palette.iter().any(|c| c.category == CommandCategory::Model);
-    let has_config = palette.iter().any(|c| c.category == CommandCategory::Config);
+    let has_config = palette
+        .iter()
+        .any(|c| c.category == CommandCategory::Config);
 
     assert!(has_core, "COMMAND_PALETTE must contain Core commands");
     assert!(has_session, "COMMAND_PALETTE must contain Session commands");
@@ -883,11 +1069,20 @@ fn test_slash_menu_category_filtering() {
     let mut last_cursor = 0;
 
     prompt
-        .render_to(&mut buf_session, &input_session, 8, &mut last_lines, &mut last_cursor)
+        .render_to(
+            &mut buf_session,
+            &input_session,
+            8,
+            &mut last_lines,
+            &mut last_cursor,
+        )
         .unwrap();
     let plain_session = strip_ansi(&String::from_utf8_lossy(&buf_session));
     assert!(plain_session.contains("/session"));
-    assert!(plain_session.contains("Session"), "Category for /session must be 'Session'");
+    assert!(
+        plain_session.contains("Session"),
+        "Category for /session must be 'Session'"
+    );
 
     // 2. Model command filter "/model"
     let input_model: Vec<char> = "/model".chars().collect();
@@ -896,11 +1091,20 @@ fn test_slash_menu_category_filtering() {
     last_cursor = 0;
 
     prompt
-        .render_to(&mut buf_model, &input_model, 6, &mut last_lines, &mut last_cursor)
+        .render_to(
+            &mut buf_model,
+            &input_model,
+            6,
+            &mut last_lines,
+            &mut last_cursor,
+        )
         .unwrap();
     let plain_model = strip_ansi(&String::from_utf8_lossy(&buf_model));
     assert!(plain_model.contains("/model"));
-    assert!(plain_model.contains("Model"), "Category for /model must be 'Model'");
+    assert!(
+        plain_model.contains("Model"),
+        "Category for /model must be 'Model'"
+    );
 
     // 3. Config command filter "/config"
     let input_config: Vec<char> = "/config".chars().collect();
@@ -909,11 +1113,20 @@ fn test_slash_menu_category_filtering() {
     last_cursor = 0;
 
     prompt
-        .render_to(&mut buf_config, &input_config, 7, &mut last_lines, &mut last_cursor)
+        .render_to(
+            &mut buf_config,
+            &input_config,
+            7,
+            &mut last_lines,
+            &mut last_cursor,
+        )
         .unwrap();
     let plain_config = strip_ansi(&String::from_utf8_lossy(&buf_config));
     assert!(plain_config.contains("/config"));
-    assert!(plain_config.contains("Config"), "Category for /config must be 'Config'");
+    assert!(
+        plain_config.contains("Config"),
+        "Category for /config must be 'Config'"
+    );
 
     // 4. General / Core command filter "/help"
     let input_help: Vec<char> = "/help".chars().collect();
@@ -922,11 +1135,20 @@ fn test_slash_menu_category_filtering() {
     last_cursor = 0;
 
     prompt
-        .render_to(&mut buf_help, &input_help, 5, &mut last_lines, &mut last_cursor)
+        .render_to(
+            &mut buf_help,
+            &input_help,
+            5,
+            &mut last_lines,
+            &mut last_cursor,
+        )
         .unwrap();
     let plain_help = strip_ansi(&String::from_utf8_lossy(&buf_help));
     assert!(plain_help.contains("/help"));
-    assert!(plain_help.contains("General"), "Category for /help must be 'General'");
+    assert!(
+        plain_help.contains("General"),
+        "Category for /help must be 'General'"
+    );
 }
 
 // ===========================================================================
@@ -951,7 +1173,8 @@ fn test_single_inplace_thinking_frame_no_line_duplication() {
                 cursor::MoveUp(2),
                 cursor::MoveToColumn(0),
                 terminal::Clear(ClearType::FromCursorDown)
-            ).unwrap();
+            )
+            .unwrap();
         }
         render_thinking_frame_to(
             stream,
@@ -962,7 +1185,8 @@ fn test_single_inplace_thinking_frame_no_line_duplication() {
             "DeepSeek V4 Flash",
             queue_buf,
             queue_buf.len(),
-        ).unwrap();
+        )
+        .unwrap();
     };
 
     // Frame 1: Initial display (displayed = false)
@@ -972,7 +1196,10 @@ fn test_single_inplace_thinking_frame_no_line_duplication() {
     assert!(frame1_raw.contains("• Running (0s) (↑100 ↓0)"));
     assert!(frame1_raw.contains("enter queue · auto · DeepSeek V4 Flash"));
     // MoveUp(2) positions cursor on the queue input line
-    assert!(frame1_raw.contains("\x1b[2A") || frame1_raw.contains("\x1b[2F"), "Must move cursor up 2 rows to queue line");
+    assert!(
+        frame1_raw.contains("\x1b[2A") || frame1_raw.contains("\x1b[2F"),
+        "Must move cursor up 2 rows to queue line"
+    );
 
     // Frame 2: Subsequent tick at 1s (displayed = true)
     render_frame(&mut terminal_stream, 1, 100, 45, "", true);
@@ -998,7 +1225,8 @@ fn test_single_inplace_thinking_frame_no_line_duplication() {
         cursor::MoveUp(2),
         cursor::MoveToColumn(0),
         terminal::Clear(ClearType::FromCursorDown)
-    ).unwrap();
+    )
+    .unwrap();
 
     let final_raw = String::from_utf8_lossy(&terminal_stream);
     assert!(
@@ -1013,13 +1241,11 @@ fn test_single_inplace_thinking_frame_no_line_duplication() {
 
 #[test]
 fn test_fx_image1_tool_call_tree_success() {
-    let items = vec![
-        ToolCallItem::new(
-            "bash",
-            "Ran which browser-use || python3 -m site --user-base",
-            "command",
-        ),
-    ];
+    let items = vec![ToolCallItem::new(
+        "bash",
+        "Ran which browser-use || python3 -m site --user-base",
+        "command",
+    )];
     let tree = format_tool_tree(&items);
     assert_eq!(
         tree,
@@ -1029,14 +1255,12 @@ fn test_fx_image1_tool_call_tree_success() {
 
 #[test]
 fn test_fx_image1_tool_call_tree_failed() {
-    let items = vec![
-        ToolCallItem::new(
-            "bash",
-            "Exited 1 ls \"/Users/aungmyatmoe/Library/Python/3.9/bin\"",
-            "command",
-        )
-        .with_failed(true),
-    ];
+    let items = vec![ToolCallItem::new(
+        "bash",
+        "Exited 1 ls \"/Users/aungmyatmoe/Library/Python/3.9/bin\"",
+        "command",
+    )
+    .with_failed(true)];
     let tree = format_tool_tree(&items);
     assert_eq!(
         tree,
@@ -1046,10 +1270,7 @@ fn test_fx_image1_tool_call_tree_failed() {
 
 #[test]
 fn test_fx_image1_skill_tool_parsing_and_rendering() {
-    let (lbl, cat) = parse_tool_info(
-        "skill",
-        &json!({"name": "google-search-browser-use"}),
-    );
+    let (lbl, cat) = parse_tool_info("skill", &json!({"name": "google-search-browser-use"}));
     assert_eq!(lbl, "Loaded skill google-search-browser-use");
     assert_eq!(cat, "read");
 
@@ -1063,24 +1284,36 @@ fn test_fx_image1_skill_tool_parsing_and_rendering() {
 
 #[test]
 fn test_fx_image1_duration_compact_exact_format() {
-    assert_eq!(format_repl_duration_compact(Duration::from_secs(70)), "1m10s");
-    assert_eq!(format_repl_duration_compact(Duration::from_secs(60)), "1m0s");
-    assert_eq!(format_repl_duration_compact(Duration::from_secs(67)), "1m7s");
-    assert_eq!(format_repl_duration_compact(Duration::from_secs(125)), "2m5s");
-    assert_eq!(format_repl_duration_compact(Duration::from_secs(3660)), "1h1m0s");
+    assert_eq!(
+        format_repl_duration_compact(Duration::from_secs(70)),
+        "1m10s"
+    );
+    assert_eq!(
+        format_repl_duration_compact(Duration::from_secs(60)),
+        "1m0s"
+    );
+    assert_eq!(
+        format_repl_duration_compact(Duration::from_secs(67)),
+        "1m7s"
+    );
+    assert_eq!(
+        format_repl_duration_compact(Duration::from_secs(125)),
+        "2m5s"
+    );
+    assert_eq!(
+        format_repl_duration_compact(Duration::from_secs(3660)),
+        "1h1m0s"
+    );
 }
 
 #[test]
 fn test_fx_image1_running_status_frame_exact_layout() {
-    let frame = format_thinking_status(
-        Duration::from_secs(70),
-        9,
-        641,
-        "claude-3-7-sonnet",
-    );
+    let frame = format_thinking_status(Duration::from_secs(70), 9, 641, "claude-3-7-sonnet");
     let plain = strip_ansi(&frame);
-    let expected = "  • Running (1m10s) (↑9 ↓641)\r\n\r\n┃ \r\n\r\nenter queue · auto · claude-3-7-sonnet\r\n";
-    let expected_lf = "  • Running (1m10s) (↑9 ↓641)\n\n┃ \n\nenter queue · auto · claude-3-7-sonnet\n";
+    let expected =
+        "  • Running (1m10s) (↑9 ↓641)\r\n\r\n┃ \r\n\r\nenter queue · auto · claude-3-7-sonnet\r\n";
+    let expected_lf =
+        "  • Running (1m10s) (↑9 ↓641)\n\n┃ \n\nenter queue · auto · claude-3-7-sonnet\n";
     assert!(
         plain == expected || plain == expected_lf,
         "Frame layout mismatch: got {:?}",
@@ -1091,13 +1324,11 @@ fn test_fx_image1_running_status_frame_exact_layout() {
 #[test]
 fn test_fx_image1_render_tool_tree_surrounded_by_blank_lines() {
     let mut buf = Vec::new();
-    let items = vec![
-        ToolCallItem::new(
-            "bash",
-            "Ran which browser-use || python3 -m site --user-base",
-            "command",
-        ),
-    ];
+    let items = vec![ToolCallItem::new(
+        "bash",
+        "Ran which browser-use || python3 -m site --user-base",
+        "command",
+    )];
     render_tool_tree_to(&mut buf, &items).expect("render_tool_tree_to should succeed");
     let plain = strip_ansi(&String::from_utf8_lossy(&buf));
     assert!(
@@ -1141,13 +1372,11 @@ fn test_fx_image1_live_tool_and_turn_lifecycle_no_double_bar() {
     .unwrap();
 
     // Render completed tool tree
-    let tools = vec![
-        ToolCallItem::new(
-            "bash",
-            "Ran which browser-use || python3 -m site --user-base",
-            "command",
-        ),
-    ];
+    let tools = vec![ToolCallItem::new(
+        "bash",
+        "Ran which browser-use || python3 -m site --user-base",
+        "command",
+    )];
     render_tool_tree_to(&mut log, &tools).unwrap();
 
     // Re-arm live running status
@@ -1228,7 +1457,13 @@ fn test_effort_picker_menu_layout_5_options_and_dividers() {
         let mut last_lines = 0;
         let mut last_cursor = 0;
         prompt
-            .render_to(&mut buf, &input_buffer, input_len, &mut last_lines, &mut last_cursor)
+            .render_to(
+                &mut buf,
+                &input_buffer,
+                input_len,
+                &mut last_lines,
+                &mut last_cursor,
+            )
             .expect("render_to effort picker failed");
 
         let raw = String::from_utf8_lossy(&buf);
@@ -1294,7 +1529,10 @@ fn test_effort_picker_menu_layout_5_options_and_dividers() {
 #[test]
 fn test_effort_picker_interactive_navigation_and_event_handling() {
     let models = vec![
-        ("deepseek-ai/DeepSeek-V4-Flash-0731".to_string(), "DeepSeek V4 Flash".to_string()),
+        (
+            "deepseek-ai/DeepSeek-V4-Flash-0731".to_string(),
+            "DeepSeek V4 Flash".to_string(),
+        ),
         ("moonshotai/Kimi-K2.6".to_string(), "Kimi K2.6".to_string()),
     ];
 
@@ -1305,12 +1543,21 @@ fn test_effort_picker_interactive_navigation_and_event_handling() {
 
     // 1. Enter on model picker -> enters effort picker stage for the selected model
     let res = prompt
-        .handle_event(Event::Key(KeyEvent::new(KeyCode::Enter, KeyModifiers::NONE)))
+        .handle_event(Event::Key(KeyEvent::new(
+            KeyCode::Enter,
+            KeyModifiers::NONE,
+        )))
         .unwrap();
-    assert_eq!(res, None, "Enter on model picker must transition to effort picker without immediate submit");
+    assert_eq!(
+        res, None,
+        "Enter on model picker must transition to effort picker without immediate submit"
+    );
     assert!(!prompt.model_picker_active());
     assert!(prompt.effort_picker_active());
-    assert_eq!(prompt.pending_model_id(), "deepseek-ai/DeepSeek-V4-Flash-0731");
+    assert_eq!(
+        prompt.pending_model_id(),
+        "deepseek-ai/DeepSeek-V4-Flash-0731"
+    );
     assert_eq!(prompt.effort_selection(), 0); // starts at "default"
 
     // 2. Down key -> moves to index 1 ("xhigh")
@@ -1351,7 +1598,10 @@ fn test_effort_picker_interactive_navigation_and_event_handling() {
 
     // 8. BackTab key -> index 3 ("medium")
     prompt
-        .handle_event(Event::Key(KeyEvent::new(KeyCode::BackTab, KeyModifiers::NONE)))
+        .handle_event(Event::Key(KeyEvent::new(
+            KeyCode::BackTab,
+            KeyModifiers::NONE,
+        )))
         .unwrap();
     assert_eq!(prompt.effort_selection(), 3);
 
@@ -1363,14 +1613,22 @@ fn test_effort_picker_interactive_navigation_and_event_handling() {
 
     // 10. Enter key on "high" -> submits `/model <model> high`
     let res = prompt
-        .handle_event(Event::Key(KeyEvent::new(KeyCode::Enter, KeyModifiers::NONE)))
+        .handle_event(Event::Key(KeyEvent::new(
+            KeyCode::Enter,
+            KeyModifiers::NONE,
+        )))
         .unwrap();
     assert_eq!(
         res,
-        Some(PromptResult::Submit("/model deepseek-ai/DeepSeek-V4-Flash-0731 high".to_string())),
+        Some(PromptResult::Submit(
+            "/model deepseek-ai/DeepSeek-V4-Flash-0731 high".to_string()
+        )),
         "Enter on effort picker must submit '/model <model> <effort>'"
     );
-    assert!(!prompt.effort_picker_active(), "Effort picker must close on submit");
+    assert!(
+        !prompt.effort_picker_active(),
+        "Effort picker must close on submit"
+    );
     assert_eq!(prompt.selected_effort(), Some("high"));
 }
 
@@ -1382,7 +1640,10 @@ fn test_effort_picker_default_effort_submission() {
         .with_effort_selection(0); // "default"
 
     let res = prompt
-        .handle_event(Event::Key(KeyEvent::new(KeyCode::Enter, KeyModifiers::NONE)))
+        .handle_event(Event::Key(KeyEvent::new(
+            KeyCode::Enter,
+            KeyModifiers::NONE,
+        )))
         .unwrap();
     assert_eq!(
         res,
@@ -1404,7 +1665,10 @@ fn test_effort_picker_cancellation_via_esc_and_ctrl_c() {
     let res_esc = prompt_esc
         .handle_event(Event::Key(KeyEvent::new(KeyCode::Esc, KeyModifiers::NONE)))
         .unwrap();
-    assert_eq!(res_esc, None, "Esc closes picker and returns to prompt editing");
+    assert_eq!(
+        res_esc, None,
+        "Esc closes picker and returns to prompt editing"
+    );
     assert!(!prompt_esc.effort_picker_active());
     assert_eq!(prompt_esc.effort_selection(), 0);
     assert_eq!(prompt_esc.pending_model_id(), "");
@@ -1416,7 +1680,10 @@ fn test_effort_picker_cancellation_via_esc_and_ctrl_c() {
         .with_effort_selection(1);
 
     let res_ctrl_c = prompt_ctrl_c
-        .handle_event(Event::Key(KeyEvent::new(KeyCode::Char('c'), KeyModifiers::CONTROL)))
+        .handle_event(Event::Key(KeyEvent::new(
+            KeyCode::Char('c'),
+            KeyModifiers::CONTROL,
+        )))
         .unwrap();
     assert_eq!(res_ctrl_c, Some(PromptResult::Cancel));
     assert!(!prompt_ctrl_c.effort_picker_active());
@@ -1562,10 +1829,7 @@ fn test_model_switch_clean_confirmation_output_and_metadata() {
         runner.config().default_model,
         "deepseek-ai/DeepSeek-V4-Flash-0731"
     );
-    assert_eq!(
-        session.active_model(),
-        "deepseek-ai/DeepSeek-V4-Flash-0731"
-    );
+    assert_eq!(session.active_model(), "deepseek-ai/DeepSeek-V4-Flash-0731");
     assert_eq!(session.get_metadata("reasoning_effort"), Some("xhigh"));
 }
 
@@ -1577,8 +1841,22 @@ fn test_model_switch_clean_confirmation_output_and_metadata() {
 fn test_progressive_word_streaming_matches_buffered_output() {
     // 1. Plain paragraph streamed word by word
     let text_tokens = vec![
-        "The ", "quick ", "brown ", "fox ", "jumps ", "over ", "the ", "lazy ", "dog.\n\n",
-        "Rust ", "provides ", "memory ", "safety ", "without ", "garbage ", "collection.\n",
+        "The ",
+        "quick ",
+        "brown ",
+        "fox ",
+        "jumps ",
+        "over ",
+        "the ",
+        "lazy ",
+        "dog.\n\n",
+        "Rust ",
+        "provides ",
+        "memory ",
+        "safety ",
+        "without ",
+        "garbage ",
+        "collection.\n",
     ];
 
     let mut streamer = MarkdownRenderer::new().with_indent(2);
@@ -1649,7 +1927,8 @@ fn test_progressive_word_streaming_matches_buffered_output() {
     assert!(plain_rich_buf.contains("println!(\"Fusion REPL ready\");"));
 
     // 3. Fine-grained character-by-character streaming parity
-    let char_stream_input = "Interactive prompt verification ensures 100% FX fidelity across all terminal sessions.\n";
+    let char_stream_input =
+        "Interactive prompt verification ensures 100% FX fidelity across all terminal sessions.\n";
     let mut char_buffered = MarkdownRenderer::buffered().with_indent(2);
     let mut char_buf_out = String::new();
     for ch in char_stream_input.chars() {
@@ -1685,9 +1964,7 @@ fn test_fx_image1_multi_prompt_queue_banner_and_status_line() {
     //
     // queued 2 · enter queue · auto · grok-4.6
 
-    let mut prompt = Prompt::new()
-        .with_model("grok-4.6")
-        .with_queued_count(2);
+    let mut prompt = Prompt::new().with_model("grok-4.6").with_queued_count(2);
     prompt.set_running_status(Some("Thinking (3s) (↑1 ↓0)".to_string()));
 
     let mut buf = Vec::new();
@@ -1695,8 +1972,17 @@ fn test_fx_image1_multi_prompt_queue_banner_and_status_line() {
     let mut last_lines = 0;
     let mut last_cursor = 0;
 
-    let res = prompt.render_to(&mut buf, &buffer_chars, 0, &mut last_lines, &mut last_cursor);
-    assert!(res.is_ok(), "Prompt render_to must succeed with queue banner");
+    let res = prompt.render_to(
+        &mut buf,
+        &buffer_chars,
+        0,
+        &mut last_lines,
+        &mut last_cursor,
+    );
+    assert!(
+        res.is_ok(),
+        "Prompt render_to must succeed with queue banner"
+    );
 
     let raw_out = String::from_utf8_lossy(&buf);
     let plain_out = strip_ansi(&raw_out);
@@ -1741,11 +2027,21 @@ fn test_queue_banner_singular_and_plural_formatting() {
     let mut buf_single = Vec::new();
     let mut last_lines = 0;
     let mut last_cursor = 0;
-    prompt_single.render_to(&mut buf_single, &[], 0, &mut last_lines, &mut last_cursor).unwrap();
+    prompt_single
+        .render_to(&mut buf_single, &[], 0, &mut last_lines, &mut last_cursor)
+        .unwrap();
     let plain_single = strip_ansi(&String::from_utf8_lossy(&buf_single));
 
-    assert!(plain_single.contains("1 queued message · ↑ to edit"), "Must format singular '1 queued message', got:\n{}", plain_single);
-    assert!(plain_single.contains("queued 1 · enter queue · auto · MiniMax M2.7"), "Must format singular status line, got:\n{}", plain_single);
+    assert!(
+        plain_single.contains("1 queued message · ↑ to edit"),
+        "Must format singular '1 queued message', got:\n{}",
+        plain_single
+    );
+    assert!(
+        plain_single.contains("queued 1 · enter queue · auto · MiniMax M2.7"),
+        "Must format singular status line, got:\n{}",
+        plain_single
+    );
 
     // 2. Plural: 5 queued messages
     let mut prompt_plural = Prompt::new()
@@ -1756,15 +2052,35 @@ fn test_queue_banner_singular_and_plural_formatting() {
     let mut buf_plural = Vec::new();
     let mut last_lines_p = 0;
     let mut last_cursor_p = 0;
-    prompt_plural.render_to(&mut buf_plural, &[], 0, &mut last_lines_p, &mut last_cursor_p).unwrap();
+    prompt_plural
+        .render_to(
+            &mut buf_plural,
+            &[],
+            0,
+            &mut last_lines_p,
+            &mut last_cursor_p,
+        )
+        .unwrap();
     let plain_plural = strip_ansi(&String::from_utf8_lossy(&buf_plural));
 
-    assert!(plain_plural.contains("5 queued messages · ↑ to edit"), "Must format plural '5 queued messages', got:\n{}", plain_plural);
-    assert!(plain_plural.contains("queued 5 · enter queue · auto · DeepSeek V4 Flash"), "Must format plural status line, got:\n{}", plain_plural);
+    assert!(
+        plain_plural.contains("5 queued messages · ↑ to edit"),
+        "Must format plural '5 queued messages', got:\n{}",
+        plain_plural
+    );
+    assert!(
+        plain_plural.contains("queued 5 · enter queue · auto · DeepSeek V4 Flash"),
+        "Must format plural status line, got:\n{}",
+        plain_plural
+    );
 
     // 3. Reset clears queued count
     prompt_plural.reset_input();
-    assert_eq!(prompt_plural.queued_count(), 0, "reset_input must reset queued_count to 0");
+    assert_eq!(
+        prompt_plural.queued_count(),
+        0,
+        "reset_input must reset queued_count to 0"
+    );
 }
 
 #[test]
@@ -1777,7 +2093,9 @@ fn test_queue_status_line_with_reasoning_effort() {
     let mut buf = Vec::new();
     let mut last_lines = 0;
     let mut last_cursor = 0;
-    prompt.render_to(&mut buf, &[], 0, &mut last_lines, &mut last_cursor).unwrap();
+    prompt
+        .render_to(&mut buf, &[], 0, &mut last_lines, &mut last_cursor)
+        .unwrap();
     let plain = strip_ansi(&String::from_utf8_lossy(&buf));
 
     assert!(
@@ -1813,7 +2131,10 @@ fn test_queue_up_arrow_recall_popping_to_input_buffer() {
         }
     }
 
-    assert_eq!(prompt.buffer.iter().collect::<String>(), "second queued prompt");
+    assert_eq!(
+        prompt.buffer.iter().collect::<String>(),
+        "second queued prompt"
+    );
     assert_eq!(prompt.cursor_pos, "second queued prompt".len());
     assert_eq!(prompt.queued_count(), 1);
     assert_eq!(queued_prompts.len(), 1);
@@ -1824,7 +2145,10 @@ fn test_queue_up_arrow_recall_popping_to_input_buffer() {
         prompt.buffer.insert(prompt.cursor_pos, c);
         prompt.cursor_pos += 1;
     }
-    assert_eq!(prompt.buffer.iter().collect::<String>(), "second queued prompt (edited)");
+    assert_eq!(
+        prompt.buffer.iter().collect::<String>(),
+        "second queued prompt (edited)"
+    );
 
     // 3. User presses Enter while thinking -> submits back to queue
     let text: String = prompt.buffer.drain(..).collect();
@@ -1849,7 +2173,10 @@ fn test_queue_up_arrow_recall_popping_to_input_buffer() {
             prompt.set_queued_count(queued_prompts.len());
         }
     }
-    assert_eq!(prompt.buffer.iter().collect::<String>(), "second queued prompt (edited)");
+    assert_eq!(
+        prompt.buffer.iter().collect::<String>(),
+        "second queued prompt (edited)"
+    );
     assert_eq!(prompt.queued_count(), 1);
 
     // Clear buffer (user discards or completes edit)
@@ -1864,7 +2191,10 @@ fn test_queue_up_arrow_recall_popping_to_input_buffer() {
             prompt.set_queued_count(queued_prompts.len());
         }
     }
-    assert_eq!(prompt.buffer.iter().collect::<String>(), "first queued prompt");
+    assert_eq!(
+        prompt.buffer.iter().collect::<String>(),
+        "first queued prompt"
+    );
     assert_eq!(prompt.queued_count(), 0);
     assert!(queued_prompts.is_empty());
 
@@ -1879,8 +2209,15 @@ fn test_queue_up_arrow_recall_popping_to_input_buffer() {
             prompt.buffer = last.chars().collect();
         }
     }
-    assert_eq!(queued_prompts.len(), initial_queue_len, "Up arrow on non-empty buffer must not pop queue");
-    assert_eq!(prompt.buffer.iter().collect::<String>(), "existing typed text");
+    assert_eq!(
+        queued_prompts.len(),
+        initial_queue_len,
+        "Up arrow on non-empty buffer must not pop queue"
+    );
+    assert_eq!(
+        prompt.buffer.iter().collect::<String>(),
+        "existing typed text"
+    );
 }
 
 // ===========================================================================
@@ -1932,7 +2269,10 @@ fn test_multi_prompt_queue_fifo_execution_across_turns() {
     assert_eq!(turn5_input, "Turn 5: verify coverage");
     executed_prompts.push(turn5_input);
 
-    assert!(prompt_queue.is_empty(), "All queued prompts must be consumed in FIFO order");
+    assert!(
+        prompt_queue.is_empty(),
+        "All queued prompts must be consumed in FIFO order"
+    );
     assert_eq!(
         executed_prompts,
         vec![
@@ -1961,11 +2301,7 @@ fn test_model_persistence_across_turns_and_components() {
     assert_eq!(runner.config().default_model, initial_model);
 
     // 2. Switch model to MiniMaxAI/MiniMax-M2.7 via slash command
-    let res = handle_slash_command(
-        "/model MiniMaxAI/MiniMax-M2.7",
-        &mut runner,
-        &mut session,
-    );
+    let res = handle_slash_command("/model MiniMaxAI/MiniMax-M2.7", &mut runner, &mut session);
 
     assert!(res.is_some());
     assert_eq!(session.active_model(), "MiniMaxAI/MiniMax-M2.7");
@@ -1981,9 +2317,15 @@ fn test_model_persistence_across_turns_and_components() {
     let mut buf = Vec::new();
     let mut last_lines = 0;
     let mut last_cursor = 0;
-    prompt.render_to(&mut buf, &[], 0, &mut last_lines, &mut last_cursor).unwrap();
+    prompt
+        .render_to(&mut buf, &[], 0, &mut last_lines, &mut last_cursor)
+        .unwrap();
     let plain = strip_ansi(&String::from_utf8_lossy(&buf));
-    assert!(plain.contains("auto · MiniMax M2.7"), "Status line must display formatted model label 'MiniMax M2.7', got:\n{}", plain);
+    assert!(
+        plain.contains("auto · MiniMax M2.7"),
+        "Status line must display formatted model label 'MiniMax M2.7', got:\n{}",
+        plain
+    );
 
     // 3. Simulate turn loop: model must persist across multiple turns without reverting
     for _turn in 1..=3 {
@@ -1997,11 +2339,7 @@ fn test_model_persistence_across_turns_and_components() {
     }
 
     // 4. Switch model to grok-4.6
-    let res2 = handle_slash_command(
-        "/model grok-4.6",
-        &mut runner,
-        &mut session,
-    );
+    let res2 = handle_slash_command("/model grok-4.6", &mut runner, &mut session);
 
     assert!(res2.is_some());
     assert_eq!(session.active_model(), "grok-4.6");
@@ -2013,9 +2351,15 @@ fn test_model_persistence_across_turns_and_components() {
     let mut buf2 = Vec::new();
     let mut last_lines2 = 0;
     let mut last_cursor2 = 0;
-    prompt.render_to(&mut buf2, &[], 0, &mut last_lines2, &mut last_cursor2).unwrap();
+    prompt
+        .render_to(&mut buf2, &[], 0, &mut last_lines2, &mut last_cursor2)
+        .unwrap();
     let plain2 = strip_ansi(&String::from_utf8_lossy(&buf2));
-    assert!(plain2.contains("auto · grok-4.6"), "Status line must display formatted model label 'grok-4.6', got:\n{}", plain2);
+    assert!(
+        plain2.contains("auto · grok-4.6"),
+        "Status line must display formatted model label 'grok-4.6', got:\n{}",
+        plain2
+    );
 
     // 5. With queued prompts, model is preserved in status line: `queued 2 · enter queue · auto · grok-4.6`
     prompt.set_queued_count(2);
@@ -2023,9 +2367,15 @@ fn test_model_persistence_across_turns_and_components() {
     let mut buf3 = Vec::new();
     let mut last_lines3 = 0;
     let mut last_cursor3 = 0;
-    prompt.render_to(&mut buf3, &[], 0, &mut last_lines3, &mut last_cursor3).unwrap();
+    prompt
+        .render_to(&mut buf3, &[], 0, &mut last_lines3, &mut last_cursor3)
+        .unwrap();
     let plain3 = strip_ansi(&String::from_utf8_lossy(&buf3));
-    assert!(plain3.contains("queued 2 · enter queue · auto · grok-4.6"), "Status line must display 'queued 2 · enter queue · auto · grok-4.6', got:\n{}", plain3);
+    assert!(
+        plain3.contains("queued 2 · enter queue · auto · grok-4.6"),
+        "Status line must display 'queued 2 · enter queue · auto · grok-4.6', got:\n{}",
+        plain3
+    );
 }
 
 // ===========================================================================
@@ -2042,7 +2392,10 @@ fn test_tool_group_header_and_branches_4_calls_exact_fx_parity() {
     // └ Matched README*
 
     let raw_tools = vec![
-        ("glob", json!({"pattern": "**/*.{md,mmd,puml,dot,svg,drawio,excalidraw}"})),
+        (
+            "glob",
+            json!({"pattern": "**/*.{md,mmd,puml,dot,svg,drawio,excalidraw}"}),
+        ),
         ("glob", json!({"pattern": "**/*diagram*"})),
         ("grep", json!({"pattern": "mermaid"})),
         ("glob", json!({"pattern": "README*"})),
@@ -2055,7 +2408,10 @@ fn test_tool_group_header_and_branches_4_calls_exact_fx_parity() {
     }
 
     assert_eq!(items.len(), 4);
-    assert_eq!(items[0].label, "Matched **/*.{md,mmd,puml,dot,svg,drawio,excalidraw}");
+    assert_eq!(
+        items[0].label,
+        "Matched **/*.{md,mmd,puml,dot,svg,drawio,excalidraw}"
+    );
     assert_eq!(items[0].category, "list");
     assert_eq!(items[1].label, "Matched **/*diagram*");
     assert_eq!(items[1].category, "list");
@@ -2072,18 +2428,37 @@ fn test_tool_group_header_and_branches_4_calls_exact_fx_parity() {
     assert_eq!(lines[0], "● 4 tool calls · 3 list · 1 read");
 
     // Branch connector check: ├ for indices 0..2, └ for index 3
-    assert_eq!(lines[1], "├ Matched **/*.{md,mmd,puml,dot,svg,drawio,excalidraw}");
+    assert_eq!(
+        lines[1],
+        "├ Matched **/*.{md,mmd,puml,dot,svg,drawio,excalidraw}"
+    );
     assert_eq!(lines[2], "├ Matched **/*diagram*");
     assert_eq!(lines[3], "├ Searched mermaid");
     assert_eq!(lines[4], "└ Matched README*");
 
     // Ensure none of the branches use ├─ or └─ (exact single space after symbol)
     for line in &lines[1..4] {
-        assert!(line.starts_with("├ "), "Intermediate branch must start with '├ ': {}", line);
-        assert!(!line.starts_with("├─"), "Branch must not use '├─': {}", line);
+        assert!(
+            line.starts_with("├ "),
+            "Intermediate branch must start with '├ ': {}",
+            line
+        );
+        assert!(
+            !line.starts_with("├─"),
+            "Branch must not use '├─': {}",
+            line
+        );
     }
-    assert!(lines[4].starts_with("└ "), "Terminal branch must start with '└ ': {}", lines[4]);
-    assert!(!lines[4].starts_with("└─"), "Terminal branch must not use '└─': {}", lines[4]);
+    assert!(
+        lines[4].starts_with("└ "),
+        "Terminal branch must start with '└ ': {}",
+        lines[4]
+    );
+    assert!(
+        !lines[4].starts_with("└─"),
+        "Terminal branch must not use '└─': {}",
+        lines[4]
+    );
 
     // Render with ANSI styling to writer and verify plain text matches exactly
     let mut buf = Vec::new();
@@ -2093,8 +2468,14 @@ fn test_tool_group_header_and_branches_4_calls_exact_fx_parity() {
     assert_eq!(plain_out.trim().replace("\r\n", "\n"), formatted.trim());
     // Verify ANSI codes are present for bullet and connectors
     assert!(raw_out.contains("●"), "Should contain bullet in raw ANSI");
-    assert!(raw_out.contains("├ "), "Should contain branch connector in raw ANSI");
-    assert!(raw_out.contains("└ "), "Should contain terminal connector in raw ANSI");
+    assert!(
+        raw_out.contains("├ "),
+        "Should contain branch connector in raw ANSI"
+    );
+    assert!(
+        raw_out.contains("└ "),
+        "Should contain terminal connector in raw ANSI"
+    );
 }
 
 #[test]
@@ -2135,7 +2516,7 @@ fn test_tool_group_header_and_branches_8_calls_exact_fx_parity() {
     // Header check: 7 read, 1 list
     assert_eq!(lines[0], "● 8 tool calls · 7 read · 1 list");
 
-    // Branches 1..=7 must start with ├ 
+    // Branches 1..=7 must start with ├
     assert_eq!(lines[1], "├ Read docs/architecture.md");
     assert_eq!(lines[2], "├ Read README.md");
     assert_eq!(lines[3], "├ Searched ```mermaid");
@@ -2144,13 +2525,21 @@ fn test_tool_group_header_and_branches_8_calls_exact_fx_parity() {
     assert_eq!(lines[6], "├ Read docs/agents.md");
     assert_eq!(lines[7], "├ Read docs/vision.md");
 
-    // Branch 8 (last) must start with └ 
+    // Branch 8 (last) must start with └
     assert_eq!(lines[8], "└ Searched ```text");
 
     for line in &lines[1..8] {
-        assert!(line.starts_with("├ "), "Branch 0..6 must start with '├ ': {}", line);
+        assert!(
+            line.starts_with("├ "),
+            "Branch 0..6 must start with '├ ': {}",
+            line
+        );
     }
-    assert!(lines[8].starts_with("└ "), "Branch 7 must start with '└ ': {}", lines[8]);
+    assert!(
+        lines[8].starts_with("└ "),
+        "Branch 7 must start with '└ ': {}",
+        lines[8]
+    );
 
     let mut buf = Vec::new();
     render_tool_tree_to(&mut buf, &items).expect("render_tool_tree_to must succeed");
@@ -2284,14 +2673,36 @@ fn test_codeblock_multiple_languages_borders_and_clean_formatting() {
         let plain = strip_ansi(&total);
 
         if lang.is_empty() {
-            assert!(plain.contains("  ────"), "Empty lang codeblock must have top border: {}", plain);
+            assert!(
+                plain.contains("  ────"),
+                "Empty lang codeblock must have top border: {}",
+                plain
+            );
         } else {
             let expected_top = format!("  ─ {} ──", lang);
-            assert!(plain.contains(&expected_top), "Lang '{}' must have top border '{}': {}", lang, expected_top, plain);
+            assert!(
+                plain.contains(&expected_top),
+                "Lang '{}' must have top border '{}': {}",
+                lang,
+                expected_top,
+                plain
+            );
         }
-        assert!(plain.contains("  ────"), "Codeblock must have bottom border: {}", plain);
-        assert!(plain.contains("echo hello"), "Code content preserved: {}", plain);
-        assert!(!plain.contains("│"), "Codeblock must not have │ border: {}", plain);
+        assert!(
+            plain.contains("  ────"),
+            "Codeblock must have bottom border: {}",
+            plain
+        );
+        assert!(
+            plain.contains("echo hello"),
+            "Code content preserved: {}",
+            plain
+        );
+        assert!(
+            !plain.contains("│"),
+            "Codeblock must not have │ border: {}",
+            plain
+        );
     }
 }
 
@@ -2307,7 +2718,9 @@ fn test_prompt_queue_display_multi_level_banners_and_status() {
     let mut buf = Vec::new();
     let mut last_lines = 0;
     let mut last_cursor = 0;
-    prompt.render_to(&mut buf, &[], 0, &mut last_lines, &mut last_cursor).unwrap();
+    prompt
+        .render_to(&mut buf, &[], 0, &mut last_lines, &mut last_cursor)
+        .unwrap();
     let plain = strip_ansi(&String::from_utf8_lossy(&buf));
     assert!(plain.contains("auto · grok-4.6"));
     assert!(!plain.contains("queued"));
@@ -2318,29 +2731,55 @@ fn test_prompt_queue_display_multi_level_banners_and_status() {
     let mut buf2 = Vec::new();
     let mut last_lines2 = 0;
     let mut last_cursor2 = 0;
-    prompt.render_to(&mut buf2, &[], 0, &mut last_lines2, &mut last_cursor2).unwrap();
+    prompt
+        .render_to(&mut buf2, &[], 0, &mut last_lines2, &mut last_cursor2)
+        .unwrap();
     let plain2 = strip_ansi(&String::from_utf8_lossy(&buf2));
-    assert!(plain2.contains("enter queue · auto · grok-4.6"), "Status line must display 'enter queue':\n{}", plain2);
+    assert!(
+        plain2.contains("enter queue · auto · grok-4.6"),
+        "Status line must display 'enter queue':\n{}",
+        plain2
+    );
 
     // 3. 1 queued message: banner `1 queued message · ↑ to edit`, status `queued 1 · enter queue · auto · grok-4.6`
     prompt.set_queued_count(1);
     let mut buf3 = Vec::new();
     let mut last_lines3 = 0;
     let mut last_cursor3 = 0;
-    prompt.render_to(&mut buf3, &[], 0, &mut last_lines3, &mut last_cursor3).unwrap();
+    prompt
+        .render_to(&mut buf3, &[], 0, &mut last_lines3, &mut last_cursor3)
+        .unwrap();
     let plain3 = strip_ansi(&String::from_utf8_lossy(&buf3));
-    assert!(plain3.contains("1 queued message · ↑ to edit"), "Banner must show singular queued message:\n{}", plain3);
-    assert!(plain3.contains("queued 1 · enter queue · auto · grok-4.6"), "Status line must show 'queued 1':\n{}", plain3);
+    assert!(
+        plain3.contains("1 queued message · ↑ to edit"),
+        "Banner must show singular queued message:\n{}",
+        plain3
+    );
+    assert!(
+        plain3.contains("queued 1 · enter queue · auto · grok-4.6"),
+        "Status line must show 'queued 1':\n{}",
+        plain3
+    );
 
     // 4. 2 queued messages: banner `2 queued messages · ↑ to edit`, status `queued 2 · enter queue · auto · grok-4.6`
     prompt.set_queued_count(2);
     let mut buf4 = Vec::new();
     let mut last_lines4 = 0;
     let mut last_cursor4 = 0;
-    prompt.render_to(&mut buf4, &[], 0, &mut last_lines4, &mut last_cursor4).unwrap();
+    prompt
+        .render_to(&mut buf4, &[], 0, &mut last_lines4, &mut last_cursor4)
+        .unwrap();
     let plain4 = strip_ansi(&String::from_utf8_lossy(&buf4));
-    assert!(plain4.contains("2 queued messages · ↑ to edit"), "Banner must show plural queued messages:\n{}", plain4);
-    assert!(plain4.contains("queued 2 · enter queue · auto · grok-4.6"), "Status line must show 'queued 2':\n{}", plain4);
+    assert!(
+        plain4.contains("2 queued messages · ↑ to edit"),
+        "Banner must show plural queued messages:\n{}",
+        plain4
+    );
+    assert!(
+        plain4.contains("queued 2 · enter queue · auto · grok-4.6"),
+        "Status line must show 'queued 2':\n{}",
+        plain4
+    );
 }
 
 #[test]
@@ -2371,10 +2810,26 @@ fn test_prompt_queue_streaming_persistence_lifecycle() {
     let mut last_lines = 0;
     let mut last_cursor = 0;
     let buffer_copy = prompt.buffer.clone();
-    prompt.render_to(&mut frame1, &buffer_copy, prompt.cursor_pos, &mut last_lines, &mut last_cursor).unwrap();
+    prompt
+        .render_to(
+            &mut frame1,
+            &buffer_copy,
+            prompt.cursor_pos,
+            &mut last_lines,
+            &mut last_cursor,
+        )
+        .unwrap();
     let frame1_plain = strip_ansi(&String::from_utf8_lossy(&frame1));
-    assert!(frame1_plain.contains("┃ explain UI layer"), "Active typing buffer must be shown:\n{}", frame1_plain);
-    assert!(frame1_plain.contains("enter queue · auto · grok-4.6"), "Running status line must show 'enter queue':\n{}", frame1_plain);
+    assert!(
+        frame1_plain.contains("┃ explain UI layer"),
+        "Active typing buffer must be shown:\n{}",
+        frame1_plain
+    );
+    assert!(
+        frame1_plain.contains("enter queue · auto · grok-4.6"),
+        "Running status line must show 'enter queue':\n{}",
+        frame1_plain
+    );
 
     // 4. User presses Enter: prompt is queued into queue VecDeque
     // KeyResult::Submit behavior while running: buffer cleared, frame cleared, queued_count increments
@@ -2391,10 +2846,20 @@ fn test_prompt_queue_streaming_persistence_lifecycle() {
 
     // Verify prompt re-render below streaming output preserves queued banner & status line
     let mut frame2 = Vec::new();
-    prompt.render_to(&mut frame2, &[], 0, &mut last_lines, &mut last_cursor).unwrap();
+    prompt
+        .render_to(&mut frame2, &[], 0, &mut last_lines, &mut last_cursor)
+        .unwrap();
     let frame2_plain = strip_ansi(&String::from_utf8_lossy(&frame2));
-    assert!(frame2_plain.contains("1 queued message · ↑ to edit"), "Queued banner must persist during streaming:\n{}", frame2_plain);
-    assert!(frame2_plain.contains("queued 1 · enter queue · auto · grok-4.6"), "Status line must reflect queued 1:\n{}", frame2_plain);
+    assert!(
+        frame2_plain.contains("1 queued message · ↑ to edit"),
+        "Queued banner must persist during streaming:\n{}",
+        frame2_plain
+    );
+    assert!(
+        frame2_plain.contains("queued 1 · enter queue · auto · grok-4.6"),
+        "Status line must reflect queued 1:\n{}",
+        frame2_plain
+    );
 
     // 6. User types and queues another message: "add error handling"
     queue.push_back("add error handling".to_string());
@@ -2402,10 +2867,20 @@ fn test_prompt_queue_streaming_persistence_lifecycle() {
     assert_eq!(prompt.queued_count(), 2);
 
     let mut frame3 = Vec::new();
-    prompt.render_to(&mut frame3, &[], 0, &mut last_lines, &mut last_cursor).unwrap();
+    prompt
+        .render_to(&mut frame3, &[], 0, &mut last_lines, &mut last_cursor)
+        .unwrap();
     let frame3_plain = strip_ansi(&String::from_utf8_lossy(&frame3));
-    assert!(frame3_plain.contains("2 queued messages · ↑ to edit"), "Queued banner must show 2 queued messages:\n{}", frame3_plain);
-    assert!(frame3_plain.contains("queued 2 · enter queue · auto · grok-4.6"), "Status line must show queued 2:\n{}", frame3_plain);
+    assert!(
+        frame3_plain.contains("2 queued messages · ↑ to edit"),
+        "Queued banner must show 2 queued messages:\n{}",
+        frame3_plain
+    );
+    assert!(
+        frame3_plain.contains("queued 2 · enter queue · auto · grok-4.6"),
+        "Status line must show queued 2:\n{}",
+        frame3_plain
+    );
 
     // 7. Turn completes: agent prints completed turn summary `  1m26s (↑4 ↓1.3k)`
     let summary = format_turn_summary(Duration::from_secs(86), 4, 1300);

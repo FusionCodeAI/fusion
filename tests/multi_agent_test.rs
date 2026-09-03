@@ -288,7 +288,9 @@ impl MockLlmServer {
                             header_end = Some(pos + 4);
                             let headers_str = String::from_utf8_lossy(&buffer[..pos]);
                             for line in headers_str.lines() {
-                                if let Some(stripped) = line.to_lowercase().strip_prefix("content-length:") {
+                                if let Some(stripped) =
+                                    line.to_lowercase().strip_prefix("content-length:")
+                                {
                                     content_length = stripped.trim().parse::<usize>().unwrap_or(0);
                                 }
                             }
@@ -343,7 +345,12 @@ impl MockLlmServer {
                         "finish_reason": "stop"
                     }]
                 });
-                let _ = socket.write_all(format!("data: {}\n\n", serde_json::to_string(&final_chunk).unwrap()).as_bytes()).await;
+                let _ = socket
+                    .write_all(
+                        format!("data: {}\n\n", serde_json::to_string(&final_chunk).unwrap())
+                            .as_bytes(),
+                    )
+                    .await;
                 let _ = socket.write_all(b"data: [DONE]\n\n").await;
             }
             MockResponse::Json(val) => {
@@ -372,10 +379,19 @@ impl MockLlmServer {
                         "finish_reason": "stop"
                     }]
                 });
-                let _ = socket.write_all(format!("data: {}\n\n", serde_json::to_string(&final_chunk).unwrap()).as_bytes()).await;
+                let _ = socket
+                    .write_all(
+                        format!("data: {}\n\n", serde_json::to_string(&final_chunk).unwrap())
+                            .as_bytes(),
+                    )
+                    .await;
                 let _ = socket.write_all(b"data: [DONE]\n\n").await;
             }
-            MockResponse::ToolCall { id, name, arguments } => {
+            MockResponse::ToolCall {
+                id,
+                name,
+                arguments,
+            } => {
                 let headers = "HTTP/1.1 200 OK\r\nContent-Type: text/event-stream\r\nCache-Control: no-cache\r\nConnection: close\r\n\r\n";
                 let _ = socket.write_all(headers.as_bytes()).await;
 
@@ -470,7 +486,11 @@ async fn test_concurrent_subagents_execution() {
         SubagentTask::tester("Verify error boundary conditions").with_name("Tester-1"),
         SubagentTask::reviewer("Audit token accounting math").with_name("Reviewer-1"),
         SubagentTask::general("Organize build artifacts").with_name("Worker-1"),
-        SubagentTask::custom("DatabaseWorker", "Optimize query indexes", "Analyze SQL plans"),
+        SubagentTask::custom(
+            "DatabaseWorker",
+            "Optimize query indexes",
+            "Analyze SQL plans",
+        ),
     ];
 
     // Spawn all 6 tasks concurrently using spawn_batch and wait via join_all
@@ -488,7 +508,10 @@ async fn test_concurrent_subagents_execution() {
             !sub_res.output.is_empty(),
             "Subagent output should not be empty"
         );
-        assert!(sub_res.turns >= 1, "Subagent should have taken at least 1 turn");
+        assert!(
+            sub_res.turns >= 1,
+            "Subagent should have taken at least 1 turn"
+        );
     }
 
     // Verify all subagents are registered and marked Completed in active_agents list
@@ -557,8 +580,12 @@ async fn test_subagent_progress_event_streaming() {
 
     assert!(!handle_events.is_empty());
     assert!(matches!(handle_events[0], SubagentProgress::Started { .. }));
-    assert!(handle_events.iter().any(|e| matches!(e, SubagentProgress::TurnStarted { .. })));
-    assert!(handle_events.iter().any(|e| matches!(e, SubagentProgress::Completed { .. })));
+    assert!(handle_events
+        .iter()
+        .any(|e| matches!(e, SubagentProgress::TurnStarted { .. })));
+    assert!(handle_events
+        .iter()
+        .any(|e| matches!(e, SubagentProgress::Completed { .. })));
 
     // Verify global broadcast receiver also received events
     let mut global_started = false;
@@ -568,7 +595,10 @@ async fn test_subagent_progress_event_streaming() {
             break;
         }
     }
-    assert!(global_started, "Global subscriber should receive agent started event");
+    assert!(
+        global_started,
+        "Global subscriber should receive agent started event"
+    );
 
     let result = handle.wait().await.expect("Wait should succeed");
     assert!(result.success);
@@ -608,13 +638,22 @@ async fn test_subagent_cancellation_lifecycle() {
 
     // Cancel task 2 via manager
     let cancelled_2 = manager.cancel("cancel-task-2").await;
-    assert!(cancelled_2, "manager.cancel should return true for active task");
+    assert!(
+        cancelled_2,
+        "manager.cancel should return true for active task"
+    );
 
     let res1 = handle1.wait().await.expect("Task 1 should resolve");
     let res2 = handle2.wait().await.expect("Task 2 should resolve");
 
-    assert!(!res1.success, "Cancelled task 1 should report success = false");
-    assert!(!res2.success, "Cancelled task 2 should report success = false");
+    assert!(
+        !res1.success,
+        "Cancelled task 1 should report success = false"
+    );
+    assert!(
+        !res2.success,
+        "Cancelled task 2 should report success = false"
+    );
     assert_eq!(res1.output, "Subagent cancelled.");
     assert_eq!(res2.output, "Subagent cancelled.");
 
@@ -689,11 +728,26 @@ async fn test_subagent_role_tool_filtering() {
     assert!(general_tools.get("grep").is_some());
 
     // Role from string and display representation
-    assert_eq!(SubagentRole::from_str("scout").unwrap(), SubagentRole::Scout);
-    assert_eq!(SubagentRole::from_str("CODER").unwrap(), SubagentRole::Coder);
-    assert_eq!(SubagentRole::from_str("tester").unwrap(), SubagentRole::Tester);
-    assert_eq!(SubagentRole::from_str("reviewer").unwrap(), SubagentRole::Reviewer);
-    assert_eq!(SubagentRole::from_str("unknown").unwrap(), SubagentRole::General);
+    assert_eq!(
+        SubagentRole::from_str("scout").unwrap(),
+        SubagentRole::Scout
+    );
+    assert_eq!(
+        SubagentRole::from_str("CODER").unwrap(),
+        SubagentRole::Coder
+    );
+    assert_eq!(
+        SubagentRole::from_str("tester").unwrap(),
+        SubagentRole::Tester
+    );
+    assert_eq!(
+        SubagentRole::from_str("reviewer").unwrap(),
+        SubagentRole::Reviewer
+    );
+    assert_eq!(
+        SubagentRole::from_str("unknown").unwrap(),
+        SubagentRole::General
+    );
     assert_eq!(format!("{}", SubagentRole::Scout), "Scout");
     assert_eq!(format!("{}", SubagentRole::Coder), "Coder");
 
@@ -702,7 +756,10 @@ async fn test_subagent_role_tool_filtering() {
         name: "SecurityAuditor".to_string(),
         prompt: "Verify no API keys are exposed".to_string(),
     };
-    assert_eq!(custom.system_prompt("SecurityAuditor"), "Verify no API keys are exposed");
+    assert_eq!(
+        custom.system_prompt("SecurityAuditor"),
+        "Verify no API keys are exposed"
+    );
 }
 
 #[tokio::test]
@@ -771,7 +828,10 @@ async fn test_mesh_pub_sub_discovery_and_status_broadcasts() {
         .expect("register tester");
 
     // 1. Broadcast Discovery from Scout
-    let file_refs = vec!["src/agent/mesh.rs".to_string(), "src/agent/subagent.rs".to_string()];
+    let file_refs = vec![
+        "src/agent/mesh.rs".to_string(),
+        "src/agent/subagent.rs".to_string(),
+    ];
     mesh.broadcast_discovery(
         "Scout-Alpha",
         "ast_analysis",
@@ -785,23 +845,32 @@ async fn test_mesh_pub_sub_discovery_and_status_broadcasts() {
     let coder_msg = coder.recv_broadcast().await.expect("coder recv broadcast");
     assert_eq!(coder_msg.sender, "Scout-Alpha");
     assert_eq!(coder_msg.topic, topics::DISCOVERY);
-    if let BroadcastPayload::Discovery { findings, file_references, .. } = coder_msg.payload {
+    if let BroadcastPayload::Discovery {
+        findings,
+        file_references,
+        ..
+    } = coder_msg.payload
+    {
         assert!(findings.contains("mesh channel architecture"));
         assert_eq!(file_references, file_refs);
     } else {
         panic!("Expected discovery payload for coder");
     }
 
-    let tester_msg = tester.recv_broadcast().await.expect("tester recv broadcast");
+    let tester_msg = tester
+        .recv_broadcast()
+        .await
+        .expect("tester recv broadcast");
     assert_eq!(tester_msg.sender, "Scout-Alpha");
     assert_eq!(tester_msg.topic, topics::DISCOVERY);
 
     // 2. Broadcast Status updates across different AgentStatus states
-    scout.broadcast_status(AgentStatus::Active {
-        task: "Indexing AST symbols".to_string(),
-    })
-    .await
-    .expect("broadcast active status");
+    scout
+        .broadcast_status(AgentStatus::Active {
+            task: "Indexing AST symbols".to_string(),
+        })
+        .await
+        .expect("broadcast active status");
 
     let status_msg = coder.recv_broadcast().await.expect("coder recv status");
     assert_eq!(status_msg.sender, "Scout-Alpha");
@@ -816,17 +885,26 @@ async fn test_mesh_pub_sub_discovery_and_status_broadcasts() {
     );
 
     // Progress status update
-    coder.broadcast_status(AgentStatus::Progress {
-        step: 3,
-        total: Some(10),
-        message: "Refactored message envelopes".to_string(),
-    })
-    .await
-    .expect("broadcast progress status");
+    coder
+        .broadcast_status(AgentStatus::Progress {
+            step: 3,
+            total: Some(10),
+            message: "Refactored message envelopes".to_string(),
+        })
+        .await
+        .expect("broadcast progress status");
 
     let progress_msg = tester.recv_broadcast().await.expect("tester recv progress");
     assert_eq!(progress_msg.sender, "Coder-Beta");
-    if let BroadcastPayload::Status { status: AgentStatus::Progress { step, total, message } } = progress_msg.payload {
+    if let BroadcastPayload::Status {
+        status:
+            AgentStatus::Progress {
+                step,
+                total,
+                message,
+            },
+    } = progress_msg.payload
+    {
         assert_eq!(step, 3);
         assert_eq!(total, Some(10));
         assert!(message.contains("Refactored message envelopes"));
@@ -835,15 +913,22 @@ async fn test_mesh_pub_sub_discovery_and_status_broadcasts() {
     }
 
     // Completed status update
-    coder.broadcast_status(AgentStatus::Completed {
-        result: Some("All 10 steps finalized with tests".to_string()),
-    })
-    .await
-    .expect("broadcast completed status");
+    coder
+        .broadcast_status(AgentStatus::Completed {
+            result: Some("All 10 steps finalized with tests".to_string()),
+        })
+        .await
+        .expect("broadcast completed status");
 
-    let completed_msg = tester.recv_broadcast().await.expect("tester recv completed");
+    let completed_msg = tester
+        .recv_broadcast()
+        .await
+        .expect("tester recv completed");
     assert_eq!(completed_msg.sender, "Coder-Beta");
-    if let BroadcastPayload::Status { status: AgentStatus::Completed { result } } = completed_msg.payload {
+    if let BroadcastPayload::Status {
+        status: AgentStatus::Completed { result },
+    } = completed_msg.payload
+    {
         assert!(result.unwrap().contains("finalized"));
     } else {
         panic!("Expected completed status payload");
@@ -855,11 +940,26 @@ async fn test_mesh_pub_sub_multi_peer_fanout() {
     let mesh = AgentMesh::new();
 
     // Register 5 distinct peers across various roles
-    let coordinator = mesh.register("Coordinator", AgentRole::Orchestrator, "Lead").await.unwrap();
-    let mut peer_a = mesh.register("Worker-A", AgentRole::Coder, "Worker A").await.unwrap();
-    let mut peer_b = mesh.register("Worker-B", AgentRole::Coder, "Worker B").await.unwrap();
-    let mut peer_c = mesh.register("Worker-C", AgentRole::Tester, "Worker C").await.unwrap();
-    let mut peer_d = mesh.register("Worker-D", AgentRole::Reviewer, "Worker D").await.unwrap();
+    let coordinator = mesh
+        .register("Coordinator", AgentRole::Orchestrator, "Lead")
+        .await
+        .unwrap();
+    let mut peer_a = mesh
+        .register("Worker-A", AgentRole::Coder, "Worker A")
+        .await
+        .unwrap();
+    let mut peer_b = mesh
+        .register("Worker-B", AgentRole::Coder, "Worker B")
+        .await
+        .unwrap();
+    let mut peer_c = mesh
+        .register("Worker-C", AgentRole::Tester, "Worker C")
+        .await
+        .unwrap();
+    let mut peer_d = mesh
+        .register("Worker-D", AgentRole::Reviewer, "Worker D")
+        .await
+        .unwrap();
 
     let test_payload = BroadcastPayload::Alert {
         severity: "warning".to_string(),
@@ -885,15 +985,23 @@ async fn test_mesh_pub_sub_multi_peer_fanout() {
 
     // Verify recent broadcast buffer has recorded the broadcast
     let recent = mesh.recent_broadcasts().await;
-    assert!(recent.iter().any(|m| m.sender == "Coordinator" && m.topic == topics::ALERT));
+    assert!(recent
+        .iter()
+        .any(|m| m.sender == "Coordinator" && m.topic == topics::ALERT));
 }
 
 #[tokio::test]
 async fn test_mesh_pub_sub_alerts_facts_and_custom_topics() {
     let mesh = AgentMesh::new();
 
-    let publisher = mesh.register("Publisher", AgentRole::General, "Pub").await.unwrap();
-    let mut subscriber = mesh.register("Subscriber", AgentRole::General, "Sub").await.unwrap();
+    let publisher = mesh
+        .register("Publisher", AgentRole::General, "Pub")
+        .await
+        .unwrap();
+    let mut subscriber = mesh
+        .register("Subscriber", AgentRole::General, "Sub")
+        .await
+        .unwrap();
 
     // 1. Alert payload
     publisher
@@ -1056,7 +1164,12 @@ async fn test_mesh_direct_query_peer_not_found_and_disconnected() {
 
     // Query non-existent peer
     let not_found = caller
-        .ask("NonExistentAgent", "Hello?", None, Some(Duration::from_secs(1)))
+        .ask(
+            "NonExistentAgent",
+            "Hello?",
+            None,
+            Some(Duration::from_secs(1)),
+        )
         .await;
     assert!(
         matches!(&not_found, Err(MeshError::PeerNotFound(id)) if id == "NonExistentAgent"),
@@ -1068,17 +1181,21 @@ async fn test_mesh_direct_query_peer_not_found_and_disconnected() {
     let msg_err = caller
         .send_direct("NonExistentAgent", "Ping", "Are you there?")
         .await;
-    assert!(
-        matches!(msg_err, Err(MeshError::PeerNotFound(id)) if id == "NonExistentAgent")
-    );
+    assert!(matches!(msg_err, Err(MeshError::PeerNotFound(id)) if id == "NonExistentAgent"));
 }
 
 #[tokio::test]
 async fn test_mesh_direct_point_to_point_messaging_and_threading() {
     let mesh = AgentMesh::new();
 
-    let peer_a = mesh.register("Agent-A", AgentRole::Coder, "Initiator").await.unwrap();
-    let mut peer_b = mesh.register("Agent-B", AgentRole::Tester, "Receiver").await.unwrap();
+    let peer_a = mesh
+        .register("Agent-A", AgentRole::Coder, "Initiator")
+        .await
+        .unwrap();
+    let mut peer_b = mesh
+        .register("Agent-B", AgentRole::Tester, "Receiver")
+        .await
+        .unwrap();
 
     // Send direct message with custom structured payload
     let direct_msg = DirectMessage::new(
@@ -1091,7 +1208,9 @@ async fn test_mesh_direct_point_to_point_messaging_and_threading() {
         "test_target": "tests/auth_test.rs",
         "coverage_required": 0.95
     }));
-    mesh.send_direct(direct_msg.clone()).await.expect("send direct message");
+    mesh.send_direct(direct_msg.clone())
+        .await
+        .expect("send direct message");
 
     let received = peer_b.recv_direct().await.expect("receive direct message");
     assert_eq!(received.from, "Agent-A");
@@ -1110,15 +1229,23 @@ async fn test_mesh_direct_point_to_point_messaging_and_threading() {
     .with_reply_to(received.id.clone());
     assert_eq!(reply_msg.reply_to, Some(received.id));
     assert_eq!(reply_msg.to, "Agent-A");
-    mesh.send_direct(reply_msg).await.expect("send reply message");
+    mesh.send_direct(reply_msg)
+        .await
+        .expect("send reply message");
 }
 
 #[tokio::test]
 async fn test_mesh_mailbox_fifo_ordering_and_capacity() {
     let mesh = AgentMesh::new();
 
-    let sender = mesh.register("BurstSender", AgentRole::General, "Sender").await.unwrap();
-    let mut receiver = mesh.register("BurstReceiver", AgentRole::General, "Receiver").await.unwrap();
+    let sender = mesh
+        .register("BurstSender", AgentRole::General, "Sender")
+        .await
+        .unwrap();
+    let mut receiver = mesh
+        .register("BurstReceiver", AgentRole::General, "Receiver")
+        .await
+        .unwrap();
 
     // Send 10 sequential messages
     for i in 0..10 {
@@ -1166,7 +1293,11 @@ async fn test_advisory_committee_evaluation_flow() {
         )
         .await;
 
-    assert_eq!(critiques.len(), 3, "All 3 committee advisors must participate");
+    assert_eq!(
+        critiques.len(),
+        3,
+        "All 3 committee advisors must participate"
+    );
     for c in &critiques {
         assert!(!c.advisor.is_empty());
         assert!(!c.focus.is_empty());
@@ -1209,20 +1340,35 @@ async fn test_advisory_committee_custom_mesh_handler() {
                 approved,
                 risk_level,
                 critique,
-                suggestions: if approved { vec![] } else { vec!["Rewrite without unsafe".to_string()] },
+                suggestions: if approved {
+                    vec![]
+                } else {
+                    vec!["Rewrite without unsafe".to_string()]
+                },
             }];
 
-            Ok(AdvisorReviewResponse::from_critiques(req.request_id.clone(), critiques))
+            Ok(AdvisorReviewResponse::from_critiques(
+                req.request_id.clone(),
+                critiques,
+            ))
         }
     }
 
-    mesh.set_advisor_handler(Arc::new(StrictSecurityCommittee)).await;
+    mesh.set_advisor_handler(Arc::new(StrictSecurityCommittee))
+        .await;
 
-    let peer = mesh.register("DevAgent", AgentRole::Coder, "Dev").await.unwrap();
+    let peer = mesh
+        .register("DevAgent", AgentRole::Coder, "Dev")
+        .await
+        .unwrap();
 
     // 1. Safe review request
     let safe_resp = peer
-        .request_review("Add safe parser", "pub fn parse(s: &str) -> Option<i32> { s.parse().ok() }", None)
+        .request_review(
+            "Add safe parser",
+            "pub fn parse(s: &str) -> Option<i32> { s.parse().ok() }",
+            None,
+        )
         .await
         .expect("safe review");
     assert!(safe_resp.approved);
@@ -1236,18 +1382,19 @@ async fn test_advisory_committee_custom_mesh_handler() {
     assert!(!unsafe_resp.approved);
     assert_eq!(unsafe_resp.highest_risk, RiskLevel::Critical);
     assert!(unsafe_resp.summary.contains("Unsafe block detected"));
-    assert!(
-        unsafe_resp
-            .critiques
-            .iter()
-            .any(|c| c.suggestions.iter().any(|s| s.contains("unsafe")))
-    );
+    assert!(unsafe_resp
+        .critiques
+        .iter()
+        .any(|c| c.suggestions.iter().any(|s| s.contains("unsafe"))));
 }
 
 #[tokio::test]
 async fn test_advisory_committee_heuristic_evaluations() {
     let mesh = AgentMesh::new();
-    let peer = mesh.register("Worker", AgentRole::Coder, "Worker").await.unwrap();
+    let peer = mesh
+        .register("Worker", AgentRole::Coder, "Worker")
+        .await
+        .unwrap();
 
     // 1. Safe change
     let safe_resp = peer
@@ -1285,7 +1432,9 @@ async fn test_advisory_committee_heuristic_evaluations() {
         .expect("secret review");
     assert!(!secret_resp.approved);
     assert_eq!(secret_resp.highest_risk, RiskLevel::High);
-    assert!(secret_resp.summary.contains("secret or private key leakage"));
+    assert!(secret_resp
+        .summary
+        .contains("secret or private key leakage"));
 }
 
 #[tokio::test]
@@ -1410,7 +1559,10 @@ async fn test_advisor_consensus_resolution_algorithms() {
     ];
 
     let sec_veto_res = resolve_security_veto(&security_critiques);
-    assert!(!sec_veto_res.is_approved(), "Security rejection must exercise veto");
+    assert!(
+        !sec_veto_res.is_approved(),
+        "Security rejection must exercise veto"
+    );
     assert!(sec_veto_res.has_veto());
 
     // 5. Critical Risk Auto-Veto Test
@@ -1434,7 +1586,10 @@ async fn test_advisor_consensus_resolution_algorithms() {
     ];
 
     let critical_res = resolve_majority(&critical_critiques);
-    assert!(!critical_res.is_approved(), "Critical risk must auto-veto even majority");
+    assert!(
+        !critical_res.is_approved(),
+        "Critical risk must auto-veto even majority"
+    );
     assert!(critical_res.is_critical());
     assert!(critical_res.has_veto());
 
@@ -1523,7 +1678,9 @@ async fn test_advisor_fallback_and_fault_tolerance() {
     let server = MockLlmServer::start().await;
     server
         .set_handler(|_| {
-            MockResponse::Text("CAUTION: This implementation raises a medium risk warning.".to_string())
+            MockResponse::Text(
+                "CAUTION: This implementation raises a medium risk warning.".to_string(),
+            )
         })
         .await;
 
@@ -1532,7 +1689,10 @@ async fn test_advisor_fallback_and_fault_tolerance() {
     let engine = AdvisorEngine::new((*client).clone(), config);
 
     let critiques = engine
-        .consult("Perform edge-case operation", "Action with plain text fallback")
+        .consult(
+            "Perform edge-case operation",
+            "Action with plain text fallback",
+        )
         .await;
 
     assert_eq!(critiques.len(), 3);
@@ -1572,13 +1732,23 @@ async fn test_advisor_disabled_configuration() {
         &config,
     )
     .await;
-    assert!(direct_critiques.is_empty(), "Disabled advisors must return empty results immediately");
+    assert!(
+        direct_critiques.is_empty(),
+        "Disabled advisors must return empty results immediately"
+    );
 
     let engine = AdvisorEngine::new((*client).clone(), config);
     let critiques = engine.consult("User query", "Proposed action").await;
 
-    assert!(critiques.is_empty(), "Disabled advisors must return empty results immediately");
-    assert_eq!(server.request_count(), 0, "No HTTP requests should be sent when advisors disabled");
+    assert!(
+        critiques.is_empty(),
+        "Disabled advisors must return empty results immediately"
+    );
+    assert_eq!(
+        server.request_count(),
+        0,
+        "No HTTP requests should be sent when advisors disabled"
+    );
 }
 
 // ===========================================================================
@@ -1589,13 +1759,22 @@ async fn test_advisor_disabled_configuration() {
 async fn test_mesh_resource_claims_and_conflict_resolution() {
     let mesh = AgentMesh::new();
 
-    let peer_a = mesh.register("Coder-A", AgentRole::Coder, "Coder A").await.unwrap();
-    let peer_b = mesh.register("Coder-B", AgentRole::Coder, "Coder B").await.unwrap();
+    let peer_a = mesh
+        .register("Coder-A", AgentRole::Coder, "Coder A")
+        .await
+        .unwrap();
+    let peer_b = mesh
+        .register("Coder-B", AgentRole::Coder, "Coder B")
+        .await
+        .unwrap();
 
     let target_file = "src/agent/mesh.rs";
 
     // Peer A claims target file
-    peer_a.claim_resource(target_file, None).await.expect("claim file");
+    peer_a
+        .claim_resource(target_file, None)
+        .await
+        .expect("claim file");
 
     // Peer B attempts to claim the same file -> rejected with ResourceAlreadyClaimed
     let conflict = peer_b.claim_resource(target_file, None).await;
@@ -1605,11 +1784,17 @@ async fn test_mesh_resource_claims_and_conflict_resolution() {
     ));
 
     // Peer A releases the file lock
-    let released = peer_a.release_resource(target_file).await.expect("release file");
+    let released = peer_a
+        .release_resource(target_file)
+        .await
+        .expect("release file");
     assert!(released);
 
     // Peer B can now claim the file
-    peer_b.claim_resource(target_file, None).await.expect("peer b claim");
+    peer_b
+        .claim_resource(target_file, None)
+        .await
+        .expect("peer b claim");
 
     // Auto-release on unregister: When peer B unregisters, its lock is cleared
     peer_b.unregister().await.expect("unregister peer b");
@@ -1621,7 +1806,10 @@ async fn test_mesh_resource_claims_and_conflict_resolution() {
 async fn test_mesh_shared_blackboard_facts() {
     let mesh = AgentMesh::new();
 
-    let peer_a = mesh.register("Scout-1", AgentRole::Scout, "Scout").await.unwrap();
+    let peer_a = mesh
+        .register("Scout-1", AgentRole::Scout, "Scout")
+        .await
+        .unwrap();
 
     // Set fact on blackboard
     let rev1 = peer_a
@@ -1642,7 +1830,10 @@ async fn test_mesh_shared_blackboard_facts() {
         .expect("update fact");
     assert_eq!(rev2, 2);
 
-    let updated = peer_a.get_fact("build_target").await.expect("get updated fact");
+    let updated = peer_a
+        .get_fact("build_target")
+        .await
+        .expect("get updated fact");
     assert_eq!(updated.revision, 2);
     assert_eq!(updated.value["arch"], "wasm32");
 }
@@ -1658,13 +1849,16 @@ async fn test_mesh_synchronization_barrier() {
     let m3 = mesh.clone();
 
     let h1 = tokio::spawn(async move {
-        m1.wait_barrier("phase_1_complete", "Worker-1", Duration::from_secs(2)).await
+        m1.wait_barrier("phase_1_complete", "Worker-1", Duration::from_secs(2))
+            .await
     });
     let h2 = tokio::spawn(async move {
-        m2.wait_barrier("phase_1_complete", "Worker-2", Duration::from_secs(2)).await
+        m2.wait_barrier("phase_1_complete", "Worker-2", Duration::from_secs(2))
+            .await
     });
     let h3 = tokio::spawn(async move {
-        m3.wait_barrier("phase_1_complete", "Worker-3", Duration::from_secs(2)).await
+        m3.wait_barrier("phase_1_complete", "Worker-3", Duration::from_secs(2))
+            .await
     });
 
     let (r1, r2, r3) = tokio::join!(h1, h2, h3);
@@ -1811,8 +2005,14 @@ fn test_session_save_and_load_roundtrip() {
     assert_eq!(loaded.system_prompt(), original.system_prompt());
     assert_eq!(loaded.metadata(), original.metadata());
     assert_eq!(loaded.total_messages(), 2);
-    assert_eq!(loaded.messages()[0].content, "Evaluate our channel buffer topology.");
-    assert_eq!(loaded.messages()[1].content, "Bounded MPSC with backpressure is recommended.");
+    assert_eq!(
+        loaded.messages()[0].content,
+        "Evaluate our channel buffer topology."
+    );
+    assert_eq!(
+        loaded.messages()[1].content,
+        "Bounded MPSC with backpressure is recommended."
+    );
     assert_eq!(loaded.token_stats().total_tokens, 210);
 }
 
@@ -1869,9 +2069,15 @@ fn test_session_prefix_lookup_simulation() {
         "model-c",
     );
 
-    session1.save_to_path(temp_dir.path().join(format!("{}.json", session1.id()))).unwrap();
-    session2.save_to_path(temp_dir.path().join(format!("{}.json", session2.id()))).unwrap();
-    session3.save_to_path(temp_dir.path().join(format!("{}.json", session3.id()))).unwrap();
+    session1
+        .save_to_path(temp_dir.path().join(format!("{}.json", session1.id())))
+        .unwrap();
+    session2
+        .save_to_path(temp_dir.path().join(format!("{}.json", session2.id())))
+        .unwrap();
+    session3
+        .save_to_path(temp_dir.path().join(format!("{}.json", session3.id())))
+        .unwrap();
 
     let find_in_dir = |prefix: &str| -> anyhow::Result<Option<Session>> {
         let clean = prefix.trim().to_lowercase();
@@ -1920,7 +2126,8 @@ fn test_session_listing_and_summary_generation() {
     s1.set_title("First Conversation");
     s1.add_user_message("How do I structure a CLI in Rust?");
     s1.add_assistant_message("Use clap with derive macros for clean subcommands.");
-    s1.save_to_path(temp_dir.path().join(format!("{}.json", s1.id()))).unwrap();
+    s1.save_to_path(temp_dir.path().join(format!("{}.json", s1.id())))
+        .unwrap();
 
     std::thread::sleep(Duration::from_millis(15));
 
@@ -1928,7 +2135,8 @@ fn test_session_listing_and_summary_generation() {
     s2.set_title("Second Conversation");
     s2.add_user_message("Write a high-performance HTTP server");
     s2.add_assistant_message("Use axum or hyper with pure Rust TLS.");
-    s2.save_to_path(temp_dir.path().join(format!("{}.json", s2.id()))).unwrap();
+    s2.save_to_path(temp_dir.path().join(format!("{}.json", s2.id())))
+        .unwrap();
 
     let mut summaries = Vec::new();
     for entry in std::fs::read_dir(temp_dir.path()).unwrap() {
@@ -1959,7 +2167,11 @@ fn test_session_listing_and_summary_generation() {
     summaries.sort_by(|a, b| b.updated_at.cmp(&a.updated_at));
 
     assert_eq!(summaries.len(), 2);
-    assert_eq!(summaries[0].id, s2.id(), "Most recent session should be first");
+    assert_eq!(
+        summaries[0].id,
+        s2.id(),
+        "Most recent session should be first"
+    );
     assert_eq!(summaries[0].title.as_deref(), Some("Second Conversation"));
     assert_eq!(summaries[0].message_count, 2);
     assert_eq!(summaries[1].id, s1.id());
@@ -1993,7 +2205,9 @@ fn test_session_export_markdown_formatting() {
     assert!(md.contains("### 🤖 Assistant\n\nGenerating configuration..."));
     assert!(md.contains("🛠️ **Tool Call:** `write` (`call_write_cfg`)"));
     assert!(md.contains("{\"path\":\"config.toml\",\"content\":\"port = 8080\"}"));
-    assert!(md.contains("### 🔧 Tool Output (`call_write_cfg`)\n\n```\nFile written: 12 bytes\n```"));
+    assert!(
+        md.contains("### 🔧 Tool Output (`call_write_cfg`)\n\n```\nFile written: 12 bytes\n```")
+    );
     assert!(md.contains("Config parser implementation complete."));
 }
 
@@ -2057,17 +2271,23 @@ async fn test_e2e_multi_agent_workflow() {
         )
         .await;
 
-    assert_eq!(critiques.len(), 3, "All 3 standard advisors must participate");
+    assert_eq!(
+        critiques.len(),
+        3,
+        "All 3 standard advisors must participate"
+    );
     assert!(AdvisorEngine::is_all_approved(&critiques));
     let advisor_system_notes = format_critiques_for_system_prompt(&critiques);
     primary_session.add_system_message(advisor_system_notes);
 
     // 3. Subagent Orchestration Phase
-    let manager = SubagentManager::new(client.clone(), config.clone(), tools.clone())
-        .with_max_concurrent(4);
+    let manager =
+        SubagentManager::new(client.clone(), config.clone(), tools.clone()).with_max_concurrent(4);
 
-    let scout_task = SubagentTask::scout("Scout existing logger interfaces").with_name("LoggerScout");
-    let coder_task = SubagentTask::coder(format!("WRITE_FILE:{}", source_str)).with_name("LoggerCoder");
+    let scout_task =
+        SubagentTask::scout("Scout existing logger interfaces").with_name("LoggerScout");
+    let coder_task =
+        SubagentTask::coder(format!("WRITE_FILE:{}", source_str)).with_name("LoggerCoder");
 
     // Execute subagents concurrently
     let results = manager.run_concurrent(vec![scout_task, coder_task]).await;
@@ -2084,14 +2304,20 @@ async fn test_e2e_multi_agent_workflow() {
     }
 
     // Verify file written by Coder subagent
-    assert!(source_file.exists(), "Coder subagent must have created generated_lib.rs");
+    assert!(
+        source_file.exists(),
+        "Coder subagent must have created generated_lib.rs"
+    );
 
     // 4. Session Persistence and Verification
     let session_path = temp_dir.path().join("final_e2e_session.json");
-    primary_session.save_to_path(&session_path).expect("Must persist primary session");
+    primary_session
+        .save_to_path(&session_path)
+        .expect("Must persist primary session");
     assert!(session_path.exists());
 
-    let resumed_primary = Session::load_from_path(&session_path).expect("Must load primary session");
+    let resumed_primary =
+        Session::load_from_path(&session_path).expect("Must load primary session");
     assert_eq!(resumed_primary.id(), primary_session.id());
     assert!(resumed_primary.total_messages() >= 3);
     assert_eq!(resumed_primary.token_stats().total_turns, 2);
@@ -2129,8 +2355,12 @@ async fn test_e2e_mesh_coordinated_multi_agent_pipeline() {
     // 2. Peer Discovery via Mesh API
     let peers = mesh.list_peers().await;
     assert_eq!(peers.len(), 4);
-    assert!(peers.iter().any(|p| p.id == "Scout" && p.role == AgentRole::Scout));
-    assert!(peers.iter().any(|p| p.id == "Coder" && p.role == AgentRole::Coder));
+    assert!(peers
+        .iter()
+        .any(|p| p.id == "Scout" && p.role == AgentRole::Scout));
+    assert!(peers
+        .iter()
+        .any(|p| p.id == "Coder" && p.role == AgentRole::Coder));
 
     // 3. Resource Locking: Coder claims exclusive lock on target source file
     let target_module = "src/agent/mesh.rs";
@@ -2156,7 +2386,10 @@ async fn test_e2e_mesh_coordinated_multi_agent_pipeline() {
         .await
         .expect("scout records architectural findings");
 
-    let fact = tester.get_fact("module_architecture").await.expect("tester reads fact");
+    let fact = tester
+        .get_fact("module_architecture")
+        .await
+        .expect("tester reads fact");
     assert_eq!(fact.author, "Scout");
     assert_eq!(fact.value["type"], "decentralized_mesh");
 
@@ -2183,7 +2416,10 @@ async fn test_e2e_mesh_coordinated_multi_agent_pipeline() {
     assert_eq!(review_resp.highest_risk, RiskLevel::Low);
 
     // 7. Release Resource Lock and update status to completed
-    coder.release_resource(target_module).await.expect("release lock");
+    coder
+        .release_resource(target_module)
+        .await
+        .expect("release lock");
     coder
         .broadcast_status(AgentStatus::Completed {
             result: Some("Mesh refactoring fully verified".to_string()),

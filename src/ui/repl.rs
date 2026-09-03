@@ -1,10 +1,11 @@
 use crossterm::{
-    cursor, execute,
+    cursor,
     event::{Event, EventStream, KeyCode, KeyEventKind},
+    execute,
     terminal::{self, ClearType},
 };
-use std::collections::VecDeque;
 use futures::StreamExt;
+use std::collections::VecDeque;
 use std::io::{stdout, Write};
 use std::time::Instant;
 
@@ -132,7 +133,10 @@ pub fn format_turn_summary(
     let elapsed_str = format_duration_compact(elapsed);
     let in_str = format_tokens_compact(in_tokens);
     let out_str = format_tokens_compact(out_tokens);
-    format!("  \x1b[2;37m{} (↑{} ↓{})\x1b[0m\r\n\r\n", elapsed_str, in_str, out_str)
+    format!(
+        "  \x1b[2;37m{} (↑{} ↓{})\x1b[0m\r\n\r\n",
+        elapsed_str, in_str, out_str
+    )
 }
 
 /// Render real-time thinking frame with status, queue line, and model footer.
@@ -199,7 +203,11 @@ pub struct ToolCallItem {
 }
 
 impl ToolCallItem {
-    pub fn new(name: impl Into<String>, label: impl Into<String>, category: impl Into<String>) -> Self {
+    pub fn new(
+        name: impl Into<String>,
+        label: impl Into<String>,
+        category: impl Into<String>,
+    ) -> Self {
         Self {
             name: name.into(),
             label: label.into(),
@@ -254,7 +262,10 @@ pub fn parse_tool_info(name: &str, args: &serde_json::Value) -> (String, String)
             (format!("Read {}", path), "read".to_string())
         }
         "file" => {
-            let action = args.get("action").and_then(|v| v.as_str()).unwrap_or("read");
+            let action = args
+                .get("action")
+                .and_then(|v| v.as_str())
+                .unwrap_or("read");
             let path = args
                 .get("path")
                 .or_else(|| args.get("file"))
@@ -387,7 +398,10 @@ pub fn parse_tool_active_label(name: &str, args: &serde_json::Value) -> String {
             format!("Reading {}", path)
         }
         "file" => {
-            let action = args.get("action").and_then(|v| v.as_str()).unwrap_or("read");
+            let action = args
+                .get("action")
+                .and_then(|v| v.as_str())
+                .unwrap_or("read");
             let path = args
                 .get("path")
                 .or_else(|| args.get("file"))
@@ -511,11 +525,18 @@ pub fn format_tool_tree(tool_batch: &[ToolCallItem]) -> String {
         format!(" · {}", breakdown.join(" · "))
     };
 
-    let call_label = if total == 1 { "tool call" } else { "tool calls" };
+    let call_label = if total == 1 {
+        "tool call"
+    } else {
+        "tool calls"
+    };
     let mut out = format!("● {} {}{}\n", total, call_label, breakdown_str);
     for (i, item) in tool_batch.iter().enumerate() {
         let connector = if i == total - 1 { "└ " } else { "├ " };
-        let display_label = if item.failed && !item.label.starts_with("Failed ") && !item.label.starts_with("Exited ") {
+        let display_label = if item.failed
+            && !item.label.starts_with("Failed ")
+            && !item.label.starts_with("Exited ")
+        {
             if item.category == "command" {
                 let cmd = item.label.strip_prefix("Ran ").unwrap_or(&item.label);
                 format!("Exited 1 {}", cmd)
@@ -542,7 +563,10 @@ fn clear_thinking_frame() {
 }
 
 /// Render tool call tree to any generic writer with ANSI styling.
-pub fn render_tool_tree_to<W: std::io::Write>(out: &mut W, tool_batch: &[ToolCallItem]) -> std::io::Result<()> {
+pub fn render_tool_tree_to<W: std::io::Write>(
+    out: &mut W,
+    tool_batch: &[ToolCallItem],
+) -> std::io::Result<()> {
     if tool_batch.is_empty() {
         return Ok(());
     }
@@ -572,11 +596,22 @@ pub fn render_tool_tree_to<W: std::io::Write>(out: &mut W, tool_batch: &[ToolCal
         format!(" · {}", breakdown.join(" · "))
     };
 
-    let call_label = if total == 1 { "tool call" } else { "tool calls" };
-    write!(out, "\r\n\x1b[2;37m● {} {}{}\x1b[0m\r\n", total, call_label, breakdown_str)?;
+    let call_label = if total == 1 {
+        "tool call"
+    } else {
+        "tool calls"
+    };
+    write!(
+        out,
+        "\r\n\x1b[2;37m● {} {}{}\x1b[0m\r\n",
+        total, call_label, breakdown_str
+    )?;
     for (i, item) in tool_batch.iter().enumerate() {
         let connector = if i == total - 1 { "└ " } else { "├ " };
-        let display_label = if item.failed && !item.label.starts_with("Failed ") && !item.label.starts_with("Exited ") {
+        let display_label = if item.failed
+            && !item.label.starts_with("Failed ")
+            && !item.label.starts_with("Exited ")
+        {
             if item.category == "command" {
                 let cmd = item.label.strip_prefix("Ran ").unwrap_or(&item.label);
                 format!("Exited 1 {}", cmd)
@@ -587,7 +622,11 @@ pub fn render_tool_tree_to<W: std::io::Write>(out: &mut W, tool_batch: &[ToolCal
             item.label.clone()
         };
         if item.failed {
-            write!(out, "\x1b[2;37m{}\x1b[31m{}\x1b[0m\r\n", connector, display_label)?;
+            write!(
+                out,
+                "\x1b[2;37m{}\x1b[31m{}\x1b[0m\r\n",
+                connector, display_label
+            )?;
         } else {
             write!(out, "\x1b[2;37m{}{}\x1b[0m\r\n", connector, display_label)?;
         }
@@ -605,21 +644,21 @@ fn parse_exit_code(output: &str) -> i32 {
     let lower = output.to_lowercase();
     if let Some(pos) = lower.find("exit code ") {
         let rest = &output[pos + 10..];
-        if let Some(code) = rest
-            .split_whitespace()
-            .next()
-            .and_then(|s| s.trim_matches(|c: char| !c.is_ascii_digit()).parse::<i32>().ok())
-        {
+        if let Some(code) = rest.split_whitespace().next().and_then(|s| {
+            s.trim_matches(|c: char| !c.is_ascii_digit())
+                .parse::<i32>()
+                .ok()
+        }) {
             return code;
         }
     }
     if let Some(pos) = lower.find("exited ") {
         let rest = &output[pos + 7..];
-        if let Some(code) = rest
-            .split_whitespace()
-            .next()
-            .and_then(|s| s.trim_matches(|c: char| !c.is_ascii_digit()).parse::<i32>().ok())
-        {
+        if let Some(code) = rest.split_whitespace().next().and_then(|s| {
+            s.trim_matches(|c: char| !c.is_ascii_digit())
+                .parse::<i32>()
+                .ok()
+        }) {
             return code;
         }
     }
@@ -1107,7 +1146,10 @@ mod tests {
         assert_eq!(label, "Loaded skill agents-sdk");
         assert_eq!(cat, "read");
 
-        let (label, cat) = parse_tool_info("load_skill", &serde_json::json!({ "skill": "browser-harness" }));
+        let (label, cat) = parse_tool_info(
+            "load_skill",
+            &serde_json::json!({ "skill": "browser-harness" }),
+        );
         assert_eq!(label, "Loaded skill browser-harness");
         assert_eq!(cat, "read");
 
@@ -1119,11 +1161,17 @@ mod tests {
         assert_eq!(label, "Searched mermaid");
         assert_eq!(cat, "read");
 
-        let (label, cat) = parse_tool_info("file", &serde_json::json!({ "action": "read", "path": "README.md" }));
+        let (label, cat) = parse_tool_info(
+            "file",
+            &serde_json::json!({ "action": "read", "path": "README.md" }),
+        );
         assert_eq!(label, "Read README.md");
         assert_eq!(cat, "read");
 
-        let (label, cat) = parse_tool_info("file", &serde_json::json!({ "action": "write", "path": "test.txt" }));
+        let (label, cat) = parse_tool_info(
+            "file",
+            &serde_json::json!({ "action": "write", "path": "test.txt" }),
+        );
         assert_eq!(label, "Wrote test.txt");
         assert_eq!(cat, "write");
 
@@ -1131,19 +1179,29 @@ mod tests {
         assert_eq!(label, "Edited src/main.rs");
         assert_eq!(cat, "edit");
 
-        let (label, cat) = parse_tool_info("bash", &serde_json::json!({ "command": "which browser-use || python3 -m site --user-base" }));
-        assert_eq!(label, "Ran which browser-use || python3 -m site --user-base");
+        let (label, cat) = parse_tool_info(
+            "bash",
+            &serde_json::json!({ "command": "which browser-use || python3 -m site --user-base" }),
+        );
+        assert_eq!(
+            label,
+            "Ran which browser-use || python3 -m site --user-base"
+        );
         assert_eq!(cat, "command");
 
         let (label, cat) = parse_tool_info("tree", &serde_json::json!({ "path": "src/ui" }));
         assert_eq!(label, "Listed src/ui");
         assert_eq!(cat, "list");
 
-        let (label, cat) = parse_tool_info("web_search", &serde_json::json!({ "query": "rust async" }));
+        let (label, cat) =
+            parse_tool_info("web_search", &serde_json::json!({ "query": "rust async" }));
         assert_eq!(label, "Searched rust async");
         assert_eq!(cat, "read");
 
-        let (label, cat) = parse_tool_info("fetch", &serde_json::json!({ "url": "https://example.com" }));
+        let (label, cat) = parse_tool_info(
+            "fetch",
+            &serde_json::json!({ "url": "https://example.com" }),
+        );
         assert_eq!(label, "Fetched https://example.com");
         assert_eq!(cat, "read");
     }
@@ -1177,12 +1235,9 @@ mod tests {
             "● 1 tool call · 1 command\n└ Ran which browser-use || python3 -m site --user-base\n"
         );
 
-        let failed_cmd = vec![ToolCallItem::new(
-            "bash",
-            "Exited 1 ls \"/Users/...\"",
-            "command",
-        )
-        .with_failed(true)];
+        let failed_cmd = vec![
+            ToolCallItem::new("bash", "Exited 1 ls \"/Users/...\"", "command").with_failed(true),
+        ];
         let formatted_failed = format_tool_tree(&failed_cmd);
         assert_eq!(
             formatted_failed,
@@ -1210,7 +1265,11 @@ mod tests {
         );
 
         let batch_4 = vec![
-            ToolCallItem::new("glob", "Matched **/*.{md,mmd,puml,dot,svg,drawio,excalidraw}", "list"),
+            ToolCallItem::new(
+                "glob",
+                "Matched **/*.{md,mmd,puml,dot,svg,drawio,excalidraw}",
+                "list",
+            ),
             ToolCallItem::new("glob", "Matched **/*diagram*", "list"),
             ToolCallItem::new("grep", "Searched mermaid", "read"),
             ToolCallItem::new("glob", "Matched README*", "list"),
@@ -1269,42 +1328,21 @@ mod tests {
 
     #[test]
     fn test_format_activity_status_blinking() {
-        let status_on = format_activity_status(
-            "Running",
-            Duration::from_millis(0),
-            0,
-            0,
-            "auto",
-        );
+        let status_on = format_activity_status("Running", Duration::from_millis(0), 0, 0, "auto");
         assert!(status_on.contains("• Running"));
 
-        let status_off = format_activity_status(
-            "Running",
-            Duration::from_millis(500),
-            0,
-            0,
-            "auto",
-        );
+        let status_off =
+            format_activity_status("Running", Duration::from_millis(500), 0, 0, "auto");
         assert!(status_off.contains("  Running"));
         assert!(!status_off.contains("• Running"));
 
-        let status_on_2 = format_activity_status(
-            "• Running",
-            Duration::from_millis(1000),
-            0,
-            0,
-            "auto",
-        );
+        let status_on_2 =
+            format_activity_status("• Running", Duration::from_millis(1000), 0, 0, "auto");
         assert!(status_on_2.contains("• Running"));
         assert!(!status_on_2.contains("• •"));
 
-        let status_off_2 = format_activity_status(
-            "• Running",
-            Duration::from_millis(1500),
-            0,
-            0,
-            "auto",
-        );
+        let status_off_2 =
+            format_activity_status("• Running", Duration::from_millis(1500), 0, 0, "auto");
         assert!(status_off_2.contains("  Running"));
         assert!(!status_off_2.contains("• •"));
     }
@@ -1333,7 +1371,10 @@ mod tests {
         assert_eq!(queued_prompts.len(), 1);
 
         // FIFO pop of remaining queue
-        assert_eq!(queued_prompts.pop_front(), Some("first message".to_string()));
+        assert_eq!(
+            queued_prompts.pop_front(),
+            Some("first message".to_string())
+        );
         assert!(queued_prompts.is_empty());
     }
 

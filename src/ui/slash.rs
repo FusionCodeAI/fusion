@@ -180,10 +180,7 @@ pub enum PromptCommand {
         local: bool,
     },
     /// Load and render a prompt template with arguments: `/prompt load <name> [args...]`
-    Load {
-        name: String,
-        args: Vec<String>,
-    },
+    Load { name: String, args: Vec<String> },
     /// Inspect template details, metadata, and variables: `/prompt show <name>`
     Show { name: String },
     /// Delete a template from disk and memory: `/prompt delete <name>`
@@ -583,11 +580,9 @@ impl SlashCommand {
                 let session_cmd = parse_session_subcommand(args);
                 SlashCommand::Session(session_cmd)
             }
-            "/bookmark" | "/bm" | "/mark" => {
-                SlashCommand::Bookmark {
-                    args: args.to_vec(),
-                }
-            }
+            "/bookmark" | "/bm" | "/mark" => SlashCommand::Bookmark {
+                args: args.to_vec(),
+            },
             "/fork" | "/branch" => {
                 let (title, turn) = parse_fork_args(args);
                 SlashCommand::Fork { title, turn }
@@ -598,11 +593,9 @@ impl SlashCommand {
             }
             "/compact" | "/compress" => SlashCommand::Compact,
             "/stats" | "/usage" | "/cost" => SlashCommand::Stats,
-            "/benchmark" | "/bench" | "/latency" | "/speed" => {
-                SlashCommand::Benchmark {
-                    args: args.to_vec(),
-                }
-            }
+            "/benchmark" | "/bench" | "/latency" | "/speed" => SlashCommand::Benchmark {
+                args: args.to_vec(),
+            },
             "/export" | "/exp" => {
                 let (format, path) = parse_export_args(args);
                 SlashCommand::Export { format, path }
@@ -634,11 +627,9 @@ impl SlashCommand {
                 let skills_cmd = parse_skills_subcommand(args);
                 SlashCommand::Skills(skills_cmd)
             }
-            "/snippet" | "/snip" | "/sn" => {
-                SlashCommand::Snippet {
-                    args: args.to_vec(),
-                }
-            }
+            "/snippet" | "/snip" | "/sn" => SlashCommand::Snippet {
+                args: args.to_vec(),
+            },
             "/tag" | "/tags" => SlashCommand::Tag {
                 args: args.to_vec(),
             },
@@ -977,9 +968,7 @@ pub fn execute_slash_command(
             CommandResult::Continue
         }
         SlashCommand::Session(subcmd) => handle_session(subcmd, runner, session),
-        SlashCommand::Fork { title, turn } => {
-            handle_fork(title.as_deref(), *turn, session)
-        }
+        SlashCommand::Fork { title, turn } => handle_fork(title.as_deref(), *turn, session),
         SlashCommand::Rewind { turns } => {
             handle_rewind(*turns, runner, session);
             CommandResult::Continue
@@ -1046,7 +1035,11 @@ pub fn execute_slash_command(
         }
         SlashCommand::Recover { args } => {
             let args_str = args.join(" ");
-            let output = crate::agent::recovery::handle_recovery_command(&args_str, &runner.tool_ctx().cwd, session);
+            let output = crate::agent::recovery::handle_recovery_command(
+                &args_str,
+                &runner.tool_ctx().cwd,
+                session,
+            );
             println!("{}", output);
             CommandResult::Continue
         }
@@ -1541,7 +1534,9 @@ fn handle_fork(title: Option<&str>, turn: Option<usize>, session: &mut Session) 
     let orig_title = session.title().unwrap_or("Session").to_string();
 
     if orig_turns == 0 && session.total_messages() == 0 {
-        println!("\x1b[1;33m⚠\x1b[0m Current session has no conversation turns yet. Nothing to fork.\n");
+        println!(
+            "\x1b[1;33m⚠\x1b[0m Current session has no conversation turns yet. Nothing to fork.\n"
+        );
         return CommandResult::Continue;
     }
 
@@ -1579,21 +1574,36 @@ fn handle_fork(title: Option<&str>, turn: Option<usize>, session: &mut Session) 
     *session = forked.clone();
 
     println!("\x1b[1;32m✦ Session Forked Successfully!\x1b[0m");
-    println!("  \x1b[1;36mBranch ID:\x1b[0m        \x1b[1;37m{}\x1b[0m", forked_id);
-    println!("  \x1b[1;36mBranch Title:\x1b[0m     \x1b[1;33m{}\x1b[0m", new_title);
+    println!(
+        "  \x1b[1;36mBranch ID:\x1b[0m        \x1b[1;37m{}\x1b[0m",
+        forked_id
+    );
+    println!(
+        "  \x1b[1;36mBranch Title:\x1b[0m     \x1b[1;33m{}\x1b[0m",
+        new_title
+    );
     println!(
         "  \x1b[1;36mParent Session:\x1b[0m   \x1b[2;37m{} (\"{}\")\x1b[0m",
         orig_id, orig_title
     );
     if let Some(t) = turn {
-        println!("  \x1b[1;36mForked At:\x1b[0m        Turn {} of {}", t, orig_turns);
+        println!(
+            "  \x1b[1;36mForked At:\x1b[0m        Turn {} of {}",
+            t, orig_turns
+        );
     }
     println!(
         "  \x1b[1;36mHistory Branched:\x1b[0m {} turns ({} messages)",
         new_turns, new_msgs
     );
-    println!("  \x1b[1;36mActive Model:\x1b[0m     \x1b[1;37m{}\x1b[0m", session.active_model());
-    println!("  \x1b[1;36mSaved To:\x1b[0m         \x1b[2;37m{}\x1b[0m", forked_path);
+    println!(
+        "  \x1b[1;36mActive Model:\x1b[0m     \x1b[1;37m{}\x1b[0m",
+        session.active_model()
+    );
+    println!(
+        "  \x1b[1;36mSaved To:\x1b[0m         \x1b[2;37m{}\x1b[0m",
+        forked_path
+    );
     println!();
 
     CommandResult::SessionSwitched(forked)
@@ -1681,7 +1691,9 @@ fn handle_compact(session: &mut Session) {
 
     if result.compacted {
         let reduction_pct = if result.original_tokens > 0 {
-            let saved = result.original_tokens.saturating_sub(result.compacted_tokens);
+            let saved = result
+                .original_tokens
+                .saturating_sub(result.compacted_tokens);
             (saved as f64 / result.original_tokens as f64) * 100.0
         } else {
             0.0
@@ -1692,8 +1704,14 @@ fn handle_compact(session: &mut Session) {
             "  \x1b[1;36mMessages:\x1b[0m  {} ➔ \x1b[1;32m{}\x1b[0m (pruned {} message{})",
             result.original_messages,
             result.compacted_messages,
-            result.original_messages.saturating_sub(result.compacted_messages),
-            if result.original_messages.saturating_sub(result.compacted_messages) == 1 {
+            result
+                .original_messages
+                .saturating_sub(result.compacted_messages),
+            if result
+                .original_messages
+                .saturating_sub(result.compacted_messages)
+                == 1
+            {
                 ""
             } else {
                 "s"
@@ -1704,7 +1722,10 @@ fn handle_compact(session: &mut Session) {
             result.original_tokens, result.compacted_tokens, reduction_pct
         );
         if let Some(summary) = &result.summary {
-            println!("  \x1b[1;36mSummary:\x1b[0m   \x1b[2;37m\"{}\"\x1b[0m", summary);
+            println!(
+                "  \x1b[1;36mSummary:\x1b[0m   \x1b[2;37m\"{}\"\x1b[0m",
+                summary
+            );
         }
         println!("  \x1b[1;36mStatus:\x1b[0m    Session history compacted and saved.\n");
     } else {
@@ -1756,9 +1777,15 @@ fn handle_stats(runner: &AgentRunner, session: &Session) {
         "\x1b[1;36m│\x1b[0m \x1b[1;37m✦ Fusion Session Analytics & Cost Breakdown\x1b[0m                  \x1b[1;36m│\x1b[0m"
     );
     println!("\x1b[1;36m├─────────────────────────────────────────────────────────────┤\x1b[0m");
-    println!("  \x1b[1;34mSession ID:\x1b[0m       \x1b[1;37m{}\x1b[0m", session.id());
+    println!(
+        "  \x1b[1;34mSession ID:\x1b[0m       \x1b[1;37m{}\x1b[0m",
+        session.id()
+    );
     if let Some(title) = session.title() {
-        println!("  \x1b[1;34mTitle:\x1b[0m            \x1b[1;33m{}\x1b[0m", title);
+        println!(
+            "  \x1b[1;34mTitle:\x1b[0m            \x1b[1;33m{}\x1b[0m",
+            title
+        );
     }
     println!(
         "  \x1b[1;34mActive Model:\x1b[0m     \x1b[1;37m{}\x1b[0m (Provider: \x1b[1;33m{}\x1b[0m)",
@@ -1899,7 +1926,10 @@ fn handle_export(format: Option<ExportFormat>, custom_path: Option<&str>, sessio
                 "\x1b[1;32m✓\x1b[0m Session exported to \x1b[1;37m{}\x1b[0m format!",
                 fmt.display_name()
             );
-            println!("  \x1b[1;36mPath:\x1b[0m     \x1b[1;33m{}\x1b[0m", target_path.display());
+            println!(
+                "  \x1b[1;36mPath:\x1b[0m     \x1b[1;33m{}\x1b[0m",
+                target_path.display()
+            );
             println!("  \x1b[1;36mSize:\x1b[0m     {}", size_display);
             println!("  \x1b[1;36mMessages:\x1b[0m {}", session.total_messages());
             println!();
@@ -1967,7 +1997,9 @@ fn print_model_info(runner: &AgentRunner, session: &Session) {
     println!("\n\x1b[1;34mFusion Gateway Models:\x1b[0m");
     println!("  \x1b[1;33mDeepSeek V4 Flash:\x1b[0m deepseek-ai/DeepSeek-V4-Flash-0731 (shorthands: deepseek, flash, v4, fusion)");
     println!("  \x1b[1;33mMiniMax M2.7:\x1b[0m      MiniMaxAI/MiniMax-M2.7 (shorthands: minimax, minimax-m2.7)");
-    println!("  \x1b[1;33mKimi K2.6:\x1b[0m         moonshotai/Kimi-K2.6 (shorthands: kimi, kimi-k2.6)");
+    println!(
+        "  \x1b[1;33mKimi K2.6:\x1b[0m         moonshotai/Kimi-K2.6 (shorthands: kimi, kimi-k2.6)"
+    );
     println!("\nUsage: \x1b[1;36m/model <model_name>\x1b[0m to switch.\n");
 }
 
@@ -1981,9 +2013,7 @@ fn handle_provider(name: Option<&str>, runner: &mut AgentRunner) {
 
         if trimmed == "fusion" {
             runner.config_mut().default_provider = "fusion".to_string();
-            println!(
-                "\x1b[1;32m✓\x1b[0m Active provider is \x1b[1;37mfusion\x1b[0m\n"
-            );
+            println!("\x1b[1;32m✓\x1b[0m Active provider is \x1b[1;37mfusion\x1b[0m\n");
         } else {
             println!(
                 "\x1b[1;33mNote:\x1b[0m Fusion CLI uses the Fusion Gateway. Supported provider is 'fusion'.\n"
@@ -2017,7 +2047,8 @@ fn handle_login(runner: &mut AgentRunner) {
         }
     };
 
-    tokio::task::block_in_place(|| handle.block_on(async move {
+    tokio::task::block_in_place(|| {
+        handle.block_on(async move {
     println!("\x1b[1;36m⟳ Starting Fusion login...\x1b[0m");
 
     let client = reqwest::Client::new();
@@ -2141,7 +2172,8 @@ fn handle_login(runner: &mut AgentRunner) {
 
         tokio::time::sleep(Duration::from_secs(2)).await;
     }
-    }))
+    })
+    })
 }
 
 /// Open a URL in the system browser (best-effort).
@@ -2154,9 +2186,20 @@ fn open_browser(url: &str) -> bool {
     #[cfg(all(target_os = "linux", not(target_os = "android")))]
     let result = Shell::new("xdg-open").arg(url).spawn().map(|_| ());
     #[cfg(target_os = "windows")]
-    let result = Shell::new("cmd").args(["/c", "start", url]).spawn().map(|_| ());
-    #[cfg(not(any(target_os = "macos", target_os = "linux", target_os = "windows", target_os = "android")))]
-    let result: std::io::Result<()> = Err(std::io::Error::new(std::io::ErrorKind::Other, "unsupported platform"));
+    let result = Shell::new("cmd")
+        .args(["/c", "start", url])
+        .spawn()
+        .map(|_| ());
+    #[cfg(not(any(
+        target_os = "macos",
+        target_os = "linux",
+        target_os = "windows",
+        target_os = "android"
+    )))]
+    let result: std::io::Result<()> = Err(std::io::Error::new(
+        std::io::ErrorKind::Other,
+        "unsupported platform",
+    ));
     result.is_ok()
 }
 
@@ -2167,11 +2210,13 @@ fn print_provider_info(runner: &AgentRunner) {
         current_provider
     );
 
-    let fusion_key = std::env::var("FUSION_API_KEY").is_ok()
-        || runner.config().fusion_api_key.is_some();
+    let fusion_key =
+        std::env::var("FUSION_API_KEY").is_ok() || runner.config().fusion_api_key.is_some();
 
     print_provider_status("fusion", "Fusion Gateway", fusion_key, current_provider);
-    println!("\nAuthenticate with \x1b[1;36m/login\x1b[0m or set \x1b[1;33mFUSION_API_KEY\x1b[0m.\n");
+    println!(
+        "\nAuthenticate with \x1b[1;36m/login\x1b[0m or set \x1b[1;33mFUSION_API_KEY\x1b[0m.\n"
+    );
 }
 
 fn print_provider_status(name: &str, label: &str, has_key: bool, current: &str) {
@@ -2208,7 +2253,9 @@ fn handle_advisors(state: Option<&str>, runner: &mut AgentRunner) {
                 if !current {
                     println!("\x1b[1;32m✓\x1b[0m Multi-domain advisors \x1b[1;32mENABLED\x1b[0m\n");
                 } else {
-                    println!("\x1b[1;33m✓\x1b[0m Multi-domain advisors \x1b[1;31mDISABLED\x1b[0m\n");
+                    println!(
+                        "\x1b[1;33m✓\x1b[0m Multi-domain advisors \x1b[1;31mDISABLED\x1b[0m\n"
+                    );
                 }
             }
             "status" | "info" => {
@@ -2235,14 +2282,19 @@ fn print_advisor_status(runner: &AgentRunner) {
         "\x1b[1;31mDISABLED\x1b[0m"
     };
 
-    println!("\x1b[1;36mAdvisor Critique Subsystem:\x1b[0m {}", status_str);
+    println!(
+        "\x1b[1;36mAdvisor Critique Subsystem:\x1b[0m {}",
+        status_str
+    );
     println!("\n\x1b[1;34mActive Domains:\x1b[0m");
     println!("  • \x1b[1;33mSecurity Advisor\x1b[0m      - Command safety, secrets scanning, privilege limits");
     println!("  • \x1b[1;33mArchitecture Advisor\x1b[0m  - Clean layering, zero-cost modularity, cross-platform");
     println!("  • \x1b[1;33mPerformance Advisor\x1b[0m   - Zero-copy, allocation audits, algorithmic complexity");
     println!("  • \x1b[1;33mLinux Advisor\x1b[0m         - POSIX conformance, system paths, procfs/sysfs nuances");
     println!("  • \x1b[1;33mMobile Advisor\x1b[0m        - Termux constraints, single-process limits, storage");
-    println!("  • \x1b[1;33mWindows Advisor\x1b[0m       - UNC paths, PowerShell quirks, CRLF handling");
+    println!(
+        "  • \x1b[1;33mWindows Advisor\x1b[0m       - UNC paths, PowerShell quirks, CRLF handling"
+    );
     println!("\nUsage: \x1b[1;36m/advisors <on|off|toggle>\x1b[0m to change.\n");
 }
 
@@ -2261,7 +2313,10 @@ fn handle_session(
             println!("  Model:      \x1b[1;37m{}\x1b[0m", session.active_model());
             println!("  Created:    \x1b[2;37m{}\x1b[0m", session.created_at);
             println!("  Updated:    \x1b[2;37m{}\x1b[0m", session.updated_at);
-            println!("  Messages:   \x1b[1;32m{}\x1b[0m", session.total_messages());
+            println!(
+                "  Messages:   \x1b[1;32m{}\x1b[0m",
+                session.total_messages()
+            );
             println!(
                 "  Path:       \x1b[2;37m{}\x1b[0m",
                 Session::session_path(session.id()).display()
@@ -2278,7 +2333,10 @@ fn handle_session(
                             Session::sessions_dir().display()
                         );
                     } else {
-                        println!("\x1b[1;36mSaved Sessions:\x1b[0m ({} total)", sessions.len());
+                        println!(
+                            "\x1b[1;36mSaved Sessions:\x1b[0m ({} total)",
+                            sessions.len()
+                        );
                         for s in &sessions {
                             let is_current = s.id == session.id();
                             let marker = if is_current {
@@ -2503,7 +2561,10 @@ fn handle_quit() -> CommandResult {
 fn handle_status(runner: &AgentRunner, session: &Session) {
     let cfg = runner.config();
     println!("\x1b[1;36mFusion Runtime Status:\x1b[0m");
-    println!("  Provider:         \x1b[1;33m{}\x1b[0m", cfg.default_provider);
+    println!(
+        "  Provider:         \x1b[1;33m{}\x1b[0m",
+        cfg.default_provider
+    );
     println!("  Model:            \x1b[1;37m{}\x1b[0m", cfg.default_model);
     println!(
         "  Advisors:         {}",
@@ -2514,7 +2575,10 @@ fn handle_status(runner: &AgentRunner, session: &Session) {
         }
     );
     println!("  Active Session:   \x1b[1;37m{}\x1b[0m", session.id());
-    println!("  Session Messages: \x1b[1;32m{}\x1b[0m", session.total_messages());
+    println!(
+        "  Session Messages: \x1b[1;32m{}\x1b[0m",
+        session.total_messages()
+    );
     println!(
         "  Registered Tools: \x1b[1;34m{}\x1b[0m",
         runner.tools().definitions().len()
@@ -2566,7 +2630,10 @@ fn handle_config(subcmd: &ConfigCommand, runner: &mut AgentRunner, session: &mut
                 "advisors_enabled" | "advisors" => {
                     let enabled = value.parse::<bool>().unwrap_or(true);
                     cfg.advisors_enabled = enabled;
-                    println!("\x1b[1;32m✓\x1b[0m Updated advisors_enabled to {}\n", enabled);
+                    println!(
+                        "\x1b[1;32m✓\x1b[0m Updated advisors_enabled to {}\n",
+                        enabled
+                    );
                 }
                 _ => {
                     println!("\x1b[1;31m✗\x1b[0m Unknown config key: {}\n", key);
@@ -2586,43 +2653,54 @@ fn handle_preset(name: Option<&str>, runner: &mut AgentRunner, session: &mut Ses
             println!("{}", crate::config::format_presets_table());
             println!("Usage: \x1b[1;33m/preset <name>\x1b[0m (e.g. \x1b[1;32m/preset coding-fast\x1b[0m)\n");
         }
-        Some(preset_name) => {
-            match crate::config::ConfigPreset::from_str_loose(preset_name) {
-                Some(preset) => {
-                    let cfg = runner.config_mut();
-                    cfg.apply_preset(preset);
-                    session.active_model = cfg.default_model.clone();
+        Some(preset_name) => match crate::config::ConfigPreset::from_str_loose(preset_name) {
+            Some(preset) => {
+                let cfg = runner.config_mut();
+                cfg.apply_preset(preset);
+                session.active_model = cfg.default_model.clone();
 
-                    println!(
-                        "\x1b[1;32m✓\x1b[0m Switched to preset \x1b[1;36m{}\x1b[0m ({})",
-                        preset.id(),
-                        preset.title()
-                    );
-                    println!("  • \x1b[1;33mProvider:\x1b[0m     {}", preset.provider());
-                    println!("  • \x1b[1;33mModel:\x1b[0m        {}", preset.model());
-                    println!(
-                        "  • \x1b[1;33mMax Tokens:\x1b[0m   {}",
-                        preset.max_tokens().map(|t| t.to_string()).unwrap_or_else(|| "-".to_string())
-                    );
-                    println!(
-                        "  • \x1b[1;33mTemperature:\x1b[0m  {}",
-                        preset.temperature().map(|t| format!("{:.1}", t)).unwrap_or_else(|| "-".to_string())
-                    );
-                    println!(
-                        "  • \x1b[1;33mAdvisors:\x1b[0m     {}",
-                        if preset.advisors_enabled() { "enabled" } else { "disabled" }
-                    );
-                    println!("  • \x1b[1;33mRecommended:\x1b[0m  {}\n", preset.recommended_for());
-                }
-                None => {
-                    println!(
+                println!(
+                    "\x1b[1;32m✓\x1b[0m Switched to preset \x1b[1;36m{}\x1b[0m ({})",
+                    preset.id(),
+                    preset.title()
+                );
+                println!("  • \x1b[1;33mProvider:\x1b[0m     {}", preset.provider());
+                println!("  • \x1b[1;33mModel:\x1b[0m        {}", preset.model());
+                println!(
+                    "  • \x1b[1;33mMax Tokens:\x1b[0m   {}",
+                    preset
+                        .max_tokens()
+                        .map(|t| t.to_string())
+                        .unwrap_or_else(|| "-".to_string())
+                );
+                println!(
+                    "  • \x1b[1;33mTemperature:\x1b[0m  {}",
+                    preset
+                        .temperature()
+                        .map(|t| format!("{:.1}", t))
+                        .unwrap_or_else(|| "-".to_string())
+                );
+                println!(
+                    "  • \x1b[1;33mAdvisors:\x1b[0m     {}",
+                    if preset.advisors_enabled() {
+                        "enabled"
+                    } else {
+                        "disabled"
+                    }
+                );
+                println!(
+                    "  • \x1b[1;33mRecommended:\x1b[0m  {}\n",
+                    preset.recommended_for()
+                );
+            }
+            None => {
+                println!(
                         "\x1b[1;31m✗\x1b[0m Unknown preset: \x1b[1;37m{}\x1b[0m\nHint: Available presets are: {}\n",
                         preset_name,
                         crate::config::available_presets_list()
                     );
-                }
             }
-        }
+        },
     }
 }
 
@@ -2634,7 +2712,10 @@ fn handle_skills(subcmd: &SkillsCommand, runner: &mut AgentRunner) {
                 println!("\x1b[1;33mℹ\x1b[0m No skills registered.");
                 println!("  Place \x1b[1;37mSKILL.md\x1b[0m in \x1b[1;36m.fusion/skills/<name>/\x1b[0m or \x1b[1;36m~/.fusion/skills/<name>/\x1b[0m.\n");
             } else {
-                println!("\x1b[1;36mRegistered Domain Skills:\x1b[0m ({} total)", skills.len());
+                println!(
+                    "\x1b[1;36mRegistered Domain Skills:\x1b[0m ({} total)",
+                    skills.len()
+                );
                 for skill in skills {
                     let status_badge = if skill.is_enabled() {
                         "\x1b[1;32m● Active\x1b[0m"
@@ -2642,7 +2723,9 @@ fn handle_skills(subcmd: &SkillsCommand, runner: &mut AgentRunner) {
                         "\x1b[1;30m○ Off\x1b[0m"
                     };
                     let source_label = match &skill.source {
-                        crate::agent::skills::SkillSource::Project(_) => "\x1b[1;34m[project]\x1b[0m",
+                        crate::agent::skills::SkillSource::Project(_) => {
+                            "\x1b[1;34m[project]\x1b[0m"
+                        }
                         crate::agent::skills::SkillSource::Global(_) => "\x1b[1;35m[global]\x1b[0m",
                         crate::agent::skills::SkillSource::Custom(_) => "\x1b[1;33m[custom]\x1b[0m",
                         crate::agent::skills::SkillSource::Builtin => "\x1b[1;32m[builtin]\x1b[0m",
@@ -2650,14 +2733,21 @@ fn handle_skills(subcmd: &SkillsCommand, runner: &mut AgentRunner) {
                     let triggers_desc = if skill.triggers().is_empty() {
                         "".to_string()
                     } else {
-                        format!(" \x1b[2;37m(triggers: {})\x1b[0m", skill.triggers().join(", "))
+                        format!(
+                            " \x1b[2;37m(triggers: {})\x1b[0m",
+                            skill.triggers().join(", ")
+                        )
                     };
                     println!(
                         "  {} {} \x1b[1;37m{}\x1b[0m - {}{}",
                         status_badge,
                         source_label,
                         skill.name(),
-                        if skill.description().is_empty() { "No description" } else { skill.description() },
+                        if skill.description().is_empty() {
+                            "No description"
+                        } else {
+                            skill.description()
+                        },
                         triggers_desc
                     );
                 }
@@ -2670,19 +2760,56 @@ fn handle_skills(subcmd: &SkillsCommand, runner: &mut AgentRunner) {
                 return;
             }
             if let Some(skill) = runner.skills().get(name) {
-                println!("\x1b[1;36mSkill Details:\x1b[0m \x1b[1;37m{}\x1b[0m", skill.name());
-                println!("  \x1b[1;33mStatus:\x1b[0m       {}", if skill.is_enabled() { "Enabled" } else { "Disabled" });
+                println!(
+                    "\x1b[1;36mSkill Details:\x1b[0m \x1b[1;37m{}\x1b[0m",
+                    skill.name()
+                );
+                println!(
+                    "  \x1b[1;33mStatus:\x1b[0m       {}",
+                    if skill.is_enabled() {
+                        "Enabled"
+                    } else {
+                        "Disabled"
+                    }
+                );
                 println!("  \x1b[1;33mSource:\x1b[0m       {}", skill.source);
                 if let Some(path) = &skill.path {
                     println!("  \x1b[1;33mPath:\x1b[0m         {}", path.display());
                 }
-                println!("  \x1b[1;33mDescription:\x1b[0m  {}", if skill.description().is_empty() { "-" } else { skill.description() });
+                println!(
+                    "  \x1b[1;33mDescription:\x1b[0m  {}",
+                    if skill.description().is_empty() {
+                        "-"
+                    } else {
+                        skill.description()
+                    }
+                );
                 let triggers_str = skill.triggers().join(", ");
-                println!("  \x1b[1;33mTriggers:\x1b[0m     {}", if skill.triggers().is_empty() { "-" } else { &triggers_str });
+                println!(
+                    "  \x1b[1;33mTriggers:\x1b[0m     {}",
+                    if skill.triggers().is_empty() {
+                        "-"
+                    } else {
+                        &triggers_str
+                    }
+                );
                 let tags_str = skill.tags().join(", ");
-                println!("  \x1b[1;33mTags:\x1b[0m         {}", if skill.tags().is_empty() { "-" } else { &tags_str });
-                println!("  \x1b[1;33mAlways On:\x1b[0m    {}", skill.is_always_active());
-                println!("\n\x1b[1;36mInstructions:\x1b[0m\n{}\n", skill.instructions().trim());
+                println!(
+                    "  \x1b[1;33mTags:\x1b[0m         {}",
+                    if skill.tags().is_empty() {
+                        "-"
+                    } else {
+                        &tags_str
+                    }
+                );
+                println!(
+                    "  \x1b[1;33mAlways On:\x1b[0m    {}",
+                    skill.is_always_active()
+                );
+                println!(
+                    "\n\x1b[1;36mInstructions:\x1b[0m\n{}\n",
+                    skill.instructions().trim()
+                );
             } else {
                 println!("\x1b[1;31m✗\x1b[0m Skill '\x1b[1;37m{}\x1b[0m' not found. Type \x1b[1;36m/skills list\x1b[0m to see available skills.\n", name);
             }
@@ -2700,9 +2827,15 @@ fn handle_skills(subcmd: &SkillsCommand, runner: &mut AgentRunner) {
                 return;
             }
             if runner.skills_mut().set_enabled(name, true) {
-                println!("\x1b[1;32m✓\x1b[0m Enabled skill '\x1b[1;37m{}\x1b[0m'.\n", name);
+                println!(
+                    "\x1b[1;32m✓\x1b[0m Enabled skill '\x1b[1;37m{}\x1b[0m'.\n",
+                    name
+                );
             } else {
-                println!("\x1b[1;31m✗\x1b[0m Skill '\x1b[1;37m{}\x1b[0m' not found.\n", name);
+                println!(
+                    "\x1b[1;31m✗\x1b[0m Skill '\x1b[1;37m{}\x1b[0m' not found.\n",
+                    name
+                );
             }
         }
         SkillsCommand::Disable { name } => {
@@ -2711,9 +2844,15 @@ fn handle_skills(subcmd: &SkillsCommand, runner: &mut AgentRunner) {
                 return;
             }
             if runner.skills_mut().set_enabled(name, false) {
-                println!("\x1b[1;32m✓\x1b[0m Disabled skill '\x1b[1;37m{}\x1b[0m'.\n", name);
+                println!(
+                    "\x1b[1;32m✓\x1b[0m Disabled skill '\x1b[1;37m{}\x1b[0m'.\n",
+                    name
+                );
             } else {
-                println!("\x1b[1;31m✗\x1b[0m Skill '\x1b[1;37m{}\x1b[0m' not found.\n", name);
+                println!(
+                    "\x1b[1;31m✗\x1b[0m Skill '\x1b[1;37m{}\x1b[0m' not found.\n",
+                    name
+                );
             }
         }
         SkillsCommand::Test { query } => {
@@ -2723,7 +2862,11 @@ fn handle_skills(subcmd: &SkillsCommand, runner: &mut AgentRunner) {
             }
             let working_dir = runner.tool_ctx().cwd.clone();
             let skill_matches = runner.skills().find_relevant(query, Some(&working_dir));
-            println!("\x1b[1;36mRelevance Matches for:\x1b[0m \"\x1b[1;37m{}\x1b[0m\" ({} matches)", query, skill_matches.len());
+            println!(
+                "\x1b[1;36mRelevance Matches for:\x1b[0m \"\x1b[1;37m{}\x1b[0m\" ({} matches)",
+                query,
+                skill_matches.len()
+            );
             if skill_matches.is_empty() {
                 println!("  \x1b[2;37mNo skills matched above relevance threshold.\x1b[0m\n");
             } else {
@@ -2742,11 +2885,7 @@ fn handle_skills(subcmd: &SkillsCommand, runner: &mut AgentRunner) {
     }
 }
 
-fn handle_prompt(
-    subcmd: &PromptCommand,
-    _runner: &mut AgentRunner,
-    session: &mut Session,
-) {
+fn handle_prompt(subcmd: &PromptCommand, _runner: &mut AgentRunner, session: &mut Session) {
     let mut lib = crate::agent::prompt_lib::PromptLibrary::new();
 
     match subcmd {
@@ -2771,10 +2910,16 @@ fn handle_prompt(
                 return;
             }
 
-            println!("\n\x1b[1;36mPrompt Template Library\x1b[0m ({} templates)", templates.len());
+            println!(
+                "\n\x1b[1;36mPrompt Template Library\x1b[0m ({} templates)",
+                templates.len()
+            );
             println!("\x1b[2;37mUse \x1b[1;37m/prompt load <name> [args...]\x1b[0m\x1b[2;37m to render a template into the conversation.\x1b[0m\n");
 
-            let mut by_cat: std::collections::BTreeMap<&str, Vec<&crate::agent::prompt_lib::PromptTemplate>> = std::collections::BTreeMap::new();
+            let mut by_cat: std::collections::BTreeMap<
+                &str,
+                Vec<&crate::agent::prompt_lib::PromptTemplate>,
+            > = std::collections::BTreeMap::new();
             for tmpl in &templates {
                 let cat = tmpl.category.as_deref().unwrap_or("General");
                 by_cat.entry(cat).or_default().push(tmpl);
@@ -2792,29 +2937,34 @@ fn handle_prompt(
                     let vars_preview = if t.variables.is_empty() {
                         String::new()
                     } else {
-                        let names: Vec<String> = t.variables.iter().map(|v| {
-                            if v.required {
-                                format!("\x1b[1;33m{{{{{}}}}}\x1b[0m", v.name)
-                            } else {
-                                format!("\x1b[2;37m{{{{{}}}}}\x1b[0m", v.name)
-                            }
-                        }).collect();
+                        let names: Vec<String> = t
+                            .variables
+                            .iter()
+                            .map(|v| {
+                                if v.required {
+                                    format!("\x1b[1;33m{{{{{}}}}}\x1b[0m", v.name)
+                                } else {
+                                    format!("\x1b[2;37m{{{{{}}}}}\x1b[0m", v.name)
+                                }
+                            })
+                            .collect();
                         format!(" {}", names.join(" "))
                     };
 
                     println!(
                         "    • \x1b[1;36m{:<16}\x1b[0m {} \x1b[0m{}\x1b[0m{}",
-                        t.name,
-                        builtin_badge,
-                        t.description,
-                        vars_preview
+                        t.name, builtin_badge, t.description, vars_preview
                     );
                 }
                 println!();
             }
         }
 
-        PromptCommand::Save { name, template, local } => {
+        PromptCommand::Save {
+            name,
+            template,
+            local,
+        } => {
             let name_trimmed = name.trim();
             if name_trimmed.is_empty() {
                 println!("\x1b[1;31mError:\x1b[0m Missing template name. Usage: \x1b[1;36m/prompt save <name> [template...]\x1b[0m");
@@ -2824,7 +2974,8 @@ fn handle_prompt(
             let template_body = if let Some(ref t) = template {
                 t.trim().to_string()
             } else {
-                session.messages()
+                session
+                    .messages()
                     .iter()
                     .rev()
                     .find(|m| m.role == crate::provider::types::Role::User)
@@ -2855,13 +3006,26 @@ fn handle_prompt(
 
             match save_result {
                 Ok(path) => {
-                    println!("\n\x1b[1;32m✓ Saved prompt template:\x1b[0m \x1b[1;36m{}\x1b[0m", tmpl.name);
-                    println!("  \x1b[2;37mLocation:\x1b[0m  \x1b[1;37m{}\x1b[0m", path.display());
+                    println!(
+                        "\n\x1b[1;32m✓ Saved prompt template:\x1b[0m \x1b[1;36m{}\x1b[0m",
+                        tmpl.name
+                    );
+                    println!(
+                        "  \x1b[2;37mLocation:\x1b[0m  \x1b[1;37m{}\x1b[0m",
+                        path.display()
+                    );
                     if !tmpl.variables.is_empty() {
-                        let var_names: Vec<&str> = tmpl.variables.iter().map(|v| v.name.as_str()).collect();
-                        println!("  \x1b[2;37mVariables:\x1b[0m \x1b[1;33m{}\x1b[0m", var_names.join(", "));
+                        let var_names: Vec<&str> =
+                            tmpl.variables.iter().map(|v| v.name.as_str()).collect();
+                        println!(
+                            "  \x1b[2;37mVariables:\x1b[0m \x1b[1;33m{}\x1b[0m",
+                            var_names.join(", ")
+                        );
                     }
-                    println!("  \x1b[2;37mExecute:\x1b[0m   \x1b[1;36m/prompt load {}\x1b[0m\n", tmpl.name);
+                    println!(
+                        "  \x1b[2;37mExecute:\x1b[0m   \x1b[1;36m/prompt load {}\x1b[0m\n",
+                        tmpl.name
+                    );
                 }
                 Err(e) => {
                     println!("\x1b[1;31mFailed to save prompt template:\x1b[0m {}", e);
@@ -2882,8 +3046,15 @@ fn handle_prompt(
                     println!("\x1b[1;31mError:\x1b[0m Template \x1b[1;37m'{}'\x1b[0m not found in library.", name_trimmed);
                     let suggestions = lib.search(name_trimmed);
                     if !suggestions.is_empty() {
-                        let names: Vec<&str> = suggestions.iter().take(3).map(|s| s.name.as_str()).collect();
-                        println!("  \x1b[2;37mDid you mean:\x1b[0m \x1b[1;36m{}\x1b[0m", names.join(", "));
+                        let names: Vec<&str> = suggestions
+                            .iter()
+                            .take(3)
+                            .map(|s| s.name.as_str())
+                            .collect();
+                        println!(
+                            "  \x1b[2;37mDid you mean:\x1b[0m \x1b[1;36m{}\x1b[0m",
+                            names.join(", ")
+                        );
                     }
                     println!("  \x1b[2;37mType \x1b[1;36m/prompt list\x1b[0m\x1b[2;37m to inspect available templates.\x1b[0m\n");
                     return;
@@ -2893,7 +3064,12 @@ fn handle_prompt(
             let rendered_res = if args.is_empty() {
                 let has_required = tmpl.variables.iter().any(|v| v.required);
                 if has_required {
-                    if let Some(user_msg) = session.messages().iter().rev().find(|m| m.role == crate::provider::types::Role::User) {
+                    if let Some(user_msg) = session
+                        .messages()
+                        .iter()
+                        .rev()
+                        .find(|m| m.role == crate::provider::types::Role::User)
+                    {
                         tmpl.render_positional(&[&user_msg.content])
                     } else {
                         tmpl.render_cli_args(args)
@@ -2907,21 +3083,35 @@ fn handle_prompt(
 
             match rendered_res {
                 Ok(rendered) => {
-                    println!("\n\x1b[1;32m✓ Loaded template:\x1b[0m \x1b[1;36m{}\x1b[0m", tmpl.name);
+                    println!(
+                        "\n\x1b[1;32m✓ Loaded template:\x1b[0m \x1b[1;36m{}\x1b[0m",
+                        tmpl.name
+                    );
                     println!("\x1b[2;37m--------------------------------------------------\x1b[0m");
                     println!("{}", rendered);
-                    println!("\x1b[2;37m--------------------------------------------------\x1b[0m\n");
+                    println!(
+                        "\x1b[2;37m--------------------------------------------------\x1b[0m\n"
+                    );
 
                     session.add_user_message(&rendered);
                     println!("\x1b[1;32m✓ Injected rendered prompt into active session.\x1b[0m");
                 }
-                Err(crate::agent::prompt_lib::PromptLibError::MissingVariable { variable, .. }) => {
+                Err(crate::agent::prompt_lib::PromptLibError::MissingVariable {
+                    variable, ..
+                }) => {
                     println!("\n\x1b[1;33mTemplate '{}' requires variable:\x1b[0m \x1b[1;31m{{{{{}}}}}\x1b[0m", tmpl.name, variable);
-                    println!("\x1b[2;37mUsage:\x1b[0m \x1b[1;36m/prompt load {} {}=\"<value>\"\x1b[0m", tmpl.name, variable);
+                    println!(
+                        "\x1b[2;37mUsage:\x1b[0m \x1b[1;36m/prompt load {} {}=\"<value>\"\x1b[0m",
+                        tmpl.name, variable
+                    );
                     if !tmpl.variables.is_empty() {
                         println!("\n\x1b[1;37mTemplate Variables:\x1b[0m");
                         for v in &tmpl.variables {
-                            let req = if v.required { "\x1b[1;31m[required]\x1b[0m" } else { "\x1b[2;37m[optional]\x1b[0m" };
+                            let req = if v.required {
+                                "\x1b[1;31m[required]\x1b[0m"
+                            } else {
+                                "\x1b[2;37m[optional]\x1b[0m"
+                            };
                             let desc = v.description.as_deref().unwrap_or("");
                             println!("  • \x1b[1;33m{:<12}\x1b[0m {} {}", v.name, req, desc);
                         }
@@ -2942,7 +3132,10 @@ fn handle_prompt(
                     print_markdown(&card);
                 }
                 None => {
-                    println!("\x1b[1;31mError:\x1b[0m Template \x1b[1;37m'{}'\x1b[0m not found.\n", name_trimmed);
+                    println!(
+                        "\x1b[1;31mError:\x1b[0m Template \x1b[1;37m'{}'\x1b[0m not found.\n",
+                        name_trimmed
+                    );
                 }
             }
         }
@@ -2951,10 +3144,16 @@ fn handle_prompt(
             let name_trimmed = name.trim();
             match lib.delete_persisted(name_trimmed) {
                 Ok(true) => {
-                    println!("\x1b[1;32m✓ Deleted prompt template:\x1b[0m \x1b[1;36m{}\x1b[0m\n", name_trimmed);
+                    println!(
+                        "\x1b[1;32m✓ Deleted prompt template:\x1b[0m \x1b[1;36m{}\x1b[0m\n",
+                        name_trimmed
+                    );
                 }
                 Ok(false) => {
-                    println!("\x1b[1;33mTemplate '{}' not found to delete.\x1b[0m\n", name_trimmed);
+                    println!(
+                        "\x1b[1;33mTemplate '{}' not found to delete.\x1b[0m\n",
+                        name_trimmed
+                    );
                 }
                 Err(e) => {
                     println!("\x1b[1;31mFailed to delete template:\x1b[0m {}\n", e);
@@ -2965,21 +3164,32 @@ fn handle_prompt(
         PromptCommand::Search { query } => {
             let matches = lib.search(query);
             if matches.is_empty() {
-                println!("\x1b[1;33mNo templates matched query:\x1b[0m \x1b[1;37m{}\x1b[0m\n", query);
+                println!(
+                    "\x1b[1;33mNo templates matched query:\x1b[0m \x1b[1;37m{}\x1b[0m\n",
+                    query
+                );
             } else {
-                println!("\n\x1b[1;36mSearch Results for:\x1b[0m \x1b[1;37m\"{}\"\x1b[0m ({} matches)\n", query, matches.len());
+                println!(
+                    "\n\x1b[1;36mSearch Results for:\x1b[0m \x1b[1;37m\"{}\"\x1b[0m ({} matches)\n",
+                    query,
+                    matches.len()
+                );
                 for t in matches {
                     let cat = t.category.as_deref().unwrap_or("General");
-                    println!("  • \x1b[1;36m{:<16}\x1b[0m \x1b[2;37m[{}]\x1b[0m {}", t.name, cat, t.description);
+                    println!(
+                        "  • \x1b[1;36m{:<16}\x1b[0m \x1b[2;37m[{}]\x1b[0m {}",
+                        t.name, cat, t.description
+                    );
                 }
                 println!();
             }
         }
 
         PromptCommand::Export { path } => {
-            let target_path = path.as_deref().map(PathBuf::from).unwrap_or_else(|| {
-                Config::config_dir().join("exports").join("prompts.json")
-            });
+            let target_path = path
+                .as_deref()
+                .map(PathBuf::from)
+                .unwrap_or_else(|| Config::config_dir().join("exports").join("prompts.json"));
 
             if let Some(parent) = target_path.parent() {
                 let _ = std::fs::create_dir_all(parent);
@@ -3002,30 +3212,32 @@ fn handle_prompt(
         PromptCommand::Import { path } => {
             let file_path = PathBuf::from(path);
             if !file_path.exists() {
-                println!("\x1b[1;31mError:\x1b[0m File not found: \x1b[1;37m{}\x1b[0m\n", file_path.display());
+                println!(
+                    "\x1b[1;31mError:\x1b[0m File not found: \x1b[1;37m{}\x1b[0m\n",
+                    file_path.display()
+                );
                 return;
             }
 
             match std::fs::read_to_string(&file_path) {
-                Ok(content) => {
-                    match lib.import_all_json(&content) {
-                        Ok(count) => {
-                            println!("\x1b[1;32m✓ Successfully imported {} prompt templates from:\x1b[0m \x1b[1;37m{}\x1b[0m\n", count, file_path.display());
-                        }
-                        Err(_) => {
-                            match lib.load_from_file(&file_path) {
-                                Ok(tmpl) => {
-                                    let name = tmpl.name.clone();
-                                    lib.insert(tmpl);
-                                    println!("\x1b[1;32m✓ Successfully imported prompt template '{}' from:\x1b[0m \x1b[1;37m{}\x1b[0m\n", name, file_path.display());
-                                }
-                                Err(e) => {
-                                    println!("\x1b[1;31mFailed to import prompt templates:\x1b[0m {}\n", e);
-                                }
-                            }
-                        }
+                Ok(content) => match lib.import_all_json(&content) {
+                    Ok(count) => {
+                        println!("\x1b[1;32m✓ Successfully imported {} prompt templates from:\x1b[0m \x1b[1;37m{}\x1b[0m\n", count, file_path.display());
                     }
-                }
+                    Err(_) => match lib.load_from_file(&file_path) {
+                        Ok(tmpl) => {
+                            let name = tmpl.name.clone();
+                            lib.insert(tmpl);
+                            println!("\x1b[1;32m✓ Successfully imported prompt template '{}' from:\x1b[0m \x1b[1;37m{}\x1b[0m\n", name, file_path.display());
+                        }
+                        Err(e) => {
+                            println!(
+                                "\x1b[1;31mFailed to import prompt templates:\x1b[0m {}\n",
+                                e
+                            );
+                        }
+                    },
+                },
                 Err(e) => {
                     println!("\x1b[1;31mFailed to read import file:\x1b[0m {}\n", e);
                 }
@@ -3683,7 +3895,10 @@ mod tests {
 
         let res3 = handle_slash_command("/m flash xhigh", &mut runner, &mut session);
         assert!(res3.is_some());
-        assert_eq!(runner.config().default_model, "deepseek-ai/DeepSeek-V4-Flash-0731");
+        assert_eq!(
+            runner.config().default_model,
+            "deepseek-ai/DeepSeek-V4-Flash-0731"
+        );
         assert_eq!(session.active_model(), "deepseek-ai/DeepSeek-V4-Flash-0731");
         assert_eq!(session.get_metadata("reasoning_effort"), Some("xhigh"));
 

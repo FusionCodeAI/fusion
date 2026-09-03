@@ -206,15 +206,38 @@ impl DocLanguage {
     }
 
     pub fn detect_from_code(code: &str) -> Self {
-        if code.contains("fn ") || code.contains("pub fn ") || code.contains("impl ") || code.contains("use std::") || code.contains("//!") || code.contains("///") || code.contains("pub struct ") || code.contains("pub enum ") || code.contains("pub mod ") || code.contains("mod ") {
+        if code.contains("fn ")
+            || code.contains("pub fn ")
+            || code.contains("impl ")
+            || code.contains("use std::")
+            || code.contains("//!")
+            || code.contains("///")
+            || code.contains("pub struct ")
+            || code.contains("pub enum ")
+            || code.contains("pub mod ")
+            || code.contains("mod ")
+        {
             DocLanguage::Rust
-        } else if code.contains("def ") && (code.contains("import ") || code.contains("self") || code.contains(":") && !code.contains("{")) {
+        } else if code.contains("def ")
+            && (code.contains("import ")
+                || code.contains("self")
+                || code.contains(":") && !code.contains("{"))
+        {
             DocLanguage::Python
-        } else if code.contains("func ") && (code.contains("package ") || code.contains("import (")) {
+        } else if code.contains("func ") && (code.contains("package ") || code.contains("import ("))
+        {
             DocLanguage::Go
-        } else if code.contains("interface ") || code.contains("export ") || code.contains(": string") || code.contains(": number") {
+        } else if code.contains("interface ")
+            || code.contains("export ")
+            || code.contains(": string")
+            || code.contains(": number")
+        {
             DocLanguage::TypeScript
-        } else if code.contains("function ") || code.contains("const ") || code.contains("let ") || code.contains("var ") {
+        } else if code.contains("function ")
+            || code.contains("const ")
+            || code.contains("let ")
+            || code.contains("var ")
+        {
             DocLanguage::JavaScript
         } else if code.contains("#include ") || code.contains("std::") {
             DocLanguage::Cpp
@@ -406,7 +429,8 @@ impl SignatureExtractor {
             }
 
             // Check if this line starts a doc comment or declaration
-            let (doc_comment, doc_start_line, next_idx) = Self::collect_leading_doc(&lines, idx, lang);
+            let (doc_comment, doc_start_line, next_idx) =
+                Self::collect_leading_doc(&lines, idx, lang);
             if next_idx >= lines.len() {
                 break;
             }
@@ -415,7 +439,14 @@ impl SignatureExtractor {
             let indent = Self::get_indent(decl_line);
 
             // Try to extract signature starting at next_idx
-            if let Some((sig_info, end_idx)) = Self::parse_declaration_at(&lines, next_idx, lang, indent, doc_comment, doc_start_line) {
+            if let Some((sig_info, end_idx)) = Self::parse_declaration_at(
+                &lines,
+                next_idx,
+                lang,
+                indent,
+                doc_comment,
+                doc_start_line,
+            ) {
                 results.push(sig_info);
                 idx = end_idx + 1;
             } else {
@@ -438,7 +469,11 @@ impl SignatureExtractor {
         indent
     }
 
-    fn collect_leading_doc(lines: &[&str], start: usize, lang: DocLanguage) -> (Option<String>, usize, usize) {
+    fn collect_leading_doc(
+        lines: &[&str],
+        start: usize,
+        lang: DocLanguage,
+    ) -> (Option<String>, usize, usize) {
         let mut doc_lines = Vec::new();
         let mut curr = start;
         let doc_start = curr + 1; // 1-based
@@ -448,14 +483,21 @@ impl SignatureExtractor {
                 while curr < lines.len() {
                     let trimmed = lines[curr].trim();
                     if trimmed.starts_with("///") || trimmed.starts_with("//!") {
-                        let content = trimmed.strip_prefix("///").or_else(|| trimmed.strip_prefix("//!")).unwrap_or("");
+                        let content = trimmed
+                            .strip_prefix("///")
+                            .or_else(|| trimmed.strip_prefix("//!"))
+                            .unwrap_or("");
                         let content = content.strip_prefix(' ').unwrap_or(content);
                         doc_lines.push(content);
                         curr += 1;
                     } else if trimmed.starts_with("/**") {
                         // Multi-line block doc comment
                         let mut block_doc = Vec::new();
-                        let first = trimmed.strip_prefix("/**").unwrap_or("").trim_end_matches("*/").trim();
+                        let first = trimmed
+                            .strip_prefix("/**")
+                            .unwrap_or("")
+                            .trim_end_matches("*/")
+                            .trim();
                         if !first.is_empty() {
                             block_doc.push(first);
                         }
@@ -468,7 +510,11 @@ impl SignatureExtractor {
                         while curr < lines.len() {
                             let b_trimmed = lines[curr].trim();
                             if b_trimmed.ends_with("*/") {
-                                let inner = b_trimmed.strip_suffix("*/").unwrap_or("").trim_start_matches('*').trim();
+                                let inner = b_trimmed
+                                    .strip_suffix("*/")
+                                    .unwrap_or("")
+                                    .trim_start_matches('*')
+                                    .trim();
                                 if !inner.is_empty() {
                                     block_doc.push(inner);
                                 }
@@ -486,12 +532,21 @@ impl SignatureExtractor {
                     }
                 }
             }
-            DocLanguage::TypeScript | DocLanguage::JavaScript | DocLanguage::Java | DocLanguage::Cpp | DocLanguage::C | DocLanguage::Php => {
+            DocLanguage::TypeScript
+            | DocLanguage::JavaScript
+            | DocLanguage::Java
+            | DocLanguage::Cpp
+            | DocLanguage::C
+            | DocLanguage::Php => {
                 while curr < lines.len() {
                     let trimmed = lines[curr].trim();
                     if trimmed.starts_with("/**") {
                         let mut block_doc = Vec::new();
-                        let first = trimmed.strip_prefix("/**").unwrap_or("").trim_end_matches("*/").trim();
+                        let first = trimmed
+                            .strip_prefix("/**")
+                            .unwrap_or("")
+                            .trim_end_matches("*/")
+                            .trim();
                         if !first.is_empty() {
                             block_doc.push(first);
                         }
@@ -504,7 +559,11 @@ impl SignatureExtractor {
                         while curr < lines.len() {
                             let b_trimmed = lines[curr].trim();
                             if b_trimmed.ends_with("*/") {
-                                let inner = b_trimmed.strip_suffix("*/").unwrap_or("").trim_start_matches('*').trim();
+                                let inner = b_trimmed
+                                    .strip_suffix("*/")
+                                    .unwrap_or("")
+                                    .trim_start_matches('*')
+                                    .trim();
                                 if !inner.is_empty() {
                                     block_doc.push(inner);
                                 }
@@ -580,17 +639,47 @@ impl SignatureExtractor {
         doc_start_line: usize,
     ) -> Option<(SignatureInfo, usize)> {
         match lang {
-            DocLanguage::Rust => Self::parse_rust_declaration(lines, start_idx, indent, existing_doc, doc_start_line),
-            DocLanguage::TypeScript | DocLanguage::JavaScript => {
-                Self::parse_ts_js_declaration(lines, start_idx, lang, indent, existing_doc, doc_start_line)
+            DocLanguage::Rust => {
+                Self::parse_rust_declaration(lines, start_idx, indent, existing_doc, doc_start_line)
             }
-            DocLanguage::Python => Self::parse_python_declaration(lines, start_idx, indent, existing_doc, doc_start_line),
-            DocLanguage::Go => Self::parse_go_declaration(lines, start_idx, indent, existing_doc, doc_start_line),
-            DocLanguage::Cpp | DocLanguage::C => Self::parse_cpp_declaration(lines, start_idx, indent, existing_doc, doc_start_line),
+            DocLanguage::TypeScript | DocLanguage::JavaScript => Self::parse_ts_js_declaration(
+                lines,
+                start_idx,
+                lang,
+                indent,
+                existing_doc,
+                doc_start_line,
+            ),
+            DocLanguage::Python => Self::parse_python_declaration(
+                lines,
+                start_idx,
+                indent,
+                existing_doc,
+                doc_start_line,
+            ),
+            DocLanguage::Go => {
+                Self::parse_go_declaration(lines, start_idx, indent, existing_doc, doc_start_line)
+            }
+            DocLanguage::Cpp | DocLanguage::C => {
+                Self::parse_cpp_declaration(lines, start_idx, indent, existing_doc, doc_start_line)
+            }
             DocLanguage::Java | DocLanguage::Kotlin | DocLanguage::CSharp => {
-                Self::parse_java_csharp_declaration(lines, start_idx, lang, indent, existing_doc, doc_start_line)
+                Self::parse_java_csharp_declaration(
+                    lines,
+                    start_idx,
+                    lang,
+                    indent,
+                    existing_doc,
+                    doc_start_line,
+                )
             }
-            _ => Self::parse_generic_declaration(lines, start_idx, indent, existing_doc, doc_start_line),
+            _ => Self::parse_generic_declaration(
+                lines,
+                start_idx,
+                indent,
+                existing_doc,
+                doc_start_line,
+            ),
         }
     }
 
@@ -609,23 +698,28 @@ impl SignatureExtractor {
 
         // Check for struct / enum / trait / type / const / macro
         static RUST_STRUCT_RE: LazyLock<Regex> = LazyLock::new(|| {
-            Regex::new(r"^(pub(?:\s*\([^)]+\))?\s+)?struct\s+([A-Za-z0-9_]+)(?:<([^>]+)>)?").unwrap()
+            Regex::new(r"^(pub(?:\s*\([^)]+\))?\s+)?struct\s+([A-Za-z0-9_]+)(?:<([^>]+)>)?")
+                .unwrap()
         });
         static RUST_ENUM_RE: LazyLock<Regex> = LazyLock::new(|| {
             Regex::new(r"^(pub(?:\s*\([^)]+\))?\s+)?enum\s+([A-Za-z0-9_]+)(?:<([^>]+)>)?").unwrap()
         });
         static RUST_TRAIT_RE: LazyLock<Regex> = LazyLock::new(|| {
-            Regex::new(r"^(pub(?:\s*\([^)]+\))?\s+)?(?:unsafe\s+)?trait\s+([A-Za-z0-9_]+)(?:<([^>]+)>)?").unwrap()
+            Regex::new(
+                r"^(pub(?:\s*\([^)]+\))?\s+)?(?:unsafe\s+)?trait\s+([A-Za-z0-9_]+)(?:<([^>]+)>)?",
+            )
+            .unwrap()
         });
         static RUST_TYPE_RE: LazyLock<Regex> = LazyLock::new(|| {
-            Regex::new(r"^(pub(?:\s*\([^)]+\))?\s+)?type\s+([A-Za-z0-9_]+)(?:<([^>]+)>)?\s*=").unwrap()
+            Regex::new(r"^(pub(?:\s*\([^)]+\))?\s+)?type\s+([A-Za-z0-9_]+)(?:<([^>]+)>)?\s*=")
+                .unwrap()
         });
         static RUST_CONST_RE: LazyLock<Regex> = LazyLock::new(|| {
-            Regex::new(r"^(pub(?:\s*\([^)]+\))?\s+)?const\s+([A-Za-z0-9_]+)\s*:\s*([^=;]+)").unwrap()
+            Regex::new(r"^(pub(?:\s*\([^)]+\))?\s+)?const\s+([A-Za-z0-9_]+)\s*:\s*([^=;]+)")
+                .unwrap()
         });
-        static RUST_MACRO_RE: LazyLock<Regex> = LazyLock::new(|| {
-            Regex::new(r"^macro_rules!\s+([A-Za-z0-9_]+)").unwrap()
-        });
+        static RUST_MACRO_RE: LazyLock<Regex> =
+            LazyLock::new(|| Regex::new(r"^macro_rules!\s+([A-Za-z0-9_]+)").unwrap());
 
         // 1. Rust Struct
         if let Some(caps) = RUST_STRUCT_RE.captures(first_line) {
@@ -845,7 +939,13 @@ impl SignatureExtractor {
                         paren_count -= 1;
                     }
                 }
-                if found_open && paren_count <= 0 && (l.contains('{') || l.contains(';') || l.contains("where") || curr > start_idx + 10) {
+                if found_open
+                    && paren_count <= 0
+                    && (l.contains('{')
+                        || l.contains(';')
+                        || l.contains("where")
+                        || curr > start_idx + 10)
+                {
                     end_idx = curr;
                     break;
                 }
@@ -882,7 +982,10 @@ impl SignatureExtractor {
                     params,
                     return_type,
                     throws,
-                    raw_signature: full_sig.trim_end_matches(['{', ';', ' ']).trim().to_string(),
+                    raw_signature: full_sig
+                        .trim_end_matches(['{', ';', ' '])
+                        .trim()
+                        .to_string(),
                     existing_doc,
                     line_start: doc_start_line,
                     sig_line: start_idx + 1,
@@ -896,7 +999,10 @@ impl SignatureExtractor {
         None
     }
 
-    fn parse_rust_fn_params_and_return(sig: &str, fn_name: &str) -> (Vec<ParamInfo>, Option<ReturnInfo>) {
+    fn parse_rust_fn_params_and_return(
+        sig: &str,
+        fn_name: &str,
+    ) -> (Vec<ParamInfo>, Option<ReturnInfo>) {
         let mut params = Vec::new();
         let mut return_type = None;
 
@@ -930,7 +1036,10 @@ impl SignatureExtractor {
                             let raw_name = parts[0].trim().trim_start_matches("mut ").trim();
                             let raw_type = parts[1].trim();
                             let is_opt = raw_type.starts_with("Option<");
-                            let desc = DocDescriptionGenerator::generate_param_desc(raw_name, Some(raw_type));
+                            let desc = DocDescriptionGenerator::generate_param_desc(
+                                raw_name,
+                                Some(raw_type),
+                            );
 
                             params.push(ParamInfo {
                                 name: raw_name.to_string(),
@@ -964,7 +1073,9 @@ impl SignatureExtractor {
                         .unwrap_or("")
                         .trim();
                     if !ret_part.is_empty() {
-                        let is_result = ret_part.starts_with("Result<") || ret_part.contains("Result<") || ret_part == "Result";
+                        let is_result = ret_part.starts_with("Result<")
+                            || ret_part.contains("Result<")
+                            || ret_part == "Result";
                         let is_option = ret_part.starts_with("Option<") || ret_part == "Option";
                         let desc = DocDescriptionGenerator::generate_return_desc(ret_part, fn_name);
 
@@ -1149,7 +1260,10 @@ impl SignatureExtractor {
         if let Some(caps) = TS_FN_RE.captures(first_line) {
             matched_vis = caps.get(1).map(|m| m.as_str().trim().to_string());
             matched_async = caps.get(2).is_some() || first_line.contains("async ");
-            matched_fn_name = caps.get(3).map(|m| m.as_str().to_string()).or_else(|| Some("anonymous".to_string()));
+            matched_fn_name = caps
+                .get(3)
+                .map(|m| m.as_str().to_string())
+                .or_else(|| Some("anonymous".to_string()));
             matched_generics = caps.get(4).map(|m| format!("<{}>", m.as_str().trim()));
         } else if let Some(caps) = TS_ARROW_RE.captures(first_line) {
             matched_vis = caps.get(1).map(|m| m.as_str().trim().to_string());
@@ -1158,7 +1272,12 @@ impl SignatureExtractor {
             matched_generics = caps.get(4).map(|m| format!("<{}>", m.as_str().trim()));
         } else if let Some(caps) = TS_METHOD_RE.captures(first_line) {
             let name_candidate = caps.get(4).map(|m| m.as_str().to_string())?;
-            if name_candidate != "if" && name_candidate != "for" && name_candidate != "while" && name_candidate != "switch" && name_candidate != "catch" {
+            if name_candidate != "if"
+                && name_candidate != "for"
+                && name_candidate != "while"
+                && name_candidate != "switch"
+                && name_candidate != "catch"
+            {
                 matched_vis = caps.get(1).map(|m| m.as_str().trim().to_string());
                 matched_static = caps.get(2).is_some();
                 matched_async = caps.get(3).is_some();
@@ -1186,7 +1305,13 @@ impl SignatureExtractor {
                         paren_count -= 1;
                     }
                 }
-                if found_open && paren_count <= 0 && (l.contains('{') || l.contains("=>") || l.contains(';') || curr > start_idx + 10) {
+                if found_open
+                    && paren_count <= 0
+                    && (l.contains('{')
+                        || l.contains("=>")
+                        || l.contains(';')
+                        || curr > start_idx + 10)
+                {
                     end_idx = curr;
                     break;
                 }
@@ -1211,7 +1336,10 @@ impl SignatureExtractor {
                     params,
                     return_type,
                     throws: Vec::new(),
-                    raw_signature: full_sig.trim_end_matches(['{', ';', ' ']).trim().to_string(),
+                    raw_signature: full_sig
+                        .trim_end_matches(['{', ';', ' '])
+                        .trim()
+                        .to_string(),
                     existing_doc,
                     line_start: doc_start_line,
                     sig_line: start_idx + 1,
@@ -1225,7 +1353,10 @@ impl SignatureExtractor {
         None
     }
 
-    fn parse_ts_fn_params_and_return(sig: &str, fn_name: &str) -> (Vec<ParamInfo>, Option<ReturnInfo>) {
+    fn parse_ts_fn_params_and_return(
+        sig: &str,
+        fn_name: &str,
+    ) -> (Vec<ParamInfo>, Option<ReturnInfo>) {
         let mut params = Vec::new();
         let mut return_type = None;
 
@@ -1241,30 +1372,41 @@ impl SignatureExtractor {
                         }
 
                         let is_variadic = p.starts_with("...");
-                        let clean_p = if is_variadic { p.strip_prefix("...").unwrap_or(p).trim() } else { p };
-
-                        let (raw_name, raw_type, default_val, is_opt) = if let Some(colon_idx) = clean_p.find(':') {
-                            let name_part = clean_p[..colon_idx].trim();
-                            let is_optional = name_part.ends_with('?');
-                            let clean_name = name_part.trim_end_matches('?').trim();
-                            let rest = clean_p[colon_idx + 1..].trim();
-
-                            let (type_part, def_part) = if let Some(eq_idx) = rest.find('=') {
-                                (rest[..eq_idx].trim().to_string(), Some(rest[eq_idx + 1..].trim().to_string()))
-                            } else {
-                                (rest.to_string(), None)
-                            };
-
-                            (clean_name, Some(type_part), def_part, is_optional)
-                        } else if let Some(eq_idx) = clean_p.find('=') {
-                            let name_part = clean_p[..eq_idx].trim();
-                            let def_part = clean_p[eq_idx + 1..].trim();
-                            (name_part, None, Some(def_part.to_string()), true)
+                        let clean_p = if is_variadic {
+                            p.strip_prefix("...").unwrap_or(p).trim()
                         } else {
-                            (clean_p, None, None, false)
+                            p
                         };
 
-                        let desc = DocDescriptionGenerator::generate_param_desc(raw_name, raw_type.as_deref());
+                        let (raw_name, raw_type, default_val, is_opt) =
+                            if let Some(colon_idx) = clean_p.find(':') {
+                                let name_part = clean_p[..colon_idx].trim();
+                                let is_optional = name_part.ends_with('?');
+                                let clean_name = name_part.trim_end_matches('?').trim();
+                                let rest = clean_p[colon_idx + 1..].trim();
+
+                                let (type_part, def_part) = if let Some(eq_idx) = rest.find('=') {
+                                    (
+                                        rest[..eq_idx].trim().to_string(),
+                                        Some(rest[eq_idx + 1..].trim().to_string()),
+                                    )
+                                } else {
+                                    (rest.to_string(), None)
+                                };
+
+                                (clean_name, Some(type_part), def_part, is_optional)
+                            } else if let Some(eq_idx) = clean_p.find('=') {
+                                let name_part = clean_p[..eq_idx].trim();
+                                let def_part = clean_p[eq_idx + 1..].trim();
+                                (name_part, None, Some(def_part.to_string()), true)
+                            } else {
+                                (clean_p, None, None, false)
+                            };
+
+                        let desc = DocDescriptionGenerator::generate_param_desc(
+                            raw_name,
+                            raw_type.as_deref(),
+                        );
 
                         params.push(ParamInfo {
                             name: raw_name.to_string(),
@@ -1293,7 +1435,8 @@ impl SignatureExtractor {
                         return_type = Some(ReturnInfo {
                             type_name: Some(ret_part.to_string()),
                             is_result_or_error: is_promise,
-                            is_option_or_nullable: ret_part.contains("null") || ret_part.contains("undefined"),
+                            is_option_or_nullable: ret_part.contains("null")
+                                || ret_part.contains("undefined"),
                             description: desc,
                         });
                     }
@@ -1318,9 +1461,8 @@ impl SignatureExtractor {
         let first_line = lines[start_idx].trim();
 
         // 1. Python Class
-        static PY_CLASS_RE: LazyLock<Regex> = LazyLock::new(|| {
-            Regex::new(r"^class\s+([A-Za-z0-9_]+)(?:\(([^)]*)\))?\s*:").unwrap()
-        });
+        static PY_CLASS_RE: LazyLock<Regex> =
+            LazyLock::new(|| Regex::new(r"^class\s+([A-Za-z0-9_]+)(?:\(([^)]*)\))?\s*:").unwrap());
 
         if let Some(caps) = PY_CLASS_RE.captures(first_line) {
             let name = caps.get(1).map(|m| m.as_str().to_string())?;
@@ -1352,9 +1494,8 @@ impl SignatureExtractor {
         }
 
         // 2. Python Def / Async Def
-        static PY_DEF_RE: LazyLock<Regex> = LazyLock::new(|| {
-            Regex::new(r"^(async\s+)?def\s+([A-Za-z0-9_]+)\s*\(").unwrap()
-        });
+        static PY_DEF_RE: LazyLock<Regex> =
+            LazyLock::new(|| Regex::new(r"^(async\s+)?def\s+([A-Za-z0-9_]+)\s*\(").unwrap());
 
         if let Some(caps) = PY_DEF_RE.captures(first_line) {
             let is_async = caps.get(1).is_some();
@@ -1383,7 +1524,11 @@ impl SignatureExtractor {
             if doc.is_none() && end_idx + 1 < lines.len() {
                 let next_line = lines[end_idx + 1].trim();
                 if next_line.starts_with("\"\"\"") || next_line.starts_with("'''") {
-                    let quote = if next_line.starts_with("\"\"\"") { "\"\"\"" } else { "'''" };
+                    let quote = if next_line.starts_with("\"\"\"") {
+                        "\"\"\""
+                    } else {
+                        "'''"
+                    };
                     let mut docstring_lines = Vec::new();
                     let first = next_line.strip_prefix(quote).unwrap_or("");
                     if first.ends_with(quote) && first.len() >= quote.len() {
@@ -1437,7 +1582,10 @@ impl SignatureExtractor {
         None
     }
 
-    fn parse_python_params_and_return(sig: &str, fn_name: &str) -> (Vec<ParamInfo>, Option<ReturnInfo>) {
+    fn parse_python_params_and_return(
+        sig: &str,
+        fn_name: &str,
+    ) -> (Vec<ParamInfo>, Option<ReturnInfo>) {
         let mut params = Vec::new();
         let mut return_type = None;
 
@@ -1455,11 +1603,15 @@ impl SignatureExtractor {
                         let is_variadic = p.starts_with('*');
                         let is_self = p == "self" || p == "cls";
 
-                        let (raw_name, raw_type, default_val) = if let Some(colon_idx) = p.find(':') {
+                        let (raw_name, raw_type, default_val) = if let Some(colon_idx) = p.find(':')
+                        {
                             let name_part = p[..colon_idx].trim();
                             let rest = p[colon_idx + 1..].trim();
                             let (type_part, def_part) = if let Some(eq_idx) = rest.find('=') {
-                                (rest[..eq_idx].trim().to_string(), Some(rest[eq_idx + 1..].trim().to_string()))
+                                (
+                                    rest[..eq_idx].trim().to_string(),
+                                    Some(rest[eq_idx + 1..].trim().to_string()),
+                                )
                             } else {
                                 (rest.to_string(), None)
                             };
@@ -1476,7 +1628,10 @@ impl SignatureExtractor {
                         let desc = if is_self {
                             "Self instance reference.".to_string()
                         } else {
-                            DocDescriptionGenerator::generate_param_desc(clean_name, raw_type.as_deref())
+                            DocDescriptionGenerator::generate_param_desc(
+                                clean_name,
+                                raw_type.as_deref(),
+                            )
                         };
 
                         params.push(ParamInfo {
@@ -1485,7 +1640,9 @@ impl SignatureExtractor {
                             default_value: default_val,
                             is_self,
                             is_variadic,
-                            is_optional: p.contains('=') || p.contains("Optional[") || p.contains("None"),
+                            is_optional: p.contains('=')
+                                || p.contains("Optional[")
+                                || p.contains("None"),
                             description: desc,
                         });
                     }
@@ -1527,14 +1684,17 @@ impl SignatureExtractor {
         let first_line = lines[start_idx].trim();
 
         // 1. Go Struct / Interface / Type
-        static GO_TYPE_RE: LazyLock<Regex> = LazyLock::new(|| {
-            Regex::new(r"^type\s+([A-Za-z0-9_]+)\s+(struct|interface)").unwrap()
-        });
+        static GO_TYPE_RE: LazyLock<Regex> =
+            LazyLock::new(|| Regex::new(r"^type\s+([A-Za-z0-9_]+)\s+(struct|interface)").unwrap());
 
         if let Some(caps) = GO_TYPE_RE.captures(first_line) {
             let name = caps.get(1).map(|m| m.as_str().to_string())?;
             let kind_str = caps.get(2).map(|m| m.as_str()).unwrap_or("struct");
-            let kind = if kind_str == "interface" { SymbolKind::Interface } else { SymbolKind::Struct };
+            let kind = if kind_str == "interface" {
+                SymbolKind::Interface
+            } else {
+                SymbolKind::Struct
+            };
             return Some((
                 SignatureInfo {
                     name,
@@ -1616,7 +1776,10 @@ impl SignatureExtractor {
         None
     }
 
-    fn parse_go_params_and_return(sig: &str, fn_name: &str) -> (Vec<ParamInfo>, Option<ReturnInfo>) {
+    fn parse_go_params_and_return(
+        sig: &str,
+        fn_name: &str,
+    ) -> (Vec<ParamInfo>, Option<ReturnInfo>) {
         let mut params = Vec::new();
         let mut return_type = None;
 
@@ -1645,8 +1808,14 @@ impl SignatureExtractor {
                             (p.to_string(), None)
                         };
 
-                        let is_variadic = type_name.as_ref().map(|t| t.starts_with("...")).unwrap_or(false);
-                        let desc = DocDescriptionGenerator::generate_param_desc(&name, type_name.as_deref());
+                        let is_variadic = type_name
+                            .as_ref()
+                            .map(|t| t.starts_with("..."))
+                            .unwrap_or(false);
+                        let desc = DocDescriptionGenerator::generate_param_desc(
+                            &name,
+                            type_name.as_deref(),
+                        );
 
                         params.push(ParamInfo {
                             name,
@@ -1700,7 +1869,11 @@ impl SignatureExtractor {
         if let Some(caps) = CPP_CLASS_RE.captures(first_line) {
             let kind_str = caps.get(1).map(|m| m.as_str()).unwrap_or("class");
             let name = caps.get(2).map(|m| m.as_str().to_string())?;
-            let kind = if kind_str == "struct" { SymbolKind::Struct } else { SymbolKind::Class };
+            let kind = if kind_str == "struct" {
+                SymbolKind::Struct
+            } else {
+                SymbolKind::Class
+            };
             return Some((
                 SignatureInfo {
                     name,
@@ -1753,7 +1926,9 @@ impl SignatureExtractor {
 
                 let full_sig = sig_lines.join(" ");
                 let (params, _) = Self::parse_cpp_params(&full_sig);
-                let desc = ret_type.as_ref().map(|rt| DocDescriptionGenerator::generate_return_desc(rt, &name));
+                let desc = ret_type
+                    .as_ref()
+                    .map(|rt| DocDescriptionGenerator::generate_return_desc(rt, &name));
 
                 return Some((
                     SignatureInfo {
@@ -1775,7 +1950,10 @@ impl SignatureExtractor {
                             description: desc.unwrap_or_default(),
                         }),
                         throws: Vec::new(),
-                        raw_signature: full_sig.trim_end_matches(['{', ';', ' ']).trim().to_string(),
+                        raw_signature: full_sig
+                            .trim_end_matches(['{', ';', ' '])
+                            .trim()
+                            .to_string(),
                         existing_doc,
                         line_start: doc_start_line,
                         sig_line: start_idx + 1,
@@ -1811,14 +1989,21 @@ impl SignatureExtractor {
 
                         let parts: Vec<&str> = type_and_name.split_whitespace().collect();
                         let (name, type_name) = if parts.len() >= 2 {
-                            let name = parts.last().unwrap().trim_start_matches(['*', '&']).to_string();
+                            let name = parts
+                                .last()
+                                .unwrap()
+                                .trim_start_matches(['*', '&'])
+                                .to_string();
                             let type_str = parts[..parts.len() - 1].join(" ");
                             (name, Some(type_str))
                         } else {
                             (type_and_name.to_string(), None)
                         };
 
-                        let desc = DocDescriptionGenerator::generate_param_desc(&name, type_name.as_deref());
+                        let desc = DocDescriptionGenerator::generate_param_desc(
+                            &name,
+                            type_name.as_deref(),
+                        );
 
                         params.push(ParamInfo {
                             name,
@@ -1904,7 +2089,12 @@ impl SignatureExtractor {
             let ret_type = caps.get(2).map(|m| m.as_str().to_string());
             let name = caps.get(3).map(|m| m.as_str().to_string())?;
 
-            if name != "if" && name != "for" && name != "while" && name != "switch" && name != "catch" {
+            if name != "if"
+                && name != "for"
+                && name != "while"
+                && name != "switch"
+                && name != "catch"
+            {
                 let mut sig_lines = Vec::new();
                 let mut curr = start_idx;
                 let mut end_idx = start_idx;
@@ -1921,14 +2111,18 @@ impl SignatureExtractor {
 
                 let full_sig = sig_lines.join(" ");
                 let (params, _) = Self::parse_cpp_params(&full_sig);
-                let desc = ret_type.as_ref().map(|rt| DocDescriptionGenerator::generate_return_desc(rt, &name));
+                let desc = ret_type
+                    .as_ref()
+                    .map(|rt| DocDescriptionGenerator::generate_return_desc(rt, &name));
 
                 return Some((
                     SignatureInfo {
                         name,
                         kind: SymbolKind::Function,
                         visibility: vis,
-                        is_async: full_sig.contains("async ") || full_sig.contains("Task<") || full_sig.contains("CompletableFuture<"),
+                        is_async: full_sig.contains("async ")
+                            || full_sig.contains("Task<")
+                            || full_sig.contains("CompletableFuture<"),
                         is_unsafe: full_sig.contains("unsafe "),
                         is_const: false,
                         is_static: full_sig.contains("static "),
@@ -1943,7 +2137,10 @@ impl SignatureExtractor {
                             description: desc.unwrap_or_default(),
                         }),
                         throws: Vec::new(),
-                        raw_signature: full_sig.trim_end_matches(['{', ';', ' ']).trim().to_string(),
+                        raw_signature: full_sig
+                            .trim_end_matches(['{', ';', ' '])
+                            .trim()
+                            .to_string(),
                         existing_doc,
                         line_start: doc_start_line,
                         sig_line: start_idx + 1,
@@ -2037,11 +2234,23 @@ impl SignatureExtractor {
         for ch in s.chars() {
             match ch {
                 '<' => angle_depth += 1,
-                '>' => if angle_depth > 0 { angle_depth -= 1 },
+                '>' => {
+                    if angle_depth > 0 {
+                        angle_depth -= 1
+                    }
+                }
                 '(' => paren_depth += 1,
-                ')' => if paren_depth > 0 { paren_depth -= 1 },
+                ')' => {
+                    if paren_depth > 0 {
+                        paren_depth -= 1
+                    }
+                }
                 '[' => bracket_depth += 1,
-                ']' => if bracket_depth > 0 { bracket_depth -= 1 },
+                ']' => {
+                    if bracket_depth > 0 {
+                        bracket_depth -= 1
+                    }
+                }
                 ',' if angle_depth == 0 && paren_depth == 0 && bracket_depth == 0 => {
                     let item = curr.trim().to_string();
                     if !item.is_empty() {
@@ -2116,25 +2325,47 @@ impl DocDescriptionGenerator {
 
         match sig.kind {
             SymbolKind::Struct => {
-                if sig.name.ends_with("Config") || sig.name.ends_with("Options") || sig.name.ends_with("Settings") {
-                    format!("Configuration options for {}.", words[..words.len().saturating_sub(1)].join(" "))
+                if sig.name.ends_with("Config")
+                    || sig.name.ends_with("Options")
+                    || sig.name.ends_with("Settings")
+                {
+                    format!(
+                        "Configuration options for {}.",
+                        words[..words.len().saturating_sub(1)].join(" ")
+                    )
                 } else if sig.name.ends_with("Error") || sig.name.ends_with("Exception") {
-                    format!("Error type representing {} failure conditions.", words[..words.len().saturating_sub(1)].join(" "))
+                    format!(
+                        "Error type representing {} failure conditions.",
+                        words[..words.len().saturating_sub(1)].join(" ")
+                    )
                 } else if sig.name.ends_with("Builder") {
-                    format!("Builder for constructing [`{}`] instances.", sig.name.strip_suffix("Builder").unwrap_or(&sig.name))
+                    format!(
+                        "Builder for constructing [`{}`] instances.",
+                        sig.name.strip_suffix("Builder").unwrap_or(&sig.name)
+                    )
                 } else {
                     format!("Represents {}.", words.join(" "))
                 }
             }
             SymbolKind::Class => {
-                if sig.name.ends_with("Manager") || sig.name.ends_with("Handler") || sig.name.ends_with("Controller") || sig.name.ends_with("Service") {
-                    format!("Coordinates and manages {} operations.", words[..words.len().saturating_sub(1)].join(" "))
+                if sig.name.ends_with("Manager")
+                    || sig.name.ends_with("Handler")
+                    || sig.name.ends_with("Controller")
+                    || sig.name.ends_with("Service")
+                {
+                    format!(
+                        "Coordinates and manages {} operations.",
+                        words[..words.len().saturating_sub(1)].join(" ")
+                    )
                 } else {
                     format!("Represents a {} entity.", words.join(" "))
                 }
             }
             SymbolKind::Interface | SymbolKind::Trait => {
-                format!("Defines the interface and contract for {}.", words.join(" "))
+                format!(
+                    "Defines the interface and contract for {}.",
+                    words.join(" ")
+                )
             }
             SymbolKind::Enum => {
                 format!("Enumeration of possible {} variants.", words.join(" "))
@@ -2341,7 +2572,14 @@ impl DocDescriptionGenerator {
             "res" | "response" => "The outgoing response object.".to_string(),
             "err" | "error" => "The error or exception instance.".to_string(),
             _ => {
-                if clean.starts_with("is_") || clean.starts_with("has_") || clean.starts_with("enable_") || clean == "force" || clean == "recursive" || clean == "exact" || clean == "case_sensitive" {
+                if clean.starts_with("is_")
+                    || clean.starts_with("has_")
+                    || clean.starts_with("enable_")
+                    || clean == "force"
+                    || clean == "recursive"
+                    || clean == "exact"
+                    || clean == "case_sensitive"
+                {
                     format!("Whether to enable {joined}.")
                 } else if let Some(tn) = type_name {
                     format!("The {joined} (`{tn}`).")
@@ -2366,7 +2604,9 @@ impl DocDescriptionGenerator {
         }
 
         if clean.starts_with("Result<") || clean.contains("Result<") {
-            return format!("A Result containing the output if successful, or an Error if the operation fails.");
+            return format!(
+                "A Result containing the output if successful, or an Error if the operation fails."
+            );
         }
 
         if clean.starts_with("Option<") || clean.starts_with("Optional[") {
@@ -2389,7 +2629,12 @@ pub struct DocFormatter;
 
 impl DocFormatter {
     /// Format doc comment for a signature according to the requested style.
-    pub fn format(sig: &SignatureInfo, style: DocStyle, lang: DocLanguage, include_examples: bool) -> String {
+    pub fn format(
+        sig: &SignatureInfo,
+        style: DocStyle,
+        lang: DocLanguage,
+        include_examples: bool,
+    ) -> String {
         let effective_style = if style == DocStyle::Auto {
             lang.default_style()
         } else {
@@ -2452,7 +2697,10 @@ impl DocFormatter {
                 lines.push("///".to_string());
                 lines.push("/// # Errors".to_string());
                 lines.push("///".to_string());
-                lines.push("/// This function will return an error if the underlying operation fails.".to_string());
+                lines.push(
+                    "/// This function will return an error if the underlying operation fails."
+                        .to_string(),
+                );
             }
         }
 
@@ -2461,11 +2709,15 @@ impl DocFormatter {
             lines.push("///".to_string());
             lines.push("/// # Safety".to_string());
             lines.push("///".to_string());
-            lines.push("/// Caller must ensure memory invariants and valid pointer references.".to_string());
+            lines.push(
+                "/// Caller must ensure memory invariants and valid pointer references."
+                    .to_string(),
+            );
         }
 
         // Examples section
-        if include_examples && (sig.kind == SymbolKind::Function || sig.kind == SymbolKind::Struct) {
+        if include_examples && (sig.kind == SymbolKind::Function || sig.kind == SymbolKind::Struct)
+        {
             lines.push("///".to_string());
             lines.push("/// # Examples".to_string());
             lines.push("///".to_string());
@@ -2473,29 +2725,49 @@ impl DocFormatter {
             if sig.kind == SymbolKind::Struct {
                 lines.push(format!("/// let item = {}::default();", sig.name));
             } else {
-                let call_args: Vec<String> = sig.params.iter().filter(|p| !p.is_self).map(|p| {
-                    if let Some(tn) = &p.type_name {
-                        if tn.contains("str") || tn.contains("String") {
-                            "\"example\"".to_string()
-                        } else if tn.contains("usize") || tn.contains("u64") || tn.contains("i32") {
-                            "42".to_string()
-                        } else if tn.contains("bool") {
-                            "true".to_string()
+                let call_args: Vec<String> = sig
+                    .params
+                    .iter()
+                    .filter(|p| !p.is_self)
+                    .map(|p| {
+                        if let Some(tn) = &p.type_name {
+                            if tn.contains("str") || tn.contains("String") {
+                                "\"example\"".to_string()
+                            } else if tn.contains("usize")
+                                || tn.contains("u64")
+                                || tn.contains("i32")
+                            {
+                                "42".to_string()
+                            } else if tn.contains("bool") {
+                                "true".to_string()
+                            } else {
+                                "Default::default()".to_string()
+                            }
                         } else {
                             "Default::default()".to_string()
                         }
-                    } else {
-                        "Default::default()".to_string()
-                    }
-                }).collect();
+                    })
+                    .collect();
 
-                let is_res = sig.return_type.as_ref().map(|r| r.is_result_or_error).unwrap_or(false);
+                let is_res = sig
+                    .return_type
+                    .as_ref()
+                    .map(|r| r.is_result_or_error)
+                    .unwrap_or(false);
                 let suffix = if is_res { "?" } else { "" };
                 let is_async = sig.is_async;
-                let prefix = if is_async { "let result = " } else { "let result = " };
+                let prefix = if is_async {
+                    "let result = "
+                } else {
+                    "let result = "
+                };
                 let await_str = if is_async { ".await" } else { "" };
 
-                lines.push(format!("/// {prefix}{}({}){await_str}{suffix};", sig.name, call_args.join(", ")));
+                lines.push(format!(
+                    "/// {prefix}{}({}){await_str}{suffix};",
+                    sig.name,
+                    call_args.join(", ")
+                ));
             }
             lines.push("/// ```".to_string());
         }
@@ -2515,7 +2787,11 @@ impl DocFormatter {
         if !non_self_params.is_empty() {
             lines.push(" *".to_string());
             for p in non_self_params {
-                let type_tag = p.type_name.as_ref().map(|t| format!("{{{t}}} ")).unwrap_or_default();
+                let type_tag = p
+                    .type_name
+                    .as_ref()
+                    .map(|t| format!("{{{t}}} "))
+                    .unwrap_or_default();
                 let name_tag = if p.is_optional {
                     if let Some(def) = &p.default_value {
                         format!("[{}={}]", p.name, def)
@@ -2525,7 +2801,10 @@ impl DocFormatter {
                 } else {
                     p.name.clone()
                 };
-                lines.push(format!(" * @param {type_tag}{name_tag} - {}", p.description));
+                lines.push(format!(
+                    " * @param {type_tag}{name_tag} - {}",
+                    p.description
+                ));
             }
         }
 
@@ -2539,30 +2818,42 @@ impl DocFormatter {
         }
 
         if sig.is_async || !sig.throws.is_empty() {
-            lines.push(" * @throws {Error} When the operation encounters an unrecoverable failure.".to_string());
+            lines.push(
+                " * @throws {Error} When the operation encounters an unrecoverable failure."
+                    .to_string(),
+            );
         }
 
         if include_examples && sig.kind == SymbolKind::Function {
             lines.push(" *".to_string());
             lines.push(" * @example".to_string());
             lines.push(" * ```ts".to_string());
-            let call_args: Vec<String> = sig.params.iter().filter(|p| !p.is_self).map(|p| {
-                if let Some(tn) = &p.type_name {
-                    if tn.contains("string") {
-                        "\"example\"".to_string()
-                    } else if tn.contains("number") {
-                        "42".to_string()
-                    } else if tn.contains("boolean") {
-                        "true".to_string()
+            let call_args: Vec<String> = sig
+                .params
+                .iter()
+                .filter(|p| !p.is_self)
+                .map(|p| {
+                    if let Some(tn) = &p.type_name {
+                        if tn.contains("string") {
+                            "\"example\"".to_string()
+                        } else if tn.contains("number") {
+                            "42".to_string()
+                        } else if tn.contains("boolean") {
+                            "true".to_string()
+                        } else {
+                            "{}".to_string()
+                        }
                     } else {
                         "{}".to_string()
                     }
-                } else {
-                    "{}".to_string()
-                }
-            }).collect();
+                })
+                .collect();
             let await_str = if sig.is_async { "await " } else { "" };
-            lines.push(format!(" * const res = {await_str}{}({});", sig.name, call_args.join(", ")));
+            lines.push(format!(
+                " * const res = {await_str}{}({});",
+                sig.name,
+                call_args.join(", ")
+            ));
             lines.push(" * ```".to_string());
         }
 
@@ -2596,7 +2887,10 @@ impl DocFormatter {
                 } else {
                     String::new()
                 };
-                lines.push(format!("    {}{type_part}: {}{def_part}", p.name, p.description));
+                lines.push(format!(
+                    "    {}{type_part}: {}{def_part}",
+                    p.name, p.description
+                ));
             }
         }
 
@@ -2619,13 +2913,18 @@ impl DocFormatter {
         if include_examples && sig.kind == SymbolKind::Function {
             lines.push(String::new());
             lines.push("Example:".to_string());
-            let call_args: Vec<String> = sig.params.iter().filter(|p| !p.is_self).map(|p| {
-                if let Some(d) = &p.default_value {
-                    format!("{}={d}", p.name)
-                } else {
-                    format!("\"value\"")
-                }
-            }).collect();
+            let call_args: Vec<String> = sig
+                .params
+                .iter()
+                .filter(|p| !p.is_self)
+                .map(|p| {
+                    if let Some(d) = &p.default_value {
+                        format!("{}={d}", p.name)
+                    } else {
+                        format!("\"value\"")
+                    }
+                })
+                .collect();
             lines.push(format!("    >>> {}({})", sig.name, call_args.join(", ")));
             lines.push("    'result'".to_string());
         }
@@ -2804,7 +3103,10 @@ impl DocFormatter {
             for p in non_self_params {
                 let t = p.type_name.as_deref().unwrap_or("-");
                 let d = p.default_value.as_deref().unwrap_or("-");
-                lines.push(format!("| `{}` | `{t}` | `{d}` | {} |", p.name, p.description));
+                lines.push(format!(
+                    "| `{}` | `{t}` | `{d}` | {} |",
+                    p.name, p.description
+                ));
             }
         }
 
@@ -2829,7 +3131,11 @@ pub struct DocAuditor;
 
 impl DocAuditor {
     /// Compute documentation coverage metrics for the extracted signatures.
-    pub fn audit(signatures: &[SignatureInfo], target: Option<String>, lang: DocLanguage) -> DocCoverageReport {
+    pub fn audit(
+        signatures: &[SignatureInfo],
+        target: Option<String>,
+        lang: DocLanguage,
+    ) -> DocCoverageReport {
         let total_symbols = signatures.len();
         let mut documented_symbols = 0;
         let mut public_total = 0;
@@ -2850,7 +3156,11 @@ impl DocAuditor {
                 }
             }
 
-            let doc_lines_count = sig.existing_doc.as_ref().map(|d| d.lines().count()).unwrap_or(0);
+            let doc_lines_count = sig
+                .existing_doc
+                .as_ref()
+                .map(|d| d.lines().count())
+                .unwrap_or(0);
 
             // Check if existing doc misses parameter tags
             let mut missing_param_docs = Vec::new();
@@ -2864,8 +3174,12 @@ impl DocAuditor {
 
             let missing_return = if let Some(doc_text) = &sig.existing_doc {
                 if let Some(ret) = &sig.return_type {
-                    if ret.type_name.as_deref() != Some("()") && ret.type_name.as_deref() != Some("void") {
-                        !doc_text.contains("return") && !doc_text.contains("Returns") && !doc_text.contains("@return")
+                    if ret.type_name.as_deref() != Some("()")
+                        && ret.type_name.as_deref() != Some("void")
+                    {
+                        !doc_text.contains("return")
+                            && !doc_text.contains("Returns")
+                            && !doc_text.contains("@return")
                     } else {
                         false
                     }
@@ -2925,7 +3239,13 @@ pub struct DocApplier;
 
 impl DocApplier {
     /// Apply/insert drafted doc comments into the source code above target declarations.
-    pub fn apply(code: &str, signatures: &[SignatureInfo], style: DocStyle, lang: DocLanguage, public_only: bool) -> String {
+    pub fn apply(
+        code: &str,
+        signatures: &[SignatureInfo],
+        style: DocStyle,
+        lang: DocLanguage,
+        public_only: bool,
+    ) -> String {
         let lines: Vec<&str> = code.lines().collect();
         let mut modified_lines = Vec::new();
         let mut sig_map: HashMap<usize, &SignatureInfo> = HashMap::new();
@@ -2969,7 +3289,13 @@ impl MarkdownApiGenerator {
 
         md.push(format!("# API Reference: `{title}`"));
         md.push(String::new());
-        md.push(format!("**Language:** {} | **Coverage:** {:.1}% ({}/{} documented)", lang.as_str(), coverage.coverage_percentage, coverage.documented_symbols, coverage.total_symbols));
+        md.push(format!(
+            "**Language:** {} | **Coverage:** {:.1}% ({}/{} documented)",
+            lang.as_str(),
+            coverage.coverage_percentage,
+            coverage.documented_symbols,
+            coverage.total_symbols
+        ));
         md.push(String::new());
 
         // Table of Contents
@@ -3139,10 +3465,7 @@ impl Tool for DocgenTool {
             .unwrap_or("draft");
         let action = DocgenAction::from_str_loose(action_str);
 
-        let style_str = args
-            .get("style")
-            .and_then(|v| v.as_str())
-            .unwrap_or("auto");
+        let style_str = args.get("style").and_then(|v| v.as_str()).unwrap_or("auto");
         let style = DocStyle::from_str_loose(style_str);
 
         let target_symbol = args
@@ -3161,9 +3484,7 @@ impl Tool for DocgenTool {
             .and_then(|v| v.as_bool())
             .unwrap_or(true);
 
-        let min_coverage = args
-            .get("min_coverage")
-            .and_then(|v| v.as_f64());
+        let min_coverage = args.get("min_coverage").and_then(|v| v.as_f64());
 
         let format = args
             .get("format")
@@ -3176,30 +3497,36 @@ impl Tool for DocgenTool {
             .or_else(|| args.get("lang").and_then(|v| v.as_str()));
 
         // Resolve code and language
-        let (code, language, target_path_str) = if let Some(code_val) = args.get("code").and_then(|v| v.as_str()) {
-            let lang = if let Some(lo) = lang_override {
-                DocLanguage::from_path_or_name(lo)
-            } else {
-                DocLanguage::detect_from_code(code_val)
-            };
-            (code_val.to_string(), lang, None)
-        } else if let Some(path_val) = args.get("path").and_then(|v| v.as_str()).or_else(|| args.get("file").and_then(|v| v.as_str())) {
-            let resolved = resolve_path(path_val, &ctx.cwd);
-            if !resolved.exists() {
-                anyhow::bail!("Target file does not exist: '{}'", resolved.display());
-            }
-            let file_content = tokio::fs::read_to_string(&resolved).await
-                .map_err(|e| anyhow::anyhow!("Failed to read file '{}': {e}", resolved.display()))?;
+        let (code, language, target_path_str) =
+            if let Some(code_val) = args.get("code").and_then(|v| v.as_str()) {
+                let lang = if let Some(lo) = lang_override {
+                    DocLanguage::from_path_or_name(lo)
+                } else {
+                    DocLanguage::detect_from_code(code_val)
+                };
+                (code_val.to_string(), lang, None)
+            } else if let Some(path_val) = args
+                .get("path")
+                .and_then(|v| v.as_str())
+                .or_else(|| args.get("file").and_then(|v| v.as_str()))
+            {
+                let resolved = resolve_path(path_val, &ctx.cwd);
+                if !resolved.exists() {
+                    anyhow::bail!("Target file does not exist: '{}'", resolved.display());
+                }
+                let file_content = tokio::fs::read_to_string(&resolved).await.map_err(|e| {
+                    anyhow::anyhow!("Failed to read file '{}': {e}", resolved.display())
+                })?;
 
-            let lang = if let Some(lo) = lang_override {
-                DocLanguage::from_path_or_name(lo)
+                let lang = if let Some(lo) = lang_override {
+                    DocLanguage::from_path_or_name(lo)
+                } else {
+                    DocLanguage::from_path_or_name(path_val)
+                };
+                (file_content, lang, Some(resolved.display().to_string()))
             } else {
-                DocLanguage::from_path_or_name(path_val)
+                anyhow::bail!("Either 'path' or 'code' must be specified for docgen.");
             };
-            (file_content, lang, Some(resolved.display().to_string()))
-        } else {
-            anyhow::bail!("Either 'path' or 'code' must be specified for docgen.");
-        };
 
         // Extract signatures
         let mut signatures = SignatureExtractor::extract(&code, language);
@@ -3221,22 +3548,44 @@ impl Tool for DocgenTool {
                     return Ok(serde_json::to_string_pretty(&signatures)?);
                 }
                 let mut out = Vec::new();
-                out.push(format!("Extracted {} signatures ({})", signatures.len(), language.as_str()));
+                out.push(format!(
+                    "Extracted {} signatures ({})",
+                    signatures.len(),
+                    language.as_str()
+                ));
                 out.push(String::new());
                 for sig in &signatures {
                     let vis = sig.visibility.as_deref().unwrap_or("private");
-                    let doc_tag = if sig.is_documented() { "[documented]" } else { "[undocumented]" };
-                    out.push(format!("- {} `{}` (line {}): {} {}", sig.kind.as_str(), sig.name, sig.sig_line, vis, doc_tag));
+                    let doc_tag = if sig.is_documented() {
+                        "[documented]"
+                    } else {
+                        "[undocumented]"
+                    };
+                    out.push(format!(
+                        "- {} `{}` (line {}): {} {}",
+                        sig.kind.as_str(),
+                        sig.name,
+                        sig.sig_line,
+                        vis,
+                        doc_tag
+                    ));
                     out.push(format!("  Signature: {}", sig.raw_signature));
                     if !sig.params.is_empty() {
-                        let params_str: Vec<String> = sig.params.iter().map(|p| {
-                            let t = p.type_name.as_deref().unwrap_or("?");
-                            format!("{}: {t}", p.name)
-                        }).collect();
+                        let params_str: Vec<String> = sig
+                            .params
+                            .iter()
+                            .map(|p| {
+                                let t = p.type_name.as_deref().unwrap_or("?");
+                                format!("{}: {t}", p.name)
+                            })
+                            .collect();
                         out.push(format!("  Params: {}", params_str.join(", ")));
                     }
                     if let Some(ret) = &sig.return_type {
-                        out.push(format!("  Returns: {}", ret.type_name.as_deref().unwrap_or("()")));
+                        out.push(format!(
+                            "  Returns: {}",
+                            ret.type_name.as_deref().unwrap_or("()")
+                        ));
                     }
                     out.push(String::new());
                 }
@@ -3265,17 +3614,28 @@ impl Tool for DocgenTool {
                 out.push(coverage.summary.clone());
                 out.push(String::new());
 
-                let undocumented: Vec<&SymbolDocStatus> = coverage.symbols.iter().filter(|s| !s.is_documented).collect();
+                let undocumented: Vec<&SymbolDocStatus> = coverage
+                    .symbols
+                    .iter()
+                    .filter(|s| !s.is_documented)
+                    .collect();
                 if !undocumented.is_empty() {
                     out.push("Undocumented Symbols:".to_string());
                     for s in undocumented {
                         let pub_tag = if s.is_public { "(public)" } else { "(private)" };
-                        out.push(format!("  - Line {:4} | {:8} | {} {}", s.line, s.kind, s.name, pub_tag));
+                        out.push(format!(
+                            "  - Line {:4} | {:8} | {} {}",
+                            s.line, s.kind, s.name, pub_tag
+                        ));
                     }
                     out.push(String::new());
                 }
 
-                let documented: Vec<&SymbolDocStatus> = coverage.symbols.iter().filter(|s| s.is_documented).collect();
+                let documented: Vec<&SymbolDocStatus> = coverage
+                    .symbols
+                    .iter()
+                    .filter(|s| s.is_documented)
+                    .collect();
                 if !documented.is_empty() {
                     out.push("Documented Symbols:".to_string());
                     for s in documented {
@@ -3284,7 +3644,10 @@ impl Tool for DocgenTool {
                         } else {
                             String::new()
                         };
-                        out.push(format!("  - Line {:4} | {:8} | {} [{} lines]{miss_p}", s.line, s.kind, s.name, s.existing_doc_lines));
+                        out.push(format!(
+                            "  - Line {:4} | {:8} | {} [{} lines]{miss_p}",
+                            s.line, s.kind, s.name, s.existing_doc_lines
+                        ));
                     }
                 }
 
@@ -3294,10 +3657,15 @@ impl Tool for DocgenTool {
                 let modified = DocApplier::apply(&code, &signatures, style, language, public_only);
 
                 // If path was provided and user asked to apply, write back to file
-                if let Some(path_val) = args.get("path").and_then(|v| v.as_str()).or_else(|| args.get("file").and_then(|v| v.as_str())) {
+                if let Some(path_val) = args
+                    .get("path")
+                    .and_then(|v| v.as_str())
+                    .or_else(|| args.get("file").and_then(|v| v.as_str()))
+                {
                     let resolved = resolve_path(path_val, &ctx.cwd);
-                    tokio::fs::write(&resolved, &modified).await
-                        .map_err(|e| anyhow::anyhow!("Failed to write updated file '{path_val}': {e}"))?;
+                    tokio::fs::write(&resolved, &modified).await.map_err(|e| {
+                        anyhow::anyhow!("Failed to write updated file '{path_val}': {e}")
+                    })?;
                     Ok(format!("Successfully inserted documentation comments into '{}'. Total symbols documented: {}.", resolved.display(), signatures.len()))
                 } else {
                     if format == "json" {
@@ -3317,7 +3685,12 @@ impl Tool for DocgenTool {
             DocgenAction::Markdown => {
                 let coverage = DocAuditor::audit(&signatures, target_path_str.clone(), language);
                 let title = target_path_str.as_deref().unwrap_or("Code Snippet");
-                let md = MarkdownApiGenerator::generate_markdown_api(title, &signatures, language, &coverage);
+                let md = MarkdownApiGenerator::generate_markdown_api(
+                    title,
+                    &signatures,
+                    language,
+                    &coverage,
+                );
                 Ok(md)
             }
             DocgenAction::Draft => {
@@ -3350,11 +3723,19 @@ impl Tool for DocgenTool {
                 }
 
                 let mut out = Vec::new();
-                out.push(format!("Drafted documentation for {} symbols (Language: {}, Style: {}):", drafts.len(), language.as_str(), style.as_str()));
+                out.push(format!(
+                    "Drafted documentation for {} symbols (Language: {}, Style: {}):",
+                    drafts.len(),
+                    language.as_str(),
+                    style.as_str()
+                ));
                 out.push(String::new());
 
                 for draft in &drafts {
-                    out.push(format!("=== [{}] {} (line {}) ===", draft.kind, draft.symbol_name, draft.line));
+                    out.push(format!(
+                        "=== [{}] {} (line {}) ===",
+                        draft.kind, draft.symbol_name, draft.line
+                    ));
                     out.push(draft.doc_comment.clone());
                     out.push(String::new());
                 }
@@ -3528,7 +3909,9 @@ func (s *Server) HandleRequest(ctx context.Context, payload []byte) (int, error)
                 description: "The hash string.".to_string(),
             }),
             throws: vec!["Errors if file missing".to_string()],
-            raw_signature: "pub async fn calculate_hash(path: &Path, timeout_ms: u64) -> Result<String, Error>".to_string(),
+            raw_signature:
+                "pub async fn calculate_hash(path: &Path, timeout_ms: u64) -> Result<String, Error>"
+                    .to_string(),
             existing_doc: None,
             line_start: 1,
             sig_line: 1,
@@ -3608,7 +3991,12 @@ pub fn start_server(config: &ServiceConfig) -> Result<(), Error> {
 "#;
         let sigs = SignatureExtractor::extract(code, DocLanguage::Rust);
         let audit = DocAuditor::audit(&sigs, None, DocLanguage::Rust);
-        let md = MarkdownApiGenerator::generate_markdown_api("server.rs", &sigs, DocLanguage::Rust, &audit);
+        let md = MarkdownApiGenerator::generate_markdown_api(
+            "server.rs",
+            &sigs,
+            DocLanguage::Rust,
+            &audit,
+        );
         assert!(md.contains("# API Reference: `server.rs`"));
         assert!(md.contains("## Table of Contents"));
         assert!(md.contains("## Structures & Classes"));
@@ -3626,37 +4014,61 @@ pub fn compute_sum(a: i32, b: i32) -> i32 {
 }
 "#;
         // 1. Test draft
-        let res = tool.execute(json!({
-            "code": code,
-            "language": "rust",
-            "action": "draft"
-        }), &ctx).await.unwrap();
+        let res = tool
+            .execute(
+                json!({
+                    "code": code,
+                    "language": "rust",
+                    "action": "draft"
+                }),
+                &ctx,
+            )
+            .await
+            .unwrap();
         assert!(res.contains("Drafted documentation for 1 symbols"));
         assert!(res.contains("compute_sum"));
 
         // 2. Test audit
-        let audit_res = tool.execute(json!({
-            "code": code,
-            "language": "rust",
-            "action": "audit"
-        }), &ctx).await.unwrap();
+        let audit_res = tool
+            .execute(
+                json!({
+                    "code": code,
+                    "language": "rust",
+                    "action": "audit"
+                }),
+                &ctx,
+            )
+            .await
+            .unwrap();
         assert!(audit_res.contains("Documentation Coverage Audit"));
 
         // 3. Test apply
-        let applied_res = tool.execute(json!({
-            "code": code,
-            "language": "rust",
-            "action": "apply"
-        }), &ctx).await.unwrap();
+        let applied_res = tool
+            .execute(
+                json!({
+                    "code": code,
+                    "language": "rust",
+                    "action": "apply"
+                }),
+                &ctx,
+            )
+            .await
+            .unwrap();
         assert!(applied_res.contains("///"));
         assert!(applied_res.contains("compute_sum"));
 
         // 4. Test markdown
-        let md_res = tool.execute(json!({
-            "code": code,
-            "language": "rust",
-            "action": "markdown"
-        }), &ctx).await.unwrap();
+        let md_res = tool
+            .execute(
+                json!({
+                    "code": code,
+                    "language": "rust",
+                    "action": "markdown"
+                }),
+                &ctx,
+            )
+            .await
+            .unwrap();
         assert!(md_res.contains("# API Reference:"));
     }
 }

@@ -60,7 +60,10 @@ pub enum MeshError {
     QueryFailed(String),
 
     #[error("Resource '{resource}' is already claimed by peer '{claimed_by}'")]
-    ResourceAlreadyClaimed { resource: String, claimed_by: String },
+    ResourceAlreadyClaimed {
+        resource: String,
+        claimed_by: String,
+    },
 
     #[error("Resource '{resource}' is not claimed by peer '{agent_id}'")]
     ResourceNotOwned { resource: String, agent_id: String },
@@ -184,14 +187,21 @@ impl fmt::Display for AgentStatus {
         match self {
             AgentStatus::Idle => write!(f, "Idle"),
             AgentStatus::Active { task } => write!(f, "Active: {task}"),
-            AgentStatus::Progress { step, total, message } => {
+            AgentStatus::Progress {
+                step,
+                total,
+                message,
+            } => {
                 if let Some(tot) = total {
                     write!(f, "Progress [{step}/{tot}]: {message}")
                 } else {
                     write!(f, "Progress [step {step}]: {message}")
                 }
             }
-            AgentStatus::Blocked { reason, waiting_for } => {
+            AgentStatus::Blocked {
+                reason,
+                waiting_for,
+            } => {
                 if let Some(target) = waiting_for {
                     write!(f, "Blocked: {reason} (waiting for: {target})")
                 } else {
@@ -255,9 +265,7 @@ pub mod topics {
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum BroadcastPayload {
     /// Agent status update (state change, progress).
-    Status {
-        status: AgentStatus,
-    },
+    Status { status: AgentStatus },
     /// Shared code discovery or knowledge finding.
     Discovery {
         topic: String,
@@ -265,20 +273,11 @@ pub enum BroadcastPayload {
         file_references: Vec<String>,
     },
     /// System, security, or error alert.
-    Alert {
-        severity: String,
-        message: String,
-    },
+    Alert { severity: String, message: String },
     /// Shared fact update on the blackboard.
-    FactUpdate {
-        key: String,
-        value: Value,
-    },
+    FactUpdate { key: String, value: Value },
     /// Custom application or extension payload.
-    Custom {
-        kind: String,
-        data: Value,
-    },
+    Custom { kind: String, data: Value },
 }
 
 /// Message broadcast to all interested peers across the mesh.
@@ -299,7 +298,11 @@ pub struct BroadcastMessage {
 
 impl BroadcastMessage {
     /// Creates a new broadcast message with a unique ID and current timestamp.
-    pub fn new(sender: impl Into<String>, topic: impl Into<String>, payload: BroadcastPayload) -> Self {
+    pub fn new(
+        sender: impl Into<String>,
+        topic: impl Into<String>,
+        payload: BroadcastPayload,
+    ) -> Self {
         Self {
             id: Uuid::new_v4().to_string(),
             sender: sender.into(),
@@ -464,7 +467,11 @@ impl PeerQueryEnvelope {
     }
 
     /// Sends a response with structured data back to the requester.
-    pub fn respond_with_data(self, answer: impl Into<String>, data: Value) -> Result<(), MeshError> {
+    pub fn respond_with_data(
+        self,
+        answer: impl Into<String>,
+        data: Value,
+    ) -> Result<(), MeshError> {
         let resp = PeerResponse::success(&self.query, answer).with_data(data);
         self.reply_tx
             .send(resp)
@@ -568,7 +575,11 @@ impl AdvisorReviewResponse {
         } else {
             let mut lines = Vec::new();
             for c in &critiques {
-                let status_icon = if c.approved { "✓ APPROVED" } else { "✗ REJECTED" };
+                let status_icon = if c.approved {
+                    "✓ APPROVED"
+                } else {
+                    "✗ REJECTED"
+                };
                 lines.push(format!(
                     "[{status_icon}] {} (Risk: {}): {}",
                     c.advisor, c.risk_level, c.critique
@@ -611,7 +622,10 @@ impl AdvisorReviewResponse {
 /// Optional custom asynchronous handler for advisor reviews.
 #[async_trait]
 pub trait AdvisorReviewHandler: Send + Sync {
-    async fn handle_review(&self, req: &AdvisorReviewRequest) -> Result<AdvisorReviewResponse, MeshError>;
+    async fn handle_review(
+        &self,
+        req: &AdvisorReviewRequest,
+    ) -> Result<AdvisorReviewResponse, MeshError>;
 }
 
 // ============================================================================
@@ -757,7 +771,13 @@ impl AgentMesh {
         let broadcast_rx = self.inner.broadcast_tx.subscribe();
 
         let mut mailboxes = self.inner.mailboxes.write().await;
-        mailboxes.insert(id.clone(), PeerMailbox { direct_tx, query_tx });
+        mailboxes.insert(
+            id.clone(),
+            PeerMailbox {
+                direct_tx,
+                query_tx,
+            },
+        );
 
         // Broadcast initial status event to all peers
         let _ = self.broadcast_status(&id, AgentStatus::Idle).await;
@@ -800,7 +820,11 @@ impl AgentMesh {
     }
 
     /// Updates the execution status of a peer.
-    pub async fn update_status(&self, agent_id: &str, status: AgentStatus) -> Result<(), MeshError> {
+    pub async fn update_status(
+        &self,
+        agent_id: &str,
+        status: AgentStatus,
+    ) -> Result<(), MeshError> {
         let mut peers = self.inner.peers.write().await;
         let info = peers
             .get_mut(agent_id)
@@ -859,7 +883,11 @@ impl AgentMesh {
     }
 
     /// Convenience: broadcasts a status update for an agent.
-    pub async fn broadcast_status(&self, agent_id: &str, status: AgentStatus) -> Result<(), MeshError> {
+    pub async fn broadcast_status(
+        &self,
+        agent_id: &str,
+        status: AgentStatus,
+    ) -> Result<(), MeshError> {
         let msg = BroadcastMessage::new(
             agent_id,
             topics::STATUS,
@@ -1002,7 +1030,10 @@ impl AgentMesh {
 
         // 2. Built-in heuristic rule-based advisor review
         let critiques = Self::evaluate_heuristic_advisors(&req);
-        Ok(AdvisorReviewResponse::from_critiques(req.request_id, critiques))
+        Ok(AdvisorReviewResponse::from_critiques(
+            req.request_id,
+            critiques,
+        ))
     }
 
     /// Internal heuristic rules for offline/built-in advisor evaluations.
@@ -1034,9 +1065,11 @@ impl AgentMesh {
         {
             sec_approved = false;
             sec_risk = RiskLevel::High;
-            sec_critique = "Potential secret or private key leakage detected in proposed diff or parameters."
-                .to_string();
-            sec_suggestions.push("Sanitize credentials before persisting or executing.".to_string());
+            sec_critique =
+                "Potential secret or private key leakage detected in proposed diff or parameters."
+                    .to_string();
+            sec_suggestions
+                .push("Sanitize credentials before persisting or executing.".to_string());
         }
 
         critiques.push(AdvisorCritique {
@@ -1051,24 +1084,32 @@ impl AgentMesh {
         // Architecture Advisor Heuristics
         let arch_approved = true;
         let mut arch_risk = RiskLevel::Low;
-        let mut arch_critique = String::from("Architectural design aligns with modularity and separation of concerns.");
+        let mut arch_critique =
+            String::from("Architectural design aligns with modularity and separation of concerns.");
         let mut arch_suggestions = Vec::new();
 
         if content_lower.contains("unwrap()") && !content_lower.contains("// test") {
             arch_risk = RiskLevel::Medium;
-            arch_critique = "Production code contains unhandled unwraps which may trigger panic.".to_string();
-            arch_suggestions.push("Replace unwrap() with idiomatic Result/Option handling (? or ok_or).".to_string());
+            arch_critique =
+                "Production code contains unhandled unwraps which may trigger panic.".to_string();
+            arch_suggestions.push(
+                "Replace unwrap() with idiomatic Result/Option handling (? or ok_or).".to_string(),
+            );
         }
 
         if content_lower.contains("/tmp/") {
             arch_risk = RiskLevel::Medium;
-            arch_critique = "Hardcoded /tmp path detected: breaks Android/Termux and Windows compatibility.".to_string();
-            arch_suggestions.push("Use std::env::temp_dir() or workspace-relative scratch paths.".to_string());
+            arch_critique =
+                "Hardcoded /tmp path detected: breaks Android/Termux and Windows compatibility."
+                    .to_string();
+            arch_suggestions
+                .push("Use std::env::temp_dir() or workspace-relative scratch paths.".to_string());
         }
 
         critiques.push(AdvisorCritique {
             advisor: "ArchitectureAdvisor".to_string(),
-            focus: "Modularity, separation of concerns, and cross-platform compatibility".to_string(),
+            focus: "Modularity, separation of concerns, and cross-platform compatibility"
+                .to_string(),
             approved: arch_approved,
             risk_level: arch_risk,
             critique: arch_critique,
@@ -1113,7 +1154,8 @@ impl AgentMesh {
             }
         }
 
-        let expires_at = ttl.map(|d| (now + chrono::Duration::from_std(d).unwrap_or_default()).to_rfc3339());
+        let expires_at =
+            ttl.map(|d| (now + chrono::Duration::from_std(d).unwrap_or_default()).to_rfc3339());
         claims.insert(
             resource.to_string(),
             ResourceClaim {
@@ -1140,7 +1182,11 @@ impl AgentMesh {
     }
 
     /// Releases a resource claimed by an agent.
-    pub async fn release_resource(&self, agent_id: &str, resource: &str) -> Result<bool, MeshError> {
+    pub async fn release_resource(
+        &self,
+        agent_id: &str,
+        resource: &str,
+    ) -> Result<bool, MeshError> {
         let mut claims = self.inner.resource_claims.write().await;
         if let Some(claim) = claims.get(resource) {
             if claim.owner != agent_id {
@@ -1336,7 +1382,11 @@ impl MeshPeerChannel {
     }
 
     /// Broadcasts an arbitrary payload on a specified topic.
-    pub async fn broadcast(&self, topic: &str, payload: BroadcastPayload) -> Result<usize, MeshError> {
+    pub async fn broadcast(
+        &self,
+        topic: &str,
+        payload: BroadcastPayload,
+    ) -> Result<usize, MeshError> {
         let msg = BroadcastMessage::new(&self.agent_id, topic, payload);
         self.mesh.broadcast(msg).await
     }
@@ -1380,8 +1430,14 @@ impl MeshPeerChannel {
     }
 
     /// Claims exclusive ownership of a file or resource.
-    pub async fn claim_resource(&self, resource: &str, ttl: Option<Duration>) -> Result<(), MeshError> {
-        self.mesh.try_claim_resource(&self.agent_id, resource, ttl).await
+    pub async fn claim_resource(
+        &self,
+        resource: &str,
+        ttl: Option<Duration>,
+    ) -> Result<(), MeshError> {
+        self.mesh
+            .try_claim_resource(&self.agent_id, resource, ttl)
+            .await
     }
 
     /// Releases ownership of a file or resource.
@@ -1410,7 +1466,9 @@ impl MeshPeerChannel {
     }
 
     /// Awaits the next broadcast message.
-    pub async fn recv_broadcast(&mut self) -> Result<BroadcastMessage, broadcast::error::RecvError> {
+    pub async fn recv_broadcast(
+        &mut self,
+    ) -> Result<BroadcastMessage, broadcast::error::RecvError> {
         self.broadcast_rx.recv().await
     }
 
@@ -1473,7 +1531,10 @@ impl Tool for MeshBroadcastTool {
     }
 
     async fn execute(&self, args: Value, _ctx: &ToolContext) -> anyhow::Result<String> {
-        let topic = args.get("topic").and_then(|v| v.as_str()).unwrap_or("status");
+        let topic = args
+            .get("topic")
+            .and_then(|v| v.as_str())
+            .unwrap_or("status");
         let message = args.get("message").and_then(|v| v.as_str()).unwrap_or("");
         let file_refs: Vec<String> = args
             .get("file_references")
@@ -1504,7 +1565,9 @@ impl Tool for MeshBroadcastTool {
 
         let msg = BroadcastMessage::new(&self.agent_id, topic, payload);
         self.mesh.broadcast(msg).await?;
-        Ok(format!("Broadcast dispatched on topic '{topic}': {message}"))
+        Ok(format!(
+            "Broadcast dispatched on topic '{topic}': {message}"
+        ))
     }
 }
 
@@ -1567,8 +1630,14 @@ impl Tool for MeshQueryPeerTool {
             .get("query")
             .and_then(|v| v.as_str())
             .ok_or_else(|| anyhow::anyhow!("Missing 'query' argument"))?;
-        let context = args.get("context").and_then(|v| v.as_str()).map(ToString::to_string);
-        let timeout_secs = args.get("timeout_secs").and_then(|v| v.as_u64()).unwrap_or(30);
+        let context = args
+            .get("context")
+            .and_then(|v| v.as_str())
+            .map(ToString::to_string);
+        let timeout_secs = args
+            .get("timeout_secs")
+            .and_then(|v| v.as_u64())
+            .unwrap_or(30);
 
         let response = self
             .mesh
@@ -1582,9 +1651,15 @@ impl Tool for MeshQueryPeerTool {
             .await?;
 
         if response.success {
-            Ok(format!("Peer '{}' replied:\n{}", response.from, response.answer))
+            Ok(format!(
+                "Peer '{}' replied:\n{}",
+                response.from, response.answer
+            ))
         } else {
-            Ok(format!("Peer '{}' reported failure:\n{}", response.from, response.answer))
+            Ok(format!(
+                "Peer '{}' reported failure:\n{}",
+                response.from, response.answer
+            ))
         }
     }
 }
@@ -1764,7 +1839,10 @@ impl Tool for MeshClaimResourceTool {
     }
 
     async fn execute(&self, args: Value, _ctx: &ToolContext) -> anyhow::Result<String> {
-        let action = args.get("action").and_then(|v| v.as_str()).unwrap_or("list");
+        let action = args
+            .get("action")
+            .and_then(|v| v.as_str())
+            .unwrap_or("list");
 
         match action {
             "claim" => {
@@ -1780,7 +1858,10 @@ impl Tool for MeshClaimResourceTool {
                 self.mesh
                     .try_claim_resource(&self.agent_id, resource, ttl)
                     .await?;
-                Ok(format!("Resource '{resource}' successfully claimed by agent '{}'.", self.agent_id))
+                Ok(format!(
+                    "Resource '{resource}' successfully claimed by agent '{}'.",
+                    self.agent_id
+                ))
             }
             "release" => {
                 let resource = args
@@ -1790,9 +1871,15 @@ impl Tool for MeshClaimResourceTool {
 
                 let released = self.mesh.release_resource(&self.agent_id, resource).await?;
                 if released {
-                    Ok(format!("Resource '{resource}' successfully released by agent '{}'.", self.agent_id))
+                    Ok(format!(
+                        "Resource '{resource}' successfully released by agent '{}'.",
+                        self.agent_id
+                    ))
                 } else {
-                    Ok(format!("Resource '{resource}' was not currently held by '{}'.", self.agent_id))
+                    Ok(format!(
+                        "Resource '{resource}' was not currently held by '{}'.",
+                        self.agent_id
+                    ))
                 }
             }
             _ => {
@@ -1844,7 +1931,9 @@ mod tests {
         assert_eq!(scouts[0].id, "Scout-1");
 
         // Duplicate registration should fail
-        let dup = mesh.register("Scout-1", AgentRole::Scout, "Duplicate").await;
+        let dup = mesh
+            .register("Scout-1", AgentRole::Scout, "Duplicate")
+            .await;
         assert!(matches!(dup, Err(MeshError::PeerAlreadyRegistered(_))));
 
         // Unregister
@@ -1881,7 +1970,12 @@ mod tests {
         let received = peer_b.recv_broadcast().await.unwrap();
         assert_eq!(received.sender, "Agent-A");
         assert_eq!(received.topic, topics::DISCOVERY);
-        if let BroadcastPayload::Discovery { findings, file_references, .. } = received.payload {
+        if let BroadcastPayload::Discovery {
+            findings,
+            file_references,
+            ..
+        } = received.payload
+        {
             assert!(findings.contains("parser logic"));
             assert_eq!(file_references, vec!["src/parser.rs"]);
         } else {
@@ -1903,7 +1997,11 @@ mod tests {
             .unwrap();
 
         peer_a
-            .send_direct("Agent-B", "Task Handshake", "Ready to hand off file modifications.")
+            .send_direct(
+                "Agent-B",
+                "Task Handshake",
+                "Ready to hand off file modifications.",
+            )
             .await
             .unwrap();
 
@@ -2048,7 +2146,10 @@ mod tests {
         assert!(released);
 
         // Now Peer B can claim it
-        peer_b.claim_resource(file, None).await.expect("peer b claim");
+        peer_b
+            .claim_resource(file, None)
+            .await
+            .expect("peer b claim");
     }
 
     #[tokio::test]
@@ -2061,22 +2162,34 @@ mod tests {
             .unwrap();
 
         peer_a
-            .set_fact("target_architecture", json!({"arch": "arm64", "os": "linux"}))
+            .set_fact(
+                "target_architecture",
+                json!({"arch": "arm64", "os": "linux"}),
+            )
             .await
             .expect("set fact");
 
-        let fact = peer_a.get_fact("target_architecture").await.expect("get fact");
+        let fact = peer_a
+            .get_fact("target_architecture")
+            .await
+            .expect("get fact");
         assert_eq!(fact.author, "Scout-A");
         assert_eq!(fact.revision, 1);
         assert_eq!(fact.value["arch"], "arm64");
 
         // Overwrite fact
         peer_a
-            .set_fact("target_architecture", json!({"arch": "wasm32", "os": "unknown"}))
+            .set_fact(
+                "target_architecture",
+                json!({"arch": "wasm32", "os": "unknown"}),
+            )
             .await
             .expect("update fact");
 
-        let updated = peer_a.get_fact("target_architecture").await.expect("get fact updated");
+        let updated = peer_a
+            .get_fact("target_architecture")
+            .await
+            .expect("get fact updated");
         assert_eq!(updated.revision, 2);
         assert_eq!(updated.value["arch"], "wasm32");
     }
@@ -2092,13 +2205,16 @@ mod tests {
         let m3 = mesh.clone();
 
         let h1 = tokio::spawn(async move {
-            m1.wait_barrier("sync_phase_1", "Worker-1", Duration::from_secs(2)).await
+            m1.wait_barrier("sync_phase_1", "Worker-1", Duration::from_secs(2))
+                .await
         });
         let h2 = tokio::spawn(async move {
-            m2.wait_barrier("sync_phase_1", "Worker-2", Duration::from_secs(2)).await
+            m2.wait_barrier("sync_phase_1", "Worker-2", Duration::from_secs(2))
+                .await
         });
         let h3 = tokio::spawn(async move {
-            m3.wait_barrier("sync_phase_1", "Worker-3", Duration::from_secs(2)).await
+            m3.wait_barrier("sync_phase_1", "Worker-3", Duration::from_secs(2))
+                .await
         });
 
         let (r1, r2, r3) = tokio::join!(h1, h2, h3);

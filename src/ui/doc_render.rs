@@ -334,7 +334,11 @@ pub struct DocPage {
 }
 
 impl DocPage {
-    pub fn new(id: impl Into<String>, title: impl Into<String>, content: impl Into<String>) -> Self {
+    pub fn new(
+        id: impl Into<String>,
+        title: impl Into<String>,
+        content: impl Into<String>,
+    ) -> Self {
         Self {
             id: id.into(),
             title: title.into(),
@@ -549,8 +553,8 @@ fn highlight_line_html(line: &str, lang: &str, out: &mut String) {
 
     // Line comment detection
     let is_comment = match lang {
-        "rs" | "rust" | "js" | "javascript" | "ts" | "typescript" | "go" | "c" | "cpp" | "csharp"
-        | "cs" | "java" | "kotlin" | "swift" | "php" => trimmed.starts_with("//"),
+        "rs" | "rust" | "js" | "javascript" | "ts" | "typescript" | "go" | "c" | "cpp"
+        | "csharp" | "cs" | "java" | "kotlin" | "swift" | "php" => trimmed.starts_with("//"),
         "py" | "python" | "sh" | "bash" | "zsh" | "yaml" | "yml" | "toml" | "ruby" | "rb"
         | "dockerfile" | "makefile" => trimmed.starts_with('#'),
         "sql" | "lua" => trimmed.starts_with("--"),
@@ -574,7 +578,10 @@ fn highlight_line_html(line: &str, lang: &str, out: &mut String) {
 
         // Inline comments: // or # or --
         if (c == '/' && i + 1 < chars.len() && chars[i + 1] == '/')
-            && matches!(lang, "rs" | "rust" | "js" | "ts" | "go" | "c" | "cpp" | "cs" | "java")
+            && matches!(
+                lang,
+                "rs" | "rust" | "js" | "ts" | "go" | "c" | "cpp" | "cs" | "java"
+            )
         {
             out.push_str("<span class=\"hl-comment\">");
             let rem: String = chars[i..].iter().collect();
@@ -583,7 +590,12 @@ fn highlight_line_html(line: &str, lang: &str, out: &mut String) {
             break;
         }
 
-        if c == '#' && matches!(lang, "py" | "python" | "sh" | "bash" | "yaml" | "toml" | "rb") {
+        if c == '#'
+            && matches!(
+                lang,
+                "py" | "python" | "sh" | "bash" | "yaml" | "toml" | "rb"
+            )
+        {
             out.push_str("<span class=\"hl-comment\">");
             let rem: String = chars[i..].iter().collect();
             out.push_str(&escape_html(&rem));
@@ -620,7 +632,8 @@ fn highlight_line_html(line: &str, lang: &str, out: &mut String) {
         }
 
         // Numbers
-        if c.is_ascii_digit() && (i == 0 || !chars[i - 1].is_alphanumeric() && chars[i - 1] != '_') {
+        if c.is_ascii_digit() && (i == 0 || !chars[i - 1].is_alphanumeric() && chars[i - 1] != '_')
+        {
             out.push_str("<span class=\"hl-num\">");
             while i < chars.len()
                 && (chars[i].is_alphanumeric() || chars[i] == '.' || chars[i] == '_')
@@ -684,72 +697,356 @@ fn is_keyword(word: &str, lang: &str) -> bool {
     match lang {
         "rs" | "rust" => matches!(
             word,
-            "as" | "async" | "await" | "break" | "const" | "continue" | "crate" | "dyn" | "else"
-                | "enum" | "extern" | "false" | "fn" | "for" | "if" | "impl" | "in" | "let"
-                | "loop" | "match" | "mod" | "move" | "mut" | "pub" | "ref" | "return" | "self"
-                | "Self" | "static" | "struct" | "super" | "trait" | "true" | "type" | "unsafe"
-                | "use" | "where" | "while"
+            "as" | "async"
+                | "await"
+                | "break"
+                | "const"
+                | "continue"
+                | "crate"
+                | "dyn"
+                | "else"
+                | "enum"
+                | "extern"
+                | "false"
+                | "fn"
+                | "for"
+                | "if"
+                | "impl"
+                | "in"
+                | "let"
+                | "loop"
+                | "match"
+                | "mod"
+                | "move"
+                | "mut"
+                | "pub"
+                | "ref"
+                | "return"
+                | "self"
+                | "Self"
+                | "static"
+                | "struct"
+                | "super"
+                | "trait"
+                | "true"
+                | "type"
+                | "unsafe"
+                | "use"
+                | "where"
+                | "while"
         ),
         "py" | "python" => matches!(
             word,
-            "and" | "as" | "assert" | "async" | "await" | "break" | "class" | "continue" | "def"
-                | "del" | "elif" | "else" | "except" | "finally" | "for" | "from" | "global"
-                | "if" | "import" | "in" | "is" | "lambda" | "None" | "nonlocal" | "not" | "or"
-                | "pass" | "raise" | "return" | "True" | "False" | "try" | "while" | "with"
-                | "yield" | "self"
+            "and"
+                | "as"
+                | "assert"
+                | "async"
+                | "await"
+                | "break"
+                | "class"
+                | "continue"
+                | "def"
+                | "del"
+                | "elif"
+                | "else"
+                | "except"
+                | "finally"
+                | "for"
+                | "from"
+                | "global"
+                | "if"
+                | "import"
+                | "in"
+                | "is"
+                | "lambda"
+                | "None"
+                | "nonlocal"
+                | "not"
+                | "or"
+                | "pass"
+                | "raise"
+                | "return"
+                | "True"
+                | "False"
+                | "try"
+                | "while"
+                | "with"
+                | "yield"
+                | "self"
         ),
         "js" | "javascript" | "ts" | "typescript" => matches!(
             word,
-            "abstract" | "arguments" | "async" | "await" | "boolean" | "break" | "byte" | "case"
-                | "catch" | "class" | "const" | "continue" | "debugger" | "default" | "delete"
-                | "do" | "else" | "enum" | "export" | "extends" | "false" | "final" | "finally"
-                | "for" | "from" | "function" | "goto" | "if" | "implements" | "import" | "in"
-                | "instanceof" | "interface" | "let" | "new" | "null" | "of" | "package"
-                | "private" | "protected" | "public" | "return" | "static" | "super" | "switch"
-                | "this" | "throw" | "true" | "try" | "type" | "typeof" | "undefined" | "var"
-                | "void" | "while" | "with" | "yield"
+            "abstract"
+                | "arguments"
+                | "async"
+                | "await"
+                | "boolean"
+                | "break"
+                | "byte"
+                | "case"
+                | "catch"
+                | "class"
+                | "const"
+                | "continue"
+                | "debugger"
+                | "default"
+                | "delete"
+                | "do"
+                | "else"
+                | "enum"
+                | "export"
+                | "extends"
+                | "false"
+                | "final"
+                | "finally"
+                | "for"
+                | "from"
+                | "function"
+                | "goto"
+                | "if"
+                | "implements"
+                | "import"
+                | "in"
+                | "instanceof"
+                | "interface"
+                | "let"
+                | "new"
+                | "null"
+                | "of"
+                | "package"
+                | "private"
+                | "protected"
+                | "public"
+                | "return"
+                | "static"
+                | "super"
+                | "switch"
+                | "this"
+                | "throw"
+                | "true"
+                | "try"
+                | "type"
+                | "typeof"
+                | "undefined"
+                | "var"
+                | "void"
+                | "while"
+                | "with"
+                | "yield"
         ),
         "go" => matches!(
             word,
-            "break" | "case" | "chan" | "const" | "continue" | "default" | "defer" | "else"
-                | "fallthrough" | "for" | "func" | "go" | "goto" | "if" | "import" | "interface"
-                | "map" | "package" | "range" | "return" | "select" | "struct" | "switch"
-                | "type" | "var" | "true" | "false" | "nil" | "iota"
+            "break"
+                | "case"
+                | "chan"
+                | "const"
+                | "continue"
+                | "default"
+                | "defer"
+                | "else"
+                | "fallthrough"
+                | "for"
+                | "func"
+                | "go"
+                | "goto"
+                | "if"
+                | "import"
+                | "interface"
+                | "map"
+                | "package"
+                | "range"
+                | "return"
+                | "select"
+                | "struct"
+                | "switch"
+                | "type"
+                | "var"
+                | "true"
+                | "false"
+                | "nil"
+                | "iota"
         ),
         "c" | "cpp" | "csharp" | "cs" | "java" => matches!(
             word,
-            "auto" | "break" | "case" | "catch" | "class" | "const" | "continue" | "default"
-                | "delete" | "do" | "else" | "enum" | "explicit" | "export" | "extern" | "false"
-                | "for" | "friend" | "goto" | "if" | "inline" | "namespace" | "new" | "operator"
-                | "private" | "protected" | "public" | "return" | "sizeof" | "static" | "struct"
-                | "switch" | "template" | "this" | "throw" | "true" | "try" | "typedef"
-                | "typename" | "using" | "virtual" | "void" | "volatile" | "while" | "nullptr"
-                | "override" | "final"
+            "auto"
+                | "break"
+                | "case"
+                | "catch"
+                | "class"
+                | "const"
+                | "continue"
+                | "default"
+                | "delete"
+                | "do"
+                | "else"
+                | "enum"
+                | "explicit"
+                | "export"
+                | "extern"
+                | "false"
+                | "for"
+                | "friend"
+                | "goto"
+                | "if"
+                | "inline"
+                | "namespace"
+                | "new"
+                | "operator"
+                | "private"
+                | "protected"
+                | "public"
+                | "return"
+                | "sizeof"
+                | "static"
+                | "struct"
+                | "switch"
+                | "template"
+                | "this"
+                | "throw"
+                | "true"
+                | "try"
+                | "typedef"
+                | "typename"
+                | "using"
+                | "virtual"
+                | "void"
+                | "volatile"
+                | "while"
+                | "nullptr"
+                | "override"
+                | "final"
         ),
         "sh" | "bash" | "zsh" => matches!(
             word,
-            "if" | "then" | "else" | "elif" | "fi" | "case" | "esac" | "for" | "select" | "while"
-                | "until" | "do" | "done" | "in" | "function" | "time" | "source" | "export"
-                | "local" | "readonly" | "return" | "exit" | "set" | "unset"
+            "if" | "then"
+                | "else"
+                | "elif"
+                | "fi"
+                | "case"
+                | "esac"
+                | "for"
+                | "select"
+                | "while"
+                | "until"
+                | "do"
+                | "done"
+                | "in"
+                | "function"
+                | "time"
+                | "source"
+                | "export"
+                | "local"
+                | "readonly"
+                | "return"
+                | "exit"
+                | "set"
+                | "unset"
         ),
         "sql" => matches!(
             word,
-            "SELECT" | "select" | "FROM" | "from" | "WHERE" | "where" | "INSERT" | "insert"
-                | "INTO" | "into" | "VALUES" | "values" | "UPDATE" | "update" | "SET" | "set"
-                | "DELETE" | "delete" | "CREATE" | "create" | "TABLE" | "table" | "DROP" | "drop"
-                | "ALTER" | "alter" | "INDEX" | "index" | "JOIN" | "join" | "LEFT" | "left"
-                | "RIGHT" | "right" | "INNER" | "inner" | "OUTER" | "outer" | "ON" | "on"
-                | "GROUP" | "group" | "BY" | "by" | "ORDER" | "order" | "HAVING" | "having"
-                | "LIMIT" | "limit" | "OFFSET" | "offset" | "UNION" | "union" | "ALL" | "all"
-                | "AS" | "as" | "DISTINCT" | "distinct" | "AND" | "and" | "OR" | "or" | "NOT"
-                | "not" | "NULL" | "null" | "TRUE" | "true" | "FALSE" | "false" | "PRIMARY"
-                | "primary" | "KEY" | "key"
+            "SELECT"
+                | "select"
+                | "FROM"
+                | "from"
+                | "WHERE"
+                | "where"
+                | "INSERT"
+                | "insert"
+                | "INTO"
+                | "into"
+                | "VALUES"
+                | "values"
+                | "UPDATE"
+                | "update"
+                | "SET"
+                | "set"
+                | "DELETE"
+                | "delete"
+                | "CREATE"
+                | "create"
+                | "TABLE"
+                | "table"
+                | "DROP"
+                | "drop"
+                | "ALTER"
+                | "alter"
+                | "INDEX"
+                | "index"
+                | "JOIN"
+                | "join"
+                | "LEFT"
+                | "left"
+                | "RIGHT"
+                | "right"
+                | "INNER"
+                | "inner"
+                | "OUTER"
+                | "outer"
+                | "ON"
+                | "on"
+                | "GROUP"
+                | "group"
+                | "BY"
+                | "by"
+                | "ORDER"
+                | "order"
+                | "HAVING"
+                | "having"
+                | "LIMIT"
+                | "limit"
+                | "OFFSET"
+                | "offset"
+                | "UNION"
+                | "union"
+                | "ALL"
+                | "all"
+                | "AS"
+                | "as"
+                | "DISTINCT"
+                | "distinct"
+                | "AND"
+                | "and"
+                | "OR"
+                | "or"
+                | "NOT"
+                | "not"
+                | "NULL"
+                | "null"
+                | "TRUE"
+                | "true"
+                | "FALSE"
+                | "false"
+                | "PRIMARY"
+                | "primary"
+                | "KEY"
+                | "key"
         ),
         _ => matches!(
             word,
-            "fn" | "func" | "function" | "def" | "class" | "struct" | "interface" | "enum"
-                | "let" | "var" | "const" | "val" | "if" | "else" | "for" | "while" | "return"
-                | "import" | "export" | "pub" | "public" | "private" | "true" | "false" | "null"
+            "fn" | "func"
+                | "function"
+                | "def"
+                | "class"
+                | "struct"
+                | "interface"
+                | "enum"
+                | "let"
+                | "var"
+                | "const"
+                | "val"
+                | "if"
+                | "else"
+                | "for"
+                | "while"
+                | "return"
+                | "import"
+                | "export"
+                | "pub"
+                | "public"
+                | "private"
+                | "true"
+                | "false"
+                | "null"
                 | "nil"
         ),
     }
@@ -910,11 +1207,7 @@ pub fn render_inline_html(text: &str) -> String {
         }
 
         // Bold & Italic combinations: *** or ___
-        if (c == '*' || c == '_')
-            && i + 2 < chars.len()
-            && chars[i + 1] == c
-            && chars[i + 2] == c
-        {
+        if (c == '*' || c == '_') && i + 2 < chars.len() && chars[i + 1] == c && chars[i + 2] == c {
             let mut end = i + 3;
             while end + 2 < chars.len()
                 && !(chars[end] == c && chars[end + 1] == c && chars[end + 2] == c)
@@ -976,8 +1269,7 @@ pub fn render_inline_html(text: &str) -> String {
                 }
                 if close_paren < chars.len() {
                     let alt: String = chars[i + 2..close_bracket].iter().collect();
-                    let url_part: String =
-                        chars[close_bracket + 2..close_paren].iter().collect();
+                    let url_part: String = chars[close_bracket + 2..close_paren].iter().collect();
                     let (url, title) = parse_link_url_title(&url_part);
                     out.push_str("<img src=\"");
                     out.push_str(&escape_html(&url));
@@ -1009,8 +1301,7 @@ pub fn render_inline_html(text: &str) -> String {
                 }
                 if close_paren < chars.len() {
                     let text_part: String = chars[i + 1..close_bracket].iter().collect();
-                    let url_part: String =
-                        chars[close_bracket + 2..close_paren].iter().collect();
+                    let url_part: String = chars[close_bracket + 2..close_paren].iter().collect();
                     let (url, title) = parse_link_url_title(&url_part);
 
                     out.push_str("<a href=\"");
@@ -1128,7 +1419,10 @@ pub fn markdown_to_html(markdown: &str) -> String {
             };
 
             let lang_badge = if !lang.is_empty() {
-                format!("<span class=\"code-lang-badge\">{}</span>", escape_html(lang))
+                format!(
+                    "<span class=\"code-lang-badge\">{}</span>",
+                    escape_html(lang)
+                )
             } else {
                 String::new()
             };
@@ -1180,7 +1474,11 @@ pub fn markdown_to_html(markdown: &str) -> String {
         if trimmed.starts_with('>') {
             let mut quote_lines = vec![line];
             while let Some(next_line) = lines.peek() {
-                if next_line.trim().starts_with('>') || (!next_line.trim().is_empty() && !next_line.starts_with('#') && !next_line.starts_with("```")) {
+                if next_line.trim().starts_with('>')
+                    || (!next_line.trim().is_empty()
+                        && !next_line.starts_with('#')
+                        && !next_line.starts_with("```"))
+                {
                     quote_lines.push(lines.next().unwrap());
                 } else {
                     break;
@@ -1215,7 +1513,8 @@ pub fn markdown_to_html(markdown: &str) -> String {
             let mut list_lines = vec![line];
             while let Some(next_line) = lines.peek() {
                 let next_trim = next_line.trim();
-                if is_list_item(next_trim) || (!next_trim.is_empty() && next_line.starts_with("  ")) {
+                if is_list_item(next_trim) || (!next_trim.is_empty() && next_line.starts_with("  "))
+                {
                     list_lines.push(lines.next().unwrap());
                 } else {
                     break;
@@ -1236,8 +1535,15 @@ pub fn markdown_to_html(markdown: &str) -> String {
             continue;
         }
         if trimmed.starts_with("<summary>") && trimmed.ends_with("</summary>") {
-            let inner = trimmed.strip_prefix("<summary>").unwrap().strip_suffix("</summary>").unwrap();
-            html.push_str(&format!("<summary>{}</summary>\n", render_inline_html(inner)));
+            let inner = trimmed
+                .strip_prefix("<summary>")
+                .unwrap()
+                .strip_suffix("</summary>")
+                .unwrap();
+            html.push_str(&format!(
+                "<summary>{}</summary>\n",
+                render_inline_html(inner)
+            ));
             continue;
         }
 
@@ -1313,7 +1619,8 @@ fn render_list(lines: &[&str]) -> String {
 
     for line in lines {
         let trim = line.trim();
-        let content = if trim.starts_with("- ") || trim.starts_with("* ") || trim.starts_with("+ ") {
+        let content = if trim.starts_with("- ") || trim.starts_with("* ") || trim.starts_with("+ ")
+        {
             &trim[2..]
         } else if let Some(pos) = trim.find(". ") {
             if trim[..pos].chars().all(|c| c.is_ascii_digit()) {
@@ -1331,7 +1638,9 @@ fn render_list(lines: &[&str]) -> String {
             out.push_str(&render_inline_html(&content[4..]));
             out.push_str("</li>\n");
         } else if content.starts_with("[x] ") || content.starts_with("[X] ") {
-            out.push_str("  <li class=\"task-list-item\"><input type=\"checkbox\" checked disabled /> ");
+            out.push_str(
+                "  <li class=\"task-list-item\"><input type=\"checkbox\" checked disabled /> ",
+            );
             out.push_str(&render_inline_html(&content[4..]));
             out.push_str("</li>\n");
         } else {
@@ -1392,7 +1701,10 @@ fn render_blockquote_or_callout(lines: &[&str]) -> String {
 
     // Standard blockquote
     let body = cleaned_lines.join(" ");
-    format!("<blockquote><p>{}</p></blockquote>\n", render_inline_html(&body))
+    format!(
+        "<blockquote><p>{}</p></blockquote>\n",
+        render_inline_html(&body)
+    )
 }
 
 fn render_table(lines: &[&str]) -> Option<String> {
@@ -1427,7 +1739,9 @@ fn render_table(lines: &[&str]) -> Option<String> {
         .collect();
 
     let mut out = String::new();
-    out.push_str("<div class=\"table-container\">\n  <table class=\"doc-table\">\n    <thead>\n      <tr>\n");
+    out.push_str(
+        "<div class=\"table-container\">\n  <table class=\"doc-table\">\n    <thead>\n      <tr>\n",
+    );
 
     for (i, h) in headers.iter().enumerate() {
         let align = alignments.get(i).unwrap_or(&"left");
@@ -1469,10 +1783,7 @@ fn parse_table_row(line: &str) -> Vec<String> {
         trimmed
     };
 
-    content
-        .split('|')
-        .map(|c| c.trim().to_string())
-        .collect()
+    content.split('|').map(|c| c.trim().to_string()).collect()
 }
 
 // ============================================================================
@@ -2599,8 +2910,13 @@ pub fn generate_doc_page(markdown: &str, config: &DocConfig) -> String {
     doc.push_str("<!DOCTYPE html>\n");
     doc.push_str("<html lang=\"en\">\n<head>\n");
     doc.push_str("  <meta charset=\"UTF-8\" />\n");
-    doc.push_str("  <meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\" />\n");
-    doc.push_str(&format!("  <title>{}</title>\n", escape_html(&config.title)));
+    doc.push_str(
+        "  <meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\" />\n",
+    );
+    doc.push_str(&format!(
+        "  <title>{}</title>\n",
+        escape_html(&config.title)
+    ));
 
     if let Some(desc) = &config.description {
         doc.push_str(&format!(
@@ -2641,7 +2957,10 @@ pub fn generate_doc_page(markdown: &str, config: &DocConfig) -> String {
             escape_html(logo)
         ));
     }
-    doc.push_str(&format!("        <span>{}</span>\n", escape_html(&config.title)));
+    doc.push_str(&format!(
+        "        <span>{}</span>\n",
+        escape_html(&config.title)
+    ));
     if let Some(ver) = &config.version {
         doc.push_str(&format!(
             "        <span class=\"nav-badge\">v{}</span>\n",
@@ -2667,7 +2986,9 @@ pub fn generate_doc_page(markdown: &str, config: &DocConfig) -> String {
     }
 
     if config.show_theme_toggle {
-        doc.push_str("      <button class=\"btn-icon\" onclick=\"toggleTheme()\" title=\"Toggle theme\">\n");
+        doc.push_str(
+            "      <button class=\"btn-icon\" onclick=\"toggleTheme()\" title=\"Toggle theme\">\n",
+        );
         doc.push_str("        <svg width=\"18\" height=\"18\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\"><path d=\"M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z\"></path></svg>\n");
         doc.push_str("      </button>\n");
     }
@@ -2745,14 +3066,19 @@ pub fn generate_doc_page(markdown: &str, config: &DocConfig) -> String {
 
     // Back to top button
     if config.show_back_to_top {
-        doc.push_str("  <button class=\"back-to-top\" onclick=\"scrollToTop()\" title=\"Back to top\">\n");
+        doc.push_str(
+            "  <button class=\"back-to-top\" onclick=\"scrollToTop()\" title=\"Back to top\">\n",
+        );
         doc.push_str("    <svg width=\"20\" height=\"20\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\"><polyline points=\"18 15 12 9 6 15\"></polyline></svg>\n");
         doc.push_str("  </button>\n");
     }
 
     // Footer
     if config.show_footer {
-        let footer_msg = config.footer_text.as_deref().unwrap_or("Documentation generated with Fusion Doc Render Engine");
+        let footer_msg = config
+            .footer_text
+            .as_deref()
+            .unwrap_or("Documentation generated with Fusion Doc Render Engine");
         doc.push_str("  <footer class=\"doc-footer\">\n");
         doc.push_str(&format!("    <p>{}</p>\n", escape_html(footer_msg)));
         doc.push_str("  </footer>\n");
@@ -2875,14 +3201,14 @@ pub mod ansi {
     pub const BG_HIGHLIGHT: &str = "\x1b[48;5;226m\x1b[30m";
 
     // Syntax highlighting colors
-    pub const HL_KW: &str = "\x1b[38;5;171m\x1b[1m";      // Magenta bold
-    pub const HL_TYPE: &str = "\x1b[38;5;81m";             // Cyan
-    pub const HL_BUILTIN: &str = "\x1b[38;5;75m";          // Blue
-    pub const HL_FN: &str = "\x1b[38;5;117m";              // Sky blue
-    pub const HL_STR: &str = "\x1b[38;5;114m";             // Green
-    pub const HL_NUM: &str = "\x1b[38;5;215m";             // Orange / peach
-    pub const HL_COMMENT: &str = "\x1b[38;5;245m\x1b[3m";  // Dim gray italic
-    pub const HL_MACRO: &str = "\x1b[38;5;220m";           // Yellow
+    pub const HL_KW: &str = "\x1b[38;5;171m\x1b[1m"; // Magenta bold
+    pub const HL_TYPE: &str = "\x1b[38;5;81m"; // Cyan
+    pub const HL_BUILTIN: &str = "\x1b[38;5;75m"; // Blue
+    pub const HL_FN: &str = "\x1b[38;5;117m"; // Sky blue
+    pub const HL_STR: &str = "\x1b[38;5;114m"; // Green
+    pub const HL_NUM: &str = "\x1b[38;5;215m"; // Orange / peach
+    pub const HL_COMMENT: &str = "\x1b[38;5;245m\x1b[3m"; // Dim gray italic
+    pub const HL_MACRO: &str = "\x1b[38;5;220m"; // Yellow
     pub const HL_INLINE_CODE: &str = "\x1b[38;5;222m\x1b[48;5;236m"; // Amber on dark bg
 }
 
@@ -3334,7 +3660,10 @@ fn highlight_line_terminal(line: &str, lang: &str, out: &mut String) {
 
         // Inline comments: // or # or --
         if (c == '/' && i + 1 < chars.len() && chars[i + 1] == '/')
-            && matches!(lang, "rs" | "rust" | "js" | "ts" | "go" | "c" | "cpp" | "cs" | "java")
+            && matches!(
+                lang,
+                "rs" | "rust" | "js" | "ts" | "go" | "c" | "cpp" | "cs" | "java"
+            )
         {
             out.push_str(ansi::HL_COMMENT);
             let rem: String = chars[i..].iter().collect();
@@ -3343,7 +3672,12 @@ fn highlight_line_terminal(line: &str, lang: &str, out: &mut String) {
             break;
         }
 
-        if c == '#' && matches!(lang, "py" | "python" | "sh" | "bash" | "yaml" | "toml" | "rb") {
+        if c == '#'
+            && matches!(
+                lang,
+                "py" | "python" | "sh" | "bash" | "yaml" | "toml" | "rb"
+            )
+        {
             out.push_str(ansi::HL_COMMENT);
             let rem: String = chars[i..].iter().collect();
             out.push_str(&rem);
@@ -3419,7 +3753,9 @@ fn highlight_line_terminal(line: &str, lang: &str, out: &mut String) {
         }
 
         // Numbers
-        if c.is_ascii_digit() && (i == 0 || (!chars[i - 1].is_alphanumeric() && chars[i - 1] != '_')) {
+        if c.is_ascii_digit()
+            && (i == 0 || (!chars[i - 1].is_alphanumeric() && chars[i - 1] != '_'))
+        {
             out.push_str(ansi::HL_NUM);
             while i < chars.len()
                 && (chars[i].is_alphanumeric() || chars[i] == '.' || chars[i] == '_')
@@ -3643,8 +3979,11 @@ pub fn render_inline_terminal(text: &str, colored: bool) -> String {
                 let alt: String = chars[start..start + close_bracket].iter().collect();
                 let url_start = start + close_bracket + 1;
                 if url_start < chars.len() && chars[url_start] == '(' {
-                    if let Some(close_paren) = chars[url_start + 1..].iter().position(|&x| x == ')') {
-                        let url: String = chars[url_start + 1..url_start + 1 + close_paren].iter().collect();
+                    if let Some(close_paren) = chars[url_start + 1..].iter().position(|&x| x == ')')
+                    {
+                        let url: String = chars[url_start + 1..url_start + 1 + close_paren]
+                            .iter()
+                            .collect();
                         out.push_str("\x1b[38;5;178m[Image: \x1b[1m");
                         out.push_str(&alt);
                         out.push_str("\x1b[22m]\x1b[0m \x1b[90m(");
@@ -3664,8 +4003,11 @@ pub fn render_inline_terminal(text: &str, colored: bool) -> String {
                 let link_text: String = chars[start..start + close_bracket].iter().collect();
                 let url_start = start + close_bracket + 1;
                 if url_start < chars.len() && chars[url_start] == '(' {
-                    if let Some(close_paren) = chars[url_start + 1..].iter().position(|&x| x == ')') {
-                        let url_raw: String = chars[url_start + 1..url_start + 1 + close_paren].iter().collect();
+                    if let Some(close_paren) = chars[url_start + 1..].iter().position(|&x| x == ')')
+                    {
+                        let url_raw: String = chars[url_start + 1..url_start + 1 + close_paren]
+                            .iter()
+                            .collect();
                         let (url, _title) = parse_link_url_title(&url_raw);
                         out.push_str("\x1b[38;5;75m\x1b[4m");
                         out.push_str(&link_text);
@@ -3886,7 +4228,12 @@ fn pad_cell(content: &str, width: usize, align: TableAlign) -> String {
         TableAlign::Center => {
             let left_pad = total_pad / 2;
             let right_pad = total_pad - left_pad;
-            format!("{}{}{}", " ".repeat(left_pad), content, " ".repeat(right_pad))
+            format!(
+                "{}{}{}",
+                " ".repeat(left_pad),
+                content,
+                " ".repeat(right_pad)
+            )
         }
     }
 }
@@ -3938,20 +4285,24 @@ impl Default for TerminalDocOptions {
     }
 }
 
-fn render_code_block_terminal(
-    code: &str,
-    lang: &str,
-    options: &TerminalDocOptions,
-) -> String {
+fn render_code_block_terminal(code: &str, lang: &str, options: &TerminalDocOptions) -> String {
     let highlighted = if options.syntax_highlighting {
         highlight_code_terminal_opt(code, lang, options.colored)
     } else {
         code.to_string()
     };
 
-    let border_color = if options.colored { "\x1b[38;5;242m" } else { "" };
+    let border_color = if options.colored {
+        "\x1b[38;5;242m"
+    } else {
+        ""
+    };
     let lang_color = if options.colored { "\x1b[1;36m" } else { "" };
-    let line_no_color = if options.colored { "\x1b[38;5;240m" } else { "" };
+    let line_no_color = if options.colored {
+        "\x1b[38;5;240m"
+    } else {
+        ""
+    };
     let reset = if options.colored { ansi::RESET } else { "" };
 
     let lines: Vec<&str> = highlighted.lines().collect();
@@ -4008,7 +4359,10 @@ fn render_code_block_terminal(
         }
         CodeBorderStyle::LeftRail => {
             let mut out = String::new();
-            out.push_str(&format!("{}{}─── {} ───{}{}\n", border_color, lang_color, lang_display, border_color, reset));
+            out.push_str(&format!(
+                "{}{}─── {} ───{}{}\n",
+                border_color, lang_color, lang_display, border_color, reset
+            ));
             for (idx, line) in lines.iter().enumerate() {
                 out.push_str(border_color);
                 out.push('│');
@@ -4025,12 +4379,18 @@ fn render_code_block_terminal(
         }
         CodeBorderStyle::Minimal => {
             let mut out = String::new();
-            out.push_str(&format!("{}[{}]-----------------------------------{}\n", border_color, lang_display, reset));
+            out.push_str(&format!(
+                "{}[{}]-----------------------------------{}\n",
+                border_color, lang_display, reset
+            ));
             for line in lines {
                 out.push_str(line);
                 out.push('\n');
             }
-            out.push_str(&format!("{}--------------------------------------{}\n", border_color, reset));
+            out.push_str(&format!(
+                "{}--------------------------------------{}\n",
+                border_color, reset
+            ));
             out
         }
         CodeBorderStyle::Plain => {
@@ -4099,10 +4459,7 @@ fn render_callout_terminal(
     out
 }
 
-fn render_list_terminal(
-    lines: &[&str],
-    options: &TerminalDocOptions,
-) -> String {
+fn render_list_terminal(lines: &[&str], options: &TerminalDocOptions) -> String {
     let mut out = String::new();
 
     for line in lines {
@@ -4115,7 +4472,11 @@ fn render_list_terminal(
         if trimmed_start.starts_with("- [ ] ") || trimmed_start.starts_with("* [ ] ") {
             let item_text = &trimmed_start[6..];
             let rendered = render_inline_terminal(item_text, options.colored);
-            let box_glyph = if options.colored { "\x1b[90m☐\x1b[0m" } else { "[ ]" };
+            let box_glyph = if options.colored {
+                "\x1b[90m☐\x1b[0m"
+            } else {
+                "[ ]"
+            };
             let prefix = format!("{}  {} ", indent_str, box_glyph);
             let prefix_w = visible_width(&prefix);
             let hanging_indent = " ".repeat(prefix_w);
@@ -4138,7 +4499,11 @@ fn render_list_terminal(
         {
             let item_text = &trimmed_start[6..];
             let rendered = render_inline_terminal(item_text, options.colored);
-            let box_glyph = if options.colored { "\x1b[32m☑\x1b[0m" } else { "[x]" };
+            let box_glyph = if options.colored {
+                "\x1b[32m☑\x1b[0m"
+            } else {
+                "[x]"
+            };
             let prefix = format!("{}  {} ", indent_str, box_glyph);
             let prefix_w = visible_width(&prefix);
             let hanging_indent = " ".repeat(prefix_w);
@@ -4162,10 +4527,34 @@ fn render_list_terminal(
             let item_text = &trimmed_start[2..];
             let rendered = render_inline_terminal(item_text, options.colored);
             let bullet_glyph = match indent_level % 4 {
-                0 => if options.colored { "\x1b[36m•\x1b[0m" } else { "•" },
-                1 => if options.colored { "\x1b[34m○\x1b[0m" } else { "○" },
-                2 => if options.colored { "\x1b[35m▪\x1b[0m" } else { "▪" },
-                _ => if options.colored { "\x1b[33m▸\x1b[0m" } else { "▸" },
+                0 => {
+                    if options.colored {
+                        "\x1b[36m•\x1b[0m"
+                    } else {
+                        "•"
+                    }
+                }
+                1 => {
+                    if options.colored {
+                        "\x1b[34m○\x1b[0m"
+                    } else {
+                        "○"
+                    }
+                }
+                2 => {
+                    if options.colored {
+                        "\x1b[35m▪\x1b[0m"
+                    } else {
+                        "▪"
+                    }
+                }
+                _ => {
+                    if options.colored {
+                        "\x1b[33m▸\x1b[0m"
+                    } else {
+                        "▸"
+                    }
+                }
             };
             let prefix = format!("{}  {} ", indent_str, bullet_glyph);
             let prefix_w = visible_width(&prefix);
@@ -4188,9 +4577,17 @@ fn render_list_terminal(
         while num_end < chars.len() && chars[num_end].is_ascii_digit() {
             num_end += 1;
         }
-        if num_end > 0 && num_end < chars.len() && chars[num_end] == '.' && (num_end + 1 == chars.len() || chars[num_end + 1] == ' ') {
+        if num_end > 0
+            && num_end < chars.len()
+            && chars[num_end] == '.'
+            && (num_end + 1 == chars.len() || chars[num_end + 1] == ' ')
+        {
             let num_str: String = chars[..num_end].iter().collect();
-            let start_item = if num_end + 1 < chars.len() { num_end + 2 } else { num_end + 1 };
+            let start_item = if num_end + 1 < chars.len() {
+                num_end + 2
+            } else {
+                num_end + 1
+            };
             let item_text: String = chars[start_item.min(chars.len())..].iter().collect();
             let rendered = render_inline_terminal(&item_text, options.colored);
             let num_glyph = if options.colored {
@@ -4262,7 +4659,12 @@ pub fn render_markdown_terminal_styled(markdown: &str, options: &TerminalDocOpti
             let hr_color = if options.colored { "\x1b[90m" } else { "" };
             let reset = if options.colored { ansi::RESET } else { "" };
             let bar_len = options.width.min(60);
-            out.push_str(&format!("\n{}{}{}\n\n", hr_color, "─".repeat(bar_len), reset));
+            out.push_str(&format!(
+                "\n{}{}{}\n\n",
+                hr_color,
+                "─".repeat(bar_len),
+                reset
+            ));
             i += 1;
             continue;
         }
@@ -4279,8 +4681,12 @@ pub fn render_markdown_terminal_styled(markdown: &str, options: &TerminalDocOpti
                     let bar_len = (visible_width(&rendered_heading) + 4).clamp(10, options.width);
                     out.push_str(&format!(
                         "\n{}# {}{}\n{}{}{}\n",
-                        col, rendered_heading, reset,
-                        bar_col, "═".repeat(bar_len), reset
+                        col,
+                        rendered_heading,
+                        reset,
+                        bar_col,
+                        "═".repeat(bar_len),
+                        reset
                     ));
                 }
                 2 => {
@@ -4289,8 +4695,12 @@ pub fn render_markdown_terminal_styled(markdown: &str, options: &TerminalDocOpti
                     let bar_len = (visible_width(&rendered_heading) + 3).clamp(8, options.width);
                     out.push_str(&format!(
                         "\n{}## {}{}\n{}{}{}\n",
-                        col, rendered_heading, reset,
-                        bar_col, "─".repeat(bar_len), reset
+                        col,
+                        rendered_heading,
+                        reset,
+                        bar_col,
+                        "─".repeat(bar_len),
+                        reset
                     ));
                 }
                 3 => {
@@ -4315,13 +4725,20 @@ pub fn render_markdown_terminal_styled(markdown: &str, options: &TerminalDocOpti
         }
 
         // 4. Tables
-        if is_table_header(trimmed) && i + 1 < lines.len() && is_table_delimiter(lines[i + 1].trim()) {
+        if is_table_header(trimmed)
+            && i + 1 < lines.len()
+            && is_table_delimiter(lines[i + 1].trim())
+        {
             let mut table_lines = Vec::new();
-            while i < lines.len() && (lines[i].trim().starts_with('|') || lines[i].trim().ends_with('|')) {
+            while i < lines.len()
+                && (lines[i].trim().starts_with('|') || lines[i].trim().ends_with('|'))
+            {
                 table_lines.push(lines[i]);
                 i += 1;
             }
-            if let Some(rendered_table) = render_table_terminal(&table_lines, options.width, options.colored) {
+            if let Some(rendered_table) =
+                render_table_terminal(&table_lines, options.width, options.colored)
+            {
                 out.push('\n');
                 out.push_str(&rendered_table);
                 out.push('\n');
@@ -4338,7 +4755,10 @@ pub fn render_markdown_terminal_styled(markdown: &str, options: &TerminalDocOpti
                 i += 1;
             }
 
-            if !quote_lines.is_empty() && quote_lines[0].starts_with("[!") && quote_lines[0].contains(']') {
+            if !quote_lines.is_empty()
+                && quote_lines[0].starts_with("[!")
+                && quote_lines[0].contains(']')
+            {
                 let header = quote_lines[0];
                 if let Some(close_idx) = header.find(']') {
                     let ctype = &header[2..close_idx];
@@ -4409,7 +4829,9 @@ pub fn render_markdown_terminal_styled(markdown: &str, options: &TerminalDocOpti
                 || lt.starts_with("```")
                 || is_horizontal_rule(lt)
                 || is_list_item(lt)
-                || (is_table_header(lt) && i + 1 < lines.len() && is_table_delimiter(lines[i + 1].trim()))
+                || (is_table_header(lt)
+                    && i + 1 < lines.len()
+                    && is_table_delimiter(lines[i + 1].trim()))
             {
                 break;
             }
@@ -4436,7 +4858,9 @@ fn is_table_header(line: &str) -> bool {
 fn is_table_delimiter(line: &str) -> bool {
     line.starts_with('|')
         && line.ends_with('|')
-        && line.chars().all(|c| c == '|' || c == '-' || c == ':' || c == ' ')
+        && line
+            .chars()
+            .all(|c| c == '|' || c == '-' || c == ':' || c == ' ')
         && line.contains('-')
 }
 
@@ -4657,13 +5081,22 @@ impl DocPager {
     /// Renders the pager status bar string.
     pub fn render_status_bar(&self) -> String {
         let total = self.lines.len();
-        let start = if total == 0 { 0 } else { self.scroll_offset + 1 };
+        let start = if total == 0 {
+            0
+        } else {
+            self.scroll_offset + 1
+        };
         let end = (self.scroll_offset + self.viewport_height).min(total);
         let pct = self.progress_percentage();
 
         let search_info = if let Some(query) = &self.search_query {
             if let Some(cur) = self.current_match_idx {
-                format!(" [{}/{} matches for '{}']", cur + 1, self.search_matches.len(), query)
+                format!(
+                    " [{}/{} matches for '{}']",
+                    cur + 1,
+                    self.search_matches.len(),
+                    query
+                )
             } else {
                 format!(" [0 matches for '{}']", query)
             }
@@ -4835,13 +5268,19 @@ mod tests {
 
     #[test]
     fn test_escape_html() {
-        assert_eq!(escape_html("<div class=\"test\">&'</div>"), "&lt;div class=&quot;test&quot;&gt;&amp;&#39;&lt;/div&gt;");
+        assert_eq!(
+            escape_html("<div class=\"test\">&'</div>"),
+            "&lt;div class=&quot;test&quot;&gt;&amp;&#39;&lt;/div&gt;"
+        );
     }
 
     #[test]
     fn test_slugify() {
         assert_eq!(slugify("Hello World!"), "hello-world");
-        assert_eq!(slugify("API Reference: v2.0 (Beta)"), "api-reference-v2-0-beta");
+        assert_eq!(
+            slugify("API Reference: v2.0 (Beta)"),
+            "api-reference-v2-0-beta"
+        );
         assert_eq!(slugify("   "), "section");
     }
 
@@ -4879,7 +5318,8 @@ fn main() {}
 
     #[test]
     fn test_inline_formatting() {
-        let md = "**bold** and *italic* and ***bold-italic*** with `code` and ~~strike~~ and ==mark==";
+        let md =
+            "**bold** and *italic* and ***bold-italic*** with `code` and ~~strike~~ and ==mark==";
         let html = render_inline_html(md);
         assert!(html.contains("<strong>bold</strong>"));
         assert!(html.contains("<em>italic</em>"));
@@ -4891,7 +5331,8 @@ fn main() {}
 
     #[test]
     fn test_links_and_images() {
-        let link_md = "[Fusion Assistant](https://github.com/theaungmyatmoe/fusion \"Official Repo\")";
+        let link_md =
+            "[Fusion Assistant](https://github.com/theaungmyatmoe/fusion \"Official Repo\")";
         let link_html = render_inline_html(link_md);
         assert!(link_html.contains("<a href=\"https://github.com/theaungmyatmoe/fusion\" title=\"Official Repo\" target=\"_blank\" rel=\"noopener noreferrer\">Fusion Assistant</a>"));
 
@@ -4902,7 +5343,8 @@ fn main() {}
 
     #[test]
     fn test_code_block_highlighting() {
-        let md = "```rust\npub fn hello_world() -> bool {\n    println!(\"Hello\");\n    true\n}\n```";
+        let md =
+            "```rust\npub fn hello_world() -> bool {\n    println!(\"Hello\");\n    true\n}\n```";
         let html = markdown_to_html(md);
         assert!(html.contains("<div class=\"code-block-wrapper\">"));
         assert!(html.contains("<span class=\"code-lang-badge\">rust</span>"));
@@ -4964,7 +5406,10 @@ fn main() {}
             .show_toc(true)
             .show_sidebar(true)
             .show_search(true)
-            .add_nav_section(NavSection::new("Guides", vec![NavItem::new("Quick Start", "quickstart.html").with_active(true)]))
+            .add_nav_section(NavSection::new(
+                "Guides",
+                vec![NavItem::new("Quick Start", "quickstart.html").with_active(true)],
+            ))
             .build();
 
         let page_html = generate_doc_page(md, &config);
@@ -4993,12 +5438,20 @@ fn main() {}
             DocPage::new("index", "Home", "# Welcome to Docs\nIntroductory content.")
                 .with_category("Getting Started")
                 .with_order(0),
-            DocPage::new("config", "Configuration", "# Config Guide\nSettings details.")
-                .with_category("Getting Started")
-                .with_order(1),
-            DocPage::new("api", "API Reference", "# API Reference\nEndpoints details.")
-                .with_category("Reference")
-                .with_order(0),
+            DocPage::new(
+                "config",
+                "Configuration",
+                "# Config Guide\nSettings details.",
+            )
+            .with_category("Getting Started")
+            .with_order(1),
+            DocPage::new(
+                "api",
+                "API Reference",
+                "# API Reference\nEndpoints details.",
+            )
+            .with_category("Reference")
+            .with_order(0),
         ];
 
         let config = DocConfig::new("Fusion Assistant Site");
@@ -5132,9 +5585,12 @@ fn main() {}
         assert_eq!(visible_width("Hello"), 5);
         assert_eq!(visible_width("\x1b[31;1mHello\x1b[0m"), 5);
         assert_eq!(visible_width("Hello\t"), 9); // tab = 4
-        // Unicode characters: CJK characters take 2 columns
+                                                 // Unicode characters: CJK characters take 2 columns
         assert_eq!(visible_width("世界"), 4);
-        assert_eq!(visible_width("\x1b[32m🦀 Rust 世界\x1b[0m"), 2 + 1 + 4 + 1 + 4);
+        assert_eq!(
+            visible_width("\x1b[32m🦀 Rust 世界\x1b[0m"),
+            2 + 1 + 4 + 1 + 4
+        );
         // Zero width
         assert_eq!(visible_width("\u{200B}"), 0);
     }
@@ -5208,7 +5664,10 @@ fn main() {}
 
         // Uncolored version strips markup
         let plain = render_inline_terminal(md, false);
-        assert_eq!(plain, "bold and italic and bold-italic and code and strike and highlight");
+        assert_eq!(
+            plain,
+            "bold and italic and bold-italic and code and strike and highlight"
+        );
     }
 
     #[test]

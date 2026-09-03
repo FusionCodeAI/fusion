@@ -22,9 +22,7 @@ use ratatui::{
     layout::{Alignment, Constraint, Direction, Layout, Rect},
     style::{Color, Modifier, Style},
     text::{Line, Span},
-    widgets::{
-        Block, BorderType, Borders, Clear, List, ListItem, Paragraph, Widget,
-    },
+    widgets::{Block, BorderType, Borders, Clear, List, ListItem, Paragraph, Widget},
     Terminal,
 };
 use serde::{Deserialize, Serialize};
@@ -90,10 +88,18 @@ impl HunkStatus {
     /// Style for this status based on the theme.
     pub fn style(&self, theme: &Theme) -> Style {
         match self {
-            Self::Pending => Style::default().fg(theme.warning).add_modifier(Modifier::BOLD),
-            Self::Staged => Style::default().fg(theme.success).add_modifier(Modifier::BOLD),
-            Self::Rejected => Style::default().fg(theme.error).add_modifier(Modifier::BOLD),
-            Self::PartiallyStaged => Style::default().fg(theme.accent).add_modifier(Modifier::BOLD),
+            Self::Pending => Style::default()
+                .fg(theme.warning)
+                .add_modifier(Modifier::BOLD),
+            Self::Staged => Style::default()
+                .fg(theme.success)
+                .add_modifier(Modifier::BOLD),
+            Self::Rejected => Style::default()
+                .fg(theme.error)
+                .add_modifier(Modifier::BOLD),
+            Self::PartiallyStaged => Style::default()
+                .fg(theme.accent)
+                .add_modifier(Modifier::BOLD),
         }
     }
 }
@@ -303,11 +309,7 @@ impl DiffHunk {
     pub fn format_unified(&self) -> String {
         let mut out = format!(
             "@@ -{},{} +{},{} @@ {}\n",
-            self.old_start,
-            self.old_lines,
-            self.new_start,
-            self.new_lines,
-            self.header
+            self.old_start, self.old_lines, self.new_start, self.new_lines, self.header
         );
         for l in &self.lines {
             match l.line_type {
@@ -487,7 +489,11 @@ impl DiffFile {
 
             for hunk in &self.hunks {
                 // Determine 1-based old line start (0-indexed in array)
-                let hunk_start = if hunk.old_start > 0 { hunk.old_start - 1 } else { 0 };
+                let hunk_start = if hunk.old_start > 0 {
+                    hunk.old_start - 1
+                } else {
+                    0
+                };
 
                 // Copy unmodified lines before this hunk
                 while orig_idx < hunk_start && orig_idx < orig_lines.len() {
@@ -552,7 +558,8 @@ impl DiffFile {
 
     /// Generate unified diff string containing only staged hunks.
     pub fn generate_staged_patch(&self) -> String {
-        let staged_hunks: Vec<&DiffHunk> = self.hunks.iter().filter(|h| h.status.is_staged()).collect();
+        let staged_hunks: Vec<&DiffHunk> =
+            self.hunks.iter().filter(|h| h.status.is_staged()).collect();
         if staged_hunks.is_empty() {
             return String::new();
         }
@@ -664,7 +671,9 @@ pub fn tokenize_line<'a>(line: &'a str, lang: SyntaxLanguage) -> Vec<SyntaxToken
         SyntaxLanguage::JavaScript | SyntaxLanguage::TypeScript => tokenize_js_ts(line),
         SyntaxLanguage::Python => tokenize_python(line),
         SyntaxLanguage::Go => tokenize_go(line),
-        SyntaxLanguage::Json | SyntaxLanguage::Toml | SyntaxLanguage::Yaml => tokenize_data_format(line),
+        SyntaxLanguage::Json | SyntaxLanguage::Toml | SyntaxLanguage::Yaml => {
+            tokenize_data_format(line)
+        }
         SyntaxLanguage::Shell => tokenize_shell(line),
         SyntaxLanguage::Html | SyntaxLanguage::Css => tokenize_markup(line),
         _ => tokenize_generic(line),
@@ -691,7 +700,8 @@ fn tokenize_rust<'a>(line: &'a str) -> Vec<SyntaxToken<'a>> {
         if bytes[i] == b'#' {
             let start = i;
             i += 1;
-            while i < len && !bytes[i].is_ascii_whitespace() && bytes[i] != b'(' && bytes[i] != b'[' {
+            while i < len && !bytes[i].is_ascii_whitespace() && bytes[i] != b'(' && bytes[i] != b'['
+            {
                 i += 1;
             }
             tokens.push(SyntaxToken {
@@ -702,7 +712,9 @@ fn tokenize_rust<'a>(line: &'a str) -> Vec<SyntaxToken<'a>> {
         }
 
         // Strings: "..." or r#"..."#
-        if bytes[i] == b'"' || (i + 1 < len && bytes[i] == b'r' && (bytes[i + 1] == b'"' || bytes[i + 1] == b'#')) {
+        if bytes[i] == b'"'
+            || (i + 1 < len && bytes[i] == b'r' && (bytes[i + 1] == b'"' || bytes[i + 1] == b'#'))
+        {
             let start = i;
             if bytes[i] == b'r' {
                 i += 1;
@@ -759,15 +771,13 @@ fn tokenize_rust<'a>(line: &'a str) -> Vec<SyntaxToken<'a>> {
 
             let kind = match word {
                 "fn" | "let" | "mut" | "pub" | "struct" | "enum" | "trait" | "impl" | "use"
-                | "mod" | "async" | "await" | "match" | "if" | "else" | "return" | "for"
-                | "in" | "while" | "loop" | "break" | "continue" | "const" | "static"
-                | "type" | "where" | "as" | "ref" | "move" | "unsafe" | "dyn" => {
-                    TokenKind::Keyword
-                }
+                | "mod" | "async" | "await" | "match" | "if" | "else" | "return" | "for" | "in"
+                | "while" | "loop" | "break" | "continue" | "const" | "static" | "type"
+                | "where" | "as" | "ref" | "move" | "unsafe" | "dyn" => TokenKind::Keyword,
                 "Self" | "String" | "str" | "bool" | "u8" | "u16" | "u32" | "u64" | "u128"
                 | "usize" | "i8" | "i16" | "i32" | "i64" | "i128" | "isize" | "f32" | "f64"
-                | "Option" | "Some" | "None" | "Result" | "Ok" | "Err" | "Vec" | "Box"
-                | "Rc" | "Arc" => TokenKind::Type,
+                | "Option" | "Some" | "None" | "Result" | "Ok" | "Err" | "Vec" | "Box" | "Rc"
+                | "Arc" => TokenKind::Type,
                 "true" | "false" => TokenKind::Keyword,
                 _ if is_fn_call => TokenKind::Function,
                 _ => TokenKind::Plain,
@@ -852,7 +862,9 @@ fn tokenize_js_ts<'a>(line: &'a str) -> Vec<SyntaxToken<'a>> {
         // Identifiers / Keywords
         if bytes[i].is_ascii_alphabetic() || bytes[i] == b'_' || bytes[i] == b'$' {
             let start = i;
-            while i < len && (bytes[i].is_ascii_alphanumeric() || bytes[i] == b'_' || bytes[i] == b'$') {
+            while i < len
+                && (bytes[i].is_ascii_alphanumeric() || bytes[i] == b'_' || bytes[i] == b'$')
+            {
                 i += 1;
             }
             let word = &line[start..i];
@@ -919,7 +931,9 @@ fn tokenize_python<'a>(line: &'a str) -> Vec<SyntaxToken<'a>> {
         if bytes[i] == b'@' {
             let start = i;
             i += 1;
-            while i < len && (bytes[i].is_ascii_alphanumeric() || bytes[i] == b'_' || bytes[i] == b'.') {
+            while i < len
+                && (bytes[i].is_ascii_alphanumeric() || bytes[i] == b'_' || bytes[i] == b'.')
+            {
                 i += 1;
             }
             tokens.push(SyntaxToken {
@@ -930,7 +944,12 @@ fn tokenize_python<'a>(line: &'a str) -> Vec<SyntaxToken<'a>> {
         }
 
         // Strings: "..." or '...' or f"..." or r"..."
-        if bytes[i] == b'"' || bytes[i] == b'\'' || ((bytes[i] == b'f' || bytes[i] == b'r' || bytes[i] == b'b') && i + 1 < len && (bytes[i + 1] == b'"' || bytes[i + 1] == b'\'')) {
+        if bytes[i] == b'"'
+            || bytes[i] == b'\''
+            || ((bytes[i] == b'f' || bytes[i] == b'r' || bytes[i] == b'b')
+                && i + 1 < len
+                && (bytes[i + 1] == b'"' || bytes[i + 1] == b'\''))
+        {
             let start = i;
             if bytes[i] == b'f' || bytes[i] == b'r' || bytes[i] == b'b' {
                 i += 1;
@@ -1144,7 +1163,9 @@ fn tokenize_data_format<'a>(line: &'a str) -> Vec<SyntaxToken<'a>> {
         // Numbers
         if bytes[i].is_ascii_digit() {
             let start = i;
-            while i < len && (bytes[i].is_ascii_alphanumeric() || bytes[i] == b'.' || bytes[i] == b'-') {
+            while i < len
+                && (bytes[i].is_ascii_alphanumeric() || bytes[i] == b'.' || bytes[i] == b'-')
+            {
                 i += 1;
             }
             tokens.push(SyntaxToken {
@@ -1157,7 +1178,9 @@ fn tokenize_data_format<'a>(line: &'a str) -> Vec<SyntaxToken<'a>> {
         // Keys / Words
         if bytes[i].is_ascii_alphabetic() || bytes[i] == b'_' || bytes[i] == b'-' {
             let start = i;
-            while i < len && (bytes[i].is_ascii_alphanumeric() || bytes[i] == b'_' || bytes[i] == b'-') {
+            while i < len
+                && (bytes[i].is_ascii_alphanumeric() || bytes[i] == b'_' || bytes[i] == b'-')
+            {
                 i += 1;
             }
             let word = &line[start..i];
@@ -1210,7 +1233,12 @@ fn tokenize_shell<'a>(line: &'a str) -> Vec<SyntaxToken<'a>> {
         if bytes[i] == b'$' {
             let start = i;
             i += 1;
-            while i < len && (bytes[i].is_ascii_alphanumeric() || bytes[i] == b'_' || bytes[i] == b'{' || bytes[i] == b'}') {
+            while i < len
+                && (bytes[i].is_ascii_alphanumeric()
+                    || bytes[i] == b'_'
+                    || bytes[i] == b'{'
+                    || bytes[i] == b'}')
+            {
                 i += 1;
             }
             tokens.push(SyntaxToken {
@@ -1239,14 +1267,16 @@ fn tokenize_shell<'a>(line: &'a str) -> Vec<SyntaxToken<'a>> {
 
         if bytes[i].is_ascii_alphabetic() || bytes[i] == b'_' {
             let start = i;
-            while i < len && (bytes[i].is_ascii_alphanumeric() || bytes[i] == b'_' || bytes[i] == b'-') {
+            while i < len
+                && (bytes[i].is_ascii_alphanumeric() || bytes[i] == b'_' || bytes[i] == b'-')
+            {
                 i += 1;
             }
             let word = &line[start..i];
             let kind = match word {
-                "if" | "then" | "else" | "elif" | "fi" | "for" | "in" | "do" | "done"
-                | "case" | "esac" | "while" | "until" | "function" | "export" | "set"
-                | "local" | "return" | "exit" => TokenKind::Keyword,
+                "if" | "then" | "else" | "elif" | "fi" | "for" | "in" | "do" | "done" | "case"
+                | "esac" | "while" | "until" | "function" | "export" | "set" | "local"
+                | "return" | "exit" => TokenKind::Keyword,
                 _ => TokenKind::Plain,
             };
             tokens.push(SyntaxToken { kind, text: word });
@@ -1254,7 +1284,14 @@ fn tokenize_shell<'a>(line: &'a str) -> Vec<SyntaxToken<'a>> {
         }
 
         let start = i;
-        while i < len && !bytes[i].is_ascii_alphanumeric() && bytes[i] != b'_' && bytes[i] != b'$' && bytes[i] != b'#' && bytes[i] != b'"' && bytes[i] != b'\'' {
+        while i < len
+            && !bytes[i].is_ascii_alphanumeric()
+            && bytes[i] != b'_'
+            && bytes[i] != b'$'
+            && bytes[i] != b'#'
+            && bytes[i] != b'"'
+            && bytes[i] != b'\''
+        {
             i += 1;
         }
         if i > start {
@@ -1345,13 +1382,21 @@ pub fn highlight_tokens_to_spans<'a>(
     let mut spans = Vec::with_capacity(tokens.len());
     for tok in tokens {
         let mut style = match tok.kind {
-            TokenKind::Keyword => Style::default().fg(theme.primary).add_modifier(Modifier::BOLD),
-            TokenKind::Type => Style::default().fg(theme.secondary).add_modifier(Modifier::BOLD),
+            TokenKind::Keyword => Style::default()
+                .fg(theme.primary)
+                .add_modifier(Modifier::BOLD),
+            TokenKind::Type => Style::default()
+                .fg(theme.secondary)
+                .add_modifier(Modifier::BOLD),
             TokenKind::Function => Style::default().fg(theme.accent),
             TokenKind::StringLiteral => Style::default().fg(theme.success),
             TokenKind::NumberLiteral => Style::default().fg(theme.warning),
-            TokenKind::Comment => Style::default().fg(theme.muted).add_modifier(Modifier::ITALIC),
-            TokenKind::Attribute => Style::default().fg(theme.warning).add_modifier(Modifier::BOLD),
+            TokenKind::Comment => Style::default()
+                .fg(theme.muted)
+                .add_modifier(Modifier::ITALIC),
+            TokenKind::Attribute => Style::default()
+                .fg(theme.warning)
+                .add_modifier(Modifier::BOLD),
             TokenKind::Variable => Style::default().fg(theme.info),
             TokenKind::Punctuation | TokenKind::Operator => Style::default().fg(theme.muted),
             TokenKind::Plain => match line_type {
@@ -1490,13 +1535,7 @@ impl DiffViewState {
 
             let header = format!("Hunk {}", hunk_idx + 1);
             let hunk = DiffHunk::new(
-                hunk_idx,
-                old_start,
-                old_count,
-                new_start,
-                new_count,
-                header,
-                lines,
+                hunk_idx, old_start, old_count, new_start, new_count, header, lines,
             );
             hunks.push(hunk);
             hunk_idx += 1;
@@ -1806,7 +1845,11 @@ impl DiffViewState {
         self.syntax_highlighting = !self.syntax_highlighting;
         self.status_message = Some(format!(
             "Syntax highlighting: {}",
-            if self.syntax_highlighting { "ON" } else { "OFF" }
+            if self.syntax_highlighting {
+                "ON"
+            } else {
+                "OFF"
+            }
         ));
     }
 
@@ -1932,7 +1975,9 @@ impl<'a> DiffViewerWidget<'a> {
 
         let stats_badge = Span::styled(
             format!("+{} -{} ", additions, deletions),
-            Style::default().fg(theme.success).add_modifier(Modifier::BOLD),
+            Style::default()
+                .fg(theme.success)
+                .add_modifier(Modifier::BOLD),
         );
 
         let progress_badge = Span::styled(
@@ -1961,7 +2006,11 @@ impl<'a> DiffViewerWidget<'a> {
             progress_badge,
             Span::raw(" | "),
             Span::styled(
-                format!("Files: {}/{}", self.state.active_file_idx + 1, total_files.max(1)),
+                format!(
+                    "Files: {}/{}",
+                    self.state.active_file_idx + 1,
+                    total_files.max(1)
+                ),
                 Style::default().fg(theme.foreground),
             ),
         ]);
@@ -1994,10 +2043,7 @@ impl<'a> DiffViewerWidget<'a> {
             let is_active = idx == self.state.active_file_idx;
             let status = file.status();
 
-            let status_span = Span::styled(
-                format!("{} ", status.icon()),
-                status.style(theme),
-            );
+            let status_span = Span::styled(format!("{} ", status.icon()), status.style(theme));
 
             let prefix = if is_active { "▶ " } else { "  " };
 
@@ -2049,7 +2095,8 @@ impl<'a> DiffViewerWidget<'a> {
         let active_file = match self.state.active_file() {
             Some(f) => f,
             None => {
-                let empty = Paragraph::new("No active file or diff").style(Style::default().fg(theme.muted));
+                let empty = Paragraph::new("No active file or diff")
+                    .style(Style::default().fg(theme.muted));
                 empty.render(area, buf);
                 return;
             }
@@ -2067,7 +2114,8 @@ impl<'a> DiffViewerWidget<'a> {
         block.render(area, buf);
 
         if active_file.hunks.is_empty() {
-            let p = Paragraph::new("No diff hunks in this file").style(Style::default().fg(theme.muted));
+            let p = Paragraph::new("No diff hunks in this file")
+                .style(Style::default().fg(theme.muted));
             p.render(inner, buf);
             return;
         }
@@ -2079,13 +2127,19 @@ impl<'a> DiffViewerWidget<'a> {
             // Hunk Header Line
             let hunk_badge = hunk.status.badge();
             let hunk_badge_style = hunk.status.style(theme);
-            let active_marker = if is_active_hunk { "▶ [ACTIVE HUNK] " } else { "  " };
+            let active_marker = if is_active_hunk {
+                "▶ [ACTIVE HUNK] "
+            } else {
+                "  "
+            };
 
             let header_spans = vec![
                 Span::styled(
                     active_marker,
                     if is_active_hunk {
-                        Style::default().fg(theme.warning).add_modifier(Modifier::BOLD)
+                        Style::default()
+                            .fg(theme.warning)
+                            .add_modifier(Modifier::BOLD)
                     } else {
                         Style::default().fg(theme.muted)
                     },
@@ -2096,7 +2150,9 @@ impl<'a> DiffViewerWidget<'a> {
                         " @@ -{},{} +{},{} @@ {}",
                         hunk.old_start, hunk.old_lines, hunk.new_start, hunk.new_lines, hunk.header
                     ),
-                    Style::default().fg(theme.accent).add_modifier(Modifier::BOLD),
+                    Style::default()
+                        .fg(theme.accent)
+                        .add_modifier(Modifier::BOLD),
                 ),
             ];
             lines.push(Line::from(header_spans));
@@ -2107,8 +2163,14 @@ impl<'a> DiffViewerWidget<'a> {
 
                 // Line numbers gutter
                 if self.state.show_line_numbers {
-                    let old_str = l.old_lineno.map(|n| format!("{:4} ", n)).unwrap_or_else(|| "     ".to_string());
-                    let new_str = l.new_lineno.map(|n| format!("{:4} ", n)).unwrap_or_else(|| "     ".to_string());
+                    let old_str = l
+                        .old_lineno
+                        .map(|n| format!("{:4} ", n))
+                        .unwrap_or_else(|| "     ".to_string());
+                    let new_str = l
+                        .new_lineno
+                        .map(|n| format!("{:4} ", n))
+                        .unwrap_or_else(|| "     ".to_string());
 
                     line_spans.push(Span::styled(old_str, Style::default().fg(theme.muted)));
                     line_spans.push(Span::styled(new_str, Style::default().fg(theme.muted)));
@@ -2117,8 +2179,18 @@ impl<'a> DiffViewerWidget<'a> {
 
                 // Change tag indicator
                 let (indicator, ind_style) = match l.line_type {
-                    DiffLineType::Addition => ("+ ", Style::default().fg(theme.success).add_modifier(Modifier::BOLD)),
-                    DiffLineType::Deletion => ("- ", Style::default().fg(theme.error).add_modifier(Modifier::BOLD)),
+                    DiffLineType::Addition => (
+                        "+ ",
+                        Style::default()
+                            .fg(theme.success)
+                            .add_modifier(Modifier::BOLD),
+                    ),
+                    DiffLineType::Deletion => (
+                        "- ",
+                        Style::default()
+                            .fg(theme.error)
+                            .add_modifier(Modifier::BOLD),
+                    ),
                     _ => ("  ", Style::default().fg(theme.muted)),
                 };
                 line_spans.push(Span::styled(indicator, ind_style));
@@ -2159,7 +2231,8 @@ impl<'a> DiffViewerWidget<'a> {
         let active_file = match self.state.active_file() {
             Some(f) => f,
             None => {
-                let empty = Paragraph::new("No active file").style(Style::default().fg(theme.muted));
+                let empty =
+                    Paragraph::new("No active file").style(Style::default().fg(theme.muted));
                 empty.render(area, buf);
                 return;
             }
@@ -2194,15 +2267,27 @@ impl<'a> DiffViewerWidget<'a> {
 
             // Header for both sides
             left_lines.push(Line::from(vec![
-                Span::styled(if is_active { "▶ " } else { "  " }, Style::default().fg(theme.warning)),
+                Span::styled(
+                    if is_active { "▶ " } else { "  " },
+                    Style::default().fg(theme.warning),
+                ),
                 Span::styled(badge, hunk.status.style(theme)),
-                Span::styled(format!(" @@ -{},{} @@", hunk.old_start, hunk.old_lines), Style::default().fg(theme.accent)),
+                Span::styled(
+                    format!(" @@ -{},{} @@", hunk.old_start, hunk.old_lines),
+                    Style::default().fg(theme.accent),
+                ),
             ]));
 
             right_lines.push(Line::from(vec![
-                Span::styled(if is_active { "▶ " } else { "  " }, Style::default().fg(theme.warning)),
+                Span::styled(
+                    if is_active { "▶ " } else { "  " },
+                    Style::default().fg(theme.warning),
+                ),
                 Span::styled(badge, hunk.status.style(theme)),
-                Span::styled(format!(" @@ +{},{} @@", hunk.new_start, hunk.new_lines), Style::default().fg(theme.accent)),
+                Span::styled(
+                    format!(" @@ +{},{} @@", hunk.new_start, hunk.new_lines),
+                    Style::default().fg(theme.accent),
+                ),
             ]));
 
             // Group additions and deletions
@@ -2210,49 +2295,69 @@ impl<'a> DiffViewerWidget<'a> {
                 match l.line_type {
                     DiffLineType::Context => {
                         let tokens = tokenize_line(&l.content, lang);
-                        let left_spans = highlight_tokens_to_spans(&tokens, DiffLineType::Context, theme);
-                        let right_spans = highlight_tokens_to_spans(&tokens, DiffLineType::Context, theme);
+                        let left_spans =
+                            highlight_tokens_to_spans(&tokens, DiffLineType::Context, theme);
+                        let right_spans =
+                            highlight_tokens_to_spans(&tokens, DiffLineType::Context, theme);
 
-                        let mut l_row = vec![
-                            Span::styled(format!("{:4} │ ", l.old_lineno.unwrap_or(0)), Style::default().fg(theme.muted)),
-                        ];
+                        let mut l_row = vec![Span::styled(
+                            format!("{:4} │ ", l.old_lineno.unwrap_or(0)),
+                            Style::default().fg(theme.muted),
+                        )];
                         l_row.extend(left_spans);
                         left_lines.push(Line::from(l_row));
 
-                        let mut r_row = vec![
-                            Span::styled(format!("{:4} │ ", l.new_lineno.unwrap_or(0)), Style::default().fg(theme.muted)),
-                        ];
+                        let mut r_row = vec![Span::styled(
+                            format!("{:4} │ ", l.new_lineno.unwrap_or(0)),
+                            Style::default().fg(theme.muted),
+                        )];
                         r_row.extend(right_spans);
                         right_lines.push(Line::from(r_row));
                     }
                     DiffLineType::Deletion => {
                         let tokens = tokenize_line(&l.content, lang);
-                        let spans = highlight_tokens_to_spans(&tokens, DiffLineType::Deletion, theme);
+                        let spans =
+                            highlight_tokens_to_spans(&tokens, DiffLineType::Deletion, theme);
 
-                        let mut row = vec![
-                            Span::styled(format!("{:4} │-", l.old_lineno.unwrap_or(0)), Style::default().fg(theme.error)),
-                        ];
+                        let mut row = vec![Span::styled(
+                            format!("{:4} │-", l.old_lineno.unwrap_or(0)),
+                            Style::default().fg(theme.error),
+                        )];
                         row.extend(spans);
                         left_lines.push(Line::from(row));
-                        right_lines.push(Line::from(Span::styled("     │", Style::default().fg(theme.border))));
+                        right_lines.push(Line::from(Span::styled(
+                            "     │",
+                            Style::default().fg(theme.border),
+                        )));
                     }
                     DiffLineType::Addition => {
                         let tokens = tokenize_line(&l.content, lang);
-                        let spans = highlight_tokens_to_spans(&tokens, DiffLineType::Addition, theme);
+                        let spans =
+                            highlight_tokens_to_spans(&tokens, DiffLineType::Addition, theme);
 
-                        let mut row = vec![
-                            Span::styled(format!("{:4} │+", l.new_lineno.unwrap_or(0)), Style::default().fg(theme.success)),
-                        ];
+                        let mut row = vec![Span::styled(
+                            format!("{:4} │+", l.new_lineno.unwrap_or(0)),
+                            Style::default().fg(theme.success),
+                        )];
                         row.extend(spans);
-                        left_lines.push(Line::from(Span::styled("     │", Style::default().fg(theme.border))));
+                        left_lines.push(Line::from(Span::styled(
+                            "     │",
+                            Style::default().fg(theme.border),
+                        )));
                         right_lines.push(Line::from(row));
                     }
                     _ => {}
                 }
             }
 
-            left_lines.push(Line::from(Span::styled("─".repeat(left_area.width as usize), Style::default().fg(theme.border))));
-            right_lines.push(Line::from(Span::styled("─".repeat(right_area.width as usize), Style::default().fg(theme.border))));
+            left_lines.push(Line::from(Span::styled(
+                "─".repeat(left_area.width as usize),
+                Style::default().fg(theme.border),
+            )));
+            right_lines.push(Line::from(Span::styled(
+                "─".repeat(right_area.width as usize),
+                Style::default().fg(theme.border),
+            )));
         }
 
         let left_visible: Vec<Line> = left_lines.into_iter().skip(self.state.scroll_y).collect();
@@ -2268,9 +2373,19 @@ impl<'a> DiffViewerWidget<'a> {
         let status_text = self.state.status_message.as_deref().unwrap_or("Ready");
 
         let hints = vec![
-            Span::styled("[s/Space] ", Style::default().fg(theme.success).add_modifier(Modifier::BOLD)),
+            Span::styled(
+                "[s/Space] ",
+                Style::default()
+                    .fg(theme.success)
+                    .add_modifier(Modifier::BOLD),
+            ),
             Span::raw("Stage  "),
-            Span::styled("[r/x] ", Style::default().fg(theme.error).add_modifier(Modifier::BOLD)),
+            Span::styled(
+                "[r/x] ",
+                Style::default()
+                    .fg(theme.error)
+                    .add_modifier(Modifier::BOLD),
+            ),
             Span::raw("Reject  "),
             Span::styled("[u] ", Style::default().fg(theme.warning)),
             Span::raw("Reset  "),
@@ -2282,14 +2397,22 @@ impl<'a> DiffViewerWidget<'a> {
             Span::raw("File  "),
             Span::styled("[?] ", Style::default().fg(theme.muted)),
             Span::raw("Help  "),
-            Span::styled("[Enter] ", Style::default().fg(theme.primary).add_modifier(Modifier::BOLD)),
+            Span::styled(
+                "[Enter] ",
+                Style::default()
+                    .fg(theme.primary)
+                    .add_modifier(Modifier::BOLD),
+            ),
             Span::raw("Apply  "),
             Span::styled("[q/Esc] ", Style::default().fg(theme.muted)),
             Span::raw("Quit"),
         ];
 
         let mut spans = vec![
-            Span::styled(format!(" Status: {} ", status_text), Style::default().fg(theme.foreground)),
+            Span::styled(
+                format!(" Status: {} ", status_text),
+                Style::default().fg(theme.foreground),
+            ),
             Span::raw(" | "),
         ];
         spans.extend(hints);
@@ -2323,7 +2446,11 @@ impl<'a> DiffViewerWidget<'a> {
         let block = Block::default()
             .borders(Borders::ALL)
             .border_type(BorderType::Double)
-            .border_style(Style::default().fg(theme.primary).add_modifier(Modifier::BOLD))
+            .border_style(
+                Style::default()
+                    .fg(theme.primary)
+                    .add_modifier(Modifier::BOLD),
+            )
             .title(" Interactive Diff Reviewer Keybindings ")
             .title_alignment(Alignment::Center);
 
@@ -2331,9 +2458,12 @@ impl<'a> DiffViewerWidget<'a> {
         block.render(modal_area, buf);
 
         let help_text = vec![
-            Line::from(vec![
-                Span::styled("  Hunk Staging Controls:", Style::default().fg(theme.primary).add_modifier(Modifier::BOLD)),
-            ]),
+            Line::from(vec![Span::styled(
+                "  Hunk Staging Controls:",
+                Style::default()
+                    .fg(theme.primary)
+                    .add_modifier(Modifier::BOLD),
+            )]),
             Line::from("    s / Space / y    Stage current hunk"),
             Line::from("    r / n / x        Reject current hunk"),
             Line::from("    u                Reset current hunk to pending"),
@@ -2342,9 +2472,12 @@ impl<'a> DiffViewerWidget<'a> {
             Line::from("    A                Stage all hunks in all files"),
             Line::from("    X                Reject all hunks in all files"),
             Line::from(""),
-            Line::from(vec![
-                Span::styled("  Navigation & Views:", Style::default().fg(theme.secondary).add_modifier(Modifier::BOLD)),
-            ]),
+            Line::from(vec![Span::styled(
+                "  Navigation & Views:",
+                Style::default()
+                    .fg(theme.secondary)
+                    .add_modifier(Modifier::BOLD),
+            )]),
             Line::from("    n / ] / J        Next hunk"),
             Line::from("    p / [ / K        Previous hunk"),
             Line::from("    > / Ctrl+N       Next file"),
@@ -2355,9 +2488,12 @@ impl<'a> DiffViewerWidget<'a> {
             Line::from("    j / k / Arrows   Scroll up / down"),
             Line::from("    Ctrl+D / Ctrl+U  Page down / page up"),
             Line::from(""),
-            Line::from(vec![
-                Span::styled("  Actions:", Style::default().fg(theme.success).add_modifier(Modifier::BOLD)),
-            ]),
+            Line::from(vec![Span::styled(
+                "  Actions:",
+                Style::default()
+                    .fg(theme.success)
+                    .add_modifier(Modifier::BOLD),
+            )]),
             Line::from("    Enter            Apply staged changes & exit"),
             Line::from("    q / Esc          Cancel & exit"),
             Line::from("    ? / h            Toggle this help modal"),
@@ -2405,7 +2541,10 @@ fn run_diff_view_event_loop(
 
             // If help is active, dismiss on Esc or ?
             if state.show_help {
-                if matches!(key.code, KeyCode::Esc | KeyCode::Char('?') | KeyCode::Char('q')) {
+                if matches!(
+                    key.code,
+                    KeyCode::Esc | KeyCode::Char('?') | KeyCode::Char('q')
+                ) {
                     state.show_help = false;
                 }
                 continue;
@@ -2594,12 +2733,24 @@ mod tests {
         let tokens = tokenize_line(line, SyntaxLanguage::Rust);
 
         assert!(!tokens.is_empty());
-        assert!(tokens.iter().any(|t| t.kind == TokenKind::Keyword && t.text == "pub"));
-        assert!(tokens.iter().any(|t| t.kind == TokenKind::Keyword && t.text == "async"));
-        assert!(tokens.iter().any(|t| t.kind == TokenKind::Keyword && t.text == "fn"));
-        assert!(tokens.iter().any(|t| t.kind == TokenKind::Function && t.text == "compute"));
-        assert!(tokens.iter().any(|t| t.kind == TokenKind::Type && t.text == "u64"));
-        assert!(tokens.iter().any(|t| t.kind == TokenKind::Type && t.text == "Result"));
+        assert!(tokens
+            .iter()
+            .any(|t| t.kind == TokenKind::Keyword && t.text == "pub"));
+        assert!(tokens
+            .iter()
+            .any(|t| t.kind == TokenKind::Keyword && t.text == "async"));
+        assert!(tokens
+            .iter()
+            .any(|t| t.kind == TokenKind::Keyword && t.text == "fn"));
+        assert!(tokens
+            .iter()
+            .any(|t| t.kind == TokenKind::Function && t.text == "compute"));
+        assert!(tokens
+            .iter()
+            .any(|t| t.kind == TokenKind::Type && t.text == "u64"));
+        assert!(tokens
+            .iter()
+            .any(|t| t.kind == TokenKind::Type && t.text == "Result"));
         assert!(tokens.iter().any(|t| t.kind == TokenKind::Comment));
     }
 
@@ -2608,8 +2759,12 @@ mod tests {
         let line = "def process_data(items: list) -> bool: # python function";
         let tokens = tokenize_line(line, SyntaxLanguage::Python);
 
-        assert!(tokens.iter().any(|t| t.kind == TokenKind::Keyword && t.text == "def"));
-        assert!(tokens.iter().any(|t| t.kind == TokenKind::Function && t.text == "process_data"));
+        assert!(tokens
+            .iter()
+            .any(|t| t.kind == TokenKind::Keyword && t.text == "def"));
+        assert!(tokens
+            .iter()
+            .any(|t| t.kind == TokenKind::Function && t.text == "process_data"));
         assert!(tokens.iter().any(|t| t.kind == TokenKind::Comment));
     }
 
@@ -2654,10 +2809,8 @@ mod tests {
 
     #[test]
     fn test_navigation_and_mode_toggles() {
-        let mut state = DiffViewState::new(vec![
-            DiffFile::new("file1.rs"),
-            DiffFile::new("file2.rs"),
-        ]);
+        let mut state =
+            DiffViewState::new(vec![DiffFile::new("file1.rs"), DiffFile::new("file2.rs")]);
 
         assert_eq!(state.active_file_idx, 0);
         state.next_file();
@@ -2686,13 +2839,21 @@ mod tests {
     fn test_syntax_tokenizer_javascript_and_go() {
         let js = "const handle = async (req: Request): Promise<Response> => { return null; };";
         let js_tokens = tokenize_line(js, SyntaxLanguage::TypeScript);
-        assert!(js_tokens.iter().any(|t| t.kind == TokenKind::Keyword && t.text == "const"));
-        assert!(js_tokens.iter().any(|t| t.kind == TokenKind::Keyword && t.text == "async"));
-        assert!(js_tokens.iter().any(|t| t.kind == TokenKind::Type && t.text == "Promise"));
+        assert!(js_tokens
+            .iter()
+            .any(|t| t.kind == TokenKind::Keyword && t.text == "const"));
+        assert!(js_tokens
+            .iter()
+            .any(|t| t.kind == TokenKind::Keyword && t.text == "async"));
+        assert!(js_tokens
+            .iter()
+            .any(|t| t.kind == TokenKind::Type && t.text == "Promise"));
 
         let go = "func main() { fmt.Println(\"Hello World\") }";
         let go_tokens = tokenize_line(go, SyntaxLanguage::Go);
-        assert!(go_tokens.iter().any(|t| t.kind == TokenKind::Keyword && t.text == "func"));
+        assert!(go_tokens
+            .iter()
+            .any(|t| t.kind == TokenKind::Keyword && t.text == "func"));
         assert!(go_tokens.iter().any(|t| t.kind == TokenKind::StringLiteral));
     }
 
@@ -2700,14 +2861,22 @@ mod tests {
     fn test_syntax_tokenizer_shell_and_json() {
         let sh = "export FUSION_HOME=\"/tmp/fusion\" # env setup";
         let sh_tokens = tokenize_line(sh, SyntaxLanguage::Shell);
-        assert!(sh_tokens.iter().any(|t| t.kind == TokenKind::Keyword && t.text == "export"));
+        assert!(sh_tokens
+            .iter()
+            .any(|t| t.kind == TokenKind::Keyword && t.text == "export"));
         assert!(sh_tokens.iter().any(|t| t.kind == TokenKind::Comment));
 
         let json = "{\"name\": \"fusion\", \"version\": 100, \"active\": true}";
         let json_tokens = tokenize_line(json, SyntaxLanguage::Json);
-        assert!(json_tokens.iter().any(|t| t.kind == TokenKind::StringLiteral));
-        assert!(json_tokens.iter().any(|t| t.kind == TokenKind::NumberLiteral));
-        assert!(json_tokens.iter().any(|t| t.kind == TokenKind::Keyword && t.text == "true"));
+        assert!(json_tokens
+            .iter()
+            .any(|t| t.kind == TokenKind::StringLiteral));
+        assert!(json_tokens
+            .iter()
+            .any(|t| t.kind == TokenKind::NumberLiteral));
+        assert!(json_tokens
+            .iter()
+            .any(|t| t.kind == TokenKind::Keyword && t.text == "true"));
     }
 
     #[test]
@@ -2733,7 +2902,10 @@ mod tests {
         // Stage first hunk only
         state.stage_current_hunk();
         assert_eq!(state.total_staged_hunks(), 1);
-        assert_eq!(state.active_file().unwrap().status(), HunkStatus::PartiallyStaged);
+        assert_eq!(
+            state.active_file().unwrap().status(),
+            HunkStatus::PartiallyStaged
+        );
 
         // Check generated staged patch has only first hunk
         let patch = state.get_staged_diff();
@@ -2743,7 +2915,10 @@ mod tests {
         // Reject second hunk
         state.reject_current_hunk();
         assert_eq!(state.total_rejected_hunks(), 1);
-        assert_eq!(state.active_file().unwrap().status(), HunkStatus::PartiallyStaged);
+        assert_eq!(
+            state.active_file().unwrap().status(),
+            HunkStatus::PartiallyStaged
+        );
     }
 
     #[test]
@@ -2763,7 +2938,10 @@ mod tests {
 
         // Render unified view
         widget.render(area, &mut buffer);
-        assert!(buffer.content().iter().any(|c| c.symbol() == "F" || c.symbol() == "f"));
+        assert!(buffer
+            .content()
+            .iter()
+            .any(|c| c.symbol() == "F" || c.symbol() == "f"));
 
         // Render side-by-side view
         state.toggle_view_mode();

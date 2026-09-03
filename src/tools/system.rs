@@ -312,7 +312,11 @@ impl SystemReport {
             }
             if !self.cpu.features.is_empty() {
                 let feat_preview = if self.cpu.features.len() > 8 {
-                    format!("{} (+{} more)", self.cpu.features[..8].join(", "), self.cpu.features.len() - 8)
+                    format!(
+                        "{} (+{} more)",
+                        self.cpu.features[..8].join(", "),
+                        self.cpu.features.len() - 8
+                    )
                 } else {
                     self.cpu.features.join(", ")
                 };
@@ -323,15 +327,30 @@ impl SystemReport {
 
         if cat == "all" || cat == "memory" || cat == "mem" || cat == "ram" {
             out.push_str("=== Memory (RAM) ===\n");
-            out.push_str(&format!("  Total:         {}\n", self.memory.total_formatted));
-            out.push_str(&format!("  Available:     {}\n", self.memory.available_formatted));
-            out.push_str(&format!("  Used:          {} ({:.1}%)\n", self.memory.used_formatted, self.memory.used_percent));
-            out.push_str(&format!("  Free:          {}\n", self.memory.free_formatted));
+            out.push_str(&format!(
+                "  Total:         {}\n",
+                self.memory.total_formatted
+            ));
+            out.push_str(&format!(
+                "  Available:     {}\n",
+                self.memory.available_formatted
+            ));
+            out.push_str(&format!(
+                "  Used:          {} ({:.1}%)\n",
+                self.memory.used_formatted, self.memory.used_percent
+            ));
+            out.push_str(&format!(
+                "  Free:          {}\n",
+                self.memory.free_formatted
+            ));
 
             if let Some(swap) = &self.swap {
                 out.push_str("\n=== Swap Space ===\n");
                 out.push_str(&format!("  Total Swap:    {}\n", swap.total_formatted));
-                out.push_str(&format!("  Used Swap:     {} ({:.1}%)\n", swap.used_formatted, swap.used_percent));
+                out.push_str(&format!(
+                    "  Used Swap:     {} ({:.1}%)\n",
+                    swap.used_formatted, swap.used_percent
+                ));
                 out.push_str(&format!("  Free Swap:     {}\n", swap.free_formatted));
             }
             out.push('\n');
@@ -343,9 +362,15 @@ impl SystemReport {
                 out.push_str(&format!("  Model:         {}\n", model));
             }
             out.push_str(&format!("  Machine:       {}\n", self.hardware.machine));
-            out.push_str(&format!("  Pointer Width: {}-bit\n", self.hardware.pointer_width_bits));
+            out.push_str(&format!(
+                "  Pointer Width: {}-bit\n",
+                self.hardware.pointer_width_bits
+            ));
             out.push_str(&format!("  Endianness:    {}\n", self.hardware.endianness));
-            out.push_str(&format!("  Target Triple: {}\n", self.hardware.target_platform));
+            out.push_str(&format!(
+                "  Target Triple: {}\n",
+                self.hardware.target_platform
+            ));
             out.push('\n');
         }
 
@@ -355,27 +380,41 @@ impl SystemReport {
                 out.push_str(&format!("  Path:          {}\n", disk.path));
                 out.push_str(&format!("  Total:         {}\n", disk.total_formatted));
                 out.push_str(&format!("  Available:     {}\n", disk.available_formatted));
-                out.push_str(&format!("  Used:          {} ({:.1}%)\n", disk.used_formatted, disk.used_percent));
+                out.push_str(&format!(
+                    "  Used:          {} ({:.1}%)\n",
+                    disk.used_formatted, disk.used_percent
+                ));
                 out.push('\n');
             }
         }
 
         if cat == "all" || cat == "runtime" || cat == "env" {
             out.push_str("=== Runtime Environment ===\n");
-            out.push_str(&format!("  Fusion Version:{}\n", self.runtime.fusion_version));
+            out.push_str(&format!(
+                "  Fusion Version:{}\n",
+                self.runtime.fusion_version
+            ));
             out.push_str(&format!("  Working Dir:   {}\n", self.runtime.cwd));
             out.push_str(&format!("  Process ID:    {}\n", self.runtime.process_id));
             if let Some(uptime) = &self.runtime.uptime_formatted {
                 out.push_str(&format!("  System Uptime: {}\n", uptime));
             }
             if let Some(load) = self.runtime.load_average {
-                out.push_str(&format!("  Load Average:  {:.2}, {:.2}, {:.2}\n", load[0], load[1], load[2]));
+                out.push_str(&format!(
+                    "  Load Average:  {:.2}, {:.2}, {:.2}\n",
+                    load[0], load[1], load[2]
+                ));
             }
             if let Some(batt) = &self.battery {
-                out.push_str(&format!("  Battery:       {}% ({}, {})\n",
+                out.push_str(&format!(
+                    "  Battery:       {}% ({}, {})\n",
                     batt.percentage,
                     batt.state,
-                    if batt.is_charging { "Charging" } else { "On Battery" }
+                    if batt.is_charging {
+                        "Charging"
+                    } else {
+                        "On Battery"
+                    }
                 ));
             }
             out.push('\n');
@@ -383,11 +422,23 @@ impl SystemReport {
 
         if cat == "summary" {
             out.push_str("=== System Summary ===\n");
-            out.push_str(&format!("  OS:      {} ({})\n", self.os.pretty_name, self.os.arch));
-            out.push_str(&format!("  CPU:     {} ({} cores)\n", self.cpu.model_name, self.cpu.logical_cores));
-            out.push_str(&format!("  Memory:  {}/{} used ({:.1}%)\n", self.memory.used_formatted, self.memory.total_formatted, self.memory.used_percent));
+            out.push_str(&format!(
+                "  OS:      {} ({})\n",
+                self.os.pretty_name, self.os.arch
+            ));
+            out.push_str(&format!(
+                "  CPU:     {} ({} cores)\n",
+                self.cpu.model_name, self.cpu.logical_cores
+            ));
+            out.push_str(&format!(
+                "  Memory:  {}/{} used ({:.1}%)\n",
+                self.memory.used_formatted, self.memory.total_formatted, self.memory.used_percent
+            ));
             if let Some(disk) = &self.disk {
-                out.push_str(&format!("  Disk:    {}/{} used ({:.1}%)\n", disk.used_formatted, disk.total_formatted, disk.used_percent));
+                out.push_str(&format!(
+                    "  Disk:    {}/{} used ({:.1}%)\n",
+                    disk.used_formatted, disk.total_formatted, disk.used_percent
+                ));
             }
             if let Some(uptime) = &self.runtime.uptime_formatted {
                 out.push_str(&format!("  Uptime:  {}\n", uptime));
@@ -563,7 +614,9 @@ pub fn parse_os_release(content: &str) -> HashMap<String, String> {
         if let Some((key, val)) = line.split_once('=') {
             let key = key.trim().to_string();
             let mut val = val.trim().to_string();
-            if (val.starts_with('"') && val.ends_with('"')) || (val.starts_with('\'') && val.ends_with('\'')) {
+            if (val.starts_with('"') && val.ends_with('"'))
+                || (val.starts_with('\'') && val.ends_with('\''))
+            {
                 if val.len() >= 2 {
                     val = val[1..val.len() - 1].to_string();
                 }
@@ -692,7 +745,9 @@ pub fn parse_proc_cpuinfo(content: &str) -> ParsedProcCpuInfo {
             let key = k.trim();
             let val = v.trim();
 
-            if info.model_name.is_none() && (key == "model name" || key == "Hardware" || key == "Processor") {
+            if info.model_name.is_none()
+                && (key == "model name" || key == "Hardware" || key == "Processor")
+            {
                 if !val.is_empty() {
                     info.model_name = Some(val.to_string());
                 }
@@ -911,9 +966,9 @@ fn collect_memory_and_swap_info() -> (MemoryInfo, Option<SwapInfo>) {
             let parsed = parse_proc_meminfo(&meminfo_str);
             total_bytes = parsed.mem_total_kb * 1024;
             free_bytes = parsed.mem_free_kb * 1024;
-            let avail_kb = parsed.mem_available_kb.unwrap_or_else(|| {
-                parsed.mem_free_kb + parsed.buffers_kb + parsed.cached_kb
-            });
+            let avail_kb = parsed
+                .mem_available_kb
+                .unwrap_or_else(|| parsed.mem_free_kb + parsed.buffers_kb + parsed.cached_kb);
             available_bytes = avail_kb * 1024;
 
             if parsed.swap_total_kb > 0 {
@@ -940,7 +995,15 @@ fn collect_memory_and_swap_info() -> (MemoryInfo, Option<SwapInfo>) {
 
     #[cfg(target_os = "windows")]
     {
-        if let Some(wmic_out) = run_command("wmic", &["OS", "get", "FreePhysicalMemory,TotalVisibleMemorySize", "/Value"]) {
+        if let Some(wmic_out) = run_command(
+            "wmic",
+            &[
+                "OS",
+                "get",
+                "FreePhysicalMemory,TotalVisibleMemorySize",
+                "/Value",
+            ],
+        ) {
             for line in wmic_out.lines() {
                 if let Some((k, v)) = line.split_once('=') {
                     let val = v.trim().parse::<u64>().unwrap_or(0);
@@ -1122,7 +1185,6 @@ pub fn parse_macos_loadavg(content: &str) -> Option<[f64; 3]> {
     }
 }
 
-
 /// Parses macOS `kern.boottime` (e.g. "{ sec = 1725200000, usec = 0 } Mon Sep ...").
 pub fn parse_macos_boottime(content: &str) -> Option<u64> {
     if let Some(idx) = content.find("sec = ") {
@@ -1143,7 +1205,11 @@ fn collect_runtime_info(cwd: Option<&Path>) -> RuntimeInfo {
     let target_triple = format!("{}-{}", std::env::consts::ARCH, std::env::consts::OS);
     let cwd_str = cwd
         .map(|p| p.display().to_string())
-        .or_else(|| std::env::current_dir().ok().map(|p| p.display().to_string()))
+        .or_else(|| {
+            std::env::current_dir()
+                .ok()
+                .map(|p| p.display().to_string())
+        })
         .unwrap_or_else(|| ".".to_string());
     let process_id = std::process::id();
 
@@ -1191,9 +1257,17 @@ pub fn parse_macos_battery(content: &str) -> Option<BatteryInfo> {
         if line.contains('%') {
             if let Some(pct_idx) = line.find('%') {
                 let before = &line[..pct_idx];
-                let num_str: String = before.chars().rev().take_while(|c| c.is_ascii_digit()).collect::<String>().chars().rev().collect();
+                let num_str: String = before
+                    .chars()
+                    .rev()
+                    .take_while(|c| c.is_ascii_digit())
+                    .collect::<String>()
+                    .chars()
+                    .rev()
+                    .collect();
                 if let Ok(pct) = num_str.parse::<u8>() {
-                    let is_charging = line.to_lowercase().contains("charging") && !line.to_lowercase().contains("discharging");
+                    let is_charging = line.to_lowercase().contains("charging")
+                        && !line.to_lowercase().contains("discharging");
                     let state = if line.contains("discharging") {
                         "Discharging".to_string()
                     } else if line.contains("charging") {
@@ -1230,8 +1304,13 @@ fn collect_battery_info() -> Option<BatteryInfo> {
         let cap_path = Path::new("/sys/class/power_supply/BAT0/capacity");
         let status_path = Path::new("/sys/class/power_supply/BAT0/status");
         if cap_path.exists() {
-            let cap = std::fs::read_to_string(cap_path).ok()?.trim().parse::<u8>().ok()?;
-            let status = std::fs::read_to_string(status_path).unwrap_or_else(|_| "Unknown".to_string());
+            let cap = std::fs::read_to_string(cap_path)
+                .ok()?
+                .trim()
+                .parse::<u8>()
+                .ok()?;
+            let status =
+                std::fs::read_to_string(status_path).unwrap_or_else(|_| "Unknown".to_string());
             let status = status.trim().to_string();
             let is_charging = status.eq_ignore_ascii_case("Charging");
             return Some(BatteryInfo {
@@ -1397,7 +1476,10 @@ cpu cores	: 16
 flags		: fpu vme de pse tsc msr pae mce cx8 apic sep
 "#;
         let parsed = parse_proc_cpuinfo(sample);
-        assert_eq!(parsed.model_name.unwrap(), "AMD Ryzen 9 5950X 16-Core Processor");
+        assert_eq!(
+            parsed.model_name.unwrap(),
+            "AMD Ryzen 9 5950X 16-Core Processor"
+        );
         assert_eq!(parsed.vendor.unwrap(), "AuthenticAMD");
         assert_eq!(parsed.frequency_mhz.unwrap(), 3400);
         assert_eq!(parsed.physical_cores.unwrap(), 16);
@@ -1516,9 +1598,21 @@ Pages occupied by compressor:             12000.
         let text_res = tool.execute(json!({}), &ctx).await;
         assert!(text_res.is_ok(), "Tool execution failed: {:?}", text_res);
         let text = text_res.unwrap();
-        assert!(text.contains("Operating System"), "Missing OS header: {}", text);
-        assert!(text.contains("CPU Information"), "Missing CPU header: {}", text);
-        assert!(text.contains("Memory (RAM)"), "Missing Memory header: {}", text);
+        assert!(
+            text.contains("Operating System"),
+            "Missing OS header: {}",
+            text
+        );
+        assert!(
+            text.contains("CPU Information"),
+            "Missing CPU header: {}",
+            text
+        );
+        assert!(
+            text.contains("Memory (RAM)"),
+            "Missing Memory header: {}",
+            text
+        );
 
         // 2. Test JSON format execution
         let json_res = tool.execute(json!({"format": "json"}), &ctx).await;
@@ -1530,17 +1624,26 @@ Pages occupied by compressor:             12000.
         assert!(parsed_val.get("memory").is_some());
 
         // 3. Test category filtering (cpu only)
-        let cpu_text = tool.execute(json!({"category": "cpu"}), &ctx).await.unwrap();
+        let cpu_text = tool
+            .execute(json!({"category": "cpu"}), &ctx)
+            .await
+            .unwrap();
         assert!(cpu_text.contains("CPU Information"));
         assert!(!cpu_text.contains("Operating System"));
 
         // 4. Test category filtering (memory JSON)
-        let mem_json = tool.execute(json!({"category": "memory", "format": "json"}), &ctx).await.unwrap();
+        let mem_json = tool
+            .execute(json!({"category": "memory", "format": "json"}), &ctx)
+            .await
+            .unwrap();
         let mem_val: Value = serde_json::from_str(&mem_json).expect("Invalid JSON for memory");
         assert!(mem_val.get("ram").is_some());
 
         // 5. Test summary category
-        let sum_text = tool.execute(json!({"category": "summary"}), &ctx).await.unwrap();
+        let sum_text = tool
+            .execute(json!({"category": "summary"}), &ctx)
+            .await
+            .unwrap();
         assert!(sum_text.contains("System Summary"));
     }
 }

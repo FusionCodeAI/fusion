@@ -441,7 +441,10 @@ impl RateLimitInfo {
             RateLimitKind::ConcurrentRequests
         } else if lower.contains("quota exceeded") || lower.contains("insufficient_quota") {
             RateLimitKind::QuotaExceeded
-        } else if lower.contains("529") || lower.contains("overloaded") || lower.contains("capacity") {
+        } else if lower.contains("529")
+            || lower.contains("overloaded")
+            || lower.contains("capacity")
+        {
             RateLimitKind::ServerOverload
         } else if lower.contains("turn limit") || lower.contains("turn rate") {
             RateLimitKind::TurnRateLimit
@@ -452,7 +455,9 @@ impl RateLimitInfo {
         // 2. Extract Retry-After if present in string (e.g. "try again in 4.5s" or "Retry-After: 12")
         let parsed_delay = parse_delay_from_error_str(error_str).unwrap_or(default_delay);
 
-        let mut info = Self::new(parsed_delay).with_kind(kind).with_message(error_str);
+        let mut info = Self::new(parsed_delay)
+            .with_kind(kind)
+            .with_message(error_str);
 
         // 3. Provider detection heuristic
         if lower.contains("anthropic") || lower.contains("claude") {
@@ -559,7 +564,11 @@ impl RateLimitInfo {
         }
 
         if let (Some(rem), Some(lim)) = (self.remaining_tpm, self.limit_tpm) {
-            parts.push(format!("TPM: {}/{}", format_tokens_compact(rem), format_tokens_compact(lim)));
+            parts.push(format!(
+                "TPM: {}/{}",
+                format_tokens_compact(rem),
+                format_tokens_compact(lim)
+            ));
         } else if let Some(lim) = self.limit_tpm {
             parts.push(format!("TPM Limit: {}", format_tokens_compact(lim)));
         }
@@ -958,9 +967,14 @@ pub fn render_rate_limit_banner_ansi(
     };
 
     let status_desc = match info.status {
-        RateLimitStatus::Waiting => format!("Retrying in: {}{}{}", countdown_color, countdown_str, ANSI_RESET),
+        RateLimitStatus::Waiting => format!(
+            "Retrying in: {}{}{}",
+            countdown_color, countdown_str, ANSI_RESET
+        ),
         RateLimitStatus::Retrying => format!("{}Retrying now...{}", ANSI_BOLD_CYAN, ANSI_RESET),
-        RateLimitStatus::Succeeded => format!("{}Request succeeded!{}", ANSI_BOLD_GREEN, ANSI_RESET),
+        RateLimitStatus::Succeeded => {
+            format!("{}Request succeeded!{}", ANSI_BOLD_GREEN, ANSI_RESET)
+        }
         RateLimitStatus::Failed => format!("{}Max retries exceeded{}", ANSI_BOLD_RED, ANSI_RESET),
         RateLimitStatus::Cancelled => format!("{}Retry cancelled{}", ANSI_GRAY, ANSI_RESET),
     };
@@ -981,10 +995,7 @@ pub fn render_rate_limit_banner_ansi(
     let strategy_label = info.backoff_strategy.short_name();
     let mut line3 = format!(
         "{} | Strategy: {}{}{}",
-        attempt_badge,
-        ANSI_DIM,
-        strategy_label,
-        ANSI_RESET
+        attempt_badge, ANSI_DIM, strategy_label, ANSI_RESET
     );
 
     if let Some(metrics) = info.format_metrics_badge() {
@@ -993,8 +1004,12 @@ pub fn render_rate_limit_banner_ansi(
     render_line(&line3, &mut out);
 
     // 5. Line 4: Actionable suggestions / hints
-    let default_suggestion = "[Esc] Cancel  [/model] Switch Model  [/compact] Prune Tokens".to_string();
-    let suggestion = info.suggested_action.as_ref().unwrap_or(&default_suggestion);
+    let default_suggestion =
+        "[Esc] Cancel  [/model] Switch Model  [/compact] Prune Tokens".to_string();
+    let suggestion = info
+        .suggested_action
+        .as_ref()
+        .unwrap_or(&default_suggestion);
     let line4 = format!("{}Action: {}{}", ANSI_DIM, suggestion, ANSI_RESET);
     render_line(&line4, &mut out);
 
@@ -1143,13 +1158,32 @@ impl<'a> Widget for RateLimitBannerWidget<'a> {
             let countdown = self.info.format_countdown();
             let provider = self.info.provider.as_deref().unwrap_or("API");
             let line = Line::from(vec![
-                Span::styled(" ⚠️ RATE LIMITED ", Style::default().fg(Color::Black).bg(alert_color).add_modifier(Modifier::BOLD)),
+                Span::styled(
+                    " ⚠️ RATE LIMITED ",
+                    Style::default()
+                        .fg(Color::Black)
+                        .bg(alert_color)
+                        .add_modifier(Modifier::BOLD),
+                ),
                 Span::raw(" "),
-                Span::styled(provider, Style::default().fg(self.theme.primary).add_modifier(Modifier::BOLD)),
+                Span::styled(
+                    provider,
+                    Style::default()
+                        .fg(self.theme.primary)
+                        .add_modifier(Modifier::BOLD),
+                ),
                 Span::raw(" | Retrying in: "),
-                Span::styled(countdown, Style::default().fg(alert_color).add_modifier(Modifier::BOLD)),
+                Span::styled(
+                    countdown,
+                    Style::default()
+                        .fg(alert_color)
+                        .add_modifier(Modifier::BOLD),
+                ),
                 Span::raw(" | "),
-                Span::styled(self.info.format_attempt_badge(), Style::default().fg(self.theme.muted)),
+                Span::styled(
+                    self.info.format_attempt_badge(),
+                    Style::default().fg(self.theme.muted),
+                ),
             ]);
             let paragraph = Paragraph::new(line);
             paragraph.render(area, buf);
@@ -1160,7 +1194,9 @@ impl<'a> Widget for RateLimitBannerWidget<'a> {
         let title_spans = vec![
             Span::styled(
                 format!(" {} RATE LIMIT NOTICE ", self.info.kind.icon()),
-                Style::default().fg(alert_color).add_modifier(Modifier::BOLD),
+                Style::default()
+                    .fg(alert_color)
+                    .add_modifier(Modifier::BOLD),
             ),
             Span::styled(
                 format!("[ {} ]", self.info.status.badge_label()),
@@ -1188,12 +1224,25 @@ impl<'a> Widget for RateLimitBannerWidget<'a> {
         let model_name = self.info.model.as_deref().unwrap_or("Active Model");
 
         lines.push(Line::from(vec![
-            Span::styled(provider_name, Style::default().fg(self.theme.primary).add_modifier(Modifier::BOLD)),
+            Span::styled(
+                provider_name,
+                Style::default()
+                    .fg(self.theme.primary)
+                    .add_modifier(Modifier::BOLD),
+            ),
             Span::raw(" ("),
             Span::styled(model_name, Style::default().fg(self.theme.secondary)),
             Span::raw(")  |  Reason: "),
-            Span::styled(self.info.kind.badge_label(), Style::default().fg(alert_color).add_modifier(Modifier::BOLD)),
-            Span::styled(format!(" - {}", self.info.kind.description()), Style::default().fg(self.theme.muted)),
+            Span::styled(
+                self.info.kind.badge_label(),
+                Style::default()
+                    .fg(alert_color)
+                    .add_modifier(Modifier::BOLD),
+            ),
+            Span::styled(
+                format!(" - {}", self.info.kind.description()),
+                Style::default().fg(self.theme.muted),
+            ),
         ]));
 
         // Line 2: Countdown Timer & Visual Progress Meter
@@ -1204,20 +1253,39 @@ impl<'a> Widget for RateLimitBannerWidget<'a> {
         let pct = (progress * 100.0).round() as u32;
 
         lines.push(Line::from(vec![
-            Span::styled(format!("{} ", self.info.spinner_frame()), Style::default().fg(alert_color)),
+            Span::styled(
+                format!("{} ", self.info.spinner_frame()),
+                Style::default().fg(alert_color),
+            ),
             Span::raw("Retrying in: "),
-            Span::styled(countdown, Style::default().fg(alert_color).add_modifier(Modifier::BOLD)),
+            Span::styled(
+                countdown,
+                Style::default()
+                    .fg(alert_color)
+                    .add_modifier(Modifier::BOLD),
+            ),
             Span::raw("  [ "),
             Span::styled(progress_bar, Style::default().fg(alert_color)),
-            Span::styled(format!(" ] {:>3}%", pct), Style::default().fg(self.theme.foreground)),
+            Span::styled(
+                format!(" ] {:>3}%", pct),
+                Style::default().fg(self.theme.foreground),
+            ),
         ]));
 
         // Line 3: Attempt counter, Strategy, and optional metrics
         if inner_area.height >= 3 {
             let mut line3_spans = vec![
-                Span::styled(self.info.format_attempt_badge(), Style::default().fg(self.theme.foreground).add_modifier(Modifier::BOLD)),
+                Span::styled(
+                    self.info.format_attempt_badge(),
+                    Style::default()
+                        .fg(self.theme.foreground)
+                        .add_modifier(Modifier::BOLD),
+                ),
                 Span::raw("  |  Strategy: "),
-                Span::styled(self.info.backoff_strategy.label(), Style::default().fg(self.theme.muted)),
+                Span::styled(
+                    self.info.backoff_strategy.label(),
+                    Style::default().fg(self.theme.muted),
+                ),
             ];
 
             if self.show_metrics {
@@ -1232,12 +1300,22 @@ impl<'a> Widget for RateLimitBannerWidget<'a> {
 
         // Line 4: Action Suggestions
         if inner_area.height >= 4 && self.show_suggestions {
-            let default_action = "[Esc] Cancel  [/model] Switch Model  [/compact] Prune Tokens".to_string();
-            let action_text = self.info.suggested_action.as_ref().unwrap_or(&default_action);
+            let default_action =
+                "[Esc] Cancel  [/model] Switch Model  [/compact] Prune Tokens".to_string();
+            let action_text = self
+                .info
+                .suggested_action
+                .as_ref()
+                .unwrap_or(&default_action);
 
             lines.push(Line::from(vec![
                 Span::styled("Actions: ", Style::default().fg(self.theme.muted)),
-                Span::styled(action_text.to_string(), Style::default().fg(self.theme.foreground).add_modifier(Modifier::DIM)),
+                Span::styled(
+                    action_text.to_string(),
+                    Style::default()
+                        .fg(self.theme.foreground)
+                        .add_modifier(Modifier::DIM),
+                ),
             ]));
         }
 
@@ -1277,14 +1355,30 @@ impl<'a> Widget for RateLimitMiniBannerWidget<'a> {
         let line = Line::from(vec![
             Span::styled(
                 format!(" {} 429 ", self.info.kind.icon()),
-                Style::default().fg(Color::Black).bg(self.theme.warning).add_modifier(Modifier::BOLD),
+                Style::default()
+                    .fg(Color::Black)
+                    .bg(self.theme.warning)
+                    .add_modifier(Modifier::BOLD),
             ),
             Span::raw(" "),
-            Span::styled(provider, Style::default().fg(self.theme.primary).add_modifier(Modifier::BOLD)),
+            Span::styled(
+                provider,
+                Style::default()
+                    .fg(self.theme.primary)
+                    .add_modifier(Modifier::BOLD),
+            ),
             Span::raw(": Retry in "),
-            Span::styled(countdown, Style::default().fg(self.theme.warning).add_modifier(Modifier::BOLD)),
+            Span::styled(
+                countdown,
+                Style::default()
+                    .fg(self.theme.warning)
+                    .add_modifier(Modifier::BOLD),
+            ),
             Span::raw(" ("),
-            Span::styled(self.info.format_attempt_badge(), Style::default().fg(self.theme.muted)),
+            Span::styled(
+                self.info.format_attempt_badge(),
+                Style::default().fg(self.theme.muted),
+            ),
             Span::raw(")"),
         ]);
 
@@ -1334,7 +1428,12 @@ impl<'a> Widget for RateLimitCountdownBarWidget<'a> {
         let line = Line::from(vec![
             Span::styled(bar_str, Style::default().fg(self.theme.warning)),
             Span::raw(" "),
-            Span::styled(countdown, Style::default().fg(self.theme.foreground).add_modifier(Modifier::BOLD)),
+            Span::styled(
+                countdown,
+                Style::default()
+                    .fg(self.theme.foreground)
+                    .add_modifier(Modifier::BOLD),
+            ),
         ]);
 
         let paragraph = Paragraph::new(line);
@@ -1405,7 +1504,9 @@ impl RateLimitTracker {
 
     /// Returns `true` if an active rate limit countdown is currently underway.
     pub fn is_active(&self) -> bool {
-        self.active.as_ref().map_or(false, |info| !info.status.is_terminal())
+        self.active
+            .as_ref()
+            .map_or(false, |info| !info.status.is_terminal())
     }
 
     /// Advances the countdown timer and animation frames.
@@ -1491,7 +1592,9 @@ impl RateLimitState {
 
     /// Create a new state with an active rate limit countdown.
     pub fn waiting(retry_after: Duration) -> Self {
-        Self { retry_after: Some(retry_after) }
+        Self {
+            retry_after: Some(retry_after),
+        }
     }
 
     /// Returns `true` when a rate limit is currently active.
@@ -1539,7 +1642,11 @@ impl<'a> RateLimitBanner<'a> {
 
     /// Returns the height this widget will occupy: `1` when active, `0` when idle.
     pub fn height(&self) -> u16 {
-        if self.state.is_active() { 1 } else { 0 }
+        if self.state.is_active() {
+            1
+        } else {
+            0
+        }
     }
 }
 
@@ -1558,14 +1665,12 @@ impl<'a> Widget for RateLimitBanner<'a> {
         let time_str = format_time_compact(remaining);
         let text = format!("⏳ {} — retry in {}", self.label, time_str);
 
-        let line = Line::from(vec![
-            Span::styled(
-                text,
-                Style::default()
-                    .fg(Color::Yellow)
-                    .add_modifier(Modifier::BOLD),
-            ),
-        ]);
+        let line = Line::from(vec![Span::styled(
+            text,
+            Style::default()
+                .fg(Color::Yellow)
+                .add_modifier(Modifier::BOLD),
+        )]);
         Paragraph::new(line).render(area, buf);
     }
 }

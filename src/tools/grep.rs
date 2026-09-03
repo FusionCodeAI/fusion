@@ -131,9 +131,6 @@ impl Tool for GrepTool {
     }
 }
 
-
-
-
 // ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
@@ -177,7 +174,10 @@ mod tests {
     #[tokio::test]
     async fn test_grep_basic_matching() {
         let temp = TestDir::new("basic");
-        temp.write_file("src/main.rs", b"fn main() {\n    println!(\"Hello World!\");\n}\n");
+        temp.write_file(
+            "src/main.rs",
+            b"fn main() {\n    println!(\"Hello World!\");\n}\n",
+        );
         temp.write_file("src/lib.rs", b"pub fn helper() -> bool {\n    true\n}\n");
 
         let tool = GrepTool::new();
@@ -316,7 +316,10 @@ mod tests {
             .await;
 
         assert!(err.is_err());
-        assert!(err.unwrap_err().to_string().contains("Invalid regular expression"));
+        assert!(err
+            .unwrap_err()
+            .to_string()
+            .contains("Invalid regular expression"));
     }
 
     #[tokio::test]
@@ -425,7 +428,10 @@ mod tests {
     #[tokio::test]
     async fn test_grep_context_lines() {
         let temp = TestDir::new("context");
-        temp.write_file("src/main.rs", b"line 1\nline 2\nKEYWORD_LINE\nline 4\nline 5\n");
+        temp.write_file(
+            "src/main.rs",
+            b"line 1\nline 2\nKEYWORD_LINE\nline 4\nline 5\n",
+        );
 
         let tool = GrepTool::new();
         let ctx = ToolContext {

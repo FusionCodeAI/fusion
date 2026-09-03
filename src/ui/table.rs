@@ -673,7 +673,9 @@ impl ColumnAutoSizer {
 
     /// Calculate optimal column widths for the given headers and data rows.
     pub fn calculate_widths(&self, headers: &[String], rows: &[Vec<String>]) -> Vec<usize> {
-        let num_cols = headers.len().max(rows.iter().map(|r| r.len()).max().unwrap_or(0));
+        let num_cols = headers
+            .len()
+            .max(rows.iter().map(|r| r.len()).max().unwrap_or(0));
         if num_cols == 0 {
             return Vec::new();
         }
@@ -828,7 +830,9 @@ impl ColumnAutoSizer {
                                 }
                             }
                             if !added {
-                                if let Some(&widest) = unassigned.iter().max_by_key(|&&c| final_widths[c]) {
+                                if let Some(&widest) =
+                                    unassigned.iter().max_by_key(|&&c| final_widths[c])
+                                {
                                     final_widths[widest] += rem;
                                 }
                                 break;
@@ -1011,16 +1015,23 @@ impl Table {
     /// Render the responsive table to an ANSI-formatted string.
     pub fn render(&self) -> String {
         let term_width = self.terminal_width.unwrap_or_else(get_terminal_width);
-        let num_cols = self.headers.len().max(self.rows.iter().map(|r| r.len()).max().unwrap_or(0));
+        let num_cols = self
+            .headers
+            .len()
+            .max(self.rows.iter().map(|r| r.len()).max().unwrap_or(0));
 
         if num_cols == 0 {
             return String::new();
         }
 
         // Check if viewport is too narrow for tabular view
-        let min_table_width = (num_cols + 1) + (num_cols * 2 * self.padding) + (num_cols * self.min_col_width);
+        let min_table_width =
+            (num_cols + 1) + (num_cols * 2 * self.padding) + (num_cols * self.min_col_width);
 
-        if self.responsive_card_fallback && term_width < min_table_width && term_width <= NARROW_TERMINAL_THRESHOLD {
+        if self.responsive_card_fallback
+            && term_width < min_table_width
+            && term_width <= NARROW_TERMINAL_THRESHOLD
+        {
             self.render_cards(term_width)
         } else {
             self.render_table(term_width)
@@ -1029,7 +1040,10 @@ impl Table {
 
     /// Render standard responsive table with auto-sized columns and cell wrapping.
     fn render_table(&self, term_width: usize) -> String {
-        let num_cols = self.headers.len().max(self.rows.iter().map(|r| r.len()).max().unwrap_or(0));
+        let num_cols = self
+            .headers
+            .len()
+            .max(self.rows.iter().map(|r| r.len()).max().unwrap_or(0));
         let auto_sizer = ColumnAutoSizer::new(term_width)
             .with_min_col_width(self.min_col_width)
             .with_padding(self.padding)
@@ -1071,13 +1085,20 @@ impl Table {
                 })
                 .collect();
 
-            let max_sublines = wrapped_headers.iter().map(|lines| lines.len()).max().unwrap_or(1);
+            let max_sublines = wrapped_headers
+                .iter()
+                .map(|lines| lines.len())
+                .max()
+                .unwrap_or(1);
 
             for subline_idx in 0..max_sublines {
                 write!(out, "{}{}\x1b[0m", self.theme.border_color, b.vertical).unwrap();
 
                 for i in 0..num_cols {
-                    let cell_line = wrapped_headers[i].get(subline_idx).map(|s| s.as_str()).unwrap_or("");
+                    let cell_line = wrapped_headers[i]
+                        .get(subline_idx)
+                        .map(|s| s.as_str())
+                        .unwrap_or("");
                     let aligned = align_cell(cell_line, widths[i], aligns[i]);
 
                     write!(out, "{}", pad_str).unwrap();
@@ -1110,13 +1131,20 @@ impl Table {
                 })
                 .collect();
 
-            let max_sublines = wrapped_cells.iter().map(|lines| lines.len()).max().unwrap_or(1);
+            let max_sublines = wrapped_cells
+                .iter()
+                .map(|lines| lines.len())
+                .max()
+                .unwrap_or(1);
 
             for subline_idx in 0..max_sublines {
                 write!(out, "{}{}\x1b[0m", self.theme.border_color, b.vertical).unwrap();
 
                 for i in 0..num_cols {
-                    let cell_line = wrapped_cells[i].get(subline_idx).map(|s| s.as_str()).unwrap_or("");
+                    let cell_line = wrapped_cells[i]
+                        .get(subline_idx)
+                        .map(|s| s.as_str())
+                        .unwrap_or("");
                     let aligned = align_cell(cell_line, widths[i], aligns[i]);
 
                     write!(out, "{}", pad_str).unwrap();
@@ -1316,7 +1344,9 @@ pub fn is_markdown_delimiter_line(line: &str) -> bool {
 
     cells.iter().all(|c| {
         let t = c.trim();
-        !t.is_empty() && t.chars().all(|ch| ch == '-' || ch == ':' || ch.is_whitespace())
+        !t.is_empty()
+            && t.chars()
+                .all(|ch| ch == '-' || ch == ':' || ch.is_whitespace())
     })
 }
 
@@ -1395,7 +1425,9 @@ impl MarkdownTableStreamer {
 
         let lines = std::mem::take(&mut self.buffered_lines);
         if let Some(table) = Table::from_markdown_lines(lines.iter().map(|s| s.as_str())) {
-            let mut t = table.with_border_style(self.border_style).with_theme(self.theme.clone());
+            let mut t = table
+                .with_border_style(self.border_style)
+                .with_theme(self.theme.clone());
             if let Some(w) = self.terminal_width {
                 t = t.with_terminal_width(w);
             }
@@ -1483,7 +1515,12 @@ mod tests {
         let wrapped = wrap_ansi(text, 15);
         assert!(wrapped.len() >= 3);
         for line in &wrapped {
-            assert!(visible_width(line) <= 15, "Line '{}' exceeds 15 width ({})", line, visible_width(line));
+            assert!(
+                visible_width(line) <= 15,
+                "Line '{}' exceeds 15 width ({})",
+                line,
+                visible_width(line)
+            );
         }
     }
 
@@ -1525,12 +1562,10 @@ mod tests {
     #[test]
     fn test_auto_sizer_narrow_screen_squeeze() {
         let headers = vec!["Feature".to_string(), "Description".to_string()];
-        let rows = vec![
-            vec![
-                "Fusion Engine".to_string(),
-                "A very long description that definitely exceeds small width".to_string(),
-            ],
-        ];
+        let rows = vec![vec![
+            "Fusion Engine".to_string(),
+            "A very long description that definitely exceeds small width".to_string(),
+        ]];
 
         // Narrow screen of 35 columns
         let sizer = ColumnAutoSizer::new(35);
@@ -1539,7 +1574,11 @@ mod tests {
         assert_eq!(widths.len(), 2);
         // Total table width = (w1 + w2) + 3 borders + 4 padding = w1 + w2 + 7 <= 35
         let total_table_w = widths.iter().sum::<usize>() + 7;
-        assert!(total_table_w <= 35, "Total table width {} exceeded 35", total_table_w);
+        assert!(
+            total_table_w <= 35,
+            "Total table width {} exceeded 35",
+            total_table_w
+        );
         assert!(widths[0] >= 3);
         assert!(widths[1] >= 3);
     }

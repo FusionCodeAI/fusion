@@ -857,12 +857,13 @@ impl JsonLogEvent {
     }
 
     /// Creates a `custom` event with an arbitrary JSON value.
-    pub fn custom(
-        seq: u64,
-        session_id: Option<String>,
-        payload: serde_json::Value,
-    ) -> Self {
-        Self::new(seq, JsonLogEventKind::Custom, JsonLogPayload::Raw(payload), session_id)
+    pub fn custom(seq: u64, session_id: Option<String>, payload: serde_json::Value) -> Self {
+        Self::new(
+            seq,
+            JsonLogEventKind::Custom,
+            JsonLogPayload::Raw(payload),
+            session_id,
+        )
     }
 
     // --- Serialization & Deserialization ---
@@ -887,12 +888,8 @@ impl JsonLogEvent {
     pub fn from_agent_event(seq: u64, session_id: Option<&str>, event: &AgentEvent) -> Self {
         let sid = session_id.map(|s| s.to_string());
         match event {
-            AgentEvent::TextDelta(delta) => {
-                Self::text_delta(seq, sid, delta, 0, false, false)
-            }
-            AgentEvent::ThinkingDelta(delta) => {
-                Self::thinking_delta(seq, sid, delta, 0, 0)
-            }
+            AgentEvent::TextDelta(delta) => Self::text_delta(seq, sid, delta, 0, false, false),
+            AgentEvent::ThinkingDelta(delta) => Self::thinking_delta(seq, sid, delta, 0, 0),
             AgentEvent::ToolStarted { id, name, args } => {
                 Self::tool_start(seq, sid, id, name, args.clone())
             }
@@ -902,18 +899,20 @@ impl JsonLogEvent {
                 success,
                 output,
                 duration,
-            } => {
-                Self::tool_finish(
-                    seq,
-                    sid,
-                    id,
-                    name,
-                    *success,
-                    output,
-                    duration.as_millis() as u64,
-                    if !*success { Some(output.clone()) } else { None },
-                )
-            }
+            } => Self::tool_finish(
+                seq,
+                sid,
+                id,
+                name,
+                *success,
+                output,
+                duration.as_millis() as u64,
+                if !*success {
+                    Some(output.clone())
+                } else {
+                    None
+                },
+            ),
             AgentEvent::AdvisorStarted { advisor, role } => {
                 Self::advisor_start(seq, sid, advisor, role)
             }
@@ -921,19 +920,17 @@ impl JsonLogEvent {
                 advisor,
                 approved,
                 critique,
-            } => {
-                Self::advisor_feedback(
-                    seq,
-                    sid,
-                    advisor,
-                    None,
-                    *approved,
-                    critique,
-                    vec![],
-                    None,
-                    None,
-                )
-            }
+            } => Self::advisor_feedback(
+                seq,
+                sid,
+                advisor,
+                None,
+                *approved,
+                critique,
+                vec![],
+                None,
+                None,
+            ),
             AgentEvent::SubagentStarted { name, task } => {
                 Self::subagent_start(seq, sid, name, task, None)
             }
@@ -941,17 +938,15 @@ impl JsonLogEvent {
                 name,
                 success,
                 output,
-            } => {
-                Self::subagent_finish(seq, sid, name, *success, output, 0)
-            }
-            AgentEvent::Status(msg) => {
-                Self::status(seq, sid, "info", msg)
-            }
+            } => Self::subagent_finish(seq, sid, name, *success, output, 0),
+            AgentEvent::Status(msg) => Self::status(seq, sid, "info", msg),
             AgentEvent::Finished { usage } => {
                 let (pt, ct, tt) = if let Some(u) = usage {
                     (
                         u.get("prompt_tokens").and_then(|v| v.as_u64()).unwrap_or(0),
-                        u.get("completion_tokens").and_then(|v| v.as_u64()).unwrap_or(0),
+                        u.get("completion_tokens")
+                            .and_then(|v| v.as_u64())
+                            .unwrap_or(0),
                         u.get("total_tokens").and_then(|v| v.as_u64()).unwrap_or(0),
                     )
                 } else {
@@ -959,9 +954,7 @@ impl JsonLogEvent {
                 };
                 Self::token_stats(seq, sid, pt, ct, tt, None)
             }
-            AgentEvent::Error(err) => {
-                Self::error(seq, sid, err, false)
-            }
+            AgentEvent::Error(err) => Self::error(seq, sid, err, false),
         }
     }
 
@@ -973,41 +966,36 @@ impl JsonLogEvent {
     ) -> Self {
         let sid = session_id.map(|s| s.to_string());
         match event {
-            AcpSessionEvent::TokenChunk(chunk) => {
-                Self::text_delta(
-                    seq,
-                    sid,
-                    &chunk.delta,
-                    chunk.index,
-                    chunk.is_first,
-                    chunk.is_last,
-                )
-            }
+            AcpSessionEvent::TokenChunk(chunk) => Self::text_delta(
+                seq,
+                sid,
+                &chunk.delta,
+                chunk.index,
+                chunk.is_first,
+                chunk.is_last,
+            ),
             AcpSessionEvent::ThinkingChunk(chunk) => {
                 Self::thinking_delta(seq, sid, &chunk.delta, chunk.index, chunk.elapsed_ms)
             }
-            AcpSessionEvent::ToolStarted(update) => {
-                Self::tool_start(
-                    seq,
-                    sid,
-                    &update.call_id,
-                    &update.name,
-                    update.args.clone().unwrap_or(serde_json::Value::Null),
-                )
-            }
-            AcpSessionEvent::ToolProgress(update) => {
-                Self::tool_progress(
-                    seq,
-                    sid,
-                    &update.call_id,
-                    &update.name,
-                    update.partial_output.clone(),
-                    update.progress,
-                    Some(update.status.clone()),
-                )
-            }
+            AcpSessionEvent::ToolStarted(update) => Self::tool_start(
+                seq,
+                sid,
+                &update.call_id,
+                &update.name,
+                update.args.clone().unwrap_or(serde_json::Value::Null),
+            ),
+            AcpSessionEvent::ToolProgress(update) => Self::tool_progress(
+                seq,
+                sid,
+                &update.call_id,
+                &update.name,
+                update.partial_output.clone(),
+                update.progress,
+                Some(update.status.clone()),
+            ),
             AcpSessionEvent::ToolCompleted(update) => {
-                let success = update.state == ToolExecutionState::Completed || update.success.unwrap_or(false);
+                let success = update.state == ToolExecutionState::Completed
+                    || update.success.unwrap_or(false);
                 Self::tool_finish(
                     seq,
                     sid,
@@ -1022,32 +1010,28 @@ impl JsonLogEvent {
             AcpSessionEvent::AdvisorStarted(update) => {
                 Self::advisor_start(seq, sid, &update.advisor, &update.role)
             }
-            AcpSessionEvent::AdvisorFeedback(update) => {
-                Self::advisor_feedback(
-                    seq,
-                    sid,
-                    &update.advisor,
-                    Some(update.role.clone()),
-                    update.approved,
-                    &update.critique,
-                    update.suggestions.clone(),
-                    Some(update.severity.to_string()),
-                    update.confidence,
-                )
-            }
+            AcpSessionEvent::AdvisorFeedback(update) => Self::advisor_feedback(
+                seq,
+                sid,
+                &update.advisor,
+                Some(update.role.clone()),
+                update.approved,
+                &update.critique,
+                update.suggestions.clone(),
+                Some(update.severity.to_string()),
+                update.confidence,
+            ),
             AcpSessionEvent::AdvisorConsensus(consensus) => {
                 Self::advisor_consensus(seq, sid, consensus)
             }
-            AcpSessionEvent::TokenStats(stats) => {
-                Self::token_stats(
-                    seq,
-                    sid,
-                    stats.prompt_tokens,
-                    stats.completion_tokens,
-                    stats.total_tokens,
-                    stats.tokens_per_second,
-                )
-            }
+            AcpSessionEvent::TokenStats(stats) => Self::token_stats(
+                seq,
+                sid,
+                stats.prompt_tokens,
+                stats.completion_tokens,
+                stats.total_tokens,
+                stats.tokens_per_second,
+            ),
             AcpSessionEvent::Subagent(sub) => {
                 if sub.status == "finished" {
                     Self::subagent_finish(
@@ -1087,20 +1071,12 @@ impl JsonLogEvent {
                         .collect(),
                 )
             }
-            AcpSessionEvent::Status {
-                message,
-                level,
-                ..
-            } => {
+            AcpSessionEvent::Status { message, level, .. } => {
                 Self::status(seq, sid, level, message)
             }
             AcpSessionEvent::Error {
-                error,
-                recoverable,
-                ..
-            } => {
-                Self::error(seq, sid, error, *recoverable)
-            }
+                error, recoverable, ..
+            } => Self::error(seq, sid, error, *recoverable),
         }
     }
 }
@@ -1246,14 +1222,9 @@ impl<W: AsyncWrite + Unpin + Send> JsonLogStreamer<W> {
         elapsed_ms: u64,
     ) -> std::io::Result<u64> {
         let seq = self.next_seq();
-        let event = JsonLogEvent::thinking_delta(
-            seq,
-            self.session_id.clone(),
-            delta,
-            index,
-            elapsed_ms,
-        )
-        .with_source(self.source.clone());
+        let event =
+            JsonLogEvent::thinking_delta(seq, self.session_id.clone(), delta, index, elapsed_ms)
+                .with_source(self.source.clone());
         self.write_event(&event).await?;
         Ok(seq)
     }
@@ -1266,13 +1237,8 @@ impl<W: AsyncWrite + Unpin + Send> JsonLogStreamer<W> {
         arguments: serde_json::Value,
     ) -> std::io::Result<u64> {
         let seq = self.next_seq();
-        let event = JsonLogEvent::tool_start(
-            seq,
-            self.session_id.clone(),
-            call_id,
-            tool_name,
-            arguments,
-        );
+        let event =
+            JsonLogEvent::tool_start(seq, self.session_id.clone(), call_id, tool_name, arguments);
         self.write_event(&event).await?;
         Ok(seq)
     }
@@ -1305,8 +1271,7 @@ impl<W: AsyncWrite + Unpin + Send> JsonLogStreamer<W> {
     /// Emits a Fusion [`AgentEvent`] as an NDJSON line.
     pub async fn emit_agent_event(&mut self, event: &AgentEvent) -> std::io::Result<u64> {
         let seq = self.next_seq();
-        let json_event =
-            JsonLogEvent::from_agent_event(seq, self.session_id.as_deref(), event);
+        let json_event = JsonLogEvent::from_agent_event(seq, self.session_id.as_deref(), event);
         self.write_event(&json_event).await?;
         Ok(seq)
     }
@@ -1375,7 +1340,10 @@ impl<R: AsyncBufRead + Unpin + Send> JsonLogReader<R> {
                 Err(e) => {
                     return Err(std::io::Error::new(
                         std::io::ErrorKind::InvalidData,
-                        format!("Line {}: failed to parse NDJSON event: {}", self.line_number, e),
+                        format!(
+                            "Line {}: failed to parse NDJSON event: {}",
+                            self.line_number, e
+                        ),
                     ));
                 }
             }
@@ -1435,7 +1403,10 @@ impl JsonLogBroadcaster {
     }
 
     /// Publishes an event to all active subscribers.
-    pub fn publish(&self, event: JsonLogEvent) -> Result<usize, broadcast::error::SendError<JsonLogEvent>> {
+    pub fn publish(
+        &self,
+        event: JsonLogEvent,
+    ) -> Result<usize, broadcast::error::SendError<JsonLogEvent>> {
         self.sender.send(event)
     }
 
@@ -1572,7 +1543,10 @@ impl JsonLogFilter {
     /// Evaluates whether an event passes the filter criteria.
     pub fn matches(&self, event: &JsonLogEvent) -> bool {
         // Token exclusion check
-        if !self.include_tokens && (event.kind == JsonLogEventKind::TextDelta || event.kind == JsonLogEventKind::ThinkingDelta) {
+        if !self.include_tokens
+            && (event.kind == JsonLogEventKind::TextDelta
+                || event.kind == JsonLogEventKind::ThinkingDelta)
+        {
             return false;
         }
 
@@ -1733,20 +1707,33 @@ mod tests {
 
     #[test]
     fn test_ndjson_line_roundtrip() {
-        let event = JsonLogEvent::text_delta(1, Some("sess-123".to_string()), "Hello world!", 0, true, false)
-            .with_turn_id("turn-001")
-            .with_meta("model", "gpt-4o");
+        let event = JsonLogEvent::text_delta(
+            1,
+            Some("sess-123".to_string()),
+            "Hello world!",
+            0,
+            true,
+            false,
+        )
+        .with_turn_id("turn-001")
+        .with_meta("model", "gpt-4o");
 
         let line = event.to_ndjson_line().unwrap();
         assert!(line.ends_with('\n'), "NDJSON line must end with newline");
-        assert!(!line[..line.len() - 1].contains('\n'), "NDJSON line must not contain unescaped newline");
+        assert!(
+            !line[..line.len() - 1].contains('\n'),
+            "NDJSON line must not contain unescaped newline"
+        );
 
         let parsed = JsonLogEvent::from_ndjson_line(&line).unwrap();
         assert_eq!(parsed.seq, 1);
         assert_eq!(parsed.session_id.as_deref(), Some("sess-123"));
         assert_eq!(parsed.turn_id.as_deref(), Some("turn-001"));
         assert_eq!(parsed.kind, JsonLogEventKind::TextDelta);
-        assert_eq!(parsed.metadata.get("model").unwrap(), &serde_json::json!("gpt-4o"));
+        assert_eq!(
+            parsed.metadata.get("model").unwrap(),
+            &serde_json::json!("gpt-4o")
+        );
 
         if let JsonLogPayload::TextDelta(payload) = parsed.payload {
             assert_eq!(payload.delta, "Hello world!");
@@ -1760,10 +1747,31 @@ mod tests {
     #[test]
     fn test_batch_format_and_parse() {
         let events = vec![
-            JsonLogEvent::session_start(1, "s-1", Some("claude-3-5-sonnet".to_string()), None, None),
+            JsonLogEvent::session_start(
+                1,
+                "s-1",
+                Some("claude-3-5-sonnet".to_string()),
+                None,
+                None,
+            ),
             JsonLogEvent::text_delta(2, Some("s-1".to_string()), "Thinking...", 0, true, false),
-            JsonLogEvent::tool_start(3, Some("s-1".to_string()), "c-1", "file_read", serde_json::json!({ "path": "Cargo.toml" })),
-            JsonLogEvent::tool_finish(4, Some("s-1".to_string()), "c-1", "file_read", true, "[package]...", 25, None),
+            JsonLogEvent::tool_start(
+                3,
+                Some("s-1".to_string()),
+                "c-1",
+                "file_read",
+                serde_json::json!({ "path": "Cargo.toml" }),
+            ),
+            JsonLogEvent::tool_finish(
+                4,
+                Some("s-1".to_string()),
+                "c-1",
+                "file_read",
+                true,
+                "[package]...",
+                25,
+                None,
+            ),
             JsonLogEvent::status(5, Some("s-1".to_string()), "info", "Turn complete"),
         ];
 
@@ -1786,10 +1794,22 @@ mod tests {
 
         // Spawn writer task
         tokio::spawn(async move {
-            streamer.emit_text_delta("Part 1 ", 0, true, false).await.unwrap();
-            streamer.emit_text_delta("Part 2 ", 1, false, false).await.unwrap();
-            streamer.emit_tool_start("call-99", "bash", serde_json::json!({ "cmd": "ls" })).await.unwrap();
-            streamer.emit_tool_finish("call-99", "bash", true, "src\nCargo.toml", 15, None).await.unwrap();
+            streamer
+                .emit_text_delta("Part 1 ", 0, true, false)
+                .await
+                .unwrap();
+            streamer
+                .emit_text_delta("Part 2 ", 1, false, false)
+                .await
+                .unwrap();
+            streamer
+                .emit_tool_start("call-99", "bash", serde_json::json!({ "cmd": "ls" }))
+                .await
+                .unwrap();
+            streamer
+                .emit_tool_finish("call-99", "bash", true, "src\nCargo.toml", 15, None)
+                .await
+                .unwrap();
             streamer.flush().await.unwrap();
         });
 
@@ -1826,7 +1846,12 @@ mod tests {
         let mut sub1 = broadcaster.subscribe();
         let mut sub2 = broadcaster.subscribe();
 
-        let event = JsonLogEvent::status(100, Some("sess-bcast".to_string()), "warn", "Rate limit near");
+        let event = JsonLogEvent::status(
+            100,
+            Some("sess-bcast".to_string()),
+            "warn",
+            "Rate limit near",
+        );
         broadcaster.publish(event.clone()).unwrap();
 
         let r1 = sub1.recv().await.unwrap();
@@ -1840,8 +1865,20 @@ mod tests {
     #[test]
     fn test_filter_engine() {
         let e_text = JsonLogEvent::text_delta(1, Some("s1".to_string()), "foo", 0, true, false);
-        let e_tool = JsonLogEvent::tool_start(2, Some("s1".to_string()), "c1", "grep", serde_json::json!({}));
-        let e_other_sess = JsonLogEvent::tool_start(3, Some("s2".to_string()), "c2", "grep", serde_json::json!({}));
+        let e_tool = JsonLogEvent::tool_start(
+            2,
+            Some("s1".to_string()),
+            "c1",
+            "grep",
+            serde_json::json!({}),
+        );
+        let e_other_sess = JsonLogEvent::tool_start(
+            3,
+            Some("s2".to_string()),
+            "c2",
+            "grep",
+            serde_json::json!({}),
+        );
 
         let filter_no_tokens = JsonLogFilter::new().with_tokens(false);
         assert!(!filter_no_tokens.matches(&e_text));
@@ -1851,7 +1888,8 @@ mod tests {
         assert!(filter_s1.matches(&e_tool));
         assert!(!filter_s1.matches(&e_other_sess));
 
-        let filter_tools_only = JsonLogFilter::new().with_allowed_kinds([JsonLogEventKind::ToolStart, JsonLogEventKind::ToolFinish]);
+        let filter_tools_only = JsonLogFilter::new()
+            .with_allowed_kinds([JsonLogEventKind::ToolStart, JsonLogEventKind::ToolFinish]);
         assert!(filter_tools_only.matches(&e_tool));
         assert!(!filter_tools_only.matches(&e_text));
     }
@@ -1864,7 +1902,16 @@ mod tests {
             JsonLogEvent::text_delta(1, Some("sess-h".to_string()), "Hello ", 0, true, false),
             JsonLogEvent::text_delta(2, Some("sess-h".to_string()), "world!", 1, false, true),
             JsonLogEvent::thinking_delta(3, Some("sess-h".to_string()), "Thinking hard...", 0, 100),
-            JsonLogEvent::tool_finish(4, Some("sess-h".to_string()), "call-1", "compile", true, "Build succeeded", 250, None),
+            JsonLogEvent::tool_finish(
+                4,
+                Some("sess-h".to_string()),
+                "call-1",
+                "compile",
+                true,
+                "Build succeeded",
+                250,
+                None,
+            ),
             JsonLogEvent::advisor_feedback(
                 5,
                 Some("sess-h".to_string()),
@@ -1876,7 +1923,17 @@ mod tests {
                 Some("info".to_string()),
                 Some(0.95f32),
             ),
-            JsonLogEvent::turn_end(6, Some("sess-h".to_string()), "turn-1", "end_turn", 450, 120, 35, 155, Some("Hello world!".to_string())),
+            JsonLogEvent::turn_end(
+                6,
+                Some("sess-h".to_string()),
+                "turn-1",
+                "end_turn",
+                450,
+                120,
+                35,
+                155,
+                Some("Hello world!".to_string()),
+            ),
         ];
 
         for ev in &events {
@@ -1901,8 +1958,16 @@ mod tests {
         let log_path = temp_dir.path().join("test_audit.jsonl");
 
         let mut logger = NdjsonFileLogger::open(&log_path).await.unwrap();
-        let event1 = JsonLogEvent::status(1, Some("sess-file".to_string()), "info", "File log started");
-        let event2 = JsonLogEvent::text_delta(2, Some("sess-file".to_string()), "Logged data", 0, true, true);
+        let event1 =
+            JsonLogEvent::status(1, Some("sess-file".to_string()), "info", "File log started");
+        let event2 = JsonLogEvent::text_delta(
+            2,
+            Some("sess-file".to_string()),
+            "Logged data",
+            0,
+            true,
+            true,
+        );
 
         logger.append(&event1).await.unwrap();
         logger.append(&event2).await.unwrap();

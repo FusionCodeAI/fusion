@@ -151,7 +151,9 @@ fn detect_git_branch_from_cmd(working_dir: &Path) -> Option<String> {
         .ok()?;
 
     if commit_out.status.success() {
-        let hash = String::from_utf8_lossy(&commit_out.stdout).trim().to_string();
+        let hash = String::from_utf8_lossy(&commit_out.stdout)
+            .trim()
+            .to_string();
         if !hash.is_empty() {
             return Some(format!("detached:{}", hash));
         }
@@ -784,7 +786,10 @@ impl StatusBar {
                 let icon = if self.show_icons { "✦ " } else { "" };
                 if let Some(prov) = &self.provider {
                     if !prov.is_empty() && !self.model.starts_with(&format!("{}/", prov)) {
-                        format!("\x1b[1;35m{}{}\x1b[0m/\x1b[1;36m{}\x1b[0m", icon, prov, self.model)
+                        format!(
+                            "\x1b[1;35m{}{}\x1b[0m/\x1b[1;36m{}\x1b[0m",
+                            icon, prov, self.model
+                        )
                     } else {
                         format!("\x1b[1;36m{}{}\x1b[0m", icon, self.model)
                     }
@@ -806,10 +811,16 @@ impl StatusBar {
                 }
                 StatusBarMode::Compact => {
                     let short_b = truncate_str(branch, 14);
-                    format!("\x1b[1;32m{}\x1b[0m", format_branch_badge(&short_b, self.show_icons))
+                    format!(
+                        "\x1b[1;32m{}\x1b[0m",
+                        format_branch_badge(&short_b, self.show_icons)
+                    )
                 }
                 StatusBarMode::Normal | StatusBarMode::Full => {
-                    format!("\x1b[1;32m{}\x1b[0m", format_branch_badge(branch, self.show_icons))
+                    format!(
+                        "\x1b[1;32m{}\x1b[0m",
+                        format_branch_badge(branch, self.show_icons)
+                    )
                 }
                 StatusBarMode::Auto => unreachable!(),
             };
@@ -822,7 +833,10 @@ impl StatusBar {
                 format!("\x1b[33m{}\x1b[0m", format_token_compact(self.tokens_used))
             }
             StatusBarMode::Compact => {
-                format!("\x1b[33m{} tok\x1b[0m", format_token_compact(self.tokens_used))
+                format!(
+                    "\x1b[33m{} tok\x1b[0m",
+                    format_token_compact(self.tokens_used)
+                )
             }
             StatusBarMode::Normal | StatusBarMode::Full => {
                 if let (Some(prompt), Some(comp)) = (self.prompt_tokens, self.completion_tokens) {
@@ -833,7 +847,10 @@ impl StatusBar {
                         format_token_compact(comp)
                     )
                 } else {
-                    format!("\x1b[33m{} tokens\x1b[0m", format_token_compact(self.tokens_used))
+                    format!(
+                        "\x1b[33m{} tokens\x1b[0m",
+                        format_token_compact(self.tokens_used)
+                    )
                 }
             }
             StatusBarMode::Auto => unreachable!(),
@@ -842,7 +859,9 @@ impl StatusBar {
 
         // 4. Session Duration
         if let Some(dur) = self.session_duration {
-            let icon = if self.show_icons && matches!(eff_mode, StatusBarMode::Normal | StatusBarMode::Full) {
+            let icon = if self.show_icons
+                && matches!(eff_mode, StatusBarMode::Normal | StatusBarMode::Full)
+            {
                 "⏱ "
             } else {
                 ""
@@ -949,7 +968,9 @@ impl StatusBar {
 
         // 4. Session Duration
         if let Some(dur) = self.session_duration {
-            let icon = if self.show_icons && matches!(eff_mode, StatusBarMode::Normal | StatusBarMode::Full) {
+            let icon = if self.show_icons
+                && matches!(eff_mode, StatusBarMode::Normal | StatusBarMode::Full)
+            {
                 "⏱ "
             } else {
                 ""
@@ -1018,10 +1039,7 @@ impl From<&StatusInfo> for StatusBar {
 
 impl From<&StatusBar> for StatusInfo {
     fn from(bar: &StatusBar) -> Self {
-        let mut info = StatusInfo::new(
-            bar.provider.clone().unwrap_or_default(),
-            bar.model.clone(),
-        );
+        let mut info = StatusInfo::new(bar.provider.clone().unwrap_or_default(), bar.model.clone());
         info.active_agent = bar.active_agent.clone();
         info.active_advisor = bar.active_advisor.clone();
         if let Some(status) = &bar.status_message {
@@ -1283,9 +1301,7 @@ mod tests {
             .with_advisor("SecAdvisor")
             .with_status("Indexing");
 
-        let bar = StatusBar::from(&info)
-            .with_tokens(8400)
-            .with_cost(0.015);
+        let bar = StatusBar::from(&info).with_tokens(8400).with_cost(0.015);
 
         assert_eq!(bar.provider.as_deref(), Some("anthropic"));
         assert_eq!(bar.model, "claude-3-5-sonnet");

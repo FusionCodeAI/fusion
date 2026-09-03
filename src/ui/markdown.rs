@@ -197,7 +197,6 @@ impl MarkdownRenderer {
             self.emit(&table_out, output);
         }
 
-
         let formatted = render_line(line, &mut self.in_code_block, &mut self.code_lang);
         self.emit(&formatted, output);
     }
@@ -288,7 +287,10 @@ pub fn render_markdown(text: &str) -> String {
     let mut output = String::new();
     let mut table_lines = Vec::new();
 
-    let flush_table = |output: &mut String, table_lines: &mut Vec<&str>, in_code_block: &mut bool, code_lang: &mut String| {
+    let flush_table = |output: &mut String,
+                       table_lines: &mut Vec<&str>,
+                       in_code_block: &mut bool,
+                       code_lang: &mut String| {
         if table_lines.is_empty() {
             return;
         }
@@ -312,14 +314,24 @@ pub fn render_markdown(text: &str) -> String {
         if !in_code_block && super::table::is_markdown_table_line(trimmed) {
             table_lines.push(line);
         } else {
-            flush_table(&mut output, &mut table_lines, &mut in_code_block, &mut code_lang);
+            flush_table(
+                &mut output,
+                &mut table_lines,
+                &mut in_code_block,
+                &mut code_lang,
+            );
             let rendered = render_line(line, &mut in_code_block, &mut code_lang);
             output.push_str(&rendered);
             output.push('\n');
         }
     }
 
-    flush_table(&mut output, &mut table_lines, &mut in_code_block, &mut code_lang);
+    flush_table(
+        &mut output,
+        &mut table_lines,
+        &mut in_code_block,
+        &mut code_lang,
+    );
 
     if in_code_block {
         let width = get_border_width();
@@ -360,7 +372,10 @@ pub fn render_line(line: &str, in_code_block: &mut bool, code_lang: &mut String)
 
     // Inside code block: render diagrams and code indented by 2 spaces with syntax or clean terminal styling
     if *in_code_block {
-        let is_plain = matches!(code_lang.to_lowercase().as_str(), "text" | "ascii" | "mermaid" | "");
+        let is_plain = matches!(
+            code_lang.to_lowercase().as_str(),
+            "text" | "ascii" | "mermaid" | ""
+        );
         if line.is_empty() {
             return String::new();
         }
@@ -430,7 +445,11 @@ pub fn render_line(line: &str, in_code_block: &mut bool, code_lang: &mut String)
         .or_else(|| trimmed.strip_prefix("+ [ ] "))
     {
         let indent = " ".repeat(line.len() - trimmed.len());
-        return format!("{}  \x1b[38;5;244m[ ]\x1b[0m {}", indent, render_inline(rest));
+        return format!(
+            "{}  \x1b[38;5;244m[ ]\x1b[0m {}",
+            indent,
+            render_inline(rest)
+        );
     }
     if let Some(rest) = trimmed
         .strip_prefix("- [x] ")
@@ -457,7 +476,12 @@ pub fn render_line(line: &str, in_code_block: &mut bool, code_lang: &mut String)
     // Numbered lists: 1. item, 2. item, etc.
     if let Some((num, rest)) = parse_numbered_list(trimmed) {
         let indent = " ".repeat(line.len() - trimmed.len());
-        return format!("{}  \x1b[36m{}.\x1b[0m {}", indent, num, render_inline(rest));
+        return format!(
+            "{}  \x1b[36m{}.\x1b[0m {}",
+            indent,
+            num,
+            render_inline(rest)
+        );
     }
 
     // Markdown tables: | col1 | col2 |
@@ -510,10 +534,7 @@ fn render_table_line(line: &str) -> Option<String> {
             .iter()
             .map(|p| "─".repeat(p.trim().len().max(3)))
             .collect();
-        Some(format!(
-            "\x1b[38;5;240m├──{}──┤\x1b[0m",
-            sep.join("┼")
-        ))
+        Some(format!("\x1b[38;5;240m├──{}──┤\x1b[0m", sep.join("┼")))
     } else {
         let formatted_cells: Vec<String> = parts
             .iter()
@@ -538,7 +559,15 @@ pub fn render_inline(text: &str) -> String {
         // Escape sequence: \char
         if chars[i] == '\\' && i + 1 < len {
             let next = chars[i + 1];
-            if next == '*' || next == '_' || next == '`' || next == '~' || next == '[' || next == ']' || next == '#' || next == '\\' {
+            if next == '*'
+                || next == '_'
+                || next == '`'
+                || next == '~'
+                || next == '['
+                || next == ']'
+                || next == '#'
+                || next == '\\'
+            {
                 result.push(next);
                 i += 2;
                 continue;
@@ -568,7 +597,9 @@ pub fn render_inline(text: &str) -> String {
         {
             let delim = chars[i];
             let mut j = i + 3;
-            while j + 2 < len && !(chars[j] == delim && chars[j + 1] == delim && chars[j + 2] == delim) {
+            while j + 2 < len
+                && !(chars[j] == delim && chars[j + 1] == delim && chars[j + 2] == delim)
+            {
                 j += 1;
             }
             if j + 2 < len {
@@ -619,7 +650,8 @@ pub fn render_inline(text: &str) -> String {
 
         // Italic: *text* or _text_ (single char delimiter)
         if chars[i] == '*'
-            || (chars[i] == '_' && (i == 0 || chars[i - 1].is_whitespace() || chars[i - 1].is_ascii_punctuation()))
+            || (chars[i] == '_'
+                && (i == 0 || chars[i - 1].is_whitespace() || chars[i - 1].is_ascii_punctuation()))
         {
             let delim = chars[i];
             let mut j = i + 1;
@@ -628,7 +660,9 @@ pub fn render_inline(text: &str) -> String {
             }
             if j < len && chars[j] == delim && j > i + 1 {
                 let valid_end = if delim == '_' {
-                    j + 1 == len || chars[j + 1].is_whitespace() || chars[j + 1].is_ascii_punctuation()
+                    j + 1 == len
+                        || chars[j + 1].is_whitespace()
+                        || chars[j + 1].is_ascii_punctuation()
                 } else {
                     true
                 };
@@ -648,10 +682,15 @@ pub fn render_inline(text: &str) -> String {
             if let Some(close_bracket) = chars[i + 1..].iter().position(|&c| c == ']') {
                 let close_bracket_idx = i + 1 + close_bracket;
                 if close_bracket_idx + 1 < len && chars[close_bracket_idx + 1] == '(' {
-                    if let Some(close_paren) = chars[close_bracket_idx + 2..].iter().position(|&c| c == ')') {
+                    if let Some(close_paren) = chars[close_bracket_idx + 2..]
+                        .iter()
+                        .position(|&c| c == ')')
+                    {
                         let close_paren_idx = close_bracket_idx + 2 + close_paren;
                         let link_text: String = chars[i + 1..close_bracket_idx].iter().collect();
-                        let link_url: String = chars[close_bracket_idx + 2..close_paren_idx].iter().collect();
+                        let link_url: String = chars[close_bracket_idx + 2..close_paren_idx]
+                            .iter()
+                            .collect();
                         result.push_str("\x1b[4;34m");
                         result.push_str(&link_text);
                         result.push_str("\x1b[0m (\x1b[38;5;244m");
@@ -669,7 +708,10 @@ pub fn render_inline(text: &str) -> String {
             if let Some(close_angle) = chars[i + 1..].iter().position(|&c| c == '>') {
                 let close_idx = i + 1 + close_angle;
                 let inner: String = chars[i + 1..close_idx].iter().collect();
-                if inner.starts_with("http://") || inner.starts_with("https://") || inner.starts_with("mailto:") {
+                if inner.starts_with("http://")
+                    || inner.starts_with("https://")
+                    || inner.starts_with("mailto:")
+                {
                     result.push_str("\x1b[4;34m");
                     result.push_str(&inner);
                     result.push_str("\x1b[0m");
@@ -699,18 +741,36 @@ pub fn highlight_code_line(line: &str, lang: &str) -> String {
     let indent = &line[..line.len() - trimmed.len()];
 
     // Full-line comments
-    if (lang_clean == "rust" || lang_clean == "rs" || lang_clean == "js" || lang_clean == "ts"
-        || lang_clean == "javascript" || lang_clean == "typescript" || lang_clean == "go"
-        || lang_clean == "c" || lang_clean == "cpp" || lang_clean == "java" || lang_clean == "kotlin"
-        || lang_clean == "swift" || lang_clean == "cs" || lang_clean == "csharp")
+    if (lang_clean == "rust"
+        || lang_clean == "rs"
+        || lang_clean == "js"
+        || lang_clean == "ts"
+        || lang_clean == "javascript"
+        || lang_clean == "typescript"
+        || lang_clean == "go"
+        || lang_clean == "c"
+        || lang_clean == "cpp"
+        || lang_clean == "java"
+        || lang_clean == "kotlin"
+        || lang_clean == "swift"
+        || lang_clean == "cs"
+        || lang_clean == "csharp")
         && (trimmed.starts_with("//") || trimmed.starts_with("/*") || trimmed.starts_with('*'))
     {
         return format!("{}\x1b[38;5;244;3m{}\x1b[0m", indent, trimmed);
     }
 
-    if (lang_clean == "python" || lang_clean == "py" || lang_clean == "bash" || lang_clean == "sh"
-        || lang_clean == "zsh" || lang_clean == "toml" || lang_clean == "yaml" || lang_clean == "yml"
-        || lang_clean == "ruby" || lang_clean == "rb" || lang_clean == "dockerfile")
+    if (lang_clean == "python"
+        || lang_clean == "py"
+        || lang_clean == "bash"
+        || lang_clean == "sh"
+        || lang_clean == "zsh"
+        || lang_clean == "toml"
+        || lang_clean == "yaml"
+        || lang_clean == "yml"
+        || lang_clean == "ruby"
+        || lang_clean == "rb"
+        || lang_clean == "dockerfile")
         && trimmed.starts_with('#')
     {
         return format!("{}\x1b[38;5;244;3m{}\x1b[0m", indent, trimmed);
@@ -767,7 +827,9 @@ pub fn highlight_code_line(line: &str, lang: &str) -> String {
         }
 
         // String literal with single quotes: '...'
-        if chars[i] == '\'' && (lang_clean != "rust" && lang_clean != "rs" || (i + 2 < len && chars[i + 2] == '\'')) {
+        if chars[i] == '\''
+            && (lang_clean != "rust" && lang_clean != "rs" || (i + 2 < len && chars[i + 2] == '\''))
+        {
             let mut j = i + 1;
             let mut escaped = false;
             while j < len {
@@ -790,8 +852,13 @@ pub fn highlight_code_line(line: &str, lang: &str) -> String {
         }
 
         // Inline comment //
-        if (lang_clean == "rust" || lang_clean == "rs" || lang_clean == "js" || lang_clean == "ts"
-            || lang_clean == "go" || lang_clean == "c" || lang_clean == "cpp")
+        if (lang_clean == "rust"
+            || lang_clean == "rs"
+            || lang_clean == "js"
+            || lang_clean == "ts"
+            || lang_clean == "go"
+            || lang_clean == "c"
+            || lang_clean == "cpp")
             && i + 1 < len
             && chars[i] == '/'
             && chars[i + 1] == '/'
@@ -804,8 +871,12 @@ pub fn highlight_code_line(line: &str, lang: &str) -> String {
         }
 
         // Inline comment #
-        if (lang_clean == "python" || lang_clean == "py" || lang_clean == "bash" || lang_clean == "sh"
-            || lang_clean == "toml" || lang_clean == "yaml")
+        if (lang_clean == "python"
+            || lang_clean == "py"
+            || lang_clean == "bash"
+            || lang_clean == "sh"
+            || lang_clean == "toml"
+            || lang_clean == "yaml")
             && chars[i] == '#'
         {
             let comment: String = chars[i..].iter().collect();
@@ -853,43 +924,164 @@ pub fn highlight_code_line(line: &str, lang: &str) -> String {
 fn is_rust_keyword(word: &str) -> bool {
     matches!(
         word,
-        "as" | "async" | "await" | "break" | "const" | "continue" | "crate" | "dyn"
-            | "else" | "enum" | "extern" | "false" | "fn" | "for" | "if" | "impl"
-            | "in" | "let" | "loop" | "match" | "mod" | "move" | "mut" | "pub"
-            | "ref" | "return" | "self" | "Self" | "static" | "struct" | "super"
-            | "trait" | "true" | "type" | "unsafe" | "use" | "where" | "while"
+        "as" | "async"
+            | "await"
+            | "break"
+            | "const"
+            | "continue"
+            | "crate"
+            | "dyn"
+            | "else"
+            | "enum"
+            | "extern"
+            | "false"
+            | "fn"
+            | "for"
+            | "if"
+            | "impl"
+            | "in"
+            | "let"
+            | "loop"
+            | "match"
+            | "mod"
+            | "move"
+            | "mut"
+            | "pub"
+            | "ref"
+            | "return"
+            | "self"
+            | "Self"
+            | "static"
+            | "struct"
+            | "super"
+            | "trait"
+            | "true"
+            | "type"
+            | "unsafe"
+            | "use"
+            | "where"
+            | "while"
     )
 }
 
 fn is_python_keyword(word: &str) -> bool {
     matches!(
         word,
-        "and" | "as" | "assert" | "async" | "await" | "break" | "class" | "continue"
-            | "def" | "del" | "elif" | "else" | "except" | "False" | "finally"
-            | "for" | "from" | "global" | "if" | "import" | "in" | "is" | "lambda"
-            | "None" | "nonlocal" | "not" | "or" | "pass" | "raise" | "return"
-            | "self" | "True" | "try" | "while" | "with" | "yield"
+        "and"
+            | "as"
+            | "assert"
+            | "async"
+            | "await"
+            | "break"
+            | "class"
+            | "continue"
+            | "def"
+            | "del"
+            | "elif"
+            | "else"
+            | "except"
+            | "False"
+            | "finally"
+            | "for"
+            | "from"
+            | "global"
+            | "if"
+            | "import"
+            | "in"
+            | "is"
+            | "lambda"
+            | "None"
+            | "nonlocal"
+            | "not"
+            | "or"
+            | "pass"
+            | "raise"
+            | "return"
+            | "self"
+            | "True"
+            | "try"
+            | "while"
+            | "with"
+            | "yield"
     )
 }
 
 fn is_js_keyword(word: &str) -> bool {
     matches!(
         word,
-        "async" | "await" | "break" | "case" | "catch" | "class" | "const" | "continue"
-            | "debugger" | "default" | "delete" | "do" | "else" | "export" | "extends"
-            | "false" | "finally" | "for" | "from" | "function" | "if" | "import"
-            | "in" | "instanceof" | "interface" | "let" | "new" | "null" | "of"
-            | "return" | "super" | "switch" | "this" | "throw" | "true" | "try"
-            | "type" | "typeof" | "undefined" | "var" | "void" | "while" | "with" | "yield"
+        "async"
+            | "await"
+            | "break"
+            | "case"
+            | "catch"
+            | "class"
+            | "const"
+            | "continue"
+            | "debugger"
+            | "default"
+            | "delete"
+            | "do"
+            | "else"
+            | "export"
+            | "extends"
+            | "false"
+            | "finally"
+            | "for"
+            | "from"
+            | "function"
+            | "if"
+            | "import"
+            | "in"
+            | "instanceof"
+            | "interface"
+            | "let"
+            | "new"
+            | "null"
+            | "of"
+            | "return"
+            | "super"
+            | "switch"
+            | "this"
+            | "throw"
+            | "true"
+            | "try"
+            | "type"
+            | "typeof"
+            | "undefined"
+            | "var"
+            | "void"
+            | "while"
+            | "with"
+            | "yield"
     )
 }
 
 fn is_sh_keyword(word: &str) -> bool {
     matches!(
         word,
-        "case" | "do" | "done" | "elif" | "else" | "esac" | "exit" | "export"
-            | "fi" | "for" | "function" | "if" | "in" | "local" | "return" | "select"
-            | "then" | "time" | "until" | "while" | "echo" | "set" | "unset"
+        "case"
+            | "do"
+            | "done"
+            | "elif"
+            | "else"
+            | "esac"
+            | "exit"
+            | "export"
+            | "fi"
+            | "for"
+            | "function"
+            | "if"
+            | "in"
+            | "local"
+            | "return"
+            | "select"
+            | "then"
+            | "time"
+            | "until"
+            | "while"
+            | "echo"
+            | "set"
+            | "unset"
     )
 }
 
@@ -898,29 +1090,94 @@ fn is_json_keyword(word: &str) -> bool {
 }
 
 fn is_config_keyword(word: &str) -> bool {
-    matches!(word, "true" | "false" | "null" | "yes" | "no" | "on" | "off")
+    matches!(
+        word,
+        "true" | "false" | "null" | "yes" | "no" | "on" | "off"
+    )
 }
 
 fn is_go_keyword(word: &str) -> bool {
     matches!(
         word,
-        "break" | "case" | "chan" | "const" | "continue" | "default" | "defer"
-            | "else" | "fallthrough" | "for" | "func" | "go" | "goto" | "if"
-            | "import" | "interface" | "map" | "package" | "range" | "return"
-            | "select" | "struct" | "switch" | "type" | "var" | "true" | "false" | "nil"
+        "break"
+            | "case"
+            | "chan"
+            | "const"
+            | "continue"
+            | "default"
+            | "defer"
+            | "else"
+            | "fallthrough"
+            | "for"
+            | "func"
+            | "go"
+            | "goto"
+            | "if"
+            | "import"
+            | "interface"
+            | "map"
+            | "package"
+            | "range"
+            | "return"
+            | "select"
+            | "struct"
+            | "switch"
+            | "type"
+            | "var"
+            | "true"
+            | "false"
+            | "nil"
     )
 }
 
 fn is_c_keyword(word: &str) -> bool {
     matches!(
         word,
-        "auto" | "break" | "case" | "char" | "const" | "continue" | "default" | "do"
-            | "double" | "else" | "enum" | "extern" | "float" | "for" | "goto" | "if"
-            | "int" | "long" | "register" | "return" | "short" | "signed" | "sizeof"
-            | "static" | "struct" | "switch" | "typedef" | "union" | "unsigned" | "void"
-            | "volatile" | "while" | "class" | "public" | "private" | "protected"
-            | "template" | "typename" | "namespace" | "using" | "virtual" | "bool"
-            | "true" | "false" | "nullptr"
+        "auto"
+            | "break"
+            | "case"
+            | "char"
+            | "const"
+            | "continue"
+            | "default"
+            | "do"
+            | "double"
+            | "else"
+            | "enum"
+            | "extern"
+            | "float"
+            | "for"
+            | "goto"
+            | "if"
+            | "int"
+            | "long"
+            | "register"
+            | "return"
+            | "short"
+            | "signed"
+            | "sizeof"
+            | "static"
+            | "struct"
+            | "switch"
+            | "typedef"
+            | "union"
+            | "unsigned"
+            | "void"
+            | "volatile"
+            | "while"
+            | "class"
+            | "public"
+            | "private"
+            | "protected"
+            | "template"
+            | "typename"
+            | "namespace"
+            | "using"
+            | "virtual"
+            | "bool"
+            | "true"
+            | "false"
+            | "nullptr"
     )
 }
 
@@ -928,20 +1185,72 @@ fn is_sql_keyword(word: &str) -> bool {
     let u = word.to_ascii_uppercase();
     matches!(
         u.as_str(),
-        "SELECT" | "FROM" | "WHERE" | "INSERT" | "INTO" | "UPDATE" | "DELETE" | "JOIN"
-            | "LEFT" | "RIGHT" | "INNER" | "OUTER" | "ON" | "GROUP" | "BY" | "ORDER"
-            | "HAVING" | "LIMIT" | "OFFSET" | "AS" | "AND" | "OR" | "NOT" | "NULL"
-            | "CREATE" | "TABLE" | "DROP" | "ALTER" | "INDEX" | "PRIMARY" | "KEY"
-            | "FOREIGN" | "REFERENCES" | "DISTINCT" | "UNION" | "ALL" | "VALUES" | "SET"
+        "SELECT"
+            | "FROM"
+            | "WHERE"
+            | "INSERT"
+            | "INTO"
+            | "UPDATE"
+            | "DELETE"
+            | "JOIN"
+            | "LEFT"
+            | "RIGHT"
+            | "INNER"
+            | "OUTER"
+            | "ON"
+            | "GROUP"
+            | "BY"
+            | "ORDER"
+            | "HAVING"
+            | "LIMIT"
+            | "OFFSET"
+            | "AS"
+            | "AND"
+            | "OR"
+            | "NOT"
+            | "NULL"
+            | "CREATE"
+            | "TABLE"
+            | "DROP"
+            | "ALTER"
+            | "INDEX"
+            | "PRIMARY"
+            | "KEY"
+            | "FOREIGN"
+            | "REFERENCES"
+            | "DISTINCT"
+            | "UNION"
+            | "ALL"
+            | "VALUES"
+            | "SET"
     )
 }
 
 fn is_generic_keyword(word: &str) -> bool {
     matches!(
         word,
-        "fn" | "def" | "function" | "func" | "var" | "let" | "const" | "class"
-            | "struct" | "interface" | "return" | "if" | "else" | "for" | "while"
-            | "import" | "export" | "from" | "pub" | "true" | "false" | "null" | "nil"
+        "fn" | "def"
+            | "function"
+            | "func"
+            | "var"
+            | "let"
+            | "const"
+            | "class"
+            | "struct"
+            | "interface"
+            | "return"
+            | "if"
+            | "else"
+            | "for"
+            | "while"
+            | "import"
+            | "export"
+            | "from"
+            | "pub"
+            | "true"
+            | "false"
+            | "null"
+            | "nil"
     )
 }
 
@@ -1155,7 +1464,8 @@ mod tests {
     #[test]
     fn test_mermaid_block_renders_codeblock() {
         let mut renderer = MarkdownRenderer::buffered();
-        let mut output = renderer.push("```mermaid\ngraph TD\n    A[Start] --> B[Process]\n    B --> C[End]\n```\n");
+        let mut output = renderer
+            .push("```mermaid\ngraph TD\n    A[Start] --> B[Process]\n    B --> C[End]\n```\n");
         output.push_str(&renderer.finish());
         let plain = super::super::table::strip_ansi(&output);
         assert!(plain.contains("─ mermaid ─"));
@@ -1172,7 +1482,11 @@ mod tests {
             let mut lang = lang_name.to_string();
             let line = "+---+";
             let rendered = render_line(line, &mut in_code, &mut lang);
-            assert_eq!(rendered, "  +---+", "Language {} should have 2-space indent without left bar", lang_name);
+            assert_eq!(
+                rendered, "  +---+",
+                "Language {} should have 2-space indent without left bar",
+                lang_name
+            );
         }
     }
 
@@ -1291,7 +1605,11 @@ mod tests {
         let mut in_code = false;
         let mut lang = String::new();
 
-        let p = render_line("Architecture diagram from docs/architecture.md:", &mut in_code, &mut lang);
+        let p = render_line(
+            "Architecture diagram from docs/architecture.md:",
+            &mut in_code,
+            &mut lang,
+        );
         assert_eq!(p, "  Architecture diagram from docs/architecture.md:");
 
         let empty = render_line("", &mut in_code, &mut lang);

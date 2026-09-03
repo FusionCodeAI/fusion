@@ -330,7 +330,12 @@ pub fn hex_dump(data: &[u8], options: &HexDumpOptions) -> HexDumpResult {
 
     // 1. Optional Header
     if options.show_header {
-        let header = format_header(bytes_per_row, group_size, options.offset_radix, options.show_ascii);
+        let header = format_header(
+            bytes_per_row,
+            group_size,
+            options.offset_radix,
+            options.show_ascii,
+        );
         output.push_str(&header);
         output.push('\n');
     }
@@ -357,7 +362,13 @@ pub fn hex_dump(data: &[u8], options: &HexDumpOptions) -> HexDumpResult {
         repeating = false;
         last_chunk = Some(chunk);
 
-        let hex_text = format_hex_bytes(chunk, bytes_per_row, group_size, options.byte_format, options.color);
+        let hex_text = format_hex_bytes(
+            chunk,
+            bytes_per_row,
+            group_size,
+            options.byte_format,
+            options.color,
+        );
         let ascii_text = if options.show_ascii {
             format_ascii_representation(chunk)
         } else {
@@ -419,7 +430,12 @@ pub fn hex_dump(data: &[u8], options: &HexDumpOptions) -> HexDumpResult {
 }
 
 /// Formats the header row showing byte offsets and column headers.
-fn format_header(bytes_per_row: usize, group_size: usize, radix: OffsetRadix, show_ascii: bool) -> String {
+fn format_header(
+    bytes_per_row: usize,
+    group_size: usize,
+    radix: OffsetRadix,
+    show_ascii: bool,
+) -> String {
     let mut header = match radix {
         OffsetRadix::Hex => "Offset(h) ".to_string(),
         OffsetRadix::Dec => "Offset(d) ".to_string(),
@@ -797,8 +813,16 @@ pub fn detect_file_type(data: &[u8]) -> Option<FileSignatureInfo> {
 
     // 1. Executables & Binaries
     if data.len() >= 4 && &data[0..4] == b"\x7FELF" {
-        let bitness = if data.len() > 4 && data[4] == 2 { "64-bit" } else { "32-bit" };
-        let endian = if data.len() > 5 && data[5] == 1 { "LSB (little endian)" } else { "MSB (big endian)" };
+        let bitness = if data.len() > 4 && data[4] == 2 {
+            "64-bit"
+        } else {
+            "32-bit"
+        };
+        let endian = if data.len() > 5 && data[5] == 1 {
+            "LSB (little endian)"
+        } else {
+            "MSB (big endian)"
+        };
         return Some(FileSignatureInfo {
             name: "ELF".to_string(),
             category: "Executable".to_string(),
@@ -811,34 +835,42 @@ pub fn detect_file_type(data: &[u8]) -> Option<FileSignatureInfo> {
     // Mach-O Binaries
     if data.len() >= 4 {
         match &data[0..4] {
-            b"\xFE\xED\xFA\xCE" => return Some(FileSignatureInfo {
-                name: "Mach-O 32-bit".to_string(),
-                category: "Executable".to_string(),
-                mime_type: Some("application/x-mach-binary".to_string()),
-                description: "Mach-O 32-bit Binary (Big Endian)".to_string(),
-                extension: "macho".to_string(),
-            }),
-            b"\xCE\xFA\xED\xFE" => return Some(FileSignatureInfo {
-                name: "Mach-O 32-bit".to_string(),
-                category: "Executable".to_string(),
-                mime_type: Some("application/x-mach-binary".to_string()),
-                description: "Mach-O 32-bit Binary (Little Endian)".to_string(),
-                extension: "macho".to_string(),
-            }),
-            b"\xFE\xED\xFA\xCF" => return Some(FileSignatureInfo {
-                name: "Mach-O 64-bit".to_string(),
-                category: "Executable".to_string(),
-                mime_type: Some("application/x-mach-binary".to_string()),
-                description: "Mach-O 64-bit Binary (Big Endian)".to_string(),
-                extension: "dylib".to_string(),
-            }),
-            b"\xCF\xFA\xED\xFE" => return Some(FileSignatureInfo {
-                name: "Mach-O 64-bit".to_string(),
-                category: "Executable".to_string(),
-                mime_type: Some("application/x-mach-binary".to_string()),
-                description: "Mach-O 64-bit Binary (Little Endian)".to_string(),
-                extension: "dylib".to_string(),
-            }),
+            b"\xFE\xED\xFA\xCE" => {
+                return Some(FileSignatureInfo {
+                    name: "Mach-O 32-bit".to_string(),
+                    category: "Executable".to_string(),
+                    mime_type: Some("application/x-mach-binary".to_string()),
+                    description: "Mach-O 32-bit Binary (Big Endian)".to_string(),
+                    extension: "macho".to_string(),
+                })
+            }
+            b"\xCE\xFA\xED\xFE" => {
+                return Some(FileSignatureInfo {
+                    name: "Mach-O 32-bit".to_string(),
+                    category: "Executable".to_string(),
+                    mime_type: Some("application/x-mach-binary".to_string()),
+                    description: "Mach-O 32-bit Binary (Little Endian)".to_string(),
+                    extension: "macho".to_string(),
+                })
+            }
+            b"\xFE\xED\xFA\xCF" => {
+                return Some(FileSignatureInfo {
+                    name: "Mach-O 64-bit".to_string(),
+                    category: "Executable".to_string(),
+                    mime_type: Some("application/x-mach-binary".to_string()),
+                    description: "Mach-O 64-bit Binary (Big Endian)".to_string(),
+                    extension: "dylib".to_string(),
+                })
+            }
+            b"\xCF\xFA\xED\xFE" => {
+                return Some(FileSignatureInfo {
+                    name: "Mach-O 64-bit".to_string(),
+                    category: "Executable".to_string(),
+                    mime_type: Some("application/x-mach-binary".to_string()),
+                    description: "Mach-O 64-bit Binary (Little Endian)".to_string(),
+                    extension: "dylib".to_string(),
+                })
+            }
             b"\xCA\xFE\xBA\xBE" => {
                 // Disambiguate Java class vs Mach-O Universal/Fat binary
                 if data.len() >= 8 && data[4] == 0 && data[5] <= 65 {
@@ -858,13 +890,15 @@ pub fn detect_file_type(data: &[u8]) -> Option<FileSignatureInfo> {
                     extension: "macho".to_string(),
                 });
             }
-            b"\x00asm" => return Some(FileSignatureInfo {
-                name: "WebAssembly".to_string(),
-                category: "Bytecode".to_string(),
-                mime_type: Some("application/wasm".to_string()),
-                description: "WebAssembly Binary Module (.wasm)".to_string(),
-                extension: "wasm".to_string(),
-            }),
+            b"\x00asm" => {
+                return Some(FileSignatureInfo {
+                    name: "WebAssembly".to_string(),
+                    category: "Bytecode".to_string(),
+                    mime_type: Some("application/wasm".to_string()),
+                    description: "WebAssembly Binary Module (.wasm)".to_string(),
+                    extension: "wasm".to_string(),
+                })
+            }
             _ => {}
         }
     }
@@ -872,12 +906,9 @@ pub fn detect_file_type(data: &[u8]) -> Option<FileSignatureInfo> {
     // Windows PE / DOS Executables
     if data.len() >= 2 && &data[0..2] == b"MZ" {
         let is_pe = if data.len() >= 0x40 {
-            let pe_offset = u32::from_le_bytes([
-                data[0x3C],
-                data[0x3C + 1],
-                data[0x3C + 2],
-                data[0x3C + 3],
-            ]) as usize;
+            let pe_offset =
+                u32::from_le_bytes([data[0x3C], data[0x3C + 1], data[0x3C + 2], data[0x3C + 3]])
+                    as usize;
             if data.len() >= pe_offset + 4 && &data[pe_offset..pe_offset + 4] == b"PE\x00\x00" {
                 true
             } else {
@@ -1028,7 +1059,8 @@ pub fn detect_file_type(data: &[u8]) -> Option<FileSignatureInfo> {
         });
     }
 
-    if data.len() >= 7 && (&data[0..7] == b"Rar!\x1A\x07\x00" || &data[0..7] == b"Rar!\x1A\x07\x01") {
+    if data.len() >= 7 && (&data[0..7] == b"Rar!\x1A\x07\x00" || &data[0..7] == b"Rar!\x1A\x07\x01")
+    {
         return Some(FileSignatureInfo {
             name: "RAR Archive".to_string(),
             category: "Archive".to_string(),
@@ -1233,7 +1265,10 @@ pub fn detect_file_type(data: &[u8]) -> Option<FileSignatureInfo> {
     }
 
     if data.len() >= 2 && &data[0..2] == b"#!" {
-        let first_line_end = data.iter().position(|&b| b == b'\n').unwrap_or(data.len().min(64));
+        let first_line_end = data
+            .iter()
+            .position(|&b| b == b'\n')
+            .unwrap_or(data.len().min(64));
         let interpreter = std::str::from_utf8(&data[2..first_line_end])
             .unwrap_or("sh")
             .trim();
@@ -1369,9 +1404,7 @@ pub fn search_bytes(
     let hex_tokens: Vec<&str> = pattern_str.split_whitespace().collect();
     let is_spaced_hex = !hex_tokens.is_empty()
         && hex_tokens.iter().all(|t| {
-            t == &"??"
-                || t == &"?"
-                || (t.len() == 2 && t.chars().all(|c| c.is_ascii_hexdigit()))
+            t == &"??" || t == &"?" || (t.len() == 2 && t.chars().all(|c| c.is_ascii_hexdigit()))
         });
 
     let (pattern_bytes, pattern_mask): (Vec<u8>, Vec<bool>) = if is_spaced_hex {
@@ -1773,8 +1806,12 @@ pub fn binary_diff(data1: &[u8], data2: &[u8], max_chunks: usize) -> BinaryDiff 
                 file2_bytes: file2_chunk,
                 file1_hex,
                 file2_hex,
-                file1_ascii: format_ascii_representation(&data1[start..data1.len().min(start + chunk_len)]),
-                file2_ascii: format_ascii_representation(&data2[start..data2.len().min(start + chunk_len)]),
+                file1_ascii: format_ascii_representation(
+                    &data1[start..data1.len().min(start + chunk_len)],
+                ),
+                file2_ascii: format_ascii_representation(
+                    &data2[start..data2.len().min(start + chunk_len)],
+                ),
             });
         }
     }
@@ -1812,17 +1849,16 @@ pub fn format_binary_diff(diff: &BinaryDiff) -> String {
         return out;
     }
 
-    out.push_str(&format!("{:<10} {:<24} {:<24} {}\n", "Offset", "File 1 Hex", "File 2 Hex", "Decoded"));
+    out.push_str(&format!(
+        "{:<10} {:<24} {:<24} {}\n",
+        "Offset", "File 1 Hex", "File 2 Hex", "Decoded"
+    ));
     out.push_str(&format!("{}\n", "-".repeat(70)));
 
     for chunk in &diff.chunks {
         out.push_str(&format!(
             "0x{:08X}   {:<24} {:<24} |{}| vs |{}|\n",
-            chunk.offset,
-            chunk.file1_hex,
-            chunk.file2_hex,
-            chunk.file1_ascii,
-            chunk.file2_ascii
+            chunk.offset, chunk.file1_hex, chunk.file2_hex, chunk.file1_ascii, chunk.file2_ascii
         ));
     }
 
@@ -1857,7 +1893,11 @@ pub fn parse_size_or_offset(val: &Value) -> Option<u64> {
         // Check for suffixes k, m, g
         let lower = trimmed.to_lowercase();
         if let Some(num_str) = lower.strip_suffix("kb").or_else(|| lower.strip_suffix('k')) {
-            return num_str.trim().parse::<f64>().ok().map(|n| (n * 1024.0) as u64);
+            return num_str
+                .trim()
+                .parse::<f64>()
+                .ok()
+                .map(|n| (n * 1024.0) as u64);
         }
         if let Some(num_str) = lower.strip_suffix("mb").or_else(|| lower.strip_suffix('m')) {
             return num_str
@@ -2102,9 +2142,9 @@ impl Tool for HexViewerTool {
                 anyhow::bail!("Path is a directory, not a file: '{}'", full_path.display());
             }
 
-            tokio::fs::read(&full_path)
-                .await
-                .map_err(|e| anyhow::anyhow!("Failed to read file '{}': {e}", full_path.display()))?
+            tokio::fs::read(&full_path).await.map_err(|e| {
+                anyhow::anyhow!("Failed to read file '{}': {e}", full_path.display())
+            })?
         } else if let Some(raw_data) = args
             .get("data")
             .and_then(|v| v.as_str())
@@ -2218,7 +2258,11 @@ impl Tool for HexViewerTool {
 
                 let mut out = String::new();
                 out.push_str("=== Binary File Inspection & Analysis ===\n");
-                out.push_str(&format!("Total Size: {} bytes ({:.2} KB)\n", data.len(), (data.len() as f64) / 1024.0));
+                out.push_str(&format!(
+                    "Total Size: {} bytes ({:.2} KB)\n",
+                    data.len(),
+                    (data.len() as f64) / 1024.0
+                ));
 
                 if let Some(s) = sig {
                     out.push_str(&format!("File Type: {} ({})\n", s.name, s.category));
@@ -2270,7 +2314,9 @@ impl Tool for HexViewerTool {
                     .get("search")
                     .or_else(|| args.get("pattern"))
                     .and_then(|v| v.as_str())
-                    .ok_or_else(|| anyhow::anyhow!("Missing required parameter: 'search' pattern"))?;
+                    .ok_or_else(|| {
+                        anyhow::anyhow!("Missing required parameter: 'search' pattern")
+                    })?;
 
                 let matches = search_bytes(&data, pattern, 100, 0)?;
 
@@ -2323,15 +2369,24 @@ impl Tool for HexViewerTool {
                 }
 
                 let mut out = String::new();
-                out.push_str(&format!("=== Extracted Strings (min_length: {}) ===\n", min_len));
+                out.push_str(&format!(
+                    "=== Extracted Strings (min_length: {}) ===\n",
+                    min_len
+                ));
                 out.push_str(&format!("Total Strings Found: {}\n\n", strings.len()));
 
                 for s in strings.iter().take(200) {
-                    out.push_str(&format!("0x{:08X} [{:<8}] {}\n", s.offset, s.encoding, s.value));
+                    out.push_str(&format!(
+                        "0x{:08X} [{:<8}] {}\n",
+                        s.offset, s.encoding, s.value
+                    ));
                 }
 
                 if strings.len() > 200 {
-                    out.push_str(&format!("... (truncated {} additional strings)\n", strings.len() - 200));
+                    out.push_str(&format!(
+                        "... (truncated {} additional strings)\n",
+                        strings.len() - 200
+                    ));
                 }
 
                 Ok(out)
@@ -2357,16 +2412,23 @@ impl Tool for HexViewerTool {
                     .or_else(|| args.get("second_path"))
                     .or_else(|| args.get("file2"))
                     .and_then(|v| v.as_str())
-                    .ok_or_else(|| anyhow::anyhow!("Missing required parameter: 'diff_path' for binary comparison"))?;
+                    .ok_or_else(|| {
+                        anyhow::anyhow!(
+                            "Missing required parameter: 'diff_path' for binary comparison"
+                        )
+                    })?;
 
                 let full_diff_path = resolve_path(diff_path_str, &ctx.cwd);
                 if !full_diff_path.exists() {
                     anyhow::bail!("Diff file not found: '{}'", full_diff_path.display());
                 }
 
-                let data2 = tokio::fs::read(&full_diff_path)
-                    .await
-                    .map_err(|e| anyhow::anyhow!("Failed to read diff file '{}': {e}", full_diff_path.display()))?;
+                let data2 = tokio::fs::read(&full_diff_path).await.map_err(|e| {
+                    anyhow::anyhow!(
+                        "Failed to read diff file '{}': {e}",
+                        full_diff_path.display()
+                    )
+                })?;
 
                 let diff_res = binary_diff(&data, &data2, 500);
 
@@ -2504,7 +2566,8 @@ mod tests {
 
     #[test]
     fn test_binary_search() {
-        let data = b"Some random bytes \x7F\x45\x4C\x46\x02\x01 and more text \x7F\x45\x99\x46 and end";
+        let data =
+            b"Some random bytes \x7F\x45\x4C\x46\x02\x01 and more text \x7F\x45\x99\x46 and end";
 
         // Plain string search
         let res = search_bytes(data, "random", 10, 0).unwrap();

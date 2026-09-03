@@ -967,7 +967,11 @@ impl Default for PdfOptions {
             title: None,
             author: Some("Fusion AI Assistant".to_string()),
             subject: Some("AI Session Transcript".to_string()),
-            keywords: vec!["Fusion".to_string(), "Transcript".to_string(), "AI".to_string()],
+            keywords: vec![
+                "Fusion".to_string(),
+                "Transcript".to_string(),
+                "AI".to_string(),
+            ],
             generate_bookmarks: true,
             grayscale: false,
             zoom: 1.0,
@@ -1092,7 +1096,8 @@ pub fn generate_print_css_rules(options: &PrintOptions) -> String {
     let code_family = options.font_family.code_font_stack();
 
     // Universal resets
-    css.push_str(r#"  *,
+    css.push_str(
+        r#"  *,
   *::before,
   *::after {
     box-sizing: border-box !important;
@@ -1101,7 +1106,8 @@ pub fn generate_print_css_rules(options: &PrintOptions) -> String {
     -webkit-print-color-adjust: exact !important;
     print-color-adjust: exact !important;
   }
-"#);
+"#,
+    );
 
     // Body styling
     let (bg_color, text_color, heading_color) = match options.theme {
@@ -1128,7 +1134,8 @@ pub fn generate_print_css_rules(options: &PrintOptions) -> String {
 
     // Hide interactive elements
     if options.hide_interactive {
-        css.push_str(r#"
+        css.push_str(
+            r#"
   .header-actions,
   .toolbar,
   .filter-group,
@@ -1144,12 +1151,14 @@ pub fn generate_print_css_rules(options: &PrintOptions) -> String {
     display: none !important;
     visibility: hidden !important;
   }
-"#);
+"#,
+        );
     }
 
     // Expand details
     if options.expand_details {
-        css.push_str(r#"
+        css.push_str(
+            r#"
   details {
     display: block !important;
   }
@@ -1162,7 +1171,8 @@ pub fn generate_print_css_rules(options: &PrintOptions) -> String {
   details > summary::-webkit-details-marker {
     display: none !important;
   }
-"#);
+"#,
+        );
     }
 
     // Headings & typography
@@ -1192,7 +1202,8 @@ pub fn generate_print_css_rules(options: &PrintOptions) -> String {
     );
 
     // App container
-    css.push_str(r#"
+    css.push_str(
+        r#"
   .app-container {
     max-width: 100% !important;
     margin: 0 !important;
@@ -1200,7 +1211,8 @@ pub fn generate_print_css_rules(options: &PrintOptions) -> String {
     border: none !important;
     box-shadow: none !important;
   }
-"#);
+"#,
+    );
 
     // Header card
     let header_border = match options.theme {
@@ -1342,7 +1354,8 @@ pub fn generate_print_css_rules(options: &PrintOptions) -> String {
     );
 
     // Thinking / DeepSeek reasoning blocks
-    css.push_str(r#"  .thinking-block,
+    css.push_str(
+        r#"  .thinking-block,
   .thought-content,
   blockquote.think-block {
     background: #f8fafc !important;
@@ -1356,7 +1369,8 @@ pub fn generate_print_css_rules(options: &PrintOptions) -> String {
     page-break-inside: avoid !important;
     break-inside: avoid !important;
   }
-"#);
+"#,
+    );
 
     // Tool execution blocks
     let tool_break_avoid = if options.page_breaks.avoid_break_inside_tools {
@@ -1437,7 +1451,8 @@ pub fn generate_print_css_rules(options: &PrintOptions) -> String {
 
     // Monochrome code syntax override if preserve_syntax_colors is false
     if !options.preserve_syntax_colors || options.theme == PrintTheme::Monochrome {
-        css.push_str(r#"  .hl-kw, .hl-fn, .hl-str, .hl-num, .hl-type, .hl-comm, .hl-tag, .hl-attr {
+        css.push_str(
+            r#"  .hl-kw, .hl-fn, .hl-str, .hl-num, .hl-type, .hl-comm, .hl-tag, .hl-attr {
     color: #000000 !important;
     font-weight: normal !important;
   }
@@ -1448,7 +1463,8 @@ pub fn generate_print_css_rules(options: &PrintOptions) -> String {
     font-style: italic !important;
     color: #4b5563 !important;
   }
-"#);
+"#,
+        );
     }
 
     // Tables
@@ -1490,7 +1506,8 @@ pub fn generate_print_css_rules(options: &PrintOptions) -> String {
     );
 
     // Blockquotes
-    css.push_str(r#"  blockquote {
+    css.push_str(
+        r#"  blockquote {
     border-left: 3pt solid #cbd5e1 !important;
     margin: 6pt 0 !important;
     padding: 4pt 8pt !important;
@@ -1499,11 +1516,13 @@ pub fn generate_print_css_rules(options: &PrintOptions) -> String {
     page-break-inside: avoid !important;
     break-inside: avoid !important;
   }
-"#);
+"#,
+    );
 
     // Links & optional URL printing
     if options.show_urls {
-        css.push_str(r#"  a {
+        css.push_str(
+            r#"  a {
     color: #0f172a !important;
     text-decoration: underline !important;
   }
@@ -1513,13 +1532,16 @@ pub fn generate_print_css_rules(options: &PrintOptions) -> String {
     font-size: 80% !important;
     color: #64748b !important;
   }
-"#);
+"#,
+        );
     } else {
-        css.push_str(r#"  a {
+        css.push_str(
+            r#"  a {
     color: #0f172a !important;
     text-decoration: underline !important;
   }
-"#);
+"#,
+        );
     }
 
     // App Footer
@@ -1572,14 +1594,22 @@ pub fn generate_standalone_print_stylesheet(options: &PrintOptions) -> String {
 /// Generates specialized CSS for PDF engines from a `PdfOptions` configuration.
 pub fn generate_pdf_css(options: &PdfOptions) -> String {
     let mut css = String::with_capacity(4096);
-    css.push_str(&generate_standalone_print_stylesheet(&options.print_options));
+    css.push_str(&generate_standalone_print_stylesheet(
+        &options.print_options,
+    ));
 
     if options.grayscale {
-        css.push_str("\n/* PDF Grayscale Filter */\nhtml { filter: grayscale(100%) !important; }\n");
+        css.push_str(
+            "\n/* PDF Grayscale Filter */\nhtml { filter: grayscale(100%) !important; }\n",
+        );
     }
 
     if (options.zoom - 1.0).abs() > f32::EPSILON {
-        let _ = writeln!(css, "\n/* PDF Zoom Scale */\nbody {{ zoom: {:.2} !important; }}", options.zoom);
+        let _ = writeln!(
+            css,
+            "\n/* PDF Zoom Scale */\nbody {{ zoom: {:.2} !important; }}",
+            options.zoom
+        );
     }
 
     css
@@ -1638,17 +1668,33 @@ pub fn optimize_for_pdf(html: &str, options: &PdfOptions) -> String {
     // 2. Metadata tags
     let mut meta_tags = String::new();
     if let Some(title) = &options.title {
-        let _ = writeln!(meta_tags, r#"  <meta name="title" content="{}">"#, escape_attr(title));
+        let _ = writeln!(
+            meta_tags,
+            r#"  <meta name="title" content="{}">"#,
+            escape_attr(title)
+        );
     }
     if let Some(author) = &options.author {
-        let _ = writeln!(meta_tags, r#"  <meta name="author" content="{}">"#, escape_attr(author));
+        let _ = writeln!(
+            meta_tags,
+            r#"  <meta name="author" content="{}">"#,
+            escape_attr(author)
+        );
     }
     if let Some(subject) = &options.subject {
-        let _ = writeln!(meta_tags, r#"  <meta name="subject" content="{}">"#, escape_attr(subject));
+        let _ = writeln!(
+            meta_tags,
+            r#"  <meta name="subject" content="{}">"#,
+            escape_attr(subject)
+        );
     }
     if !options.keywords.is_empty() {
         let kw_str = options.keywords.join(", ");
-        let _ = writeln!(meta_tags, r#"  <meta name="keywords" content="{}">"#, escape_attr(&kw_str));
+        let _ = writeln!(
+            meta_tags,
+            r#"  <meta name="keywords" content="{}">"#,
+            escape_attr(&kw_str)
+        );
     }
 
     if !meta_tags.is_empty() {
@@ -1734,8 +1780,14 @@ mod tests {
             width: "150mm".to_string(),
             height: "200mm".to_string(),
         };
-        assert_eq!(custom.to_css_value(PageOrientation::Portrait), "150mm 200mm");
-        assert_eq!(custom.to_css_value(PageOrientation::Landscape), "200mm 150mm");
+        assert_eq!(
+            custom.to_css_value(PageOrientation::Portrait),
+            "150mm 200mm"
+        );
+        assert_eq!(
+            custom.to_css_value(PageOrientation::Landscape),
+            "200mm 150mm"
+        );
 
         assert!(PageSize::A4.dimensions_mm().is_some());
         assert_eq!(PageSize::A4.dimensions_mm().unwrap(), (210.0, 297.0));
@@ -1836,9 +1888,7 @@ mod tests {
 
     #[test]
     fn test_generate_pdf_css() {
-        let pdf_opts = PdfOptions::new()
-            .with_grayscale(true)
-            .with_zoom(0.95);
+        let pdf_opts = PdfOptions::new().with_grayscale(true).with_zoom(0.95);
 
         let css = generate_pdf_css(&pdf_opts);
         assert!(css.contains("filter: grayscale(100%)"));

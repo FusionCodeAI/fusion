@@ -386,12 +386,18 @@ impl<'a> TreeScanner<'a> {
         gitignore_stack: &[Gitignore],
     ) -> bool {
         // 1. Hidden file check (dotfiles)
-        if !self.options.show_hidden && file_name.starts_with('.') && file_name != "." && file_name != ".." {
+        if !self.options.show_hidden
+            && file_name.starts_with('.')
+            && file_name != "."
+            && file_name != ".."
+        {
             return true;
         }
 
         // Always ignore .git directory internals unless show_hidden is true
-        if !self.options.show_hidden && (file_name == ".git" || file_name == ".hg" || file_name == ".svn") {
+        if !self.options.show_hidden
+            && (file_name == ".git" || file_name == ".hg" || file_name == ".svn")
+        {
             return true;
         }
 
@@ -435,7 +441,10 @@ impl<'a> TreeScanner<'a> {
             .unwrap_or_else(|| current_path.to_string_lossy().to_string());
 
         let metadata = fs::symlink_metadata(current_path).ok();
-        let is_symlink = metadata.as_ref().map(|m| m.file_type().is_symlink()).unwrap_or(false);
+        let is_symlink = metadata
+            .as_ref()
+            .map(|m| m.file_type().is_symlink())
+            .unwrap_or(false);
         let mut symlink_target = None;
 
         if is_symlink {
@@ -452,11 +461,14 @@ impl<'a> TreeScanner<'a> {
             metadata.as_ref().map(|m| m.is_dir()).unwrap_or(false)
         };
 
-        let modified = metadata.as_ref().and_then(|m| m.modified().ok()).and_then(|t| {
-            t.duration_since(SystemTime::UNIX_EPOCH)
-                .ok()
-                .map(|d| d.as_secs())
-        });
+        let modified = metadata
+            .as_ref()
+            .and_then(|m| m.modified().ok())
+            .and_then(|t| {
+                t.duration_since(SystemTime::UNIX_EPOCH)
+                    .ok()
+                    .map(|d| d.as_secs())
+            });
 
         // If it's a file or non-followed symlink
         if !is_dir {
@@ -646,12 +658,7 @@ impl<'a> TreeScanner<'a> {
                 break;
             }
 
-            let child_node = self.scan_dir(
-                &child_path,
-                &child_rel,
-                depth + 1,
-                gitignore_stack,
-            );
+            let child_node = self.scan_dir(&child_path, &child_rel, depth + 1, gitignore_stack);
 
             dir_total_size += child_node.size;
             child_nodes.push(child_node);
@@ -857,7 +864,11 @@ pub fn render_tree_text(root: &TreeNode, options: &TreeOptions, stats: &TreeStat
 
     // Summary footer
     out.push('\n');
-    let dir_label = if stats.directories == 1 { "directory" } else { "directories" };
+    let dir_label = if stats.directories == 1 {
+        "directory"
+    } else {
+        "directories"
+    };
     let file_label = if stats.files == 1 { "file" } else { "files" };
 
     if options.dirs_only {
@@ -1601,7 +1612,10 @@ mod tests {
         };
 
         // Execute default tree
-        let res = tool.execute(json!({}), &ctx).await.expect("Tool execution failed");
+        let res = tool
+            .execute(json!({}), &ctx)
+            .await
+            .expect("Tool execution failed");
         assert!(res.contains("src/"));
         assert!(res.contains("Cargo.toml"));
 

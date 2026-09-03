@@ -537,7 +537,10 @@ pub fn parse_github_repo_from_remote(remote_url: &str) -> Option<(String, String
 
     // 1. SSH format: git@github.com:owner/repo or user@host:owner/repo
     if let Some((_host_part, path_part)) = base.split_once(':') {
-        if !base.starts_with("http://") && !base.starts_with("https://") && !base.starts_with("ssh://") {
+        if !base.starts_with("http://")
+            && !base.starts_with("https://")
+            && !base.starts_with("ssh://")
+        {
             let parts: Vec<&str> = path_part.trim_matches('/').split('/').collect();
             if parts.len() >= 2 {
                 let owner = parts[parts.len() - 2].trim();
@@ -595,7 +598,9 @@ pub async fn detect_repo_from_cwd(cwd: &Path) -> Option<(String, String)> {
     let repo_root = find_git_root(cwd)?;
 
     // Try reading remote.origin.url from git config
-    let out = run_git_command(&["config", "--get", "remote.origin.url"], &repo_root, 5).await.ok()?;
+    let out = run_git_command(&["config", "--get", "remote.origin.url"], &repo_root, 5)
+        .await
+        .ok()?;
     if out.success && !out.stdout.trim().is_empty() {
         if let Some(pair) = parse_github_repo_from_remote(out.stdout.trim()) {
             return Some(pair);
@@ -603,7 +608,9 @@ pub async fn detect_repo_from_cwd(cwd: &Path) -> Option<(String, String)> {
     }
 
     // Try reading all remotes
-    let remotes_out = run_git_command(&["remote", "-v"], &repo_root, 5).await.ok()?;
+    let remotes_out = run_git_command(&["remote", "-v"], &repo_root, 5)
+        .await
+        .ok()?;
     if remotes_out.success {
         for line in remotes_out.stdout.lines() {
             let parts: Vec<&str> = line.split_whitespace().collect();
@@ -658,7 +665,10 @@ pub async fn run_gh_command(
     let output = match tokio::time::timeout(timeout_duration, child.wait_with_output()).await {
         Ok(Ok(out)) => out,
         Ok(Err(e)) => anyhow::bail!("Failed reading 'gh' output: {e}"),
-        Err(_) => anyhow::bail!("'gh' command timed out after {timeout_secs}s: gh {}", args.join(" ")),
+        Err(_) => anyhow::bail!(
+            "'gh' command timed out after {timeout_secs}s: gh {}",
+            args.join(" ")
+        ),
     };
 
     let stdout = String::from_utf8_lossy(&output.stdout).to_string();
@@ -699,7 +709,10 @@ fn parse_user_from_val(val: &Value) -> Option<GitHubUser> {
         return None;
     }
     let login = val.get("login")?.as_str()?.to_string();
-    let name = val.get("name").and_then(|v| v.as_str()).map(|s| s.to_string());
+    let name = val
+        .get("name")
+        .and_then(|v| v.as_str())
+        .map(|s| s.to_string());
     let avatar_url = val
         .get("avatarUrl")
         .or_else(|| val.get("avatar_url"))
@@ -724,8 +737,14 @@ fn parse_labels_from_val(val: &Value) -> Vec<GitHubLabel> {
     if let Some(arr) = val.as_array() {
         for item in arr {
             if let Some(name) = item.get("name").and_then(|v| v.as_str()) {
-                let color = item.get("color").and_then(|v| v.as_str()).map(|s| s.to_string());
-                let description = item.get("description").and_then(|v| v.as_str()).map(|s| s.to_string());
+                let color = item
+                    .get("color")
+                    .and_then(|v| v.as_str())
+                    .map(|s| s.to_string());
+                let description = item
+                    .get("description")
+                    .and_then(|v| v.as_str())
+                    .map(|s| s.to_string());
                 labels.push(GitHubLabel {
                     name: name.to_string(),
                     color,
@@ -743,8 +762,14 @@ fn parse_milestone_from_val(val: &Value) -> Option<GitHubMilestone> {
     }
     let title = val.get("title")?.as_str()?.to_string();
     let number = val.get("number").and_then(|v| v.as_u64());
-    let state = val.get("state").and_then(|v| v.as_str()).map(|s| s.to_string());
-    let description = val.get("description").and_then(|v| v.as_str()).map(|s| s.to_string());
+    let state = val
+        .get("state")
+        .and_then(|v| v.as_str())
+        .map(|s| s.to_string());
+    let description = val
+        .get("description")
+        .and_then(|v| v.as_str())
+        .map(|s| s.to_string());
     let due_on = val
         .get("dueOn")
         .or_else(|| val.get("due_on"))
@@ -842,8 +867,14 @@ fn parse_files_from_val(val: &Value) -> Vec<GitHubFileChange> {
 
             let additions = item.get("additions").and_then(|v| v.as_u64()).unwrap_or(0) as usize;
             let deletions = item.get("deletions").and_then(|v| v.as_u64()).unwrap_or(0) as usize;
-            let status = item.get("status").and_then(|v| v.as_str()).map(|s| s.to_string());
-            let patch = item.get("patch").and_then(|v| v.as_str()).map(|s| s.to_string());
+            let status = item
+                .get("status")
+                .and_then(|v| v.as_str())
+                .map(|s| s.to_string());
+            let patch = item
+                .get("patch")
+                .and_then(|v| v.as_str())
+                .map(|s| s.to_string());
 
             files.push(GitHubFileChange {
                 path,
@@ -919,15 +950,19 @@ fn parse_reviews_from_val(val: &Value) -> Vec<GitHubReview> {
     if let Some(arr) = val.as_array() {
         for item in arr {
             let id = item.get("id").map(|v| v.to_string());
-            let author = item.get("author").and_then(parse_user_from_val).or_else(|| {
-                item.get("user").and_then(parse_user_from_val)
-            });
+            let author = item
+                .get("author")
+                .and_then(parse_user_from_val)
+                .or_else(|| item.get("user").and_then(parse_user_from_val));
             let state = item
                 .get("state")
                 .and_then(|v| v.as_str())
                 .unwrap_or("PENDING")
                 .to_string();
-            let body = item.get("body").and_then(|v| v.as_str()).map(|s| s.to_string());
+            let body = item
+                .get("body")
+                .and_then(|v| v.as_str())
+                .map(|s| s.to_string());
             let submitted_at = item
                 .get("submittedAt")
                 .or_else(|| item.get("submitted_at"))
@@ -957,9 +992,10 @@ fn parse_comments_from_val(val: &Value) -> Vec<GitHubComment> {
     if let Some(arr) = val.as_array() {
         for item in arr {
             let id = item.get("id").map(|v| v.to_string());
-            let author = item.get("author").and_then(parse_user_from_val).or_else(|| {
-                item.get("user").and_then(parse_user_from_val)
-            });
+            let author = item
+                .get("author")
+                .and_then(parse_user_from_val)
+                .or_else(|| item.get("user").and_then(parse_user_from_val));
             let body = item
                 .get("body")
                 .and_then(|v| v.as_str())
@@ -1002,7 +1038,10 @@ pub fn normalize_pr_json(val: &Value) -> GitHubPr {
         .and_then(|v| v.as_str())
         .unwrap_or("Untitled PR")
         .to_string();
-    let body = val.get("body").and_then(|v| v.as_str()).map(|s| s.to_string());
+    let body = val
+        .get("body")
+        .and_then(|v| v.as_str())
+        .map(|s| s.to_string());
     let state = val
         .get("state")
         .and_then(|v| v.as_str())
@@ -1043,15 +1082,24 @@ pub fn normalize_pr_json(val: &Value) -> GitHubPr {
         .and_then(|v| v.as_str())
         .map(|s| s.to_string());
 
-    let additions = val.get("additions").and_then(|v| v.as_u64()).map(|n| n as usize);
-    let deletions = val.get("deletions").and_then(|v| v.as_u64()).map(|n| n as usize);
+    let additions = val
+        .get("additions")
+        .and_then(|v| v.as_u64())
+        .map(|n| n as usize);
+    let deletions = val
+        .get("deletions")
+        .and_then(|v| v.as_u64())
+        .map(|n| n as usize);
     let changed_files = val
         .get("changedFiles")
         .or_else(|| val.get("changed_files"))
         .and_then(|v| v.as_u64())
         .map(|n| n as usize);
 
-    let labels = val.get("labels").map(parse_labels_from_val).unwrap_or_default();
+    let labels = val
+        .get("labels")
+        .map(parse_labels_from_val)
+        .unwrap_or_default();
     let assignees = val
         .get("assignees")
         .map(parse_users_list_from_val)
@@ -1063,15 +1111,13 @@ pub fn normalize_pr_json(val: &Value) -> GitHubPr {
         .unwrap_or_default();
     let milestone = val.get("milestone").and_then(parse_milestone_from_val);
 
-    let mergeable = val
-        .get("mergeable")
-        .and_then(|v| {
-            if let Some(b) = v.as_bool() {
-                Some(if b { "MERGEABLE" } else { "CONFLICTING" }.to_string())
-            } else {
-                v.as_str().map(|s| s.to_string())
-            }
-        });
+    let mergeable = val.get("mergeable").and_then(|v| {
+        if let Some(b) = v.as_bool() {
+            Some(if b { "MERGEABLE" } else { "CONFLICTING" }.to_string())
+        } else {
+            v.as_str().map(|s| s.to_string())
+        }
+    });
 
     let merge_state_status = val
         .get("mergeStateStatus")
@@ -1108,19 +1154,17 @@ pub fn normalize_pr_json(val: &Value) -> GitHubPr {
         .and_then(|v| v.as_str())
         .map(|s| s.to_string());
 
-    let comments_count = val
-        .get("comments")
-        .and_then(|v| {
-            if let Some(arr) = v.as_array() {
-                Some(arr.len())
-            } else if let Some(n) = v.as_u64() {
-                Some(n as usize)
-            } else if let Some(tot) = v.get("totalCount").and_then(|t| t.as_u64()) {
-                Some(tot as usize)
-            } else {
-                None
-            }
-        });
+    let comments_count = val.get("comments").and_then(|v| {
+        if let Some(arr) = v.as_array() {
+            Some(arr.len())
+        } else if let Some(n) = v.as_u64() {
+            Some(n as usize)
+        } else if let Some(tot) = v.get("totalCount").and_then(|t| t.as_u64()) {
+            Some(tot as usize)
+        } else {
+            None
+        }
+    });
 
     let reviews_count = val
         .get("reviews")
@@ -1140,14 +1184,23 @@ pub fn normalize_pr_json(val: &Value) -> GitHubPr {
         .map(parse_status_checks_from_val)
         .unwrap_or_default();
 
-    let files = val.get("files").map(parse_files_from_val).unwrap_or_default();
-    let commits = val.get("commits").map(parse_commits_from_val).unwrap_or_default();
+    let files = val
+        .get("files")
+        .map(parse_files_from_val)
+        .unwrap_or_default();
+    let commits = val
+        .get("commits")
+        .map(parse_commits_from_val)
+        .unwrap_or_default();
     let reviews = val
         .get("reviews")
         .or_else(|| val.get("latestReviews"))
         .map(parse_reviews_from_val)
         .unwrap_or_default();
-    let comments = val.get("comments").map(parse_comments_from_val).unwrap_or_default();
+    let comments = val
+        .get("comments")
+        .map(parse_comments_from_val)
+        .unwrap_or_default();
 
     GitHubPr {
         number,
@@ -1192,7 +1245,10 @@ pub fn normalize_issue_json(val: &Value) -> GitHubIssue {
         .and_then(|v| v.as_str())
         .unwrap_or("Untitled Issue")
         .to_string();
-    let body = val.get("body").and_then(|v| v.as_str()).map(|s| s.to_string());
+    let body = val
+        .get("body")
+        .and_then(|v| v.as_str())
+        .map(|s| s.to_string());
     let state = val
         .get("state")
         .and_then(|v| v.as_str())
@@ -1210,7 +1266,10 @@ pub fn normalize_issue_json(val: &Value) -> GitHubIssue {
         .and_then(parse_user_from_val)
         .or_else(|| val.get("user").and_then(parse_user_from_val));
 
-    let labels = val.get("labels").map(parse_labels_from_val).unwrap_or_default();
+    let labels = val
+        .get("labels")
+        .map(parse_labels_from_val)
+        .unwrap_or_default();
     let assignees = val
         .get("assignees")
         .map(parse_users_list_from_val)
@@ -1250,7 +1309,10 @@ pub fn normalize_issue_json(val: &Value) -> GitHubIssue {
         .and_then(|v| v.as_str())
         .map(|s| s.to_string());
 
-    let comments = val.get("comments").map(parse_comments_from_val).unwrap_or_default();
+    let comments = val
+        .get("comments")
+        .map(parse_comments_from_val)
+        .unwrap_or_default();
 
     GitHubIssue {
         number,
@@ -1272,7 +1334,11 @@ pub fn normalize_issue_json(val: &Value) -> GitHubIssue {
 
 /// Normalizes repository metadata from `gh repo view` or GitHub API.
 pub fn normalize_repo_json(val: &Value) -> GitHubRepoInfo {
-    let name = val.get("name").and_then(|v| v.as_str()).unwrap_or("").to_string();
+    let name = val
+        .get("name")
+        .and_then(|v| v.as_str())
+        .unwrap_or("")
+        .to_string();
     let owner = val
         .get("owner")
         .and_then(|v| {
@@ -1297,7 +1363,10 @@ pub fn normalize_repo_json(val: &Value) -> GitHubRepoInfo {
             }
         });
 
-    let description = val.get("description").and_then(|v| v.as_str()).map(|s| s.to_string());
+    let description = val
+        .get("description")
+        .and_then(|v| v.as_str())
+        .map(|s| s.to_string());
 
     let default_branch = val
         .get("defaultBranchRef")
@@ -1346,14 +1415,25 @@ pub fn normalize_repo_json(val: &Value) -> GitHubRepoInfo {
     let license = val
         .get("licenseInfo")
         .and_then(|v| v.get("name").or_else(|| v.get("spdxId")))
-        .or_else(|| val.get("license").and_then(|v| v.get("name").or_else(|| v.get("spdx_id"))))
+        .or_else(|| {
+            val.get("license")
+                .and_then(|v| v.get("name").or_else(|| v.get("spdx_id")))
+        })
         .and_then(|v| v.as_str())
         .map(|s| s.to_string());
 
     let mut topics = Vec::new();
-    if let Some(arr) = val.get("repositoryTopics").or_else(|| val.get("topics")).and_then(|v| v.as_array()) {
+    if let Some(arr) = val
+        .get("repositoryTopics")
+        .or_else(|| val.get("topics"))
+        .and_then(|v| v.as_array())
+    {
         for t in arr {
-            if let Some(s) = t.get("name").and_then(|v| v.as_str()).or_else(|| t.as_str()) {
+            if let Some(s) = t
+                .get("name")
+                .and_then(|v| v.as_str())
+                .or_else(|| t.as_str())
+            {
                 topics.push(s.to_string());
             }
         }
@@ -1400,8 +1480,14 @@ pub fn normalize_release_json(val: &Value) -> GitHubRelease {
         .unwrap_or("")
         .to_string();
 
-    let name = val.get("name").and_then(|v| v.as_str()).map(|s| s.to_string());
-    let body = val.get("body").and_then(|v| v.as_str()).map(|s| s.to_string());
+    let name = val
+        .get("name")
+        .and_then(|v| v.as_str())
+        .map(|s| s.to_string());
+    let body = val
+        .get("body")
+        .and_then(|v| v.as_str())
+        .map(|s| s.to_string());
     let is_draft = val
         .get("isDraft")
         .or_else(|| val.get("draft"))
@@ -1433,7 +1519,11 @@ pub fn normalize_release_json(val: &Value) -> GitHubRelease {
     let mut assets = Vec::new();
     if let Some(arr) = val.get("assets").and_then(|v| v.as_array()) {
         for item in arr {
-            let aname = item.get("name").and_then(|v| v.as_str()).unwrap_or("").to_string();
+            let aname = item
+                .get("name")
+                .and_then(|v| v.as_str())
+                .unwrap_or("")
+                .to_string();
             let size = item.get("size").and_then(|v| v.as_u64()).unwrap_or(0);
             let download_count = item
                 .get("downloadCount")
@@ -1510,7 +1600,10 @@ pub fn normalize_workflow_run_json(val: &Value) -> GitHubWorkflowRun {
         .and_then(|v| v.as_str())
         .map(|s| s.to_string());
 
-    let event = val.get("event").and_then(|v| v.as_str()).map(|s| s.to_string());
+    let event = val
+        .get("event")
+        .and_then(|v| v.as_str())
+        .map(|s| s.to_string());
 
     let head_sha = val
         .get("headSha")
@@ -1552,8 +1645,10 @@ pub fn normalize_workflow_run_json(val: &Value) -> GitHubWorkflowRun {
 const PR_FIELDS: &str = "additions,assignees,author,baseRefName,body,changedFiles,closedAt,comments,commits,createdAt,deletions,files,headRefName,headRefOid,isDraft,labels,latestReviews,mergeStateStatus,mergeable,mergedAt,mergedBy,milestone,number,reviewRequests,reviews,state,statusCheckRollup,title,updatedAt,url";
 const ISSUE_FIELDS: &str = "assignees,author,body,closedAt,comments,createdAt,labels,milestone,number,state,title,updatedAt,url";
 const REPO_FIELDS: &str = "name,owner,nameWithOwner,description,defaultBranchRef,visibility,isPrivate,isFork,stargazerCount,forksCount,openIssuesCount,licenseInfo,repositoryTopics,url,homepageUrl";
-const RELEASE_FIELDS: &str = "tagName,name,body,isDraft,isPrerelease,isLatest,publishedAt,url,assets";
-const RUN_FIELDS: &str = "databaseId,displayTitle,workflowName,status,conclusion,headBranch,event,headSha,createdAt,url";
+const RELEASE_FIELDS: &str =
+    "tagName,name,body,isDraft,isPrerelease,isLatest,publishedAt,url,assets";
+const RUN_FIELDS: &str =
+    "databaseId,displayTitle,workflowName,status,conclusion,headBranch,event,headSha,createdAt,url";
 
 /// Lists pull requests via `gh pr list`.
 pub async fn gh_list_prs(
@@ -1622,8 +1717,12 @@ pub async fn gh_list_prs(
         anyhow::bail!("gh pr list failed: {}", output.stderr.trim());
     }
 
-    let parsed: Value = serde_json::from_str(&output.stdout)
-        .map_err(|e| anyhow::anyhow!("Failed parsing gh pr list output: {e}\nRaw: {}", output.stdout))?;
+    let parsed: Value = serde_json::from_str(&output.stdout).map_err(|e| {
+        anyhow::anyhow!(
+            "Failed parsing gh pr list output: {e}\nRaw: {}",
+            output.stdout
+        )
+    })?;
 
     let mut pull_requests = Vec::new();
     if let Some(arr) = parsed.as_array() {
@@ -1666,8 +1765,12 @@ pub async fn gh_view_pr(
         anyhow::bail!("gh pr view failed for '{pr_ref}': {}", output.stderr.trim());
     }
 
-    let parsed: Value = serde_json::from_str(&output.stdout)
-        .map_err(|e| anyhow::anyhow!("Failed parsing gh pr view output: {e}\nRaw: {}", output.stdout))?;
+    let parsed: Value = serde_json::from_str(&output.stdout).map_err(|e| {
+        anyhow::anyhow!(
+            "Failed parsing gh pr view output: {e}\nRaw: {}",
+            output.stdout
+        )
+    })?;
 
     Ok(normalize_pr_json(&parsed))
 }
@@ -1750,8 +1853,12 @@ pub async fn gh_list_issues(
         anyhow::bail!("gh issue list failed: {}", output.stderr.trim());
     }
 
-    let parsed: Value = serde_json::from_str(&output.stdout)
-        .map_err(|e| anyhow::anyhow!("Failed parsing gh issue list output: {e}\nRaw: {}", output.stdout))?;
+    let parsed: Value = serde_json::from_str(&output.stdout).map_err(|e| {
+        anyhow::anyhow!(
+            "Failed parsing gh issue list output: {e}\nRaw: {}",
+            output.stdout
+        )
+    })?;
 
     let mut issues = Vec::new();
     if let Some(arr) = parsed.as_array() {
@@ -1791,11 +1898,18 @@ pub async fn gh_view_issue(
 
     let output = run_gh_command(&args, cwd, env, 30).await?;
     if !output.success {
-        anyhow::bail!("gh issue view failed for '{issue_ref}': {}", output.stderr.trim());
+        anyhow::bail!(
+            "gh issue view failed for '{issue_ref}': {}",
+            output.stderr.trim()
+        );
     }
 
-    let parsed: Value = serde_json::from_str(&output.stdout)
-        .map_err(|e| anyhow::anyhow!("Failed parsing gh issue view output: {e}\nRaw: {}", output.stdout))?;
+    let parsed: Value = serde_json::from_str(&output.stdout).map_err(|e| {
+        anyhow::anyhow!(
+            "Failed parsing gh issue view output: {e}\nRaw: {}",
+            output.stdout
+        )
+    })?;
 
     Ok(normalize_issue_json(&parsed))
 }
@@ -1816,8 +1930,12 @@ pub async fn gh_view_repo(
         anyhow::bail!("gh repo view failed: {}", output.stderr.trim());
     }
 
-    let parsed: Value = serde_json::from_str(&output.stdout)
-        .map_err(|e| anyhow::anyhow!("Failed parsing gh repo view output: {e}\nRaw: {}", output.stdout))?;
+    let parsed: Value = serde_json::from_str(&output.stdout).map_err(|e| {
+        anyhow::anyhow!(
+            "Failed parsing gh repo view output: {e}\nRaw: {}",
+            output.stdout
+        )
+    })?;
 
     Ok(normalize_repo_json(&parsed))
 }
@@ -1844,8 +1962,12 @@ pub async fn gh_list_releases(
         anyhow::bail!("gh release list failed: {}", output.stderr.trim());
     }
 
-    let parsed: Value = serde_json::from_str(&output.stdout)
-        .map_err(|e| anyhow::anyhow!("Failed parsing gh release list output: {e}\nRaw: {}", output.stdout))?;
+    let parsed: Value = serde_json::from_str(&output.stdout).map_err(|e| {
+        anyhow::anyhow!(
+            "Failed parsing gh release list output: {e}\nRaw: {}",
+            output.stdout
+        )
+    })?;
 
     let mut releases = Vec::new();
     if let Some(arr) = parsed.as_array() {
@@ -1885,11 +2007,18 @@ pub async fn gh_view_release(
 
     let output = run_gh_command(&args, cwd, env, 30).await?;
     if !output.success {
-        anyhow::bail!("gh release view failed for '{tag}': {}", output.stderr.trim());
+        anyhow::bail!(
+            "gh release view failed for '{tag}': {}",
+            output.stderr.trim()
+        );
     }
 
-    let parsed: Value = serde_json::from_str(&output.stdout)
-        .map_err(|e| anyhow::anyhow!("Failed parsing gh release view output: {e}\nRaw: {}", output.stdout))?;
+    let parsed: Value = serde_json::from_str(&output.stdout).map_err(|e| {
+        anyhow::anyhow!(
+            "Failed parsing gh release view output: {e}\nRaw: {}",
+            output.stdout
+        )
+    })?;
 
     Ok(normalize_release_json(&parsed))
 }
@@ -1926,8 +2055,12 @@ pub async fn gh_list_runs(
         anyhow::bail!("gh run list failed: {}", output.stderr.trim());
     }
 
-    let parsed: Value = serde_json::from_str(&output.stdout)
-        .map_err(|e| anyhow::anyhow!("Failed parsing gh run list output: {e}\nRaw: {}", output.stdout))?;
+    let parsed: Value = serde_json::from_str(&output.stdout).map_err(|e| {
+        anyhow::anyhow!(
+            "Failed parsing gh run list output: {e}\nRaw: {}",
+            output.stdout
+        )
+    })?;
 
     let mut runs = Vec::new();
     if let Some(arr) = parsed.as_array() {
@@ -1969,10 +2102,15 @@ pub async fn query_github_api(
     let url = if endpoint.starts_with("http://") || endpoint.starts_with("https://") {
         endpoint.to_string()
     } else {
-        format!("https://api.github.com/{}", endpoint.trim_start_matches('/'))
+        format!(
+            "https://api.github.com/{}",
+            endpoint.trim_start_matches('/')
+        )
     };
 
-    let mut req = client.get(&url).header("Accept", "application/vnd.github.v3+json");
+    let mut req = client
+        .get(&url)
+        .header("Accept", "application/vnd.github.v3+json");
 
     // Check GITHUB_TOKEN or GH_TOKEN
     let token = env
@@ -1988,14 +2126,20 @@ pub async fn query_github_api(
         }
     }
 
-    let res = req.send().await.map_err(|e| anyhow::anyhow!("GitHub API network error: {e}"))?;
+    let res = req
+        .send()
+        .await
+        .map_err(|e| anyhow::anyhow!("GitHub API network error: {e}"))?;
     let status = res.status();
     if !status.is_success() {
         let text = res.text().await.unwrap_or_default();
         anyhow::bail!("GitHub API returned HTTP {status}: {text}");
     }
 
-    let json_val: Value = res.json().await.map_err(|e| anyhow::anyhow!("GitHub API JSON parse error: {e}"))?;
+    let json_val: Value = res
+        .json()
+        .await
+        .map_err(|e| anyhow::anyhow!("GitHub API JSON parse error: {e}"))?;
     Ok(json_val)
 }
 
@@ -2017,7 +2161,13 @@ pub fn format_pr_list_summary(report: &GitHubPrListReport) -> String {
 
     for pr in &report.pull_requests {
         let state_badge = match pr.state.as_str() {
-            "OPEN" => if pr.is_draft { "[DRAFT]" } else { "[OPEN]" },
+            "OPEN" => {
+                if pr.is_draft {
+                    "[DRAFT]"
+                } else {
+                    "[OPEN]"
+                }
+            }
             "MERGED" => "[MERGED]",
             "CLOSED" => "[CLOSED]",
             _ => "[UNKNOWN]",
@@ -2051,13 +2201,22 @@ pub fn format_pr_list_summary(report: &GitHubPrListReport) -> String {
 pub fn format_pr_view_summary(pr: &GitHubPr) -> String {
     let mut out = String::new();
     let state_badge = match pr.state.as_str() {
-        "OPEN" => if pr.is_draft { "[DRAFT]" } else { "[OPEN]" },
+        "OPEN" => {
+            if pr.is_draft {
+                "[DRAFT]"
+            } else {
+                "[OPEN]"
+            }
+        }
         "MERGED" => "[MERGED]",
         "CLOSED" => "[CLOSED]",
         _ => "[UNKNOWN]",
     };
 
-    out.push_str(&format!("# PR #{}: {} {}\n\n", pr.number, pr.title, state_badge));
+    out.push_str(&format!(
+        "# PR #{}: {} {}\n\n",
+        pr.number, pr.title, state_badge
+    ));
     out.push_str(&format!("**URL**: {}\n", pr.url));
 
     if let Some(author) = &pr.author {
@@ -2067,22 +2226,39 @@ pub fn format_pr_view_summary(pr: &GitHubPr) -> String {
         out.push_str(&format!("**Branches**: `{head}` -> `{base}`\n"));
     }
     if let (Some(add), Some(del), Some(files)) = (pr.additions, pr.deletions, pr.changed_files) {
-        out.push_str(&format!("**Diff Stats**: +{add} / -{del} across {files} changed files\n"));
+        out.push_str(&format!(
+            "**Diff Stats**: +{add} / -{del} across {files} changed files\n"
+        ));
     }
     if let Some(m) = &pr.mergeable {
-        out.push_str(&format!("**Mergeable**: {} (Status: {})\n", m, pr.merge_state_status.as_deref().unwrap_or("N/A")));
+        out.push_str(&format!(
+            "**Mergeable**: {} (Status: {})\n",
+            m,
+            pr.merge_state_status.as_deref().unwrap_or("N/A")
+        ));
     }
     if !pr.labels.is_empty() {
         let label_names: Vec<&str> = pr.labels.iter().map(|l| l.name.as_str()).collect();
         out.push_str(&format!("**Labels**: {}\n", label_names.join(", ")));
     }
     if !pr.assignees.is_empty() {
-        let assignee_names: Vec<String> = pr.assignees.iter().map(|u| format!("@{}", u.login)).collect();
+        let assignee_names: Vec<String> = pr
+            .assignees
+            .iter()
+            .map(|u| format!("@{}", u.login))
+            .collect();
         out.push_str(&format!("**Assignees**: {}\n", assignee_names.join(", ")));
     }
     if !pr.reviewers.is_empty() {
-        let reviewer_names: Vec<String> = pr.reviewers.iter().map(|u| format!("@{}", u.login)).collect();
-        out.push_str(&format!("**Requested Reviewers**: {}\n", reviewer_names.join(", ")));
+        let reviewer_names: Vec<String> = pr
+            .reviewers
+            .iter()
+            .map(|u| format!("@{}", u.login))
+            .collect();
+        out.push_str(&format!(
+            "**Requested Reviewers**: {}\n",
+            reviewer_names.join(", ")
+        ));
     }
     if let Some(ms) = &pr.milestone {
         out.push_str(&format!("**Milestone**: {}\n", ms.title));
@@ -2106,7 +2282,10 @@ pub fn format_pr_view_summary(pr: &GitHubPr) -> String {
     if !pr.files.is_empty() {
         out.push_str("### Changed Files\n\n");
         for file in &pr.files {
-            out.push_str(&format!("- `{}` (+{}/-{})\n", file.path, file.additions, file.deletions));
+            out.push_str(&format!(
+                "- `{}` (+{}/-{})\n",
+                file.path, file.additions, file.deletions
+            ));
         }
         out.push('\n');
     }
@@ -2127,7 +2306,11 @@ pub fn format_issue_list_summary(report: &GitHubIssueListReport) -> String {
     }
 
     for issue in &report.issues {
-        let state_badge = if issue.state == "OPEN" { "[OPEN]" } else { "[CLOSED]" };
+        let state_badge = if issue.state == "OPEN" {
+            "[OPEN]"
+        } else {
+            "[CLOSED]"
+        };
         let author_str = issue
             .author
             .as_ref()
@@ -2151,9 +2334,16 @@ pub fn format_issue_list_summary(report: &GitHubIssueListReport) -> String {
 
 pub fn format_issue_view_summary(issue: &GitHubIssue) -> String {
     let mut out = String::new();
-    let state_badge = if issue.state == "OPEN" { "[OPEN]" } else { "[CLOSED]" };
+    let state_badge = if issue.state == "OPEN" {
+        "[OPEN]"
+    } else {
+        "[CLOSED]"
+    };
 
-    out.push_str(&format!("# Issue #{}: {} {}\n\n", issue.number, issue.title, state_badge));
+    out.push_str(&format!(
+        "# Issue #{}: {} {}\n\n",
+        issue.number, issue.title, state_badge
+    ));
     out.push_str(&format!("**URL**: {}\n", issue.url));
 
     if let Some(author) = &issue.author {
@@ -2164,7 +2354,11 @@ pub fn format_issue_view_summary(issue: &GitHubIssue) -> String {
         out.push_str(&format!("**Labels**: {}\n", label_names.join(", ")));
     }
     if !issue.assignees.is_empty() {
-        let assignee_names: Vec<String> = issue.assignees.iter().map(|u| format!("@{}", u.login)).collect();
+        let assignee_names: Vec<String> = issue
+            .assignees
+            .iter()
+            .map(|u| format!("@{}", u.login))
+            .collect();
         out.push_str(&format!("**Assignees**: {}\n", assignee_names.join(", ")));
     }
     if let Some(ms) = &issue.milestone {
@@ -2180,8 +2374,17 @@ pub fn format_issue_view_summary(issue: &GitHubIssue) -> String {
     if !issue.comments.is_empty() {
         out.push_str("### Comments\n\n");
         for (idx, c) in issue.comments.iter().enumerate() {
-            let author_login = c.author.as_ref().map(|u| u.login.as_str()).unwrap_or("ghost");
-            out.push_str(&format!("#### Comment {} by @{}\n\n{}\n\n", idx + 1, author_login, c.body));
+            let author_login = c
+                .author
+                .as_ref()
+                .map(|u| u.login.as_str())
+                .unwrap_or("ghost");
+            out.push_str(&format!(
+                "#### Comment {} by @{}\n\n{}\n\n",
+                idx + 1,
+                author_login,
+                c.body
+            ));
         }
     }
 
@@ -2197,7 +2400,10 @@ pub fn format_repo_view_summary(repo: &GitHubRepoInfo) -> String {
     }
     out.push_str(&format!("**Default Branch**: `{}`\n", repo.default_branch));
     out.push_str(&format!("**Visibility**: {}\n", repo.visibility));
-    out.push_str(&format!("**Stars**: {} | **Forks**: {} | **Open Issues/PRs**: {}\n", repo.stars_count, repo.forks_count, repo.open_issues_count));
+    out.push_str(&format!(
+        "**Stars**: {} | **Forks**: {} | **Open Issues/PRs**: {}\n",
+        repo.stars_count, repo.forks_count, repo.open_issues_count
+    ));
     if let Some(lic) = &repo.license {
         out.push_str(&format!("**License**: {}\n", lic));
     }
@@ -2212,7 +2418,10 @@ pub fn format_repo_view_summary(repo: &GitHubRepoInfo) -> String {
 
 pub fn format_release_list_summary(report: &GitHubReleaseListReport) -> String {
     let mut out = String::new();
-    out.push_str(&format!("# Releases for '{}' (Total: {})\n\n", report.repo, report.total_count));
+    out.push_str(&format!(
+        "# Releases for '{}' (Total: {})\n\n",
+        report.repo, report.total_count
+    ));
     if report.releases.is_empty() {
         out.push_str("No releases found.\n");
         return out;
@@ -2230,14 +2439,20 @@ pub fn format_release_list_summary(report: &GitHubReleaseListReport) -> String {
         };
 
         let title = rel.name.as_deref().unwrap_or(&rel.tag_name);
-        out.push_str(&format!("- **{}** ({}) {} {}\n", rel.tag_name, title, tag_badge, rel.url));
+        out.push_str(&format!(
+            "- **{}** ({}) {} {}\n",
+            rel.tag_name, title, tag_badge, rel.url
+        ));
     }
     out
 }
 
 pub fn format_workflow_runs_summary(report: &GitHubWorkflowRunListReport) -> String {
     let mut out = String::new();
-    out.push_str(&format!("# Actions Workflow Runs for '{}' (Total: {})\n\n", report.repo, report.total_count));
+    out.push_str(&format!(
+        "# Actions Workflow Runs for '{}' (Total: {})\n\n",
+        report.repo, report.total_count
+    ));
     if report.runs.is_empty() {
         out.push_str("No workflow runs found.\n");
         return out;
@@ -2245,8 +2460,20 @@ pub fn format_workflow_runs_summary(report: &GitHubWorkflowRunListReport) -> Str
 
     for run in &report.runs {
         let conclusion_str = run.conclusion.as_deref().unwrap_or(&run.status);
-        let branch_str = run.branch.as_deref().map(|b| format!(" on `{b}`")).unwrap_or_default();
-        out.push_str(&format!("- [{}] **#{}** {} ({}){}\n  {}\n", conclusion_str, run.id, run.name, run.workflow_name.as_deref().unwrap_or("workflow"), branch_str, run.url));
+        let branch_str = run
+            .branch
+            .as_deref()
+            .map(|b| format!(" on `{b}`"))
+            .unwrap_or_default();
+        out.push_str(&format!(
+            "- [{}] **#{}** {} ({}){}\n  {}\n",
+            conclusion_str,
+            run.id,
+            run.name,
+            run.workflow_name.as_deref().unwrap_or("workflow"),
+            branch_str,
+            run.url
+        ));
     }
     out
 }
@@ -2419,25 +2646,34 @@ impl Tool for GitHubTool {
         let tag_param = args.get("tag").and_then(|v| v.as_str());
         let workflow_param = args.get("workflow").and_then(|v| v.as_str());
         let branch_param = args.get("branch").and_then(|v| v.as_str());
-        let format_param = args.get("format").and_then(|v| v.as_str()).unwrap_or("json");
+        let format_param = args
+            .get("format")
+            .and_then(|v| v.as_str())
+            .unwrap_or("json");
 
         // Target resolver (pr_number, issue_number, target, or positional number)
-        let pr_target = args
-            .get("pr_number")
-            .map(|v| v.to_string())
-            .or_else(|| args.get("target").and_then(|v| v.as_str()).map(|s| s.to_string()));
+        let pr_target = args.get("pr_number").map(|v| v.to_string()).or_else(|| {
+            args.get("target")
+                .and_then(|v| v.as_str())
+                .map(|s| s.to_string())
+        });
 
-        let issue_target = args
-            .get("issue_number")
-            .map(|v| v.to_string())
-            .or_else(|| args.get("target").and_then(|v| v.as_str()).map(|s| s.to_string()));
+        let issue_target = args.get("issue_number").map(|v| v.to_string()).or_else(|| {
+            args.get("target")
+                .and_then(|v| v.as_str())
+                .map(|s| s.to_string())
+        });
 
         let release_target = tag_param.map(|s| s.to_string()).or_else(|| {
-            args.get("target").and_then(|v| v.as_str()).map(|s| s.to_string())
+            args.get("target")
+                .and_then(|v| v.as_str())
+                .map(|s| s.to_string())
         });
 
         // Resolve active repository
-        let detected_repo = detect_repo_from_cwd(&ctx.cwd).await.map(|(o, r)| format!("{o}/{r}"));
+        let detected_repo = detect_repo_from_cwd(&ctx.cwd)
+            .await
+            .map(|(o, r)| format!("{o}/{r}"));
         let effective_repo = repo_param.map(|s| s.to_string()).or(detected_repo);
 
         let gh_available = is_gh_cli_available(&ctx.cwd).await;
@@ -2479,7 +2715,9 @@ impl Tool for GitHubTool {
                         Err(e) => {
                             // Try REST API fallback if repo is known
                             if let Some(r) = &effective_repo {
-                                let endpoint = format!("repos/{r}/pulls?state={state_param}&per_page={limit_param}");
+                                let endpoint = format!(
+                                    "repos/{r}/pulls?state={state_param}&per_page={limit_param}"
+                                );
                                 match query_github_api(&endpoint, &ctx.env).await {
                                     Ok(api_val) => {
                                         let mut pull_requests = Vec::new();
@@ -2502,7 +2740,10 @@ impl Tool for GitHubTool {
                                             repo: Some(r.clone()),
                                             backend: "github_api".to_string(),
                                             data,
-                                            message: format!("Retrieved {} pull requests via GitHub API", total_count),
+                                            message: format!(
+                                                "Retrieved {} pull requests via GitHub API",
+                                                total_count
+                                            ),
                                             summary: Some(summary),
                                         }
                                     }
@@ -2517,7 +2758,8 @@ impl Tool for GitHubTool {
                     }
                 } else if let Some(r) = &effective_repo {
                     // Fallback to REST API
-                    let endpoint = format!("repos/{r}/pulls?state={state_param}&per_page={limit_param}");
+                    let endpoint =
+                        format!("repos/{r}/pulls?state={state_param}&per_page={limit_param}");
                     let api_val = query_github_api(&endpoint, &ctx.env).await?;
                     let mut pull_requests = Vec::new();
                     if let Some(arr) = api_val.as_array() {
@@ -2550,7 +2792,9 @@ impl Tool for GitHubTool {
             // --- PR View ---
             "pr_view" | "view_pr" | "pr" => {
                 let target = pr_target.ok_or_else(|| {
-                    anyhow::anyhow!("Missing required parameter 'pr_number' or 'target' for pr_view")
+                    anyhow::anyhow!(
+                        "Missing required parameter 'pr_number' or 'target' for pr_view"
+                    )
                 })?;
 
                 if gh_available {
@@ -2605,18 +2849,23 @@ impl Tool for GitHubTool {
                         summary: Some(summary),
                     }
                 } else {
-                    anyhow::bail!("GitHub CLI ('gh') is not installed and no remote repository was detected.");
+                    anyhow::bail!(
+                        "GitHub CLI ('gh') is not installed and no remote repository was detected."
+                    );
                 }
             }
 
             // --- PR Diff ---
             "pr_diff" | "diff_pr" => {
                 let target = pr_target.ok_or_else(|| {
-                    anyhow::anyhow!("Missing required parameter 'pr_number' or 'target' for pr_diff")
+                    anyhow::anyhow!(
+                        "Missing required parameter 'pr_number' or 'target' for pr_diff"
+                    )
                 })?;
 
                 if gh_available {
-                    let diff_text = gh_pr_diff(effective_repo.as_deref(), &target, &ctx.cwd, &ctx.env).await?;
+                    let diff_text =
+                        gh_pr_diff(effective_repo.as_deref(), &target, &ctx.cwd, &ctx.env).await?;
                     GitHubToolResponse {
                         action: "pr_diff".to_string(),
                         success: true,
@@ -2634,7 +2883,9 @@ impl Tool for GitHubTool {
             // --- PR Commits ---
             "pr_commits" | "commits_pr" => {
                 let target = pr_target.ok_or_else(|| {
-                    anyhow::anyhow!("Missing required parameter 'pr_number' or 'target' for pr_commits")
+                    anyhow::anyhow!(
+                        "Missing required parameter 'pr_number' or 'target' for pr_commits"
+                    )
                 })?;
 
                 let pr = gh_view_pr(effective_repo.as_deref(), &target, &ctx.cwd, &ctx.env).await?;
@@ -2645,7 +2896,11 @@ impl Tool for GitHubTool {
                     repo: effective_repo,
                     backend: "gh_cli".to_string(),
                     data,
-                    message: format!("Retrieved {} commits for PR #{}", pr.commits.len(), pr.number),
+                    message: format!(
+                        "Retrieved {} commits for PR #{}",
+                        pr.commits.len(),
+                        pr.number
+                    ),
                     summary: None,
                 }
             }
@@ -2653,7 +2908,9 @@ impl Tool for GitHubTool {
             // --- PR Status Checks ---
             "pr_checks" | "checks_pr" | "status_checks" => {
                 let target = pr_target.ok_or_else(|| {
-                    anyhow::anyhow!("Missing required parameter 'pr_number' or 'target' for pr_checks")
+                    anyhow::anyhow!(
+                        "Missing required parameter 'pr_number' or 'target' for pr_checks"
+                    )
                 })?;
 
                 let pr = gh_view_pr(effective_repo.as_deref(), &target, &ctx.cwd, &ctx.env).await?;
@@ -2664,7 +2921,11 @@ impl Tool for GitHubTool {
                     repo: effective_repo,
                     backend: "gh_cli".to_string(),
                     data,
-                    message: format!("Retrieved {} status checks for PR #{}", pr.status_checks.len(), pr.number),
+                    message: format!(
+                        "Retrieved {} status checks for PR #{}",
+                        pr.status_checks.len(),
+                        pr.number
+                    ),
                     summary: None,
                 }
             }
@@ -2672,7 +2933,9 @@ impl Tool for GitHubTool {
             // --- PR Reviews ---
             "pr_reviews" | "reviews_pr" => {
                 let target = pr_target.ok_or_else(|| {
-                    anyhow::anyhow!("Missing required parameter 'pr_number' or 'target' for pr_reviews")
+                    anyhow::anyhow!(
+                        "Missing required parameter 'pr_number' or 'target' for pr_reviews"
+                    )
                 })?;
 
                 let pr = gh_view_pr(effective_repo.as_deref(), &target, &ctx.cwd, &ctx.env).await?;
@@ -2683,7 +2946,11 @@ impl Tool for GitHubTool {
                     repo: effective_repo,
                     backend: "gh_cli".to_string(),
                     data,
-                    message: format!("Retrieved {} reviews for PR #{}", pr.reviews.len(), pr.number),
+                    message: format!(
+                        "Retrieved {} reviews for PR #{}",
+                        pr.reviews.len(),
+                        pr.number
+                    ),
                     summary: None,
                 }
             }
@@ -2717,7 +2984,8 @@ impl Tool for GitHubTool {
                         summary: Some(summary),
                     }
                 } else if let Some(r) = &effective_repo {
-                    let endpoint = format!("repos/{r}/issues?state={state_param}&per_page={limit_param}");
+                    let endpoint =
+                        format!("repos/{r}/issues?state={state_param}&per_page={limit_param}");
                     let api_val = query_github_api(&endpoint, &ctx.env).await?;
                     let mut issues = Vec::new();
                     if let Some(arr) = api_val.as_array() {
@@ -2746,18 +3014,24 @@ impl Tool for GitHubTool {
                         summary: Some(summary),
                     }
                 } else {
-                    anyhow::bail!("GitHub CLI ('gh') is not installed and no remote repository was detected.");
+                    anyhow::bail!(
+                        "GitHub CLI ('gh') is not installed and no remote repository was detected."
+                    );
                 }
             }
 
             // --- Issue View ---
             "issue_view" | "view_issue" | "issue" => {
                 let target = issue_target.ok_or_else(|| {
-                    anyhow::anyhow!("Missing required parameter 'issue_number' or 'target' for issue_view")
+                    anyhow::anyhow!(
+                        "Missing required parameter 'issue_number' or 'target' for issue_view"
+                    )
                 })?;
 
                 if gh_available {
-                    let issue = gh_view_issue(effective_repo.as_deref(), &target, &ctx.cwd, &ctx.env).await?;
+                    let issue =
+                        gh_view_issue(effective_repo.as_deref(), &target, &ctx.cwd, &ctx.env)
+                            .await?;
                     let summary = format_issue_view_summary(&issue);
                     let data = serde_json::to_value(&issue)?;
                     GitHubToolResponse {
@@ -2785,17 +3059,22 @@ impl Tool for GitHubTool {
                         summary: Some(summary),
                     }
                 } else {
-                    anyhow::bail!("GitHub CLI ('gh') is not installed and no remote repository was detected.");
+                    anyhow::bail!(
+                        "GitHub CLI ('gh') is not installed and no remote repository was detected."
+                    );
                 }
             }
 
             // --- Issue Comments ---
             "issue_comments" | "comments_issue" => {
                 let target = issue_target.ok_or_else(|| {
-                    anyhow::anyhow!("Missing required parameter 'issue_number' or 'target' for issue_comments")
+                    anyhow::anyhow!(
+                        "Missing required parameter 'issue_number' or 'target' for issue_comments"
+                    )
                 })?;
 
-                let issue = gh_view_issue(effective_repo.as_deref(), &target, &ctx.cwd, &ctx.env).await?;
+                let issue =
+                    gh_view_issue(effective_repo.as_deref(), &target, &ctx.cwd, &ctx.env).await?;
                 let data = serde_json::to_value(&issue.comments)?;
                 GitHubToolResponse {
                     action: "issue_comments".to_string(),
@@ -2803,7 +3082,11 @@ impl Tool for GitHubTool {
                     repo: effective_repo,
                     backend: "gh_cli".to_string(),
                     data,
-                    message: format!("Retrieved {} comments for Issue #{}", issue.comments.len(), issue.number),
+                    message: format!(
+                        "Retrieved {} comments for Issue #{}",
+                        issue.comments.len(),
+                        issue.number
+                    ),
                     summary: None,
                 }
             }
@@ -2811,7 +3094,8 @@ impl Tool for GitHubTool {
             // --- Repo View ---
             "repo_view" | "view_repo" | "repo_info" => {
                 if gh_available {
-                    let repo_info = gh_view_repo(effective_repo.as_deref(), &ctx.cwd, &ctx.env).await?;
+                    let repo_info =
+                        gh_view_repo(effective_repo.as_deref(), &ctx.cwd, &ctx.env).await?;
                     let summary = format_repo_view_summary(&repo_info);
                     let data = serde_json::to_value(&repo_info)?;
                     GitHubToolResponse {
@@ -2835,18 +3119,29 @@ impl Tool for GitHubTool {
                         repo: Some(repo_info.full_name.clone()),
                         backend: "github_api".to_string(),
                         data,
-                        message: format!("Retrieved repository info for '{}' via GitHub API", repo_info.full_name),
+                        message: format!(
+                            "Retrieved repository info for '{}' via GitHub API",
+                            repo_info.full_name
+                        ),
                         summary: Some(summary),
                     }
                 } else {
-                    anyhow::bail!("GitHub CLI ('gh') is not installed and no remote repository was detected.");
+                    anyhow::bail!(
+                        "GitHub CLI ('gh') is not installed and no remote repository was detected."
+                    );
                 }
             }
 
             // --- Release Listing ---
             "release_list" | "list_releases" | "releases" => {
                 if gh_available {
-                    let report = gh_list_releases(effective_repo.as_deref(), limit_param, &ctx.cwd, &ctx.env).await?;
+                    let report = gh_list_releases(
+                        effective_repo.as_deref(),
+                        limit_param,
+                        &ctx.cwd,
+                        &ctx.env,
+                    )
+                    .await?;
                     let summary = format_release_list_summary(&report);
                     let data = serde_json::to_value(&report)?;
                     GitHubToolResponse {
@@ -2885,7 +3180,9 @@ impl Tool for GitHubTool {
                         summary: Some(summary),
                     }
                 } else {
-                    anyhow::bail!("GitHub CLI ('gh') is not installed and no remote repository was detected.");
+                    anyhow::bail!(
+                        "GitHub CLI ('gh') is not installed and no remote repository was detected."
+                    );
                 }
             }
 
@@ -2896,7 +3193,9 @@ impl Tool for GitHubTool {
                 })?;
 
                 if gh_available {
-                    let release = gh_view_release(effective_repo.as_deref(), &tag, &ctx.cwd, &ctx.env).await?;
+                    let release =
+                        gh_view_release(effective_repo.as_deref(), &tag, &ctx.cwd, &ctx.env)
+                            .await?;
                     let data = serde_json::to_value(&release)?;
                     GitHubToolResponse {
                         action: "release_view".to_string(),
@@ -2922,7 +3221,9 @@ impl Tool for GitHubTool {
                         summary: None,
                     }
                 } else {
-                    anyhow::bail!("GitHub CLI ('gh') is not installed and no remote repository was detected.");
+                    anyhow::bail!(
+                        "GitHub CLI ('gh') is not installed and no remote repository was detected."
+                    );
                 }
             }
 
@@ -3207,7 +3508,13 @@ mod tests {
         assert_eq!(tool.name(), "github");
         let params = tool.parameters();
         assert_eq!(params["type"], "object");
-        assert!(params["properties"]["action"]["enum"].as_array().unwrap().len() >= 10);
+        assert!(
+            params["properties"]["action"]["enum"]
+                .as_array()
+                .unwrap()
+                .len()
+                >= 10
+        );
         assert_eq!(params["required"][0], "action");
     }
 
@@ -3215,8 +3522,13 @@ mod tests {
     async fn test_github_tool_invalid_action() {
         let tool = GitHubTool::new();
         let ctx = ToolContext::default();
-        let res = tool.execute(json!({ "action": "invalid_action_xyz" }), &ctx).await;
+        let res = tool
+            .execute(json!({ "action": "invalid_action_xyz" }), &ctx)
+            .await;
         assert!(res.is_err());
-        assert!(res.unwrap_err().to_string().contains("Unknown GitHub action"));
+        assert!(res
+            .unwrap_err()
+            .to_string()
+            .contains("Unknown GitHub action"));
     }
 }

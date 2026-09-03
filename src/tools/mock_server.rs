@@ -191,7 +191,14 @@ impl MockRoute {
     }
 
     /// Check if an incoming request matches this route's criteria.
-    pub fn matches(&self, method: &str, path: &str, query: &HashMap<String, String>, headers: &HashMap<String, String>, body: Option<&str>) -> bool {
+    pub fn matches(
+        &self,
+        method: &str,
+        path: &str,
+        query: &HashMap<String, String>,
+        headers: &HashMap<String, String>,
+        body: Option<&str>,
+    ) -> bool {
         // Check call limit
         if let Some(limit) = self.call_limit {
             if self.call_count >= limit {
@@ -331,7 +338,9 @@ impl Default for MockServerConfig {
             name: None,
             cors: Some(true),
             default_status: Some(404),
-            default_body: Some("{\"error\":\"not_found\",\"message\":\"No mock route matched\"}".to_string()),
+            default_body: Some(
+                "{\"error\":\"not_found\",\"message\":\"No mock route matched\"}".to_string(),
+            ),
             max_history: Some(500),
             routes: Vec::new(),
         }
@@ -502,7 +511,10 @@ impl MockServerInstance {
 
         let local_addr = listener.local_addr()?;
         let actual_port = local_addr.port();
-        let server_id = format!("srv_{}", uuid::Uuid::new_v4().to_string().replace('-', "")[..12].to_string());
+        let server_id = format!(
+            "srv_{}",
+            uuid::Uuid::new_v4().to_string().replace('-', "")[..12].to_string()
+        );
         let server_url = format!("http://{}:{}", host, actual_port);
 
         let (shutdown_tx, shutdown_rx) = watch::channel(false);
@@ -726,7 +738,8 @@ impl MockServerInstance {
             }
         }
         // Default requirement if no counts specified: called at least once
-        if criteria.count.is_none() && criteria.min_count.is_none() && criteria.max_count.is_none() {
+        if criteria.count.is_none() && criteria.min_count.is_none() && criteria.max_count.is_none()
+        {
             expected_parts.push("called at least 1 time(s)".to_string());
             if actual_count == 0 {
                 matched = false;
@@ -735,9 +748,15 @@ impl MockServerInstance {
 
         let desc = expected_parts.join(", ");
         let message = if matched {
-            format!("Verification passed: Expected [{}] matched {} request(s).", desc, actual_count)
+            format!(
+                "Verification passed: Expected [{}] matched {} request(s).",
+                desc, actual_count
+            )
         } else {
-            format!("Verification failed: Expected [{}] but recorded {} matching request(s).", desc, actual_count)
+            format!(
+                "Verification failed: Expected [{}] but recorded {} matching request(s).",
+                desc, actual_count
+            )
         };
 
         VerificationResult {
@@ -928,7 +947,9 @@ async fn handle_connection(
         None
     };
 
-    let body_json = body_str.as_ref().and_then(|s| serde_json::from_str::<Value>(s).ok());
+    let body_json = body_str
+        .as_ref()
+        .and_then(|s| serde_json::from_str::<Value>(s).ok());
 
     // CORS preflight handling
     if cors && method == "OPTIONS" {
@@ -959,7 +980,10 @@ async fn handle_connection(
                 matched_route_id = Some(route.id.clone());
                 route.call_count += 1;
                 resp_status = route.status;
-                resp_status_text = route.status_text.clone().unwrap_or_else(|| default_status_text(route.status).to_string());
+                resp_status_text = route
+                    .status_text
+                    .clone()
+                    .unwrap_or_else(|| default_status_text(route.status).to_string());
                 resp_headers = route.response_headers.clone();
                 delay_ms = route.delay_ms;
 
@@ -1015,17 +1039,32 @@ async fn handle_connection(
     }
 
     // Default Content-Type to application/json if not explicitly specified and looks like json
-    if !resp_headers.keys().any(|k| k.eq_ignore_ascii_case("content-type")) {
+    if !resp_headers
+        .keys()
+        .any(|k| k.eq_ignore_ascii_case("content-type"))
+    {
         let trimmed = resp_body.trim();
-        if (trimmed.starts_with('{') && trimmed.ends_with('}')) || (trimmed.starts_with('[') && trimmed.ends_with(']')) {
-            resp_headers.insert("Content-Type".to_string(), "application/json; charset=utf-8".to_string());
+        if (trimmed.starts_with('{') && trimmed.ends_with('}'))
+            || (trimmed.starts_with('[') && trimmed.ends_with(']'))
+        {
+            resp_headers.insert(
+                "Content-Type".to_string(),
+                "application/json; charset=utf-8".to_string(),
+            );
         } else {
-            resp_headers.insert("Content-Type".to_string(), "text/plain; charset=utf-8".to_string());
+            resp_headers.insert(
+                "Content-Type".to_string(),
+                "text/plain; charset=utf-8".to_string(),
+            );
         }
     }
 
     // Add CORS headers if enabled
-    if cors && !resp_headers.keys().any(|k| k.eq_ignore_ascii_case("access-control-allow-origin")) {
+    if cors
+        && !resp_headers
+            .keys()
+            .any(|k| k.eq_ignore_ascii_case("access-control-allow-origin"))
+    {
         resp_headers.insert("Access-Control-Allow-Origin".to_string(), "*".to_string());
     }
 
@@ -1046,7 +1085,9 @@ async fn handle_connection(
 }
 
 fn find_subsequence(haystack: &[u8], needle: &[u8]) -> Option<usize> {
-    haystack.windows(needle.len()).position(|window| window == needle)
+    haystack
+        .windows(needle.len())
+        .position(|window| window == needle)
 }
 
 fn default_status_text(status: u16) -> &'static str {
@@ -1080,7 +1121,10 @@ fn url_decode(s: &str) -> String {
     let mut i = 0;
     while i < bytes.len() {
         if bytes[i] == b'%' && i + 2 < bytes.len() {
-            if let Ok(val) = u8::from_str_radix(std::str::from_utf8(&bytes[i + 1..i + 2 + 1]).unwrap_or(""), 16) {
+            if let Ok(val) = u8::from_str_radix(
+                std::str::from_utf8(&bytes[i + 1..i + 2 + 1]).unwrap_or(""),
+                16,
+            ) {
                 result.push(val as char);
                 i += 3;
                 continue;
@@ -1369,13 +1413,15 @@ impl Tool for MockServerTool {
 
         match action.as_str() {
             "start" => {
-                let config: MockServerConfig = serde_json::from_value(args.clone()).unwrap_or_default();
+                let config: MockServerConfig =
+                    serde_json::from_value(args.clone()).unwrap_or_default();
                 let info = manager.start_server(config).await?;
                 Ok(json!({
                     "status": "success",
                     "message": format!("Mock HTTP server started on {}", info.url),
                     "server": info
-                }).to_string())
+                })
+                .to_string())
             }
 
             "stop" => {
@@ -1391,14 +1437,16 @@ impl Tool for MockServerTool {
                             "status": "success",
                             "message": format!("Stopped {} mock server(s)", stopped),
                             "count": stopped
-                        }).to_string())
+                        })
+                        .to_string())
                     } else {
                         manager.stop_server(id).await?;
                         Ok(json!({
                             "status": "success",
                             "message": format!("Stopped mock server '{}'", id),
                             "server_id": id
-                        }).to_string())
+                        })
+                        .to_string())
                     }
                 } else {
                     anyhow::bail!("Missing 'server_id' argument for 'stop' action");
@@ -1411,7 +1459,8 @@ impl Tool for MockServerTool {
                     "status": "success",
                     "count": servers.len(),
                     "servers": servers
-                }).to_string())
+                })
+                .to_string())
             }
 
             "add_route" | "mock" => {
@@ -1460,7 +1509,8 @@ impl Tool for MockServerTool {
                     "removed": removed,
                     "route_id": route_id,
                     "server_id": server_id
-                }).to_string())
+                })
+                .to_string())
             }
 
             "clear_routes" => {
@@ -1479,7 +1529,8 @@ impl Tool for MockServerTool {
                     "status": "success",
                     "message": format!("Cleared all routes from server '{}'", server_id),
                     "server_id": server_id
-                }).to_string())
+                })
+                .to_string())
             }
 
             "get_requests" | "requests" | "history" => {
@@ -1494,11 +1545,26 @@ impl Tool for MockServerTool {
                     .ok_or_else(|| anyhow::anyhow!("Mock server '{}' not found", server_id))?;
 
                 let filter = RequestFilter {
-                    method: args.get("method").and_then(|v| v.as_str()).map(ToString::to_string),
-                    path: args.get("path").and_then(|v| v.as_str()).map(ToString::to_string),
-                    limit: args.get("limit").and_then(|v| v.as_u64()).map(|n| n as usize),
-                    since: args.get("since").and_then(|v| v.as_str()).map(ToString::to_string),
-                    matched_route_id: args.get("matched_route_id").and_then(|v| v.as_str()).map(ToString::to_string),
+                    method: args
+                        .get("method")
+                        .and_then(|v| v.as_str())
+                        .map(ToString::to_string),
+                    path: args
+                        .get("path")
+                        .and_then(|v| v.as_str())
+                        .map(ToString::to_string),
+                    limit: args
+                        .get("limit")
+                        .and_then(|v| v.as_u64())
+                        .map(|n| n as usize),
+                    since: args
+                        .get("since")
+                        .and_then(|v| v.as_str())
+                        .map(ToString::to_string),
+                    matched_route_id: args
+                        .get("matched_route_id")
+                        .and_then(|v| v.as_str())
+                        .map(ToString::to_string),
                 };
 
                 let requests = server.get_requests(&filter).await;
@@ -1507,7 +1573,8 @@ impl Tool for MockServerTool {
                     "server_id": server_id,
                     "count": requests.len(),
                     "requests": requests
-                }).to_string())
+                })
+                .to_string())
             }
 
             "get_last_request" | "last_request" => {
@@ -1522,8 +1589,14 @@ impl Tool for MockServerTool {
                     .ok_or_else(|| anyhow::anyhow!("Mock server '{}' not found", server_id))?;
 
                 let filter = RequestFilter {
-                    method: args.get("method").and_then(|v| v.as_str()).map(ToString::to_string),
-                    path: args.get("path").and_then(|v| v.as_str()).map(ToString::to_string),
+                    method: args
+                        .get("method")
+                        .and_then(|v| v.as_str())
+                        .map(ToString::to_string),
+                    path: args
+                        .get("path")
+                        .and_then(|v| v.as_str())
+                        .map(ToString::to_string),
                     limit: Some(1),
                     since: None,
                     matched_route_id: None,
@@ -1537,7 +1610,8 @@ impl Tool for MockServerTool {
                     "server_id": server_id,
                     "has_request": last.is_some(),
                     "request": last
-                }).to_string())
+                })
+                .to_string())
             }
 
             "clear_requests" | "clear_history" => {
@@ -1557,7 +1631,8 @@ impl Tool for MockServerTool {
                     "message": format!("Cleared {} recorded request(s)", cleared),
                     "cleared_count": cleared,
                     "server_id": server_id
-                }).to_string())
+                })
+                .to_string())
             }
 
             "verify" => {
@@ -1572,15 +1647,37 @@ impl Tool for MockServerTool {
                     .ok_or_else(|| anyhow::anyhow!("Mock server '{}' not found", server_id))?;
 
                 let criteria = VerificationCriteria {
-                    method: args.get("method").and_then(|v| v.as_str()).map(ToString::to_string),
-                    path: args.get("path").and_then(|v| v.as_str()).map(ToString::to_string),
-                    count: args.get("count").and_then(|v| v.as_u64()).map(|n| n as usize),
-                    min_count: args.get("min_count").and_then(|v| v.as_u64()).map(|n| n as usize),
-                    max_count: args.get("max_count").and_then(|v| v.as_u64()).map(|n| n as usize),
-                    body_contains: args.get("body_contains").and_then(|v| v.as_str()).map(ToString::to_string),
-                    header_contains: args.get("header_key").and_then(|k| k.as_str()).and_then(|k| {
-                        args.get("header_value").and_then(|v| v.as_str()).map(|v| (k.to_string(), v.to_string()))
-                    }),
+                    method: args
+                        .get("method")
+                        .and_then(|v| v.as_str())
+                        .map(ToString::to_string),
+                    path: args
+                        .get("path")
+                        .and_then(|v| v.as_str())
+                        .map(ToString::to_string),
+                    count: args
+                        .get("count")
+                        .and_then(|v| v.as_u64())
+                        .map(|n| n as usize),
+                    min_count: args
+                        .get("min_count")
+                        .and_then(|v| v.as_u64())
+                        .map(|n| n as usize),
+                    max_count: args
+                        .get("max_count")
+                        .and_then(|v| v.as_u64())
+                        .map(|n| n as usize),
+                    body_contains: args
+                        .get("body_contains")
+                        .and_then(|v| v.as_str())
+                        .map(ToString::to_string),
+                    header_contains: args.get("header_key").and_then(|k| k.as_str()).and_then(
+                        |k| {
+                            args.get("header_value")
+                                .and_then(|v| v.as_str())
+                                .map(|v| (k.to_string(), v.to_string()))
+                        },
+                    ),
                 };
 
                 let result = server.verify(&criteria).await;
@@ -1591,7 +1688,8 @@ impl Tool for MockServerTool {
                     "actual_count": result.actual_count,
                     "expected": result.expected_description,
                     "matching_requests": result.matching_requests
-                }).to_string())
+                })
+                .to_string())
             }
 
             "reset" => {
@@ -1610,7 +1708,8 @@ impl Tool for MockServerTool {
                     "status": "success",
                     "message": format!("Reset mock server '{}'", server_id),
                     "server_id": server_id
-                }).to_string())
+                })
+                .to_string())
             }
 
             "test_request" | "send" => {
@@ -1619,24 +1718,37 @@ impl Tool for MockServerTool {
                     .and_then(|v| v.as_str())
                     .ok_or_else(|| anyhow::anyhow!("Missing 'url' argument for test_request"))?;
 
-                let target_url = if !url_arg.starts_with("http://") && !url_arg.starts_with("https://") {
-                    // Prepend server url if server_id supplied
-                    if let Some(srv_id) = args.get("server_id").and_then(|v| v.as_str()) {
-                        let server = manager
-                            .get_server(srv_id)
-                            .await
-                            .ok_or_else(|| anyhow::anyhow!("Mock server '{}' not found", srv_id))?;
-                        let p = if url_arg.starts_with('/') { url_arg } else { &format!("/{}", url_arg) };
-                        format!("{}{}", server.url, p)
+                let target_url =
+                    if !url_arg.starts_with("http://") && !url_arg.starts_with("https://") {
+                        // Prepend server url if server_id supplied
+                        if let Some(srv_id) = args.get("server_id").and_then(|v| v.as_str()) {
+                            let server = manager.get_server(srv_id).await.ok_or_else(|| {
+                                anyhow::anyhow!("Mock server '{}' not found", srv_id)
+                            })?;
+                            let p = if url_arg.starts_with('/') {
+                                url_arg
+                            } else {
+                                &format!("/{}", url_arg)
+                            };
+                            format!("{}{}", server.url, p)
+                        } else {
+                            anyhow::bail!(
+                                "Relative URL provided but no 'server_id' specified: {}",
+                                url_arg
+                            );
+                        }
                     } else {
-                        anyhow::bail!("Relative URL provided but no 'server_id' specified: {}", url_arg);
-                    }
-                } else {
-                    url_arg.to_string()
-                };
+                        url_arg.to_string()
+                    };
 
-                let method_str = args.get("method").and_then(|v| v.as_str()).unwrap_or("GET").to_uppercase();
-                let body_opt = args.get("request_body").and_then(|v| v.as_str())
+                let method_str = args
+                    .get("method")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("GET")
+                    .to_uppercase();
+                let body_opt = args
+                    .get("request_body")
+                    .and_then(|v| v.as_str())
                     .or_else(|| args.get("body").and_then(|v| v.as_str()));
 
                 let client = reqwest::Client::builder()
@@ -1686,7 +1798,8 @@ impl Tool for MockServerTool {
                         "body": resp_text,
                         "body_json": json_val
                     }
-                }).to_string())
+                })
+                .to_string())
             }
 
             other => {
@@ -1727,7 +1840,11 @@ mod tests {
         // 2. Fetch /health
         let client = reqwest::Client::new();
         let health_url = format!("{}/health", server_info.url);
-        let resp = client.get(&health_url).send().await.expect("send GET /health");
+        let resp = client
+            .get(&health_url)
+            .send()
+            .await
+            .expect("send GET /health");
         assert_eq!(resp.status().as_u16(), 200);
         let health_json: Value = resp.json().await.expect("parse json");
         assert_eq!(health_json["status"], "healthy");
@@ -1746,12 +1863,18 @@ mod tests {
         assert_eq!(auth_json["token"], "tok_12345");
 
         // 4. Verify recorded requests
-        let server = manager.get_server(&server_info.id).await.expect("get server");
+        let server = manager
+            .get_server(&server_info.id)
+            .await
+            .expect("get server");
         let requests = server.get_requests(&RequestFilter::default()).await;
         assert_eq!(requests.len(), 2);
 
         // Check auth request details
-        let auth_req = requests.iter().find(|r| r.path == "/api/v1/auth").expect("find auth req");
+        let auth_req = requests
+            .iter()
+            .find(|r| r.path == "/api/v1/auth")
+            .expect("find auth req");
         assert_eq!(auth_req.method, "POST");
         assert!(auth_req.body.as_ref().unwrap().contains("admin"));
         assert_eq!(auth_req.body_json.as_ref().unwrap()["username"], "admin");
@@ -1804,10 +1927,17 @@ mod tests {
                 header_contains: None,
             })
             .await;
-        assert!(verify_result.matched, "Verification message: {}", verify_result.message);
+        assert!(
+            verify_result.matched,
+            "Verification message: {}",
+            verify_result.message
+        );
 
         // 7. Stop server
-        manager.stop_server(&server_info.id).await.expect("stop server");
+        manager
+            .stop_server(&server_info.id)
+            .await
+            .expect("stop server");
     }
 
     #[tokio::test]
@@ -1928,8 +2058,14 @@ mod tests {
 
         // Parametric
         assert!(match_path_pattern("/users/:id", "/users/12345"));
-        assert!(match_path_pattern("/users/:id/posts/:post_id", "/users/42/posts/99"));
-        assert!(!match_path_pattern("/users/:id/posts/:post_id", "/users/42/comments/99"));
+        assert!(match_path_pattern(
+            "/users/:id/posts/:post_id",
+            "/users/42/posts/99"
+        ));
+        assert!(!match_path_pattern(
+            "/users/:id/posts/:post_id",
+            "/users/42/comments/99"
+        ));
 
         // Regex
         assert!(match_path_pattern("regex:^/items/\\d+$", "/items/12345"));
@@ -2041,7 +2177,10 @@ mod tests {
         let client = reqwest::Client::new();
 
         let resp = client
-            .request(reqwest::Method::OPTIONS, &format!("{}/api/anything", server_info.url))
+            .request(
+                reqwest::Method::OPTIONS,
+                &format!("{}/api/anything", server_info.url),
+            )
             .header("Origin", "http://localhost:3000")
             .header("Access-Control-Request-Method", "POST")
             .send()
@@ -2050,7 +2189,11 @@ mod tests {
 
         assert_eq!(resp.status().as_u16(), 204);
         assert_eq!(
-            resp.headers().get("access-control-allow-origin").unwrap().to_str().unwrap(),
+            resp.headers()
+                .get("access-control-allow-origin")
+                .unwrap()
+                .to_str()
+                .unwrap(),
             "*"
         );
 
@@ -2101,7 +2244,10 @@ mod tests {
         assert_eq!(r3.status().as_u16(), 404);
 
         // Reset server -> resets count
-        let server = manager.get_server(&server_info.id).await.expect("get server");
+        let server = manager
+            .get_server(&server_info.id)
+            .await
+            .expect("get server");
         server.reset().await;
 
         // 4th call after reset -> 200 again!

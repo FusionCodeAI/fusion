@@ -59,7 +59,12 @@ pub struct SyntaxIssue {
 }
 
 impl SyntaxIssue {
-    pub fn error(rule: impl Into<String>, message: impl Into<String>, line: usize, column: usize) -> Self {
+    pub fn error(
+        rule: impl Into<String>,
+        message: impl Into<String>,
+        line: usize,
+        column: usize,
+    ) -> Self {
         Self {
             severity: IssueSeverity::Error,
             rule: rule.into(),
@@ -72,7 +77,12 @@ impl SyntaxIssue {
         }
     }
 
-    pub fn warning(rule: impl Into<String>, message: impl Into<String>, line: usize, column: usize) -> Self {
+    pub fn warning(
+        rule: impl Into<String>,
+        message: impl Into<String>,
+        line: usize,
+        column: usize,
+    ) -> Self {
         Self {
             severity: IssueSeverity::Warning,
             rule: rule.into(),
@@ -105,10 +115,24 @@ pub struct SyntaxValidationReport {
 }
 
 impl SyntaxValidationReport {
-    pub fn new(language: String, file_path: Option<String>, content: &str, issues: Vec<SyntaxIssue>) -> Self {
-        let error_count = issues.iter().filter(|i| i.severity == IssueSeverity::Error).count();
-        let warning_count = issues.iter().filter(|i| i.severity == IssueSeverity::Warning).count();
-        let total_lines = content.lines().count().max(if content.is_empty() { 0 } else { 1 });
+    pub fn new(
+        language: String,
+        file_path: Option<String>,
+        content: &str,
+        issues: Vec<SyntaxIssue>,
+    ) -> Self {
+        let error_count = issues
+            .iter()
+            .filter(|i| i.severity == IssueSeverity::Error)
+            .count();
+        let warning_count = issues
+            .iter()
+            .filter(|i| i.severity == IssueSeverity::Warning)
+            .count();
+        let total_lines = content
+            .lines()
+            .count()
+            .max(if content.is_empty() { 0 } else { 1 });
         let total_chars = content.chars().count();
 
         Self {
@@ -267,7 +291,11 @@ impl SupportedLanguage {
 }
 
 /// Detect language from file path, explicit hint, or content inspection.
-pub fn detect_language(path: Option<&Path>, content: &str, hint: Option<&str>) -> SupportedLanguage {
+pub fn detect_language(
+    path: Option<&Path>,
+    content: &str,
+    hint: Option<&str>,
+) -> SupportedLanguage {
     if let Some(h) = hint {
         if !h.trim().is_empty() && h != "auto" {
             let parsed = SupportedLanguage::from_str_hint(h);
@@ -306,7 +334,8 @@ pub fn detect_language(path: Option<&Path>, content: &str, hint: Option<&str>) -
         if first_line.contains("python") {
             return SupportedLanguage::Python;
         }
-        if first_line.contains("node") || first_line.contains("deno") || first_line.contains("bun") {
+        if first_line.contains("node") || first_line.contains("deno") || first_line.contains("bun")
+        {
             return SupportedLanguage::JavaScript;
         }
         if first_line.contains("sh") || first_line.contains("bash") || first_line.contains("zsh") {
@@ -323,7 +352,9 @@ pub fn detect_language(path: Option<&Path>, content: &str, hint: Option<&str>) -
     if trimmed.starts_with("<!DOCTYPE html") || trimmed.starts_with("<html") {
         return SupportedLanguage::Html;
     }
-    if (trimmed.starts_with('{') && trimmed.ends_with('}')) || (trimmed.starts_with('[') && trimmed.ends_with(']')) {
+    if (trimmed.starts_with('{') && trimmed.ends_with('}'))
+        || (trimmed.starts_with('[') && trimmed.ends_with(']'))
+    {
         if serde_json::from_str::<serde_json::Value>(content).is_ok() {
             return SupportedLanguage::Json;
         }
@@ -504,14 +535,16 @@ pub fn check_delimiters(
         }
 
         // Single-line # comments (Python, Ruby, Shell, YAML, TOML)
-        if ch == '#' && matches!(
-            lang,
-            SupportedLanguage::Python
-                | SupportedLanguage::Ruby
-                | SupportedLanguage::Shell
-                | SupportedLanguage::Yaml
-                | SupportedLanguage::Toml
-        ) {
+        if ch == '#'
+            && matches!(
+                lang,
+                SupportedLanguage::Python
+                    | SupportedLanguage::Ruby
+                    | SupportedLanguage::Shell
+                    | SupportedLanguage::Yaml
+                    | SupportedLanguage::Toml
+            )
+        {
             while pos < len && chars[pos] != '\n' {
                 pos += 1;
                 col += 1;
@@ -520,9 +553,17 @@ pub fn check_delimiters(
         }
 
         // Single-line -- comments (SQL, Lua)
-        if ch == '-' && pos + 1 < len && chars[pos + 1] == '-' && matches!(lang, SupportedLanguage::Sql | SupportedLanguage::Lua) {
+        if ch == '-'
+            && pos + 1 < len
+            && chars[pos + 1] == '-'
+            && matches!(lang, SupportedLanguage::Sql | SupportedLanguage::Lua)
+        {
             // Lua block comment check: --[[ ... ]]
-            if lang == SupportedLanguage::Lua && pos + 3 < len && chars[pos + 2] == '[' && chars[pos + 3] == '[' {
+            if lang == SupportedLanguage::Lua
+                && pos + 3 < len
+                && chars[pos + 2] == '['
+                && chars[pos + 3] == '['
+            {
                 let start_line = line;
                 let start_col = col;
                 pos += 4;
@@ -562,7 +603,12 @@ pub fn check_delimiters(
         }
 
         // HTML/XML comments: <!-- ... -->
-        if ch == '<' && pos + 3 < len && chars[pos + 1] == '!' && chars[pos + 2] == '-' && chars[pos + 3] == '-' {
+        if ch == '<'
+            && pos + 3 < len
+            && chars[pos + 1] == '!'
+            && chars[pos + 2] == '-'
+            && chars[pos + 3] == '-'
+        {
             let start_line = line;
             let start_col = col;
             pos += 4;
@@ -573,7 +619,11 @@ pub fn check_delimiters(
                     line += 1;
                     col = 1;
                     pos += 1;
-                } else if chars[pos] == '-' && pos + 2 < len && chars[pos + 1] == '-' && chars[pos + 2] == '>' {
+                } else if chars[pos] == '-'
+                    && pos + 2 < len
+                    && chars[pos + 1] == '-'
+                    && chars[pos + 2] == '>'
+                {
                     pos += 3;
                     col += 3;
                     closed = true;
@@ -670,13 +720,18 @@ pub fn check_delimiters(
 
         // Python Triple Quotes: """ or ''' (with optional prefix r, u, f, b, fr, rf)
         if lang == SupportedLanguage::Python {
-            let quote_char = if ch == '"' && pos + 2 < len && chars[pos + 1] == '"' && chars[pos + 2] == '"' {
-                Some('"')
-            } else if ch == '\'' && pos + 2 < len && chars[pos + 1] == '\'' && chars[pos + 2] == '\'' {
-                Some('\'')
-            } else {
-                None
-            };
+            let quote_char =
+                if ch == '"' && pos + 2 < len && chars[pos + 1] == '"' && chars[pos + 2] == '"' {
+                    Some('"')
+                } else if ch == '\''
+                    && pos + 2 < len
+                    && chars[pos + 1] == '\''
+                    && chars[pos + 2] == '\''
+                {
+                    Some('\'')
+                } else {
+                    None
+                };
 
             if let Some(qc) = quote_char {
                 let start_line = line;
@@ -698,7 +753,11 @@ pub fn check_delimiters(
                             col += 2;
                         }
                         pos += 2;
-                    } else if chars[pos] == qc && pos + 2 < len && chars[pos + 1] == qc && chars[pos + 2] == qc {
+                    } else if chars[pos] == qc
+                        && pos + 2 < len
+                        && chars[pos + 1] == qc
+                        && chars[pos + 2] == qc
+                    {
                         pos += 3;
                         col += 3;
                         matched = true;
@@ -902,7 +961,11 @@ pub fn check_delimiters(
                     pos += 2;
                 } else if curr == quote_char {
                     // SQL allows '' escape for single quote
-                    if lang == SupportedLanguage::Sql && quote_char == '\'' && pos + 1 < len && chars[pos + 1] == '\'' {
+                    if lang == SupportedLanguage::Sql
+                        && quote_char == '\''
+                        && pos + 1 < len
+                        && chars[pos + 1] == '\''
+                    {
                         pos += 2;
                         col += 2;
                         continue;
@@ -1109,7 +1172,12 @@ pub fn check_indentation(
                 // Check if previous line opened a new block with ':'
                 if let Some((prev_line_num, prev_trimmed, prev_indent)) = &prev_non_empty_line {
                     let prev_ends_with_colon = prev_trimmed.ends_with(':')
-                        || prev_trimmed.split('#').next().unwrap_or("").trim_end().ends_with(':');
+                        || prev_trimmed
+                            .split('#')
+                            .next()
+                            .unwrap_or("")
+                            .trim_end()
+                            .ends_with(':');
 
                     if prev_ends_with_colon && current_indent <= *prev_indent {
                         issues.push(
@@ -1131,7 +1199,12 @@ pub fn check_indentation(
                     // Increased indent
                     if let Some((_, prev_trimmed, _)) = &prev_non_empty_line {
                         let prev_ends_with_colon = prev_trimmed.ends_with(':')
-                            || prev_trimmed.split('#').next().unwrap_or("").trim_end().ends_with(':');
+                            || prev_trimmed
+                                .split('#')
+                                .next()
+                                .unwrap_or("")
+                                .trim_end()
+                                .ends_with(':');
 
                         if !prev_ends_with_colon {
                             issues.push(
@@ -1191,7 +1264,12 @@ pub fn check_indentation(
 }
 
 impl SyntaxIssue {
-    pub fn info(rule: impl Into<String>, message: impl Into<String>, line: usize, column: usize) -> Self {
+    pub fn info(
+        rule: impl Into<String>,
+        message: impl Into<String>,
+        line: usize,
+        column: usize,
+    ) -> Self {
         Self {
             severity: IssueSeverity::Info,
             rule: rule.into(),
@@ -1212,7 +1290,12 @@ impl SyntaxIssue {
 /// Validates strict JSON syntax, reporting exact line, column, and hints.
 pub fn check_json(content: &str, issues: &mut Vec<SyntaxIssue>) {
     if content.trim().is_empty() {
-        issues.push(SyntaxIssue::error("empty-json", "JSON document is empty", 1, 1));
+        issues.push(SyntaxIssue::error(
+            "empty-json",
+            "JSON document is empty",
+            1,
+            1,
+        ));
         return;
     }
 
@@ -1225,10 +1308,16 @@ pub fn check_json(content: &str, issues: &mut Vec<SyntaxIssue>) {
         if err_str.contains("trailing comma") || err_str.contains("expected value") {
             suggestion = Some("Remove trailing comma before '}' or ']'".to_string());
         } else if err_str.contains("single quote") || err_str.contains("key must be a string") {
-            suggestion = Some("Wrap object keys and string values in double quotes (\"...\")".to_string());
+            suggestion =
+                Some("Wrap object keys and string values in double quotes (\"...\")".to_string());
         }
 
-        let mut issue = SyntaxIssue::error("invalid-json", format!("JSON syntax error: {err_str}"), err_line, err_col);
+        let mut issue = SyntaxIssue::error(
+            "invalid-json",
+            format!("JSON syntax error: {err_str}"),
+            err_line,
+            err_col,
+        );
         if let Some(sug) = suggestion {
             issue = issue.with_suggestion(sug);
         }
@@ -1239,8 +1328,8 @@ pub fn check_json(content: &str, issues: &mut Vec<SyntaxIssue>) {
 /// HTML5 Void Elements which do not have a closing tag.
 fn html_void_tags() -> HashSet<&'static str> {
     [
-        "area", "base", "br", "col", "embed", "hr", "img", "input", "link", "meta", "param", "source", "track",
-        "wbr", "!doctype",
+        "area", "base", "br", "col", "embed", "hr", "img", "input", "link", "meta", "param",
+        "source", "track", "wbr", "!doctype",
     ]
     .into_iter()
     .collect()
@@ -1281,7 +1370,8 @@ pub fn check_html_xml(content: &str, is_xml: bool, issues: &mut Vec<SyntaxIssue>
             col += 1;
 
             // Skip comments: <!-- ... -->
-            if pos + 2 < len && chars[pos] == '!' && chars[pos + 1] == '-' && chars[pos + 2] == '-' {
+            if pos + 2 < len && chars[pos] == '!' && chars[pos + 1] == '-' && chars[pos + 2] == '-'
+            {
                 pos += 3;
                 col += 3;
                 while pos < len {
@@ -1289,7 +1379,11 @@ pub fn check_html_xml(content: &str, is_xml: bool, issues: &mut Vec<SyntaxIssue>
                         line += 1;
                         col = 1;
                         pos += 1;
-                    } else if chars[pos] == '-' && pos + 2 < len && chars[pos + 1] == '-' && chars[pos + 2] == '>' {
+                    } else if chars[pos] == '-'
+                        && pos + 2 < len
+                        && chars[pos + 1] == '-'
+                        && chars[pos + 2] == '>'
+                    {
                         pos += 3;
                         col += 3;
                         break;
@@ -1310,7 +1404,11 @@ pub fn check_html_xml(content: &str, is_xml: bool, issues: &mut Vec<SyntaxIssue>
                         line += 1;
                         col = 1;
                         pos += 1;
-                    } else if chars[pos] == ']' && pos + 2 < len && chars[pos + 1] == ']' && chars[pos + 2] == '>' {
+                    } else if chars[pos] == ']'
+                        && pos + 2 < len
+                        && chars[pos + 1] == ']'
+                        && chars[pos + 2] == '>'
+                    {
                         pos += 3;
                         col += 3;
                         break;
@@ -1346,7 +1444,12 @@ pub fn check_html_xml(content: &str, is_xml: bool, issues: &mut Vec<SyntaxIssue>
 
             // Read tag name
             let mut tag_name = String::new();
-            while pos < len && (chars[pos].is_alphanumeric() || chars[pos] == '-' || chars[pos] == '_' || chars[pos] == ':') {
+            while pos < len
+                && (chars[pos].is_alphanumeric()
+                    || chars[pos] == '-'
+                    || chars[pos] == '_'
+                    || chars[pos] == ':')
+            {
                 tag_name.push(chars[pos]);
                 pos += 1;
                 col += 1;
@@ -1491,7 +1594,12 @@ pub fn validate_syntax(
     issues.sort_by_key(|i| (i.line, i.column));
 
     let file_path_str = path.map(|p| p.to_string_lossy().to_string());
-    SyntaxValidationReport::new(lang.display_name().to_string(), file_path_str, content, issues)
+    SyntaxValidationReport::new(
+        lang.display_name().to_string(),
+        file_path_str,
+        content,
+        issues,
+    )
 }
 
 // ---------------------------------------------------------------------------
@@ -1564,7 +1672,11 @@ pub fn format_report_text(report: &SyntaxValidationReport, content: &str) -> Str
                 if report.warning_count == 1 { "" } else { "s" }
             ));
             for issue in &report.issues {
-                out.push_str(&format_diagnostic(issue, content, report.file_path.as_deref()));
+                out.push_str(&format_diagnostic(
+                    issue,
+                    content,
+                    report.file_path.as_deref(),
+                ));
                 out.push('\n');
             }
         }
@@ -1580,7 +1692,11 @@ pub fn format_report_text(report: &SyntaxValidationReport, content: &str) -> Str
         ));
 
         for issue in &report.issues {
-            out.push_str(&format_diagnostic(issue, content, report.file_path.as_deref()));
+            out.push_str(&format_diagnostic(
+                issue,
+                content,
+                report.file_path.as_deref(),
+            ));
             out.push('\n');
         }
     }
@@ -1761,16 +1877,16 @@ impl RgbColor {
     pub fn to_ansi16_fg(&self) -> u8 {
         let idx = self.to_ansi256();
         match idx {
-            0 => 30, // black
-            1 => 31, // red
-            2 => 32, // green
-            3 => 33, // yellow
-            4 => 34, // blue
-            5 => 35, // magenta
-            6 => 36, // cyan
-            7 => 37, // white
-            8 => 90, // bright black
-            9 => 91, // bright red
+            0 => 30,  // black
+            1 => 31,  // red
+            2 => 32,  // green
+            3 => 33,  // yellow
+            4 => 34,  // blue
+            5 => 35,  // magenta
+            6 => 36,  // cyan
+            7 => 37,  // white
+            8 => 90,  // bright black
+            9 => 91,  // bright red
             10 => 92, // bright green
             11 => 93, // bright yellow
             12 => 94, // bright blue
@@ -2024,18 +2140,28 @@ impl HighlightTheme {
     pub fn dark() -> Self {
         Self {
             name: "dark".to_string(),
-            keyword: HighlightStyle::new().fg(RgbColor::new(255, 121, 198)).bold(),
+            keyword: HighlightStyle::new()
+                .fg(RgbColor::new(255, 121, 198))
+                .bold(),
             type_style: HighlightStyle::new().fg(RgbColor::new(139, 233, 253)),
             function: HighlightStyle::new().fg(RgbColor::new(80, 250, 123)),
             string: HighlightStyle::new().fg(RgbColor::new(241, 250, 140)),
             number: HighlightStyle::new().fg(RgbColor::new(189, 147, 249)),
-            comment: HighlightStyle::new().fg(RgbColor::new(98, 114, 164)).italic(),
+            comment: HighlightStyle::new()
+                .fg(RgbColor::new(98, 114, 164))
+                .italic(),
             operator: HighlightStyle::new().fg(RgbColor::new(255, 121, 198)),
             punctuation: HighlightStyle::new().fg(RgbColor::new(248, 248, 242)),
-            tag: HighlightStyle::new().fg(RgbColor::new(255, 121, 198)).bold(),
-            attribute: HighlightStyle::new().fg(RgbColor::new(80, 250, 123)).italic(),
+            tag: HighlightStyle::new()
+                .fg(RgbColor::new(255, 121, 198))
+                .bold(),
+            attribute: HighlightStyle::new()
+                .fg(RgbColor::new(80, 250, 123))
+                .italic(),
             variable: HighlightStyle::new().fg(RgbColor::new(248, 248, 242)),
-            constant: HighlightStyle::new().fg(RgbColor::new(189, 147, 249)).bold(),
+            constant: HighlightStyle::new()
+                .fg(RgbColor::new(189, 147, 249))
+                .bold(),
             macro_style: HighlightStyle::new().fg(RgbColor::new(255, 184, 108)),
             plain: HighlightStyle::new().fg(RgbColor::new(248, 248, 242)),
         }
@@ -2046,11 +2172,15 @@ impl HighlightTheme {
         Self {
             name: "monokai".to_string(),
             keyword: HighlightStyle::new().fg(RgbColor::new(249, 38, 114)).bold(),
-            type_style: HighlightStyle::new().fg(RgbColor::new(102, 217, 239)).italic(),
+            type_style: HighlightStyle::new()
+                .fg(RgbColor::new(102, 217, 239))
+                .italic(),
             function: HighlightStyle::new().fg(RgbColor::new(166, 226, 46)),
             string: HighlightStyle::new().fg(RgbColor::new(230, 219, 116)),
             number: HighlightStyle::new().fg(RgbColor::new(174, 129, 255)),
-            comment: HighlightStyle::new().fg(RgbColor::new(117, 113, 94)).italic(),
+            comment: HighlightStyle::new()
+                .fg(RgbColor::new(117, 113, 94))
+                .italic(),
             operator: HighlightStyle::new().fg(RgbColor::new(249, 38, 114)),
             punctuation: HighlightStyle::new().fg(RgbColor::new(248, 248, 242)),
             tag: HighlightStyle::new().fg(RgbColor::new(249, 38, 114)),
@@ -2066,12 +2196,16 @@ impl HighlightTheme {
     pub fn one_dark() -> Self {
         Self {
             name: "one_dark".to_string(),
-            keyword: HighlightStyle::new().fg(RgbColor::new(198, 120, 221)).bold(),
+            keyword: HighlightStyle::new()
+                .fg(RgbColor::new(198, 120, 221))
+                .bold(),
             type_style: HighlightStyle::new().fg(RgbColor::new(229, 192, 123)),
             function: HighlightStyle::new().fg(RgbColor::new(97, 175, 239)),
             string: HighlightStyle::new().fg(RgbColor::new(152, 195, 121)),
             number: HighlightStyle::new().fg(RgbColor::new(209, 154, 102)),
-            comment: HighlightStyle::new().fg(RgbColor::new(92, 99, 112)).italic(),
+            comment: HighlightStyle::new()
+                .fg(RgbColor::new(92, 99, 112))
+                .italic(),
             operator: HighlightStyle::new().fg(RgbColor::new(86, 182, 194)),
             punctuation: HighlightStyle::new().fg(RgbColor::new(171, 178, 191)),
             tag: HighlightStyle::new().fg(RgbColor::new(224, 108, 117)),
@@ -2092,7 +2226,9 @@ impl HighlightTheme {
             function: HighlightStyle::new().fg(RgbColor::new(111, 66, 193)),
             string: HighlightStyle::new().fg(RgbColor::new(3, 47, 98)),
             number: HighlightStyle::new().fg(RgbColor::new(0, 92, 197)),
-            comment: HighlightStyle::new().fg(RgbColor::new(106, 115, 125)).italic(),
+            comment: HighlightStyle::new()
+                .fg(RgbColor::new(106, 115, 125))
+                .italic(),
             operator: HighlightStyle::new().fg(RgbColor::new(215, 58, 73)),
             punctuation: HighlightStyle::new().fg(RgbColor::new(36, 41, 46)),
             tag: HighlightStyle::new().fg(RgbColor::new(34, 134, 58)),
@@ -2108,12 +2244,16 @@ impl HighlightTheme {
     pub fn nord() -> Self {
         Self {
             name: "nord".to_string(),
-            keyword: HighlightStyle::new().fg(RgbColor::new(129, 161, 193)).bold(),
+            keyword: HighlightStyle::new()
+                .fg(RgbColor::new(129, 161, 193))
+                .bold(),
             type_style: HighlightStyle::new().fg(RgbColor::new(143, 188, 187)),
             function: HighlightStyle::new().fg(RgbColor::new(136, 192, 208)),
             string: HighlightStyle::new().fg(RgbColor::new(163, 190, 140)),
             number: HighlightStyle::new().fg(RgbColor::new(180, 142, 173)),
-            comment: HighlightStyle::new().fg(RgbColor::new(76, 86, 106)).italic(),
+            comment: HighlightStyle::new()
+                .fg(RgbColor::new(76, 86, 106))
+                .italic(),
             operator: HighlightStyle::new().fg(RgbColor::new(129, 161, 193)),
             punctuation: HighlightStyle::new().fg(RgbColor::new(236, 239, 244)),
             tag: HighlightStyle::new().fg(RgbColor::new(129, 161, 193)),
@@ -2134,7 +2274,9 @@ impl HighlightTheme {
             function: HighlightStyle::new().fg(RgbColor::new(38, 139, 210)),
             string: HighlightStyle::new().fg(RgbColor::new(42, 161, 152)),
             number: HighlightStyle::new().fg(RgbColor::new(211, 54, 130)),
-            comment: HighlightStyle::new().fg(RgbColor::new(88, 110, 117)).italic(),
+            comment: HighlightStyle::new()
+                .fg(RgbColor::new(88, 110, 117))
+                .italic(),
             operator: HighlightStyle::new().fg(RgbColor::new(133, 153, 0)),
             punctuation: HighlightStyle::new().fg(RgbColor::new(131, 148, 150)),
             tag: HighlightStyle::new().fg(RgbColor::new(38, 139, 210)),
@@ -2328,7 +2470,12 @@ impl<'a> SourceScanner<'a> {
         true
     }
 
-    fn make_token(&self, kind: SyntaxTokenKind, start_char: usize, end_char: usize) -> Option<SyntaxToken> {
+    fn make_token(
+        &self,
+        kind: SyntaxTokenKind,
+        start_char: usize,
+        end_char: usize,
+    ) -> Option<SyntaxToken> {
         if start_char >= end_char {
             return None;
         }
@@ -2460,22 +2607,71 @@ impl<'a> SourceScanner<'a> {
 }
 
 const RUST_KEYWORDS: &[&str] = &[
-    "as", "async", "await", "break", "const", "continue", "crate", "dyn", "else",
-    "enum", "extern", "false", "fn", "for", "if", "impl", "in", "let", "loop",
-    "match", "mod", "move", "mut", "pub", "ref", "return", "self", "Self",
-    "static", "struct", "super", "trait", "true", "type", "unsafe", "use",
-    "where", "while", "yield",
+    "as", "async", "await", "break", "const", "continue", "crate", "dyn", "else", "enum", "extern",
+    "false", "fn", "for", "if", "impl", "in", "let", "loop", "match", "mod", "move", "mut", "pub",
+    "ref", "return", "self", "Self", "static", "struct", "super", "trait", "true", "type",
+    "unsafe", "use", "where", "while", "yield",
 ];
 
 const RUST_TYPES: &[&str] = &[
-    "bool", "char", "str", "u8", "u16", "u32", "u64", "u128", "usize",
-    "i8", "i16", "i32", "i64", "i128", "isize", "f32", "f64",
-    "Option", "Result", "Some", "None", "Ok", "Err",
-    "Vec", "String", "Box", "Rc", "Arc", "Cell", "RefCell", "Mutex", "RwLock",
-    "HashMap", "HashSet", "BTreeMap", "BTreeSet", "VecDeque", "BinaryHeap",
-    "Pin", "Future", "Send", "Sync", "Clone", "Copy", "Debug", "Default",
-    "Display", "Error", "From", "Into", "Iterator", "IntoIterator",
-    "Path", "PathBuf", "File", "Duration", "Instant", "Ordering",
+    "bool",
+    "char",
+    "str",
+    "u8",
+    "u16",
+    "u32",
+    "u64",
+    "u128",
+    "usize",
+    "i8",
+    "i16",
+    "i32",
+    "i64",
+    "i128",
+    "isize",
+    "f32",
+    "f64",
+    "Option",
+    "Result",
+    "Some",
+    "None",
+    "Ok",
+    "Err",
+    "Vec",
+    "String",
+    "Box",
+    "Rc",
+    "Arc",
+    "Cell",
+    "RefCell",
+    "Mutex",
+    "RwLock",
+    "HashMap",
+    "HashSet",
+    "BTreeMap",
+    "BTreeSet",
+    "VecDeque",
+    "BinaryHeap",
+    "Pin",
+    "Future",
+    "Send",
+    "Sync",
+    "Clone",
+    "Copy",
+    "Debug",
+    "Default",
+    "Display",
+    "Error",
+    "From",
+    "Into",
+    "Iterator",
+    "IntoIterator",
+    "Path",
+    "PathBuf",
+    "File",
+    "Duration",
+    "Instant",
+    "Ordering",
 ];
 
 fn tokenize_rust(content: &str) -> Vec<SyntaxToken> {
@@ -2694,7 +2890,13 @@ fn tokenize_rust(content: &str) -> Vec<SyntaxToken> {
                 continue;
             }
 
-            let kind = if ident_text == "true" || ident_text == "false" || ident_text == "Some" || ident_text == "None" || ident_text == "Ok" || ident_text == "Err" {
+            let kind = if ident_text == "true"
+                || ident_text == "false"
+                || ident_text == "Some"
+                || ident_text == "None"
+                || ident_text == "Ok"
+                || ident_text == "Err"
+            {
                 SyntaxTokenKind::Constant
             } else if ident_text == "self" {
                 SyntaxTokenKind::Variable
@@ -2704,11 +2906,19 @@ fn tokenize_rust(content: &str) -> Vec<SyntaxToken> {
                 SyntaxTokenKind::Keyword
             } else if RUST_TYPES.contains(&ident_text) {
                 SyntaxTokenKind::Type
-            } else if ident_text.chars().all(|c| c.is_uppercase() || c == '_' || c.is_ascii_digit()) && ident_text.len() >= 2 {
+            } else if ident_text
+                .chars()
+                .all(|c| c.is_uppercase() || c == '_' || c.is_ascii_digit())
+                && ident_text.len() >= 2
+            {
                 SyntaxTokenKind::Constant
             } else if s.peek_next_non_whitespace() == Some('(') {
                 SyntaxTokenKind::Function
-            } else if ident_text.chars().next().map_or(false, |c| c.is_uppercase()) {
+            } else if ident_text
+                .chars()
+                .next()
+                .map_or(false, |c| c.is_uppercase())
+            {
                 SyntaxTokenKind::Type
             } else {
                 SyntaxTokenKind::Plain
@@ -2763,23 +2973,116 @@ fn tokenize_rust(content: &str) -> Vec<SyntaxToken> {
 }
 
 const JS_KEYWORDS: &[&str] = &[
-    "abstract", "any", "as", "async", "await", "boolean", "break", "case", "catch",
-    "class", "const", "continue", "debugger", "declare", "default", "delete", "do",
-    "else", "enum", "export", "extends", "false", "finally", "for", "from", "function",
-    "get", "if", "implements", "import", "in", "instanceof", "interface", "is",
-    "keyof", "let", "namespace", "never", "new", "null", "number", "object", "of",
-    "override", "package", "private", "protected", "public", "readonly", "require",
-    "return", "satisfies", "set", "static", "string", "super", "switch", "symbol",
-    "this", "throw", "true", "try", "type", "typeof", "undefined", "unknown", "var",
-    "void", "while", "with", "yield",
+    "abstract",
+    "any",
+    "as",
+    "async",
+    "await",
+    "boolean",
+    "break",
+    "case",
+    "catch",
+    "class",
+    "const",
+    "continue",
+    "debugger",
+    "declare",
+    "default",
+    "delete",
+    "do",
+    "else",
+    "enum",
+    "export",
+    "extends",
+    "false",
+    "finally",
+    "for",
+    "from",
+    "function",
+    "get",
+    "if",
+    "implements",
+    "import",
+    "in",
+    "instanceof",
+    "interface",
+    "is",
+    "keyof",
+    "let",
+    "namespace",
+    "never",
+    "new",
+    "null",
+    "number",
+    "object",
+    "of",
+    "override",
+    "package",
+    "private",
+    "protected",
+    "public",
+    "readonly",
+    "require",
+    "return",
+    "satisfies",
+    "set",
+    "static",
+    "string",
+    "super",
+    "switch",
+    "symbol",
+    "this",
+    "throw",
+    "true",
+    "try",
+    "type",
+    "typeof",
+    "undefined",
+    "unknown",
+    "var",
+    "void",
+    "while",
+    "with",
+    "yield",
 ];
 
 const JS_TYPES: &[&str] = &[
-    "Array", "Boolean", "Date", "Error", "Function", "Map", "Number", "Object",
-    "Promise", "RegExp", "Set", "String", "Symbol", "BigInt", "Record", "Partial",
-    "Required", "Readonly", "Pick", "Omit", "Exclude", "Extract", "NonNullable",
-    "Parameters", "ReturnType", "InstanceType", "Console", "console", "document",
-    "window", "process", "Math", "JSON", "Node", "Element", "Event",
+    "Array",
+    "Boolean",
+    "Date",
+    "Error",
+    "Function",
+    "Map",
+    "Number",
+    "Object",
+    "Promise",
+    "RegExp",
+    "Set",
+    "String",
+    "Symbol",
+    "BigInt",
+    "Record",
+    "Partial",
+    "Required",
+    "Readonly",
+    "Pick",
+    "Omit",
+    "Exclude",
+    "Extract",
+    "NonNullable",
+    "Parameters",
+    "ReturnType",
+    "InstanceType",
+    "Console",
+    "console",
+    "document",
+    "window",
+    "process",
+    "Math",
+    "JSON",
+    "Node",
+    "Element",
+    "Event",
 ];
 
 fn tokenize_javascript_typescript(content: &str, _lang: SupportedLanguage) -> Vec<SyntaxToken> {
@@ -2870,7 +3173,10 @@ fn tokenize_javascript_typescript(content: &str, _lang: SupportedLanguage) -> Ve
         }
 
         // Decorators @name
-        if s.peek() == Some('@') && s.peek_nth(1).map_or(false, |c| c.is_alphabetic() || c == '_') {
+        if s.peek() == Some('@')
+            && s.peek_nth(1)
+                .map_or(false, |c| c.is_alphabetic() || c == '_')
+        {
             let start = s.pos;
             s.advance();
             while let Some(c) = s.peek() {
@@ -2912,7 +3218,9 @@ fn tokenize_javascript_typescript(content: &str, _lang: SupportedLanguage) -> Ve
         }
 
         // Identifiers, Keywords, Types, Functions
-        if s.peek().map_or(false, |c| c.is_alphabetic() || c == '_' || c == '$') {
+        if s.peek()
+            .map_or(false, |c| c.is_alphabetic() || c == '_' || c == '$')
+        {
             let start = s.pos;
             while let Some(c) = s.peek() {
                 if c.is_alphanumeric() || c == '_' || c == '$' {
@@ -2923,21 +3231,44 @@ fn tokenize_javascript_typescript(content: &str, _lang: SupportedLanguage) -> Ve
             }
             let ident_text = &s.source[s.char_to_byte[start]..s.char_to_byte[s.pos]];
 
-            let kind = if ident_text == "true" || ident_text == "false" || ident_text == "null" || ident_text == "undefined" || ident_text == "NaN" || ident_text == "Infinity" {
+            let kind = if ident_text == "true"
+                || ident_text == "false"
+                || ident_text == "null"
+                || ident_text == "undefined"
+                || ident_text == "NaN"
+                || ident_text == "Infinity"
+            {
                 SyntaxTokenKind::Constant
             } else if ident_text == "this" || ident_text == "super" {
                 SyntaxTokenKind::Variable
-            } else if ident_text == "any" || ident_text == "boolean" || ident_text == "never" || ident_text == "number" || ident_text == "object" || ident_text == "string" || ident_text == "symbol" || ident_text == "unknown" || ident_text == "void" {
+            } else if ident_text == "any"
+                || ident_text == "boolean"
+                || ident_text == "never"
+                || ident_text == "number"
+                || ident_text == "object"
+                || ident_text == "string"
+                || ident_text == "symbol"
+                || ident_text == "unknown"
+                || ident_text == "void"
+            {
                 SyntaxTokenKind::Type
             } else if JS_KEYWORDS.contains(&ident_text) {
                 SyntaxTokenKind::Keyword
             } else if JS_TYPES.contains(&ident_text) {
                 SyntaxTokenKind::Type
-            } else if ident_text.chars().all(|c| c.is_uppercase() || c == '_' || c.is_ascii_digit()) && ident_text.len() >= 2 {
+            } else if ident_text
+                .chars()
+                .all(|c| c.is_uppercase() || c == '_' || c.is_ascii_digit())
+                && ident_text.len() >= 2
+            {
                 SyntaxTokenKind::Constant
             } else if s.peek_next_non_whitespace() == Some('(') {
                 SyntaxTokenKind::Function
-            } else if ident_text.chars().next().map_or(false, |c| c.is_uppercase()) {
+            } else if ident_text
+                .chars()
+                .next()
+                .map_or(false, |c| c.is_uppercase())
+            {
                 SyntaxTokenKind::Type
             } else {
                 SyntaxTokenKind::Plain
@@ -2951,8 +3282,8 @@ fn tokenize_javascript_typescript(content: &str, _lang: SupportedLanguage) -> Ve
 
         // Multi-char operators
         let multi_ops = &[
-            "===", "!==", "==", "!=", "<=", ">=", "=>", "&&", "||", "??", "?.",
-            "+=", "-=", "*=", "/=", "%=", "**=", "**", "++", "--", "<<=", ">>=",
+            "===", "!==", "==", "!=", "<=", ">=", "=>", "&&", "||", "??", "?.", "+=", "-=", "*=",
+            "/=", "%=", "**=", "**", "++", "--", "<<=", ">>=",
         ];
         let mut matched_op = false;
         for op in multi_ops {
@@ -2974,9 +3305,9 @@ fn tokenize_javascript_typescript(content: &str, _lang: SupportedLanguage) -> Ve
         let start = s.pos;
         let ch = s.advance();
         let kind = match ch {
-            Some('+' | '-' | '*' | '/' | '%' | '=' | '<' | '>' | '!' | '&' | '|' | '^' | '~' | '?') => {
-                SyntaxTokenKind::Operator
-            }
+            Some(
+                '+' | '-' | '*' | '/' | '%' | '=' | '<' | '>' | '!' | '&' | '|' | '^' | '~' | '?',
+            ) => SyntaxTokenKind::Operator,
             Some('(' | ')' | '{' | '}' | '[' | ']' | ';' | ',' | '.' | ':') => {
                 SyntaxTokenKind::Punctuation
             }
@@ -2992,19 +3323,66 @@ fn tokenize_javascript_typescript(content: &str, _lang: SupportedLanguage) -> Ve
 }
 
 const PYTHON_KEYWORDS: &[&str] = &[
-    "and", "as", "assert", "async", "await", "break", "case", "class", "continue",
-    "def", "del", "elif", "else", "except", "finally", "for", "from", "global",
-    "if", "import", "in", "is", "lambda", "match", "nonlocal", "not", "or",
-    "pass", "raise", "return", "try", "while", "with", "yield",
+    "and", "as", "assert", "async", "await", "break", "case", "class", "continue", "def", "del",
+    "elif", "else", "except", "finally", "for", "from", "global", "if", "import", "in", "is",
+    "lambda", "match", "nonlocal", "not", "or", "pass", "raise", "return", "try", "while", "with",
+    "yield",
 ];
 
 const PYTHON_BUILTINS: &[&str] = &[
-    "int", "float", "str", "bool", "list", "dict", "set", "tuple", "bytes", "bytearray",
-    "object", "type", "range", "len", "print", "input", "open", "isinstance", "issubclass",
-    "enumerate", "zip", "map", "filter", "any", "all", "min", "max", "sum", "abs",
-    "repr", "id", "dir", "vars", "callable", "iter", "next", "super", "property",
-    "staticmethod", "classmethod", "Optional", "Union", "List", "Dict", "Set",
-    "Tuple", "Any", "Callable", "Iterable", "Iterator", "Sequence", "Mapping", "Generator",
+    "int",
+    "float",
+    "str",
+    "bool",
+    "list",
+    "dict",
+    "set",
+    "tuple",
+    "bytes",
+    "bytearray",
+    "object",
+    "type",
+    "range",
+    "len",
+    "print",
+    "input",
+    "open",
+    "isinstance",
+    "issubclass",
+    "enumerate",
+    "zip",
+    "map",
+    "filter",
+    "any",
+    "all",
+    "min",
+    "max",
+    "sum",
+    "abs",
+    "repr",
+    "id",
+    "dir",
+    "vars",
+    "callable",
+    "iter",
+    "next",
+    "super",
+    "property",
+    "staticmethod",
+    "classmethod",
+    "Optional",
+    "Union",
+    "List",
+    "Dict",
+    "Set",
+    "Tuple",
+    "Any",
+    "Callable",
+    "Iterable",
+    "Iterator",
+    "Sequence",
+    "Mapping",
+    "Generator",
 ];
 
 fn tokenize_python(content: &str) -> Vec<SyntaxToken> {
@@ -3033,8 +3411,10 @@ fn tokenize_python(content: &str) -> Vec<SyntaxToken> {
         }
 
         // Triple quoted strings: """...""" or '''...'''
-        let prefixes = &["f\"\"\"", "r\"\"\"", "b\"\"\"", "u\"\"\"", "fr\"\"\"", "rf\"\"\"", "\"\"\"",
-                         "f'''", "r'''", "b'''", "u'''", "fr'''", "rf'''", "'''"];
+        let prefixes = &[
+            "f\"\"\"", "r\"\"\"", "b\"\"\"", "u\"\"\"", "fr\"\"\"", "rf\"\"\"", "\"\"\"", "f'''",
+            "r'''", "b'''", "u'''", "fr'''", "rf'''", "'''",
+        ];
         let mut matched_triple = false;
         for p in prefixes {
             if s.starts_with_str(p) {
@@ -3060,8 +3440,10 @@ fn tokenize_python(content: &str) -> Vec<SyntaxToken> {
         }
 
         // Single/double quoted strings with optional prefix
-        let str_prefixes = &["f\"", "r\"", "b\"", "u\"", "fr\"", "rf\"", "\"",
-                            "f'", "r'", "b'", "u'", "fr'", "rf'", "'"];
+        let str_prefixes = &[
+            "f\"", "r\"", "b\"", "u\"", "fr\"", "rf\"", "\"", "f'", "r'", "b'", "u'", "fr'", "rf'",
+            "'",
+        ];
         let mut matched_str = false;
         for p in str_prefixes {
             if s.starts_with_str(p) {
@@ -3093,7 +3475,10 @@ fn tokenize_python(content: &str) -> Vec<SyntaxToken> {
         }
 
         // Decorator @deco
-        if s.peek() == Some('@') && s.peek_nth(1).map_or(false, |c| c.is_alphabetic() || c == '_') {
+        if s.peek() == Some('@')
+            && s.peek_nth(1)
+                .map_or(false, |c| c.is_alphabetic() || c == '_')
+        {
             let start = s.pos;
             s.advance();
             while let Some(c) = s.peek() {
@@ -3129,7 +3514,12 @@ fn tokenize_python(content: &str) -> Vec<SyntaxToken> {
             }
             let ident_text = &s.source[s.char_to_byte[start]..s.char_to_byte[s.pos]];
 
-            let kind = if ident_text == "True" || ident_text == "False" || ident_text == "None" || ident_text == "Ellipsis" || ident_text == "NotImplemented" {
+            let kind = if ident_text == "True"
+                || ident_text == "False"
+                || ident_text == "None"
+                || ident_text == "Ellipsis"
+                || ident_text == "NotImplemented"
+            {
                 SyntaxTokenKind::Constant
             } else if ident_text == "self" || ident_text == "cls" {
                 SyntaxTokenKind::Variable
@@ -3137,11 +3527,19 @@ fn tokenize_python(content: &str) -> Vec<SyntaxToken> {
                 SyntaxTokenKind::Keyword
             } else if PYTHON_BUILTINS.contains(&ident_text) {
                 SyntaxTokenKind::Type
-            } else if ident_text.chars().all(|c| c.is_uppercase() || c == '_' || c.is_ascii_digit()) && ident_text.len() >= 2 {
+            } else if ident_text
+                .chars()
+                .all(|c| c.is_uppercase() || c == '_' || c.is_ascii_digit())
+                && ident_text.len() >= 2
+            {
                 SyntaxTokenKind::Constant
             } else if s.peek_next_non_whitespace() == Some('(') {
                 SyntaxTokenKind::Function
-            } else if ident_text.chars().next().map_or(false, |c| c.is_uppercase()) {
+            } else if ident_text
+                .chars()
+                .next()
+                .map_or(false, |c| c.is_uppercase())
+            {
                 SyntaxTokenKind::Type
             } else {
                 SyntaxTokenKind::Plain
@@ -3155,8 +3553,8 @@ fn tokenize_python(content: &str) -> Vec<SyntaxToken> {
 
         // Multi-character operators
         let multi_ops = &[
-            "->", "==", "!=", "<=", ">=", "+=", "-=", "*=", "/=", "//=", "%=",
-            "**=", "**", "//", ":=", "<<=", ">>=",
+            "->", "==", "!=", "<=", ">=", "+=", "-=", "*=", "/=", "//=", "%=", "**=", "**", "//",
+            ":=", "<<=", ">>=",
         ];
         let mut matched_op = false;
         for op in multi_ops {
@@ -3196,17 +3594,70 @@ fn tokenize_python(content: &str) -> Vec<SyntaxToken> {
 }
 
 const GO_KEYWORDS: &[&str] = &[
-    "break", "case", "chan", "const", "continue", "default", "defer", "else",
-    "fallthrough", "for", "func", "go", "goto", "if", "import", "interface",
-    "map", "package", "range", "return", "select", "struct", "switch", "type", "var",
+    "break",
+    "case",
+    "chan",
+    "const",
+    "continue",
+    "default",
+    "defer",
+    "else",
+    "fallthrough",
+    "for",
+    "func",
+    "go",
+    "goto",
+    "if",
+    "import",
+    "interface",
+    "map",
+    "package",
+    "range",
+    "return",
+    "select",
+    "struct",
+    "switch",
+    "type",
+    "var",
 ];
 
 const GO_TYPES: &[&str] = &[
-    "bool", "byte", "complex64", "complex128", "error", "float32", "float64",
-    "int", "int8", "int16", "int32", "int64", "rune", "string",
-    "uint", "uint8", "uint16", "uint32", "uint64", "uintptr", "any",
-    "append", "cap", "close", "complex", "copy", "delete", "imag", "len",
-    "make", "new", "panic", "print", "println", "real", "recover",
+    "bool",
+    "byte",
+    "complex64",
+    "complex128",
+    "error",
+    "float32",
+    "float64",
+    "int",
+    "int8",
+    "int16",
+    "int32",
+    "int64",
+    "rune",
+    "string",
+    "uint",
+    "uint8",
+    "uint16",
+    "uint32",
+    "uint64",
+    "uintptr",
+    "any",
+    "append",
+    "cap",
+    "close",
+    "complex",
+    "copy",
+    "delete",
+    "imag",
+    "len",
+    "make",
+    "new",
+    "panic",
+    "print",
+    "println",
+    "real",
+    "recover",
 ];
 
 fn tokenize_go(content: &str) -> Vec<SyntaxToken> {
@@ -3311,17 +3762,29 @@ fn tokenize_go(content: &str) -> Vec<SyntaxToken> {
             }
             let ident_text = &s.source[s.char_to_byte[start]..s.char_to_byte[s.pos]];
 
-            let kind = if ident_text == "true" || ident_text == "false" || ident_text == "iota" || ident_text == "nil" {
+            let kind = if ident_text == "true"
+                || ident_text == "false"
+                || ident_text == "iota"
+                || ident_text == "nil"
+            {
                 SyntaxTokenKind::Constant
             } else if GO_KEYWORDS.contains(&ident_text) {
                 SyntaxTokenKind::Keyword
             } else if GO_TYPES.contains(&ident_text) {
                 SyntaxTokenKind::Type
-            } else if ident_text.chars().all(|c| c.is_uppercase() || c == '_' || c.is_ascii_digit()) && ident_text.len() >= 2 {
+            } else if ident_text
+                .chars()
+                .all(|c| c.is_uppercase() || c == '_' || c.is_ascii_digit())
+                && ident_text.len() >= 2
+            {
                 SyntaxTokenKind::Constant
             } else if s.peek_next_non_whitespace() == Some('(') {
                 SyntaxTokenKind::Function
-            } else if ident_text.chars().next().map_or(false, |c| c.is_uppercase()) {
+            } else if ident_text
+                .chars()
+                .next()
+                .map_or(false, |c| c.is_uppercase())
+            {
                 SyntaxTokenKind::Type
             } else {
                 SyntaxTokenKind::Plain
@@ -3335,8 +3798,8 @@ fn tokenize_go(content: &str) -> Vec<SyntaxToken> {
 
         // Multi-char operators
         let multi_ops = &[
-            ":=", "<-", "==", "!=", "<=", ">=", "&&", "||", "++", "--", "+=", "-=",
-            "*=", "/=", "%=", "&=", "|=", "^=", "<<=", ">>=", "...",
+            ":=", "<-", "==", "!=", "<=", ">=", "&&", "||", "++", "--", "+=", "-=", "*=", "/=",
+            "%=", "&=", "|=", "^=", "<<=", ">>=", "...",
         ];
         let mut matched_op = false;
         for op in multi_ops {
@@ -3376,27 +3839,136 @@ fn tokenize_go(content: &str) -> Vec<SyntaxToken> {
 }
 
 const C_CPP_KEYWORDS: &[&str] = &[
-    "alignas", "alignof", "and", "and_eq", "asm", "auto", "bitand", "bitor",
-    "bool", "break", "case", "catch", "char", "char8_t", "char16_t", "char32_t",
-    "class", "compl", "concept", "const", "consteval", "constexpr", "constinit",
-    "const_cast", "continue", "co_await", "co_return", "co_yield", "decltype",
-    "default", "delete", "do", "double", "dynamic_cast", "else", "enum", "explicit",
-    "export", "extern", "false", "float", "for", "friend", "goto", "if", "inline",
-    "int", "long", "mutable", "namespace", "new", "noexcept", "not", "not_eq",
-    "nullptr", "operator", "or", "or_eq", "override", "private", "protected",
-    "public", "reflexpr", "register", "reinterpret_cast", "requires", "return",
-    "short", "signed", "sizeof", "static", "static_assert", "static_cast",
-    "struct", "switch", "template", "this", "thread_local", "throw", "true",
-    "try", "typedef", "typeid", "typename", "union", "unsigned", "using",
-    "virtual", "void", "volatile", "wchar_t", "while", "xor", "xor_eq",
+    "alignas",
+    "alignof",
+    "and",
+    "and_eq",
+    "asm",
+    "auto",
+    "bitand",
+    "bitor",
+    "bool",
+    "break",
+    "case",
+    "catch",
+    "char",
+    "char8_t",
+    "char16_t",
+    "char32_t",
+    "class",
+    "compl",
+    "concept",
+    "const",
+    "consteval",
+    "constexpr",
+    "constinit",
+    "const_cast",
+    "continue",
+    "co_await",
+    "co_return",
+    "co_yield",
+    "decltype",
+    "default",
+    "delete",
+    "do",
+    "double",
+    "dynamic_cast",
+    "else",
+    "enum",
+    "explicit",
+    "export",
+    "extern",
+    "false",
+    "float",
+    "for",
+    "friend",
+    "goto",
+    "if",
+    "inline",
+    "int",
+    "long",
+    "mutable",
+    "namespace",
+    "new",
+    "noexcept",
+    "not",
+    "not_eq",
+    "nullptr",
+    "operator",
+    "or",
+    "or_eq",
+    "override",
+    "private",
+    "protected",
+    "public",
+    "reflexpr",
+    "register",
+    "reinterpret_cast",
+    "requires",
+    "return",
+    "short",
+    "signed",
+    "sizeof",
+    "static",
+    "static_assert",
+    "static_cast",
+    "struct",
+    "switch",
+    "template",
+    "this",
+    "thread_local",
+    "throw",
+    "true",
+    "try",
+    "typedef",
+    "typeid",
+    "typename",
+    "union",
+    "unsigned",
+    "using",
+    "virtual",
+    "void",
+    "volatile",
+    "wchar_t",
+    "while",
+    "xor",
+    "xor_eq",
 ];
 
 const C_CPP_TYPES: &[&str] = &[
-    "int8_t", "int16_t", "int32_t", "int64_t", "uint8_t", "uint16_t", "uint32_t", "uint64_t",
-    "size_t", "ssize_t", "intptr_t", "uintptr_t", "ptrdiff_t",
-    "string", "wstring", "vector", "map", "unordered_map", "set", "unordered_set",
-    "pair", "tuple", "shared_ptr", "unique_ptr", "weak_ptr", "make_shared", "make_unique",
-    "std", "cout", "cin", "cerr", "endl", "FILE",
+    "int8_t",
+    "int16_t",
+    "int32_t",
+    "int64_t",
+    "uint8_t",
+    "uint16_t",
+    "uint32_t",
+    "uint64_t",
+    "size_t",
+    "ssize_t",
+    "intptr_t",
+    "uintptr_t",
+    "ptrdiff_t",
+    "string",
+    "wstring",
+    "vector",
+    "map",
+    "unordered_map",
+    "set",
+    "unordered_set",
+    "pair",
+    "tuple",
+    "shared_ptr",
+    "unique_ptr",
+    "weak_ptr",
+    "make_shared",
+    "make_unique",
+    "std",
+    "cout",
+    "cin",
+    "cerr",
+    "endl",
+    "FILE",
 ];
 
 fn tokenize_c_cpp_family(content: &str, _lang: SupportedLanguage) -> Vec<SyntaxToken> {
@@ -3502,7 +4074,11 @@ fn tokenize_c_cpp_family(content: &str, _lang: SupportedLanguage) -> Vec<SyntaxT
             }
             let ident_text = &s.source[s.char_to_byte[start]..s.char_to_byte[s.pos]];
 
-            let kind = if ident_text == "true" || ident_text == "false" || ident_text == "nullptr" || ident_text == "NULL" {
+            let kind = if ident_text == "true"
+                || ident_text == "false"
+                || ident_text == "nullptr"
+                || ident_text == "NULL"
+            {
                 SyntaxTokenKind::Constant
             } else if ident_text == "this" {
                 SyntaxTokenKind::Variable
@@ -3510,11 +4086,19 @@ fn tokenize_c_cpp_family(content: &str, _lang: SupportedLanguage) -> Vec<SyntaxT
                 SyntaxTokenKind::Keyword
             } else if C_CPP_TYPES.contains(&ident_text) {
                 SyntaxTokenKind::Type
-            } else if ident_text.chars().all(|c| c.is_uppercase() || c == '_' || c.is_ascii_digit()) && ident_text.len() >= 2 {
+            } else if ident_text
+                .chars()
+                .all(|c| c.is_uppercase() || c == '_' || c.is_ascii_digit())
+                && ident_text.len() >= 2
+            {
                 SyntaxTokenKind::Constant
             } else if s.peek_next_non_whitespace() == Some('(') {
                 SyntaxTokenKind::Function
-            } else if ident_text.chars().next().map_or(false, |c| c.is_uppercase()) {
+            } else if ident_text
+                .chars()
+                .next()
+                .map_or(false, |c| c.is_uppercase())
+            {
                 SyntaxTokenKind::Type
             } else {
                 SyntaxTokenKind::Plain
@@ -3528,8 +4112,8 @@ fn tokenize_c_cpp_family(content: &str, _lang: SupportedLanguage) -> Vec<SyntaxT
 
         // Multi-char operators
         let multi_ops = &[
-            "::", "->*", "->", "==", "!=", "<=", ">=", "&&", "||", "++", "--",
-            "+=", "-=", "*=", "/=", "%=", "<<=", ">>=", "<<", ">>",
+            "::", "->*", "->", "==", "!=", "<=", ">=", "&&", "||", "++", "--", "+=", "-=", "*=",
+            "/=", "%=", "<<=", ">>=", "<<", ">>",
         ];
         let mut matched_op = false;
         for op in multi_ops {
@@ -3551,9 +4135,9 @@ fn tokenize_c_cpp_family(content: &str, _lang: SupportedLanguage) -> Vec<SyntaxT
         let start = s.pos;
         let ch = s.advance();
         let kind = match ch {
-            Some('+' | '-' | '*' | '/' | '%' | '&' | '|' | '^' | '~' | '<' | '>' | '=' | '!' | '?') => {
-                SyntaxTokenKind::Operator
-            }
+            Some(
+                '+' | '-' | '*' | '/' | '%' | '&' | '|' | '^' | '~' | '<' | '>' | '=' | '!' | '?',
+            ) => SyntaxTokenKind::Operator,
             Some('(' | ')' | '{' | '}' | '[' | ']' | ';' | ',' | '.' | ':') => {
                 SyntaxTokenKind::Punctuation
             }
@@ -3596,7 +4180,10 @@ fn tokenize_html_xml(content: &str, _is_xml: bool) -> Vec<SyntaxToken> {
         }
 
         // Doctype / XML header
-        if s.starts_with_str("<!DOCTYPE") || s.starts_with_str("<!doctype") || s.starts_with_str("<?xml") {
+        if s.starts_with_str("<!DOCTYPE")
+            || s.starts_with_str("<!doctype")
+            || s.starts_with_str("<?xml")
+        {
             let start = s.pos;
             while let Some(c) = s.peek() {
                 s.advance();
@@ -3677,7 +4264,14 @@ fn tokenize_html_xml(content: &str, _is_xml: bool) -> Vec<SyntaxToken> {
                 // Attribute name
                 let start_attr = s.pos;
                 while let Some(c) = s.peek() {
-                    if c.is_alphanumeric() || c == '-' || c == '_' || c == ':' || c == '@' || c == '#' || c == '.' {
+                    if c.is_alphanumeric()
+                        || c == '-'
+                        || c == '_'
+                        || c == ':'
+                        || c == '@'
+                        || c == '#'
+                        || c == '.'
+                    {
                         s.advance();
                     } else {
                         break;
@@ -3838,7 +4432,10 @@ fn tokenize_css(content: &str) -> Vec<SyntaxToken> {
         }
 
         // Class selector .class_name
-        if s.peek() == Some('.') && s.peek_nth(1).map_or(false, |c| c.is_alphabetic() || c == '-' || c == '_') {
+        if s.peek() == Some('.')
+            && s.peek_nth(1)
+                .map_or(false, |c| c.is_alphabetic() || c == '-' || c == '_')
+        {
             let start = s.pos;
             s.advance();
             while let Some(c) = s.peek() {
@@ -3889,7 +4486,9 @@ fn tokenize_css(content: &str) -> Vec<SyntaxToken> {
         }
 
         // Identifiers (properties, tag names, pseudo-classes)
-        if s.peek().map_or(false, |c| c.is_alphabetic() || c == '-' || c == '_') {
+        if s.peek()
+            .map_or(false, |c| c.is_alphabetic() || c == '-' || c == '_')
+        {
             let start = s.pos;
             while let Some(c) = s.peek() {
                 if c.is_alphanumeric() || c == '-' || c == '_' {
@@ -3916,7 +4515,9 @@ fn tokenize_css(content: &str) -> Vec<SyntaxToken> {
         let start = s.pos;
         let ch = s.advance();
         let kind = match ch {
-            Some('{' | '}' | '(' | ')' | '[' | ']' | ';' | ':' | ',') => SyntaxTokenKind::Punctuation,
+            Some('{' | '}' | '(' | ')' | '[' | ']' | ';' | ':' | ',') => {
+                SyntaxTokenKind::Punctuation
+            }
             Some('+' | '>' | '~' | '*' | '=' | '!') => SyntaxTokenKind::Operator,
             _ => SyntaxTokenKind::Plain,
         };
@@ -4090,7 +4691,9 @@ fn tokenize_yaml(content: &str) -> Vec<SyntaxToken> {
         }
 
         // Identifiers / Keys / Constants
-        if s.peek().map_or(false, |c| c.is_alphanumeric() || c == '_' || c == '-') {
+        if s.peek()
+            .map_or(false, |c| c.is_alphanumeric() || c == '_' || c == '-')
+        {
             let start = s.pos;
             while let Some(c) = s.peek() {
                 if c.is_alphanumeric() || c == '_' || c == '-' {
@@ -4104,7 +4707,14 @@ fn tokenize_yaml(content: &str) -> Vec<SyntaxToken> {
 
             let kind = if s.peek_next_non_whitespace() == Some(':') {
                 SyntaxTokenKind::Attribute
-            } else if lower == "true" || lower == "false" || lower == "yes" || lower == "no" || lower == "null" || lower == "on" || lower == "off" {
+            } else if lower == "true"
+                || lower == "false"
+                || lower == "yes"
+                || lower == "no"
+                || lower == "null"
+                || lower == "on"
+                || lower == "off"
+            {
                 SyntaxTokenKind::Constant
             } else {
                 SyntaxTokenKind::Plain
@@ -4180,7 +4790,11 @@ fn tokenize_toml(content: &str) -> Vec<SyntaxToken> {
         // Multi-line strings """...""" or '''...'''
         if s.starts_with_str("\"\"\"") || s.starts_with_str("'''") {
             let start = s.pos;
-            let delimiter = if s.starts_with_str("\"\"\"") { "\"\"\"" } else { "'''" };
+            let delimiter = if s.starts_with_str("\"\"\"") {
+                "\"\"\""
+            } else {
+                "'''"
+            };
             s.advance_n(3);
             while !s.is_eof() {
                 if s.starts_with_str(delimiter) {
@@ -4225,7 +4839,9 @@ fn tokenize_toml(content: &str) -> Vec<SyntaxToken> {
         }
 
         // Keys / Constants
-        if s.peek().map_or(false, |c| c.is_alphanumeric() || c == '_' || c == '-') {
+        if s.peek()
+            .map_or(false, |c| c.is_alphanumeric() || c == '_' || c == '-')
+        {
             let start = s.pos;
             while let Some(c) = s.peek() {
                 if c.is_alphanumeric() || c == '_' || c == '-' {
@@ -4237,7 +4853,9 @@ fn tokenize_toml(content: &str) -> Vec<SyntaxToken> {
             let ident_text = &s.source[s.char_to_byte[start]..s.char_to_byte[s.pos]];
             let kind = if ident_text == "true" || ident_text == "false" {
                 SyntaxTokenKind::Constant
-            } else if s.peek_next_non_whitespace() == Some('=') || s.peek_next_non_whitespace() == Some('.') {
+            } else if s.peek_next_non_whitespace() == Some('=')
+                || s.peek_next_non_whitespace() == Some('.')
+            {
                 SyntaxTokenKind::Attribute
             } else {
                 SyntaxTokenKind::Plain
@@ -4265,16 +4883,16 @@ fn tokenize_toml(content: &str) -> Vec<SyntaxToken> {
 }
 
 const SHELL_KEYWORDS: &[&str] = &[
-    "if", "then", "else", "elif", "fi", "for", "in", "do", "done", "while",
-    "until", "case", "esac", "function", "select", "time",
+    "if", "then", "else", "elif", "fi", "for", "in", "do", "done", "while", "until", "case",
+    "esac", "function", "select", "time",
 ];
 
 const SHELL_COMMANDS: &[&str] = &[
-    "echo", "cd", "pwd", "export", "set", "unset", "source", "alias", "eval",
-    "exec", "exit", "read", "shift", "test", "local", "declare", "typeset",
-    "readonly", "trap", "kill", "wait", "cat", "grep", "sed", "awk", "find",
-    "mkdir", "rm", "cp", "mv", "ls", "chmod", "chown", "curl", "wget", "git",
-    "sudo", "docker", "cargo", "npm", "yarn", "pnpm", "bun", "node", "python", "pip",
+    "echo", "cd", "pwd", "export", "set", "unset", "source", "alias", "eval", "exec", "exit",
+    "read", "shift", "test", "local", "declare", "typeset", "readonly", "trap", "kill", "wait",
+    "cat", "grep", "sed", "awk", "find", "mkdir", "rm", "cp", "mv", "ls", "chmod", "chown", "curl",
+    "wget", "git", "sudo", "docker", "cargo", "npm", "yarn", "pnpm", "bun", "node", "python",
+    "pip",
 ];
 
 fn tokenize_shell(content: &str) -> Vec<SyntaxToken> {
@@ -4346,7 +4964,15 @@ fn tokenize_shell(content: &str) -> Vec<SyntaxToken> {
                 }
             } else {
                 while let Some(c) = s.peek() {
-                    if c.is_alphanumeric() || c == '_' || c == '?' || c == '!' || c == '@' || c == '*' || c == '#' || c == '$' {
+                    if c.is_alphanumeric()
+                        || c == '_'
+                        || c == '?'
+                        || c == '!'
+                        || c == '@'
+                        || c == '*'
+                        || c == '#'
+                        || c == '$'
+                    {
                         s.advance();
                     } else {
                         break;
@@ -4397,7 +5023,9 @@ fn tokenize_shell(content: &str) -> Vec<SyntaxToken> {
         }
 
         // Identifiers, Keywords, Builtins, Commands
-        if s.peek().map_or(false, |c| c.is_alphabetic() || c == '_' || c == '-') {
+        if s.peek()
+            .map_or(false, |c| c.is_alphabetic() || c == '_' || c == '-')
+        {
             let start = s.pos;
             while let Some(c) = s.peek() {
                 if c.is_alphanumeric() || c == '_' || c == '-' {
@@ -4457,25 +5085,109 @@ fn tokenize_shell(content: &str) -> Vec<SyntaxToken> {
 }
 
 const SQL_KEYWORDS: &[&str] = &[
-    "select", "from", "where", "insert", "into", "values", "update", "set", "delete",
-    "join", "inner", "left", "right", "full", "outer", "cross", "on", "group", "by",
-    "having", "order", "asc", "desc", "limit", "offset", "union", "all", "distinct",
-    "create", "table", "drop", "alter", "index", "view", "primary", "key", "foreign",
-    "references", "constraint", "default", "check", "unique", "not", "null", "and",
-    "or", "in", "is", "like", "ilike", "between", "exists", "case", "when", "then",
-    "else", "end", "cast", "as", "with", "recursive", "truncate", "begin", "commit",
-    "rollback", "transaction",
+    "select",
+    "from",
+    "where",
+    "insert",
+    "into",
+    "values",
+    "update",
+    "set",
+    "delete",
+    "join",
+    "inner",
+    "left",
+    "right",
+    "full",
+    "outer",
+    "cross",
+    "on",
+    "group",
+    "by",
+    "having",
+    "order",
+    "asc",
+    "desc",
+    "limit",
+    "offset",
+    "union",
+    "all",
+    "distinct",
+    "create",
+    "table",
+    "drop",
+    "alter",
+    "index",
+    "view",
+    "primary",
+    "key",
+    "foreign",
+    "references",
+    "constraint",
+    "default",
+    "check",
+    "unique",
+    "not",
+    "null",
+    "and",
+    "or",
+    "in",
+    "is",
+    "like",
+    "ilike",
+    "between",
+    "exists",
+    "case",
+    "when",
+    "then",
+    "else",
+    "end",
+    "cast",
+    "as",
+    "with",
+    "recursive",
+    "truncate",
+    "begin",
+    "commit",
+    "rollback",
+    "transaction",
 ];
 
 const SQL_TYPES: &[&str] = &[
-    "int", "integer", "bigint", "smallint", "varchar", "text", "char", "boolean",
-    "date", "timestamp", "time", "float", "double", "decimal", "numeric", "blob",
-    "json", "jsonb", "serial",
+    "int",
+    "integer",
+    "bigint",
+    "smallint",
+    "varchar",
+    "text",
+    "char",
+    "boolean",
+    "date",
+    "timestamp",
+    "time",
+    "float",
+    "double",
+    "decimal",
+    "numeric",
+    "blob",
+    "json",
+    "jsonb",
+    "serial",
 ];
 
 const SQL_FUNCTIONS: &[&str] = &[
-    "count", "sum", "avg", "min", "max", "coalesce", "now", "length", "concat",
-    "lower", "upper", "substring",
+    "count",
+    "sum",
+    "avg",
+    "min",
+    "max",
+    "coalesce",
+    "now",
+    "length",
+    "concat",
+    "lower",
+    "upper",
+    "substring",
 ];
 
 fn tokenize_sql(content: &str) -> Vec<SyntaxToken> {
@@ -4756,7 +5468,9 @@ fn tokenize_generic(content: &str) -> Vec<SyntaxToken> {
         let ch = s.advance();
         let kind = match ch {
             Some('+' | '-' | '*' | '/' | '=' | '<' | '>') => SyntaxTokenKind::Operator,
-            Some('(' | ')' | '{' | '}' | '[' | ']' | ';' | ',' | '.' | ':') => SyntaxTokenKind::Punctuation,
+            Some('(' | ')' | '{' | '}' | '[' | ']' | ';' | ',' | '.' | ':') => {
+                SyntaxTokenKind::Punctuation
+            }
             _ => SyntaxTokenKind::Plain,
         };
         if let Some(tok) = s.make_token(kind, start, s.pos) {
@@ -4777,9 +5491,10 @@ pub fn tokenize(content: &str, lang: SupportedLanguage) -> Vec<SyntaxToken> {
         | SupportedLanguage::Tsx => tokenize_javascript_typescript(content, lang),
         SupportedLanguage::Python => tokenize_python(content),
         SupportedLanguage::Go => tokenize_go(content),
-        SupportedLanguage::C | SupportedLanguage::Cpp | SupportedLanguage::CSharp | SupportedLanguage::Java => {
-            tokenize_c_cpp_family(content, lang)
-        }
+        SupportedLanguage::C
+        | SupportedLanguage::Cpp
+        | SupportedLanguage::CSharp
+        | SupportedLanguage::Java => tokenize_c_cpp_family(content, lang),
         SupportedLanguage::Html | SupportedLanguage::Xml => {
             tokenize_html_xml(content, lang == SupportedLanguage::Xml)
         }
@@ -4988,9 +5703,9 @@ impl Tool for SyntaxCheckTool {
                 if full_path.is_dir() {
                     anyhow::bail!("Path is a directory, not a file: '{}'", full_path.display());
                 }
-                let bytes = tokio::fs::read(&full_path)
-                    .await
-                    .map_err(|e| anyhow::anyhow!("Failed to read file '{}': {e}", full_path.display()))?;
+                let bytes = tokio::fs::read(&full_path).await.map_err(|e| {
+                    anyhow::anyhow!("Failed to read file '{}': {e}", full_path.display())
+                })?;
                 let text = String::from_utf8_lossy(&bytes).to_string();
                 (text, Some(full_path))
             }
@@ -5006,17 +5721,29 @@ impl Tool for SyntaxCheckTool {
         let lang_hint = args.get("language").and_then(|v| v.as_str());
         let lang = detect_language(resolved_path.as_deref(), &content, lang_hint);
 
-        let format = args.get("format").and_then(|v| v.as_str()).unwrap_or("text");
-        let should_highlight = args.get("highlight").and_then(|v| v.as_bool()).unwrap_or(false)
+        let format = args
+            .get("format")
+            .and_then(|v| v.as_str())
+            .unwrap_or("text");
+        let should_highlight = args
+            .get("highlight")
+            .and_then(|v| v.as_bool())
+            .unwrap_or(false)
             || format == "highlight"
             || format == "ansi";
 
         if should_highlight {
             let theme_str = args.get("theme").and_then(|v| v.as_str()).unwrap_or("dark");
             let theme = HighlightTheme::from_name(theme_str);
-            let mode_str = args.get("color_mode").and_then(|v| v.as_str()).unwrap_or("truecolor");
+            let mode_str = args
+                .get("color_mode")
+                .and_then(|v| v.as_str())
+                .unwrap_or("truecolor");
             let color_mode = ColorMode::from_str_hint(mode_str);
-            let line_numbers = args.get("line_numbers").and_then(|v| v.as_bool()).unwrap_or(false);
+            let line_numbers = args
+                .get("line_numbers")
+                .and_then(|v| v.as_bool())
+                .unwrap_or(false);
 
             let highlighter = SyntaxHighlighter::new()
                 .with_theme(theme)
@@ -5027,9 +5754,18 @@ impl Tool for SyntaxCheckTool {
         }
 
         let options = SyntaxCheckOptions {
-            check_indentation: args.get("check_indentation").and_then(|v| v.as_bool()).unwrap_or(true),
-            check_brackets: args.get("check_brackets").and_then(|v| v.as_bool()).unwrap_or(true),
-            check_quotes: args.get("check_quotes").and_then(|v| v.as_bool()).unwrap_or(true),
+            check_indentation: args
+                .get("check_indentation")
+                .and_then(|v| v.as_bool())
+                .unwrap_or(true),
+            check_brackets: args
+                .get("check_brackets")
+                .and_then(|v| v.as_bool())
+                .unwrap_or(true),
+            check_quotes: args
+                .get("check_quotes")
+                .and_then(|v| v.as_bool())
+                .unwrap_or(true),
             language_override: lang_hint.map(|s| s.to_string()),
         };
 
@@ -5061,7 +5797,12 @@ fn main() {
     }
 }
 "#;
-        let report = validate_syntax(code, SupportedLanguage::Rust, None, &SyntaxCheckOptions::default());
+        let report = validate_syntax(
+            code,
+            SupportedLanguage::Rust,
+            None,
+            &SyntaxCheckOptions::default(),
+        );
         assert!(report.valid, "Report should be valid: {:?}", report.issues);
         assert_eq!(report.error_count, 0);
     }
@@ -5069,7 +5810,12 @@ fn main() {
     #[test]
     fn test_rust_mismatched_brackets() {
         let code = "fn test() { let arr = [1, 2, 3}; }";
-        let report = validate_syntax(code, SupportedLanguage::Rust, None, &SyntaxCheckOptions::default());
+        let report = validate_syntax(
+            code,
+            SupportedLanguage::Rust,
+            None,
+            &SyntaxCheckOptions::default(),
+        );
         assert!(!report.valid);
         assert_eq!(report.error_count, 1);
         assert_eq!(report.issues[0].rule, "mismatched-delimiter");
@@ -5078,9 +5824,17 @@ fn main() {
     #[test]
     fn test_rust_unclosed_delimiter() {
         let code = "fn test() { let arr = [1, 2, 3; }";
-        let report = validate_syntax(code, SupportedLanguage::Rust, None, &SyntaxCheckOptions::default());
+        let report = validate_syntax(
+            code,
+            SupportedLanguage::Rust,
+            None,
+            &SyntaxCheckOptions::default(),
+        );
         assert!(!report.valid);
-        assert!(report.issues.iter().any(|i| i.rule == "mismatched-delimiter" || i.rule == "unclosed-delimiter"));
+        assert!(report
+            .issues
+            .iter()
+            .any(|i| i.rule == "mismatched-delimiter" || i.rule == "unclosed-delimiter"));
     }
 
     #[test]
@@ -5092,8 +5846,17 @@ fn lifetime<'a>(s: &'a str) -> &'a str {
     s
 }
 "##;
-        let report = validate_syntax(code, SupportedLanguage::Rust, None, &SyntaxCheckOptions::default());
-        assert!(report.valid, "Report should handle raw strings and lifetimes: {:?}", report.issues);
+        let report = validate_syntax(
+            code,
+            SupportedLanguage::Rust,
+            None,
+            &SyntaxCheckOptions::default(),
+        );
+        assert!(
+            report.valid,
+            "Report should handle raw strings and lifetimes: {:?}",
+            report.issues
+        );
     }
 
     #[test]
@@ -5104,7 +5867,12 @@ fn lifetime<'a>(s: &'a str) -> &'a str {
    Still comment */
 fn valid() {}
 "#;
-        let report = validate_syntax(code, SupportedLanguage::Rust, None, &SyntaxCheckOptions::default());
+        let report = validate_syntax(
+            code,
+            SupportedLanguage::Rust,
+            None,
+            &SyntaxCheckOptions::default(),
+        );
         assert!(report.valid, "Nested comments should be supported in Rust");
     }
 
@@ -5117,17 +5885,34 @@ def calculate(a, b):
     else:
         return b - a
 "#;
-        let report = validate_syntax(valid_py, SupportedLanguage::Python, None, &SyntaxCheckOptions::default());
-        assert!(report.valid, "Valid Python indentation failed: {:?}", report.issues);
+        let report = validate_syntax(
+            valid_py,
+            SupportedLanguage::Python,
+            None,
+            &SyntaxCheckOptions::default(),
+        );
+        assert!(
+            report.valid,
+            "Valid Python indentation failed: {:?}",
+            report.issues
+        );
 
         let invalid_py = r#"
 def calculate(a, b):
 if a > b:
     return a
 "#;
-        let report2 = validate_syntax(invalid_py, SupportedLanguage::Python, None, &SyntaxCheckOptions::default());
+        let report2 = validate_syntax(
+            invalid_py,
+            SupportedLanguage::Python,
+            None,
+            &SyntaxCheckOptions::default(),
+        );
         assert!(!report2.valid);
-        assert!(report2.issues.iter().any(|i| i.rule == "expected-indented-block"));
+        assert!(report2
+            .issues
+            .iter()
+            .any(|i| i.rule == "expected-indented-block"));
     }
 
     #[test]
@@ -5138,7 +5923,12 @@ def foo():
         x = 1
       y = 2
 "#;
-        let report = validate_syntax(py, SupportedLanguage::Python, None, &SyntaxCheckOptions::default());
+        let report = validate_syntax(
+            py,
+            SupportedLanguage::Python,
+            None,
+            &SyntaxCheckOptions::default(),
+        );
         assert!(!report.valid);
         assert!(report.issues.iter().any(|i| i.rule == "unindent-mismatch"));
     }
@@ -5152,8 +5942,17 @@ def doc():
     """
     return 42
 "#;
-        let report = validate_syntax(py, SupportedLanguage::Python, None, &SyntaxCheckOptions::default());
-        assert!(report.valid, "Python triple quotes should not leak braces: {:?}", report.issues);
+        let report = validate_syntax(
+            py,
+            SupportedLanguage::Python,
+            None,
+            &SyntaxCheckOptions::default(),
+        );
+        assert!(
+            report.valid,
+            "Python triple quotes should not leak braces: {:?}",
+            report.issues
+        );
     }
 
     #[test]
@@ -5162,18 +5961,37 @@ def doc():
 const msg = `Hello ${user.getName({ formal: true })}!`;
 console.log(msg);
 "#;
-        let report = validate_syntax(js, SupportedLanguage::JavaScript, None, &SyntaxCheckOptions::default());
-        assert!(report.valid, "JS template literal with nested expr failed: {:?}", report.issues);
+        let report = validate_syntax(
+            js,
+            SupportedLanguage::JavaScript,
+            None,
+            &SyntaxCheckOptions::default(),
+        );
+        assert!(
+            report.valid,
+            "JS template literal with nested expr failed: {:?}",
+            report.issues
+        );
     }
 
     #[test]
     fn test_json_validation() {
         let valid_json = r#"{"name": "fusion", "version": 2, "tools": ["syntax", "read"]}"#;
-        let report = validate_syntax(valid_json, SupportedLanguage::Json, None, &SyntaxCheckOptions::default());
+        let report = validate_syntax(
+            valid_json,
+            SupportedLanguage::Json,
+            None,
+            &SyntaxCheckOptions::default(),
+        );
         assert!(report.valid);
 
         let invalid_json = r#"{"name": "fusion", "trailing": 1, }"#;
-        let report2 = validate_syntax(invalid_json, SupportedLanguage::Json, None, &SyntaxCheckOptions::default());
+        let report2 = validate_syntax(
+            invalid_json,
+            SupportedLanguage::Json,
+            None,
+            &SyntaxCheckOptions::default(),
+        );
         assert!(!report2.valid);
         assert!(report2.issues.iter().any(|i| i.rule == "invalid-json"));
     }
@@ -5187,7 +6005,12 @@ console.log(msg);
     <p>Hello <span>World</span></p>
 </div>
 "#;
-        let report = validate_syntax(valid_html, SupportedLanguage::Html, None, &SyntaxCheckOptions::default());
+        let report = validate_syntax(
+            valid_html,
+            SupportedLanguage::Html,
+            None,
+            &SyntaxCheckOptions::default(),
+        );
         assert!(report.valid, "Valid HTML failed: {:?}", report.issues);
 
         let mismatched_html = r#"
@@ -5195,7 +6018,12 @@ console.log(msg);
     <span>Mismatched</div>
 </span>
 "#;
-        let report2 = validate_syntax(mismatched_html, SupportedLanguage::Html, None, &SyntaxCheckOptions::default());
+        let report2 = validate_syntax(
+            mismatched_html,
+            SupportedLanguage::Html,
+            None,
+            &SyntaxCheckOptions::default(),
+        );
         assert!(!report2.valid);
         assert!(report2.issues.iter().any(|i| i.rule == "tag-mismatch"));
     }
@@ -5203,15 +6031,28 @@ console.log(msg);
     #[test]
     fn test_yaml_tab_error() {
         let yaml_with_tabs = "key:\n\tvalue: 1\n";
-        let report = validate_syntax(yaml_with_tabs, SupportedLanguage::Yaml, None, &SyntaxCheckOptions::default());
+        let report = validate_syntax(
+            yaml_with_tabs,
+            SupportedLanguage::Yaml,
+            None,
+            &SyntaxCheckOptions::default(),
+        );
         assert!(!report.valid);
-        assert!(report.issues.iter().any(|i| i.rule == "yaml-tab-indentation"));
+        assert!(report
+            .issues
+            .iter()
+            .any(|i| i.rule == "yaml-tab-indentation"));
     }
 
     #[test]
     fn test_mixed_indentation_warning() {
         let mixed = "fn main() {\n \tlet x = 1;\n}\n";
-        let report = validate_syntax(mixed, SupportedLanguage::Rust, None, &SyntaxCheckOptions::default());
+        let report = validate_syntax(
+            mixed,
+            SupportedLanguage::Rust,
+            None,
+            &SyntaxCheckOptions::default(),
+        );
         assert!(report.warning_count > 0);
         assert!(report.issues.iter().any(|i| i.rule == "mixed-indentation"));
     }
@@ -5257,7 +6098,9 @@ console.log(msg);
         let tokens = tokenize(code, SupportedLanguage::Rust);
         assert_has_token(&tokens, SyntaxTokenKind::String, "\"hello\"");
         assert!(
-            tokens.iter().any(|t| t.kind == SyntaxTokenKind::Comment && t.text.contains("line comment")),
+            tokens
+                .iter()
+                .any(|t| t.kind == SyntaxTokenKind::Comment && t.text.contains("line comment")),
             "Line comment not found"
         );
     }
@@ -5267,8 +6110,11 @@ console.log(msg);
         let code = "println!(\"hi\");";
         let tokens = tokenize(code, SupportedLanguage::Rust);
         assert!(
-            tokens.iter().any(|t| t.kind == SyntaxTokenKind::Macro && t.text.contains("println")),
-            "Macro not found in {:?}", tok_pairs(&tokens)
+            tokens
+                .iter()
+                .any(|t| t.kind == SyntaxTokenKind::Macro && t.text.contains("println")),
+            "Macro not found in {:?}",
+            tok_pairs(&tokens)
         );
     }
 
@@ -5290,7 +6136,9 @@ console.log(msg);
         assert_has_token(&tokens, SyntaxTokenKind::Function, "greet");
         // `string` and `void` should be recognized as types in TS
         assert!(
-            tokens.iter().any(|t| t.kind == SyntaxTokenKind::Type && (t.text == "string" || t.text == "void")),
+            tokens.iter().any(
+                |t| t.kind == SyntaxTokenKind::Type && (t.text == "string" || t.text == "void")
+            ),
             "TS built-in type not found"
         );
     }
@@ -5303,7 +6151,9 @@ console.log(msg);
         assert_has_token(&tokens, SyntaxTokenKind::Keyword, "return");
         assert_has_token(&tokens, SyntaxTokenKind::Function, "calculate");
         assert!(
-            tokens.iter().any(|t| t.kind == SyntaxTokenKind::Comment && t.text.contains("sum them")),
+            tokens
+                .iter()
+                .any(|t| t.kind == SyntaxTokenKind::Comment && t.text.contains("sum them")),
             "Python comment not found"
         );
     }
@@ -5313,7 +6163,9 @@ console.log(msg);
         let code = "s = \"\"\"multi\nline\nstring\"\"\"";
         let tokens = tokenize(code, SupportedLanguage::Python);
         assert!(
-            tokens.iter().any(|t| t.kind == SyntaxTokenKind::String && t.text.contains("multi")),
+            tokens
+                .iter()
+                .any(|t| t.kind == SyntaxTokenKind::String && t.text.contains("multi")),
             "Triple-quote string not tokenized"
         );
     }
@@ -5337,7 +6189,9 @@ console.log(msg);
         assert_has_token(&tokens, SyntaxTokenKind::Type, "int");
         assert_has_token(&tokens, SyntaxTokenKind::Number, "0");
         assert!(
-            tokens.iter().any(|t| t.kind == SyntaxTokenKind::Macro && t.text.contains("include")),
+            tokens
+                .iter()
+                .any(|t| t.kind == SyntaxTokenKind::Macro && t.text.contains("include")),
             "C preprocessor directive not found"
         );
     }
@@ -5347,7 +6201,9 @@ console.log(msg);
         let code = "/* block\n   comment */ int x = 5;";
         let tokens = tokenize(code, SupportedLanguage::Cpp);
         assert!(
-            tokens.iter().any(|t| t.kind == SyntaxTokenKind::Comment && t.text.contains("block")),
+            tokens
+                .iter()
+                .any(|t| t.kind == SyntaxTokenKind::Comment && t.text.contains("block")),
             "Block comment not found"
         );
         assert_has_token(&tokens, SyntaxTokenKind::Type, "int");
@@ -5359,15 +6215,21 @@ console.log(msg);
         let code = r#"<div class="main"><p>Hello</p></div>"#;
         let tokens = tokenize(code, SupportedLanguage::Html);
         assert!(
-            tokens.iter().any(|t| t.kind == SyntaxTokenKind::Tag && t.text.contains("div")),
+            tokens
+                .iter()
+                .any(|t| t.kind == SyntaxTokenKind::Tag && t.text.contains("div")),
             "HTML tag 'div' not found"
         );
         assert!(
-            tokens.iter().any(|t| t.kind == SyntaxTokenKind::Attribute && t.text.contains("class")),
+            tokens
+                .iter()
+                .any(|t| t.kind == SyntaxTokenKind::Attribute && t.text.contains("class")),
             "HTML attribute 'class' not found"
         );
         assert!(
-            tokens.iter().any(|t| t.kind == SyntaxTokenKind::String && t.text.contains("main")),
+            tokens
+                .iter()
+                .any(|t| t.kind == SyntaxTokenKind::String && t.text.contains("main")),
             "HTML attribute value string not found"
         );
     }
@@ -5377,14 +6239,14 @@ console.log(msg);
         let code = "body { color: red; font-size: 14px; }";
         let tokens = tokenize(code, SupportedLanguage::Css);
         // CSS should tokenize property names and values
-        assert!(
-            !tokens.is_empty(),
-            "CSS tokenizer produced no tokens"
-        );
+        assert!(!tokens.is_empty(), "CSS tokenizer produced no tokens");
         // Numbers like 14px should be recognized
         assert!(
-            tokens.iter().any(|t| t.kind == SyntaxTokenKind::Number && t.text.contains("14")),
-            "CSS number not found in: {:?}", tok_pairs(&tokens)
+            tokens
+                .iter()
+                .any(|t| t.kind == SyntaxTokenKind::Number && t.text.contains("14")),
+            "CSS number not found in: {:?}",
+            tok_pairs(&tokens)
         );
     }
 
@@ -5393,16 +6255,22 @@ console.log(msg);
         let code = r#"{"name": "fusion", "version": 2, "active": true}"#;
         let tokens = tokenize(code, SupportedLanguage::Json);
         assert!(
-            tokens.iter().any(|t| t.kind == SyntaxTokenKind::Attribute && t.text.contains("name")),
+            tokens
+                .iter()
+                .any(|t| t.kind == SyntaxTokenKind::Attribute && t.text.contains("name")),
             "JSON key not found"
         );
         assert!(
-            tokens.iter().any(|t| t.kind == SyntaxTokenKind::String && t.text.contains("fusion")),
+            tokens
+                .iter()
+                .any(|t| t.kind == SyntaxTokenKind::String && t.text.contains("fusion")),
             "JSON string value not found"
         );
         assert_has_token(&tokens, SyntaxTokenKind::Number, "2");
         assert!(
-            tokens.iter().any(|t| t.kind == SyntaxTokenKind::Constant && t.text == "true"),
+            tokens
+                .iter()
+                .any(|t| t.kind == SyntaxTokenKind::Constant && t.text == "true"),
             "JSON boolean not found"
         );
     }
@@ -5412,11 +6280,16 @@ console.log(msg);
         let code = "name: fusion\n# comment\nversion: 2";
         let tokens = tokenize(code, SupportedLanguage::Yaml);
         assert!(
-            tokens.iter().any(|t| t.kind == SyntaxTokenKind::Attribute && t.text.contains("name")),
-            "YAML key not found in: {:?}", tok_pairs(&tokens)
+            tokens
+                .iter()
+                .any(|t| t.kind == SyntaxTokenKind::Attribute && t.text.contains("name")),
+            "YAML key not found in: {:?}",
+            tok_pairs(&tokens)
         );
         assert!(
-            tokens.iter().any(|t| t.kind == SyntaxTokenKind::Comment && t.text.contains("comment")),
+            tokens
+                .iter()
+                .any(|t| t.kind == SyntaxTokenKind::Comment && t.text.contains("comment")),
             "YAML comment not found"
         );
     }
@@ -5426,11 +6299,16 @@ console.log(msg);
         let code = "[package]\nname = \"fusion\"\nversion = 1";
         let tokens = tokenize(code, SupportedLanguage::Toml);
         assert!(
-            tokens.iter().any(|t| (t.kind == SyntaxTokenKind::Tag || t.kind == SyntaxTokenKind::Attribute) && t.text.contains("package")),
-            "TOML section header not found in: {:?}", tok_pairs(&tokens)
+            tokens.iter().any(|t| (t.kind == SyntaxTokenKind::Tag
+                || t.kind == SyntaxTokenKind::Attribute)
+                && t.text.contains("package")),
+            "TOML section header not found in: {:?}",
+            tok_pairs(&tokens)
         );
         assert!(
-            tokens.iter().any(|t| t.kind == SyntaxTokenKind::String && t.text.contains("fusion")),
+            tokens
+                .iter()
+                .any(|t| t.kind == SyntaxTokenKind::String && t.text.contains("fusion")),
             "TOML string value not found"
         );
     }
@@ -5443,8 +6321,11 @@ console.log(msg);
         assert_has_token(&tokens, SyntaxTokenKind::Keyword, "then");
         assert_has_token(&tokens, SyntaxTokenKind::Keyword, "fi");
         assert!(
-            tokens.iter().any(|t| t.kind == SyntaxTokenKind::Variable && t.text.contains("HOME")),
-            "Shell variable not found in: {:?}", tok_pairs(&tokens)
+            tokens
+                .iter()
+                .any(|t| t.kind == SyntaxTokenKind::Variable && t.text.contains("HOME")),
+            "Shell variable not found in: {:?}",
+            tok_pairs(&tokens)
         );
     }
 
@@ -5470,7 +6351,10 @@ console.log(msg);
         let code = "fn main() { let x = 42; }";
         let tokens = tokenize(code, SupportedLanguage::Rust);
         let reconstructed: String = tokens.iter().map(|t| t.text.as_str()).collect();
-        assert_eq!(reconstructed, code, "Token texts don't reconstruct original input");
+        assert_eq!(
+            reconstructed, code,
+            "Token texts don't reconstruct original input"
+        );
     }
 
     #[test]
@@ -5487,7 +6371,11 @@ console.log(msg);
                 pair[0], pair[1]
             );
         }
-        assert_eq!(tokens.last().unwrap().end, code.len(), "Last token should end at content length");
+        assert_eq!(
+            tokens.last().unwrap().end,
+            code.len(),
+            "Last token should end at content length"
+        );
     }
 
     #[test]
@@ -5534,7 +6422,10 @@ console.log(msg);
     fn test_rgb_ansi256_fg_format() {
         let c = RgbColor::new(255, 0, 0);
         let s = c.to_ansi256_fg();
-        assert!(s.starts_with("\x1b[38;5;"), "256-color FG should start with ESC[38;5;");
+        assert!(
+            s.starts_with("\x1b[38;5;"),
+            "256-color FG should start with ESC[38;5;"
+        );
         assert!(s.ends_with('m'));
     }
 
@@ -5542,7 +6433,10 @@ console.log(msg);
     fn test_rgb_ansi256_bg_format() {
         let c = RgbColor::new(0, 0, 255);
         let s = c.to_ansi256_bg();
-        assert!(s.starts_with("\x1b[48;5;"), "256-color BG should start with ESC[48;5;");
+        assert!(
+            s.starts_with("\x1b[48;5;"),
+            "256-color BG should start with ESC[48;5;"
+        );
         assert!(s.ends_with('m'));
     }
 
@@ -5566,9 +6460,14 @@ console.log(msg);
 
     #[test]
     fn test_highlight_style_format_text_truecolor() {
-        let style = HighlightStyle::new().fg(RgbColor::new(255, 121, 198)).bold();
+        let style = HighlightStyle::new()
+            .fg(RgbColor::new(255, 121, 198))
+            .bold();
         let out = style.format_text("fn", ColorMode::TrueColor);
-        assert!(out.contains("\x1b[38;2;255;121;198m"), "Should contain truecolor fg");
+        assert!(
+            out.contains("\x1b[38;2;255;121;198m"),
+            "Should contain truecolor fg"
+        );
         assert!(out.contains("\x1b[1m"), "Should contain bold");
         assert!(out.contains("fn"), "Should contain the text");
         assert!(out.ends_with("\x1b[0m"), "Should end with reset");
@@ -5576,7 +6475,9 @@ console.log(msg);
 
     #[test]
     fn test_highlight_style_format_text_ansi256() {
-        let style = HighlightStyle::new().fg(RgbColor::new(80, 250, 123)).italic();
+        let style = HighlightStyle::new()
+            .fg(RgbColor::new(80, 250, 123))
+            .italic();
         let out = style.format_text("green", ColorMode::Ansi256);
         assert!(out.contains("\x1b[38;5;"), "Should contain 256-color fg");
         assert!(out.contains("\x1b[3m"), "Should contain italic");
@@ -5607,7 +6508,10 @@ console.log(msg);
             .fg(RgbColor::new(0, 0, 0))
             .bg(RgbColor::new(255, 255, 0));
         let out = style.format_text("highlighted", ColorMode::TrueColor);
-        assert!(out.contains("\x1b[48;2;255;255;0m"), "Should contain truecolor bg");
+        assert!(
+            out.contains("\x1b[48;2;255;255;0m"),
+            "Should contain truecolor bg"
+        );
     }
 
     // -----------------------------------------------------------------------
@@ -5622,7 +6526,10 @@ console.log(msg);
         assert!(kw_style.fg.is_some(), "Keyword should have fg color");
 
         let comment_style = theme.style_for(SyntaxTokenKind::Comment);
-        assert!(comment_style.italic, "Comment should be italic in dark theme");
+        assert!(
+            comment_style.italic,
+            "Comment should be italic in dark theme"
+        );
     }
 
     #[test]
@@ -5633,7 +6540,10 @@ console.log(msg);
         assert_eq!(HighlightTheme::from_name("onedark").name, "one_dark");
         assert_eq!(HighlightTheme::from_name("light").name, "light");
         assert_eq!(HighlightTheme::from_name("nord").name, "nord");
-        assert_eq!(HighlightTheme::from_name("solarized").name, "solarized_dark");
+        assert_eq!(
+            HighlightTheme::from_name("solarized").name,
+            "solarized_dark"
+        );
         // Unknown falls back to dark
         assert_eq!(HighlightTheme::from_name("unknown_theme").name, "dark");
     }
@@ -5675,7 +6585,12 @@ console.log(msg);
     #[test]
     fn test_highlight_with_theme_plain_passthrough() {
         let code = "fn main() {}";
-        let out = highlight_with_theme(code, SupportedLanguage::Rust, &HighlightTheme::dark(), ColorMode::Plain);
+        let out = highlight_with_theme(
+            code,
+            SupportedLanguage::Rust,
+            &HighlightTheme::dark(),
+            ColorMode::Plain,
+        );
         assert_eq!(out, code, "Plain mode should return original code");
     }
 
@@ -5697,7 +6612,13 @@ console.log(msg);
     #[test]
     fn test_highlight_with_line_numbers() {
         let code = "fn main() {\n    println!(\"hi\");\n}";
-        let out = highlight_with_line_numbers(code, SupportedLanguage::Rust, 1, &HighlightTheme::dark(), ColorMode::TrueColor);
+        let out = highlight_with_line_numbers(
+            code,
+            SupportedLanguage::Rust,
+            1,
+            &HighlightTheme::dark(),
+            ColorMode::TrueColor,
+        );
         // Should contain line numbers
         let stripped = strip_ansi(&out);
         assert!(stripped.contains("1"), "Should have line number 1");
@@ -5710,7 +6631,10 @@ console.log(msg);
         let code = "fn main() { }";
         let path = std::path::Path::new("test.rs");
         let out = highlight_auto(code, Some(path), None);
-        assert!(out.contains("\x1b["), "Auto-detected Rust should be highlighted");
+        assert!(
+            out.contains("\x1b["),
+            "Auto-detected Rust should be highlighted"
+        );
     }
 
     #[test]
@@ -5750,21 +6674,48 @@ console.log(msg);
     #[test]
     fn test_color_mode_truecolor_vs_256() {
         let code = "fn main() {}";
-        let tc = highlight_with_theme(code, SupportedLanguage::Rust, &HighlightTheme::dark(), ColorMode::TrueColor);
-        let a256 = highlight_with_theme(code, SupportedLanguage::Rust, &HighlightTheme::dark(), ColorMode::Ansi256);
+        let tc = highlight_with_theme(
+            code,
+            SupportedLanguage::Rust,
+            &HighlightTheme::dark(),
+            ColorMode::TrueColor,
+        );
+        let a256 = highlight_with_theme(
+            code,
+            SupportedLanguage::Rust,
+            &HighlightTheme::dark(),
+            ColorMode::Ansi256,
+        );
         // Both should produce ANSI output but with different escape formats
-        assert!(tc.contains("\x1b[38;2;"), "TrueColor should use 38;2 sequences");
-        assert!(a256.contains("\x1b[38;5;"), "Ansi256 should use 38;5 sequences");
+        assert!(
+            tc.contains("\x1b[38;2;"),
+            "TrueColor should use 38;2 sequences"
+        );
+        assert!(
+            a256.contains("\x1b[38;5;"),
+            "Ansi256 should use 38;5 sequences"
+        );
     }
 
     #[test]
     fn test_color_mode_ansi16() {
         let code = "fn main() {}";
-        let out = highlight_with_theme(code, SupportedLanguage::Rust, &HighlightTheme::dark(), ColorMode::Ansi16);
+        let out = highlight_with_theme(
+            code,
+            SupportedLanguage::Rust,
+            &HighlightTheme::dark(),
+            ColorMode::Ansi16,
+        );
         assert!(out.contains("\x1b["), "Ansi16 should produce escapes");
         // Should NOT contain 38;2 or 38;5
-        assert!(!out.contains("\x1b[38;2;"), "Ansi16 should not use truecolor");
-        assert!(!out.contains("\x1b[38;5;"), "Ansi16 should not use 256-color");
+        assert!(
+            !out.contains("\x1b[38;2;"),
+            "Ansi16 should not use truecolor"
+        );
+        assert!(
+            !out.contains("\x1b[38;5;"),
+            "Ansi16 should not use 256-color"
+        );
     }
 
     // -----------------------------------------------------------------------
@@ -5834,26 +6785,74 @@ console.log(msg);
 
     #[test]
     fn test_detect_language_from_path() {
-        assert_eq!(detect_language(Some(Path::new("main.rs")), "", None), SupportedLanguage::Rust);
-        assert_eq!(detect_language(Some(Path::new("app.js")), "", None), SupportedLanguage::JavaScript);
-        assert_eq!(detect_language(Some(Path::new("app.ts")), "", None), SupportedLanguage::TypeScript);
-        assert_eq!(detect_language(Some(Path::new("script.py")), "", None), SupportedLanguage::Python);
-        assert_eq!(detect_language(Some(Path::new("main.go")), "", None), SupportedLanguage::Go);
-        assert_eq!(detect_language(Some(Path::new("main.c")), "", None), SupportedLanguage::C);
-        assert_eq!(detect_language(Some(Path::new("main.cpp")), "", None), SupportedLanguage::Cpp);
-        assert_eq!(detect_language(Some(Path::new("index.html")), "", None), SupportedLanguage::Html);
-        assert_eq!(detect_language(Some(Path::new("style.css")), "", None), SupportedLanguage::Css);
-        assert_eq!(detect_language(Some(Path::new("data.json")), "", None), SupportedLanguage::Json);
-        assert_eq!(detect_language(Some(Path::new("config.yaml")), "", None), SupportedLanguage::Yaml);
-        assert_eq!(detect_language(Some(Path::new("Cargo.toml")), "", None), SupportedLanguage::Toml);
-        assert_eq!(detect_language(Some(Path::new("run.sh")), "", None), SupportedLanguage::Shell);
+        assert_eq!(
+            detect_language(Some(Path::new("main.rs")), "", None),
+            SupportedLanguage::Rust
+        );
+        assert_eq!(
+            detect_language(Some(Path::new("app.js")), "", None),
+            SupportedLanguage::JavaScript
+        );
+        assert_eq!(
+            detect_language(Some(Path::new("app.ts")), "", None),
+            SupportedLanguage::TypeScript
+        );
+        assert_eq!(
+            detect_language(Some(Path::new("script.py")), "", None),
+            SupportedLanguage::Python
+        );
+        assert_eq!(
+            detect_language(Some(Path::new("main.go")), "", None),
+            SupportedLanguage::Go
+        );
+        assert_eq!(
+            detect_language(Some(Path::new("main.c")), "", None),
+            SupportedLanguage::C
+        );
+        assert_eq!(
+            detect_language(Some(Path::new("main.cpp")), "", None),
+            SupportedLanguage::Cpp
+        );
+        assert_eq!(
+            detect_language(Some(Path::new("index.html")), "", None),
+            SupportedLanguage::Html
+        );
+        assert_eq!(
+            detect_language(Some(Path::new("style.css")), "", None),
+            SupportedLanguage::Css
+        );
+        assert_eq!(
+            detect_language(Some(Path::new("data.json")), "", None),
+            SupportedLanguage::Json
+        );
+        assert_eq!(
+            detect_language(Some(Path::new("config.yaml")), "", None),
+            SupportedLanguage::Yaml
+        );
+        assert_eq!(
+            detect_language(Some(Path::new("Cargo.toml")), "", None),
+            SupportedLanguage::Toml
+        );
+        assert_eq!(
+            detect_language(Some(Path::new("run.sh")), "", None),
+            SupportedLanguage::Shell
+        );
     }
 
     #[test]
     fn test_detect_language_from_hint() {
-        assert_eq!(detect_language(None, "", Some("rust")), SupportedLanguage::Rust);
-        assert_eq!(detect_language(None, "", Some("python")), SupportedLanguage::Python);
-        assert_eq!(detect_language(None, "", Some("javascript")), SupportedLanguage::JavaScript);
+        assert_eq!(
+            detect_language(None, "", Some("rust")),
+            SupportedLanguage::Rust
+        );
+        assert_eq!(
+            detect_language(None, "", Some("python")),
+            SupportedLanguage::Python
+        );
+        assert_eq!(
+            detect_language(None, "", Some("javascript")),
+            SupportedLanguage::JavaScript
+        );
     }
 
     // -----------------------------------------------------------------------

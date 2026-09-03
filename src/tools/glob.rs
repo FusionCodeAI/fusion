@@ -116,93 +116,96 @@ impl Tool for GlobTool {
         let cwd = ctx.cwd.clone();
         let target_path = search_path.clone();
 
-        let matched = tokio::task::spawn_blocking(move || -> anyhow::Result<(Vec<String>, usize)> {
-            let mut builder = WalkBuilder::new(&target_path);
-            builder
-                .hidden(!hidden)
-                // Honor .gitignore even outside a git repository (e.g. extracted
-                // archives, CI workspaces) — matches the behavior of ripgrep's
-                // default file-type filtering in editors.
-                .require_git(false)
-                .git_ignore(true)
-                .git_global(true)
-                .git_exclude(true)
-                .parents(true);
+        let matched =
+            tokio::task::spawn_blocking(move || -> anyhow::Result<(Vec<String>, usize)> {
+                let mut builder = WalkBuilder::new(&target_path);
+                builder
+                    .hidden(!hidden)
+                    // Honor .gitignore even outside a git repository (e.g. extracted
+                    // archives, CI workspaces) — matches the behavior of ripgrep's
+                    // default file-type filtering in editors.
+                    .require_git(false)
+                    .git_ignore(true)
+                    .git_global(true)
+                    .git_exclude(true)
+                    .parents(true);
 
-            if let Some(max_depth) = depth {
-                builder.max_depth(Some(max_depth));
-            }
+                if let Some(max_depth) = depth {
+                    builder.max_depth(Some(max_depth));
+                }
 
-            let mut results = Vec::new();
-            let mut total_count = 0;
-            let max_results = 500;
+                let mut results = Vec::new();
+                let mut total_count = 0;
+                let max_results = 500;
 
-            for result in builder.build() {
-                let entry = match result {
-                    Ok(entry) => entry,
-                    Err(e) => {
-                        tracing::debug!("Glob walk error: {e}");
+                for result in builder.build() {
+                    let entry = match result {
+                        Ok(entry) => entry,
+                        Err(e) => {
+                            tracing::debug!("Glob walk error: {e}");
+                            continue;
+                        }
+                    };
+
+                    // Skip the search root itself
+                    if entry.depth() == 0 {
                         continue;
                     }
-                };
 
-                // Skip the search root itself
-                if entry.depth() == 0 {
-                    continue;
-                }
+                    let path = entry.path();
 
-                let path = entry.path();
+                    // Never descend into .git internals, even when hidden files are
+                    // included — the ignore crate only auto-filters .git when the
+                    // walk is inside a real repository.
+                    if path
+                        .strip_prefix(&target_path)
+                        .unwrap_or(path)
+                        .components()
+                        .any(|c| c.as_os_str() == ".git")
+                    {
+                        tracing::debug!("Glob walk skipping .git path: {}", path.display());
+                        continue;
+                    }
 
-                // Never descend into .git internals, even when hidden files are
-                // included — the ignore crate only auto-filters .git when the
-                // walk is inside a real repository.
-                if path
-                    .strip_prefix(&target_path)
-                    .unwrap_or(path)
-                    .components()
-                    .any(|c| c.as_os_str() == ".git")
-                {
-                    tracing::debug!("Glob walk skipping .git path: {}", path.display());
-                    continue;
-                }
+                    let rel_path = path.strip_prefix(&cwd).unwrap_or(path);
+                    let rel_target = path.strip_prefix(&target_path).unwrap_or(path);
+                    let file_name = path.file_name().unwrap_or_default();
 
-                let rel_path = path.strip_prefix(&cwd).unwrap_or(path);
-                let rel_target = path.strip_prefix(&target_path).unwrap_or(path);
-                let file_name = path.file_name().unwrap_or_default();
+                    // Normalize paths for consistent cross-platform matching (replace '\' with '/')
+                    let rel_path_str = rel_path.to_string_lossy().replace('\\', "/");
+                    let rel_target_str = rel_target.to_string_lossy().replace('\\', "/");
+                    let full_path_str = path.to_string_lossy().replace('\\', "/");
+                    let file_name_str = file_name.to_string_lossy();
 
-                // Normalize paths for consistent cross-platform matching (replace '\' with '/')
-                let rel_path_str = rel_path.to_string_lossy().replace('\\', "/");
-                let rel_target_str = rel_target.to_string_lossy().replace('\\', "/");
-                let full_path_str = path.to_string_lossy().replace('\\', "/");
-                let file_name_str = file_name.to_string_lossy();
+                    let is_match = glob_matcher.is_match(&rel_path_str)
+                        || glob_matcher.is_match(&rel_target_str)
+                        || glob_matcher.is_match(&full_path_str)
+                        || glob_matcher.is_match(&*file_name_str)
+                        || strict_matcher.as_ref().map_or(false, |m| {
+                            m.is_match(&rel_path_str)
+                                || m.is_match(&rel_target_str)
+                                || m.is_match(&full_path_str)
+                        });
 
-                let is_match = glob_matcher.is_match(&rel_path_str)
-                    || glob_matcher.is_match(&rel_target_str)
-                    || glob_matcher.is_match(&full_path_str)
-                    || glob_matcher.is_match(&*file_name_str)
-                    || strict_matcher.as_ref().map_or(false, |m| {
-                        m.is_match(&rel_path_str)
-                            || m.is_match(&rel_target_str)
-                            || m.is_match(&full_path_str)
-                    });
-
-                if is_match {
-                    total_count += 1;
-                    if results.len() < max_results {
-                        let mut s = rel_path_str.clone();
-                        if entry.file_type().map(|ft| ft.is_dir()).unwrap_or(false) && !s.ends_with('/') {
-                            s.push('/');
+                    if is_match {
+                        total_count += 1;
+                        if results.len() < max_results {
+                            let mut s = rel_path_str.clone();
+                            if entry.file_type().map(|ft| ft.is_dir()).unwrap_or(false)
+                                && !s.ends_with('/')
+                            {
+                                s.push('/');
+                            }
+                            results.push(s);
                         }
-                        results.push(s);
                     }
                 }
-            }
 
-            results.sort();
-            Ok((results, total_count))
-        })
-        .await
-        .map_err(|e| anyhow::anyhow!("Glob task failed: {e}"))??;
+                results.sort();
+                Ok((results, total_count))
+            })
+            .await
+            .map_err(|e| anyhow::anyhow!("Glob task failed: {e}"))??;
 
         let (mut results, total_count) = matched;
 
@@ -241,7 +244,8 @@ mod tests {
 
         impl TempDir {
             pub fn new() -> Self {
-                let path = std::env::temp_dir().join(format!("fusion_glob_test_{}", Uuid::new_v4()));
+                let path =
+                    std::env::temp_dir().join(format!("fusion_glob_test_{}", Uuid::new_v4()));
                 std::fs::create_dir_all(&path).expect("failed to create temp dir");
                 Self { path }
             }
@@ -366,7 +370,10 @@ mod tests {
         let res = tool.execute(json!({ "pattern": "[abc" }), &ctx).await;
         assert!(res.is_err());
         let err = format!("{}", res.unwrap_err());
-        assert!(err.contains("Invalid glob pattern"), "unexpected error: {err}");
+        assert!(
+            err.contains("Invalid glob pattern"),
+            "unexpected error: {err}"
+        );
     }
 
     #[tokio::test]
@@ -382,11 +389,7 @@ mod tests {
         let target = temp.path().join("target");
         fs::create_dir_all(&target).unwrap();
         fs::write(target.join("out.o"), "\0\0\0").unwrap();
-        fs::write(
-            temp.path().join(".gitignore"),
-            "target/\n*.bin\n",
-        )
-        .unwrap();
+        fs::write(temp.path().join(".gitignore"), "target/\n*.bin\n").unwrap();
 
         let tool = GlobTool::new();
         let res = tool
@@ -423,7 +426,10 @@ mod tests {
             .unwrap();
         assert!(res.contains("visible.txt"));
         assert!(!res.contains(".hidden.txt"), "hidden file leaked: {res}");
-        assert!(!res.contains("settings.conf"), "nested hidden file leaked: {res}");
+        assert!(
+            !res.contains("settings.conf"),
+            "nested hidden file leaked: {res}"
+        );
 
         // With hidden: true, dotfiles appear but .git internals never do.
         let git_dir = temp.path().join(".git");
@@ -522,7 +528,10 @@ mod tests {
             .execute(json!({ "pattern": "*.md", "case_sensitive": false }), &ctx)
             .await
             .unwrap();
-        assert!(res.contains("README.MD"), "case-insensitive match failed: {res}");
+        assert!(
+            res.contains("README.MD"),
+            "case-insensitive match failed: {res}"
+        );
     }
 
     #[tokio::test]
@@ -564,7 +573,10 @@ mod tests {
 
         let tool = GlobTool::new();
         let res = tool
-            .execute(json!({ "pattern": "*.txt", "path": "does/not/exist" }), &ctx)
+            .execute(
+                json!({ "pattern": "*.txt", "path": "does/not/exist" }),
+                &ctx,
+            )
             .await;
         assert!(res.is_err());
     }
@@ -587,7 +599,10 @@ mod tests {
             .await
             .unwrap();
 
-        assert!(res.contains("additional files truncated"), "no truncation: {res}");
+        assert!(
+            res.contains("additional files truncated"),
+            "no truncation: {res}"
+        );
         let lines: Vec<&str> = res.lines().collect();
         assert_eq!(lines.len(), 501); // 500 results + 1 truncation notice
     }

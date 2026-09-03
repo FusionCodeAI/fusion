@@ -43,11 +43,11 @@
 //! 3. Use `wrangler.jsonc` configuration with strict schema validation.
 //! ```
 
+use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
 use std::fmt;
 use std::fs;
 use std::path::{Path, PathBuf};
-use serde::{Deserialize, Serialize};
 
 use crate::config::Config;
 
@@ -260,10 +260,7 @@ impl Skill {
 
         // Fallback name if still empty
         if metadata.name.trim().is_empty() {
-            metadata.name = default_name
-                .unwrap_or("unnamed-skill")
-                .trim()
-                .to_string();
+            metadata.name = default_name.unwrap_or("unnamed-skill").trim().to_string();
         }
 
         // If instructions are empty, fallback to entire trimmed content
@@ -476,7 +473,8 @@ fn parse_markdown_headers(content: &str, default_name: &str) -> (SkillMetadata, 
                 if !meta.description.is_empty() {
                     meta.description.push(' ');
                 }
-                meta.description.push_str(trimmed.trim_start_matches('>').trim());
+                meta.description
+                    .push_str(trimmed.trim_start_matches('>').trim());
             }
         } else {
             // Capture blockquote right under top header as description if empty
@@ -578,7 +576,8 @@ impl SkillLoader {
 
         // Determine fallback name from parent dir if named SKILL.md or from file stem
         let default_name = if let Some(file_name) = path.file_name().and_then(|n| n.to_str()) {
-            if file_name.eq_ignore_ascii_case("SKILL.md") || file_name.eq_ignore_ascii_case("SKILL") {
+            if file_name.eq_ignore_ascii_case("SKILL.md") || file_name.eq_ignore_ascii_case("SKILL")
+            {
                 path.parent()
                     .and_then(|p| p.file_name())
                     .and_then(|n| n.to_str())
@@ -597,7 +596,11 @@ impl SkillLoader {
     /// Discovers:
     /// 1. `<dir>/<skill_name>/SKILL.md` (case-insensitive `SKILL.md`, `skill.md`, `Skill.md`)
     /// 2. `<dir>/<skill_name>.md`
-    pub fn scan_directory(&self, dir: &Path, source_kind: impl Fn(&Path) -> SkillSource) -> Vec<Skill> {
+    pub fn scan_directory(
+        &self,
+        dir: &Path,
+        source_kind: impl Fn(&Path) -> SkillSource,
+    ) -> Vec<Skill> {
         let mut skills = Vec::new();
         if !dir.exists() || !dir.is_dir() {
             return skills;
@@ -684,7 +687,9 @@ impl SkillLoader {
 
         // 2. Load custom extra directories
         for extra in &self.extra_dirs {
-            for skill in self.scan_directory(extra, |p| SkillSource::Custom(p.display().to_string())) {
+            for skill in
+                self.scan_directory(extra, |p| SkillSource::Custom(p.display().to_string()))
+            {
                 registry.register(skill);
             }
         }
@@ -787,11 +792,7 @@ impl SkillRegistry {
     /// - Category tag match (Score: 0.5)
     ///
     /// Results are filtered to enabled skills and sorted by descending relevance score.
-    pub fn find_relevant(
-        &self,
-        query: &str,
-        workspace_root: Option<&Path>,
-    ) -> Vec<SkillMatch> {
+    pub fn find_relevant(&self, query: &str, workspace_root: Option<&Path>) -> Vec<SkillMatch> {
         let mut matches = Vec::new();
         let query_lower = query.to_lowercase();
         let query_tokens: HashSet<String> = tokenize_words(&query_lower);
@@ -814,7 +815,9 @@ impl SkillRegistry {
                 format!("@{}", skill_name_lower),
             ];
 
-            let is_explicit = explicit_patterns.iter().any(|pat| query_lower.contains(pat));
+            let is_explicit = explicit_patterns
+                .iter()
+                .any(|pat| query_lower.contains(pat));
             if is_explicit {
                 score = 1.0;
                 matched_triggers.push(format!("explicit:{}", skill.name()));
@@ -842,7 +845,10 @@ impl SkillRegistry {
                     }
 
                     // Check if trigger is a single word or phrase in the query
-                    if trigger_lower.contains(' ') || trigger_lower.contains('.') || trigger_lower.contains('/') {
+                    if trigger_lower.contains(' ')
+                        || trigger_lower.contains('.')
+                        || trigger_lower.contains('/')
+                    {
                         if query_lower.contains(&trigger_lower) {
                             score = score.max(0.80);
                             matched_triggers.push(trigger.clone());
@@ -850,7 +856,9 @@ impl SkillRegistry {
                                 reason = format!("Trigger phrase '{}' matched in prompt", trigger);
                             }
                         }
-                    } else if query_tokens.contains(&trigger_lower) || query_lower.contains(&trigger_lower) {
+                    } else if query_tokens.contains(&trigger_lower)
+                        || query_lower.contains(&trigger_lower)
+                    {
                         score = score.max(0.75);
                         matched_triggers.push(trigger.clone());
                         if reason.is_empty() {
@@ -953,7 +961,11 @@ impl SkillRegistry {
         md.push_str("|:------:|:------|:-------|:---------|:------------|\n");
 
         for skill in skills {
-            let status = if skill.is_enabled() { "🟢 Active" } else { "⚪ Disabled" };
+            let status = if skill.is_enabled() {
+                "🟢 Active"
+            } else {
+                "⚪ Disabled"
+            };
             let source_str = match &skill.source {
                 SkillSource::Project(_) => "Project",
                 SkillSource::Global(_) => "Global",
@@ -1027,8 +1039,14 @@ author: "Fusion Team"
 
         let skill = Skill::parse_markdown(md, None, SkillSource::Builtin, None).unwrap();
         assert_eq!(skill.name(), "cloudflare-workers");
-        assert_eq!(skill.description(), "Guidelines for Cloudflare Workers & Durable Objects");
-        assert_eq!(skill.triggers(), &["wrangler.jsonc", "wrangler.toml", "cloudflare", "worker"]);
+        assert_eq!(
+            skill.description(),
+            "Guidelines for Cloudflare Workers & Durable Objects"
+        );
+        assert_eq!(
+            skill.triggers(),
+            &["wrangler.jsonc", "wrangler.toml", "cloudflare", "worker"]
+        );
         assert_eq!(skill.tags(), &["cloud", "serverless"]);
         assert!(skill.is_enabled());
         assert!(!skill.is_always_active());
@@ -1058,7 +1076,12 @@ Always leverage multi-stage builds.
         assert_eq!(skill.name(), "docker-expert");
         assert_eq!(
             skill.triggers(),
-            &["Dockerfile", "docker-compose.yml", "compose.yaml", "container"]
+            &[
+                "Dockerfile",
+                "docker-compose.yml",
+                "compose.yaml",
+                "container"
+            ]
         );
         assert_eq!(skill.tags(), &["devops", "containerization"]);
         assert!(skill.instructions().contains("multi-stage builds"));
@@ -1082,15 +1105,23 @@ Always leverage multi-stage builds.
 
         let skill = Skill::parse_markdown(md, None, SkillSource::Builtin, None).unwrap();
         assert_eq!(skill.name(), "React Optimization");
-        assert_eq!(skill.description(), "Performance patterns for modern React 19 apps.");
-        assert_eq!(skill.triggers(), &["react", "useMemo", "useCallback", "rerender"]);
+        assert_eq!(
+            skill.description(),
+            "Performance patterns for modern React 19 apps."
+        );
+        assert_eq!(
+            skill.triggers(),
+            &["react", "useMemo", "useCallback", "rerender"]
+        );
         assert!(skill.instructions().contains("Don't prematurely memoize"));
     }
 
     #[test]
     fn test_parse_fallback_plain_markdown() {
         let md = "Just simple instructions without frontmatter or special headers.";
-        let skill = Skill::parse_markdown(md, Some("my-fallback-skill"), SkillSource::Builtin, None).unwrap();
+        let skill =
+            Skill::parse_markdown(md, Some("my-fallback-skill"), SkillSource::Builtin, None)
+                .unwrap();
         assert_eq!(skill.name(), "my-fallback-skill");
         assert_eq!(skill.instructions(), md);
         assert!(skill.is_enabled());
@@ -1114,7 +1145,8 @@ triggers: ["rust", "benchmark", "criterion"]
 ---
 Global instructions: Use Criterion.
 "#,
-        ).unwrap();
+        )
+        .unwrap();
 
         // 2. Create project skill overriding rust-perf in temp_project/.fusion/skills/rust-perf/SKILL.md
         let proj_skills_dir = temp_project.path().join(".fusion").join("skills");
@@ -1129,7 +1161,8 @@ triggers: ["rust", "perf", "simd"]
 ---
 Project instructions: Use SIMD where appropriate.
 "#,
-        ).unwrap();
+        )
+        .unwrap();
 
         // 3. Create a unique project skill in temp_project/.fusion/skills/sql-queries.md
         fs::write(
@@ -1141,16 +1174,21 @@ triggers: ["sql", "postgres", "query"]
 ---
 Always use prepared statements.
 "#,
-        ).unwrap();
+        )
+        .unwrap();
 
         let loader = SkillLoader::new();
 
-        let global_skills = loader.scan_directory(&global_skills_dir, |p| SkillSource::Global(p.to_path_buf()));
+        let global_skills =
+            loader.scan_directory(&global_skills_dir, |p| SkillSource::Global(p.to_path_buf()));
         assert_eq!(global_skills.len(), 1);
         assert_eq!(global_skills[0].name(), "rust-perf");
-        assert!(global_skills[0].instructions().contains("Global instructions"));
+        assert!(global_skills[0]
+            .instructions()
+            .contains("Global instructions"));
 
-        let proj_skills = loader.scan_directory(&proj_skills_dir, |p| SkillSource::Project(p.to_path_buf()));
+        let proj_skills =
+            loader.scan_directory(&proj_skills_dir, |p| SkillSource::Project(p.to_path_buf()));
         assert_eq!(proj_skills.len(), 2);
 
         // Test registry overriding
@@ -1164,7 +1202,9 @@ Always use prepared statements.
 
         assert_eq!(registry.len(), 2);
         let overridden_rust = registry.get("rust-perf").unwrap();
-        assert!(overridden_rust.instructions().contains("Project instructions: Use SIMD"));
+        assert!(overridden_rust
+            .instructions()
+            .contains("Project instructions: Use SIMD"));
         assert!(matches!(overridden_rust.source, SkillSource::Project(_)));
 
         let sql = registry.get("sql-queries").unwrap();
@@ -1178,7 +1218,11 @@ Always use prepared statements.
         let cf_skill = Skill::new(
             "cloudflare-workers",
             "Cloudflare Workers & Durable Objects",
-            vec!["wrangler.toml".to_string(), "cloudflare".to_string(), "worker".to_string()],
+            vec![
+                "wrangler.toml".to_string(),
+                "cloudflare".to_string(),
+                "worker".to_string(),
+            ],
             "1. Use Web Standard APIs.\n2. Avoid unhandled rejections.",
             SkillSource::Builtin,
         );
@@ -1186,7 +1230,11 @@ Always use prepared statements.
         let docker_skill = Skill::new(
             "docker",
             "Docker containerization guidelines",
-            vec!["dockerfile".to_string(), "docker".to_string(), "container".to_string()],
+            vec![
+                "dockerfile".to_string(),
+                "docker".to_string(),
+                "container".to_string(),
+            ],
             "1. Use multi-stage builds.",
             SkillSource::Builtin,
         );
@@ -1197,7 +1245,8 @@ Always use prepared statements.
             vec!["style".to_string()],
             "Write readable, self-documenting code.",
             SkillSource::Builtin,
-        ).with_always_active(true);
+        )
+        .with_always_active(true);
 
         registry.register(cf_skill);
         registry.register(docker_skill);
@@ -1211,12 +1260,14 @@ Always use prepared statements.
         assert!(matched_names.contains(&"code-style")); // because always active
 
         // 2. Query matching explicit @docker or @skill:docker
-        let explicit_matches = registry.find_relevant("Please check @skill:docker configuration", None);
+        let explicit_matches =
+            registry.find_relevant("Please check @skill:docker configuration", None);
         assert_eq!(explicit_matches[0].skill.name(), "docker");
         assert_eq!(explicit_matches[0].score, 1.0);
 
         // 3. Inject relevant skills prompt block
-        let injection = registry.inject_relevant_skills("Need help with cloudflare worker", None, Some(2));
+        let injection =
+            registry.inject_relevant_skills("Need help with cloudflare worker", None, Some(2));
         assert!(injection.is_some());
         let text = injection.unwrap();
         assert!(text.contains("Active Domain Skills:"));
@@ -1259,6 +1310,7 @@ Always use prepared statements.
         ));
 
         let table = registry.format_catalog_markdown();
-        assert!(table.contains("| `rust-async` | Builtin | tokio, async | Tokio async best practices |"));
+        assert!(table
+            .contains("| `rust-async` | Builtin | tokio, async | Tokio async best practices |"));
     }
 }
