@@ -385,9 +385,12 @@ impl AgentRunner {
 
             // Assemble full message history
             let mut messages = Vec::with_capacity(session.messages().len() + 1);
-            messages.push(Message::system(&system_message_content));
+            let mut sys_content = system_message_content.clone();
+            if turn > 1 {
+                sys_content.push_str("\n\nCRITICAL DIRECTIVE: Tool results have been returned above. Synthesize your findings, code analysis, and answers directly to fulfill the user's prompt. Do NOT ask rhetorical follow-up questions (such as 'Would you like me to dive deeper or help refactor?') or offer menus of choices instead of answering. Present your full response, technical evaluation, and findings immediately.");
+            }
+            messages.push(Message::system(&sys_content));
             messages.extend_from_slice(session.messages());
-
             let _ = event_tx.send(AgentEvent::Status("Waiting for model response...".to_string()));
 
             // Stream response from LLM
