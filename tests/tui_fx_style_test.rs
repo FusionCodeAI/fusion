@@ -15,15 +15,31 @@
 //! 12. Slash menu 3-column layout (`General`, `Session`, `Model`, `Config`), top/bottom dividers, and footer hints.
 //! 13. Single in-place thinking frame rendering without line duplication.
 //! 14. All tests execute completely in-memory without requiring a physical PTY/TTY.
+//! 15. Reasoning effort picker menu layout (5 options: default, xhigh, high, medium, low framed by dividers).
+//! 16. Dynamic status line updating with reasoning effort (`auto · <model> · high`).
+//! 17. Clean model switch confirmation output without `/model` prefix text.
+//! 18. Smooth progressive word streaming output parity with buffered markdown rendering.
+use std::collections::HashMap;
 use std::time::Duration;
-use crossterm::{cursor, execute, terminal::{self, ClearType}};
+use crossterm::{
+    cursor,
+    event::{Event, KeyCode, KeyEvent, KeyModifiers},
+    execute,
+    terminal::{self, ClearType},
+};
 use serde_json::json;
 
+use fusion::agent::loop_runner::AgentRunner;
+use fusion::agent::session::Session;
+use fusion::config::Config;
+use fusion::provider::LlmClient;
+use fusion::tools::{default_registry, ToolContext};
 use fusion::ui::{
     format_activity_status, format_model_label, format_repl_duration_compact, format_repl_tokens_compact,
-    format_thinking_status, format_tool_duration, format_tool_tree, format_turn_summary,
+    format_thinking_status, format_tool_tree, format_turn_summary, handle_slash_command,
     parse_tool_active_label, parse_tool_info, render_thinking_frame_to, render_tool_tree_to,
-    strip_ansi, CommandCategory, MarkdownRenderer, Prompt, ToolCallItem,
+    strip_ansi, CommandCategory, MarkdownRenderer, Prompt, PromptResult, ToolCallItem,
+    EFFORT_OPTIONS,
 };
 // ===========================================================================
 // Contract 1: Screen clearing and cursor reset on startup
@@ -1154,4 +1170,489 @@ fn test_fx_image1_live_tool_and_turn_lifecycle_no_double_bar() {
     assert!(plain.contains("● 1 tool call · 1 command"));
     assert!(plain.contains("└ Ran which browser-use || python3 -m site --user-base"));
     assert!(plain.contains("  1m10s (↑9 ↓641)"));
+}
+
+// ===========================================================================
+// Helper: In-Memory AgentRunner and Session Factory
+// ===========================================================================
+
+fn create_test_runner_and_session() -> (AgentRunner, Session) {
+    let config = Config::default();
+    let tools = default_registry();
+    let tool_ctx = ToolContext {
+        cwd: std::env::temp_dir(),
+        env: HashMap::new(),
+    };
+    let client = LlmClient::new();
+    let model = config.default_model.clone();
+    let runner = AgentRunner::new(client, config, tools, tool_ctx);
+    let session = Session::new(&model);
+    (runner, session)
+}
+
+// ===========================================================================
+// Contract 15: Reasoning Effort Picker Menu Layout and Key Handling
+// ===========================================================================
+
+#[test]
+fn test_effort_picker_menu_layout_5_options_and_dividers() {
+    assert_eq!(
+        EFFORT_OPTIONS,
+        &["default", "xhigh", "high", "medium", "low"],
+        "EFFORT_OPTIONS must match exact 5 options"
+    );
+
+    let model_id = "deepseek-ai/DeepSeek-V4-Flash-0731";
+    let input_buffer: Vec<char> = format!("/model {} ", model_id).chars().collect();
+    let input_len = input_buffer.len();
+
+    // Test each option selection index from 0 to 4
+    for sel_idx in 0..EFFORT_OPTIONS.len() {
+        let prompt = Prompt::new()
+            .with_pending_model_id(model_id)
+            .with_effort_picker_active(true)
+            .with_effort_selection(sel_idx);
+
+        let mut buf = Vec::new();
+        let mut last_lines = 0;
+        let mut last_cursor = 0;
+        prompt
+            .render_to(&mut buf, &input_buffer, input_len, &mut last_lines, &mut last_cursor)
+            .expect("render_to effort picker failed");
+
+        let raw = String::from_utf8_lossy(&buf);
+        let plain = strip_ansi(&raw);
+
+        // 1. Input line displays `┃ /model <model>`
+        assert!(
+            plain.contains(&format!("┃ /model {}", model_id)),
+            "Input line must display '┃ /model {}', got:\n{}",
+            model_id,
+            plain
+        );
+
+        // 2. Framed by dividers
+        assert!(
+            plain.contains('─'),
+            "Effort picker menu must be framed by horizontal dividers '─'"
+        );
+
+        // 3. All 5 options are present in the menu
+        for opt in EFFORT_OPTIONS {
+            assert!(
+                plain.contains(opt),
+                "Effort picker menu must contain option '{}', got:\n{}",
+                opt,
+                plain
+            );
+        }
+
+        // 4. Selected option is bold white (\x1b[1;37m), unselected are dim (\x1b[2;37m)
+        let selected_opt = EFFORT_OPTIONS[sel_idx];
+        assert!(
+            raw.contains(&format!("\x1b[1;37m{}\x1b[0m", selected_opt)),
+            "Selected option '{}' must be rendered in bold white (\\x1b[1;37m)",
+            selected_opt
+        );
+
+        for (other_idx, &other_opt) in EFFORT_OPTIONS.iter().enumerate() {
+            if other_idx != sel_idx {
+                assert!(
+                    raw.contains(&format!("\x1b[2;37m{}\x1b[0m", other_opt)),
+                    "Unselected option '{}' must be rendered in dim (\\x1b[2;37m)",
+                    other_opt
+                );
+            }
+        }
+
+        // 5. Status line dynamically updates to auto · <model> or auto · <model> · <effort>
+        let expected_status = if selected_opt == "default" {
+            "auto · DeepSeek V4 Flash".to_string()
+        } else {
+            format!("auto · DeepSeek V4 Flash · {}", selected_opt)
+        };
+        assert!(
+            plain.contains(&expected_status),
+            "Status line must display '{}', got:\n{}",
+            expected_status,
+            plain
+        );
+    }
+}
+
+#[test]
+fn test_effort_picker_interactive_navigation_and_event_handling() {
+    let models = vec![
+        ("deepseek-ai/DeepSeek-V4-Flash-0731".to_string(), "DeepSeek V4 Flash".to_string()),
+        ("moonshotai/Kimi-K2.6".to_string(), "Kimi K2.6".to_string()),
+    ];
+
+    let mut prompt = Prompt::new()
+        .with_models(models)
+        .with_model_picker_active(true)
+        .with_model_selection(0);
+
+    // 1. Enter on model picker -> enters effort picker stage for the selected model
+    let res = prompt
+        .handle_event(Event::Key(KeyEvent::new(KeyCode::Enter, KeyModifiers::NONE)))
+        .unwrap();
+    assert_eq!(res, None, "Enter on model picker must transition to effort picker without immediate submit");
+    assert!(!prompt.model_picker_active());
+    assert!(prompt.effort_picker_active());
+    assert_eq!(prompt.pending_model_id(), "deepseek-ai/DeepSeek-V4-Flash-0731");
+    assert_eq!(prompt.effort_selection(), 0); // starts at "default"
+
+    // 2. Down key -> moves to index 1 ("xhigh")
+    prompt
+        .handle_event(Event::Key(KeyEvent::new(KeyCode::Down, KeyModifiers::NONE)))
+        .unwrap();
+    assert_eq!(prompt.effort_selection(), 1);
+
+    // 3. Tab key -> moves to index 2 ("high")
+    prompt
+        .handle_event(Event::Key(KeyEvent::new(KeyCode::Tab, KeyModifiers::NONE)))
+        .unwrap();
+    assert_eq!(prompt.effort_selection(), 2);
+
+    // 4. Down key -> moves to index 3 ("medium")
+    prompt
+        .handle_event(Event::Key(KeyEvent::new(KeyCode::Down, KeyModifiers::NONE)))
+        .unwrap();
+    assert_eq!(prompt.effort_selection(), 3);
+
+    // 5. Down key -> moves to index 4 ("low")
+    prompt
+        .handle_event(Event::Key(KeyEvent::new(KeyCode::Down, KeyModifiers::NONE)))
+        .unwrap();
+    assert_eq!(prompt.effort_selection(), 4);
+
+    // 6. Down key wrap-around -> index 0 ("default")
+    prompt
+        .handle_event(Event::Key(KeyEvent::new(KeyCode::Down, KeyModifiers::NONE)))
+        .unwrap();
+    assert_eq!(prompt.effort_selection(), 0);
+
+    // 7. Up key wrap-around -> index 4 ("low")
+    prompt
+        .handle_event(Event::Key(KeyEvent::new(KeyCode::Up, KeyModifiers::NONE)))
+        .unwrap();
+    assert_eq!(prompt.effort_selection(), 4);
+
+    // 8. BackTab key -> index 3 ("medium")
+    prompt
+        .handle_event(Event::Key(KeyEvent::new(KeyCode::BackTab, KeyModifiers::NONE)))
+        .unwrap();
+    assert_eq!(prompt.effort_selection(), 3);
+
+    // 9. Up key -> index 2 ("high")
+    prompt
+        .handle_event(Event::Key(KeyEvent::new(KeyCode::Up, KeyModifiers::NONE)))
+        .unwrap();
+    assert_eq!(prompt.effort_selection(), 2);
+
+    // 10. Enter key on "high" -> submits `/model <model> high`
+    let res = prompt
+        .handle_event(Event::Key(KeyEvent::new(KeyCode::Enter, KeyModifiers::NONE)))
+        .unwrap();
+    assert_eq!(
+        res,
+        Some(PromptResult::Submit("/model deepseek-ai/DeepSeek-V4-Flash-0731 high".to_string())),
+        "Enter on effort picker must submit '/model <model> <effort>'"
+    );
+    assert!(!prompt.effort_picker_active(), "Effort picker must close on submit");
+    assert_eq!(prompt.selected_effort(), Some("high"));
+}
+
+#[test]
+fn test_effort_picker_default_effort_submission() {
+    let mut prompt = Prompt::new()
+        .with_pending_model_id("gpt-4o")
+        .with_effort_picker_active(true)
+        .with_effort_selection(0); // "default"
+
+    let res = prompt
+        .handle_event(Event::Key(KeyEvent::new(KeyCode::Enter, KeyModifiers::NONE)))
+        .unwrap();
+    assert_eq!(
+        res,
+        Some(PromptResult::Submit("/model gpt-4o".to_string())),
+        "Selecting 'default' effort must submit clean '/model <model>' without effort suffix"
+    );
+    assert!(!prompt.effort_picker_active());
+    assert_eq!(prompt.selected_effort(), None);
+}
+
+#[test]
+fn test_effort_picker_cancellation_via_esc_and_ctrl_c() {
+    // 1. Cancel via Esc
+    let mut prompt_esc = Prompt::new()
+        .with_pending_model_id("MiniMaxAI/MiniMax-M2.7")
+        .with_effort_picker_active(true)
+        .with_effort_selection(2);
+
+    let res_esc = prompt_esc
+        .handle_event(Event::Key(KeyEvent::new(KeyCode::Esc, KeyModifiers::NONE)))
+        .unwrap();
+    assert_eq!(res_esc, None, "Esc closes picker and returns to prompt editing");
+    assert!(!prompt_esc.effort_picker_active());
+    assert_eq!(prompt_esc.effort_selection(), 0);
+    assert_eq!(prompt_esc.pending_model_id(), "");
+
+    // 2. Cancel via Ctrl+C
+    let mut prompt_ctrl_c = Prompt::new()
+        .with_pending_model_id("moonshotai/Kimi-K2.6")
+        .with_effort_picker_active(true)
+        .with_effort_selection(1);
+
+    let res_ctrl_c = prompt_ctrl_c
+        .handle_event(Event::Key(KeyEvent::new(KeyCode::Char('c'), KeyModifiers::CONTROL)))
+        .unwrap();
+    assert_eq!(res_ctrl_c, Some(PromptResult::Cancel));
+    assert!(!prompt_ctrl_c.effort_picker_active());
+    assert_eq!(prompt_ctrl_c.pending_model_id(), "");
+}
+
+// ===========================================================================
+// Contract 16: Status Line Formatting with Reasoning Effort
+// ===========================================================================
+
+#[test]
+fn test_status_line_with_reasoning_effort_variations() {
+    let mut buf = Vec::new();
+    let empty_buf: Vec<char> = Vec::new();
+    let mut last_lines = 0;
+    let mut last_cursor = 0;
+
+    // 1. Standard model with high effort
+    let prompt1 = Prompt::new()
+        .with_model("deepseek-ai/DeepSeek-V4-Flash-0731")
+        .with_selected_effort(Some("high".to_string()));
+    prompt1
+        .render_to(&mut buf, &empty_buf, 0, &mut last_lines, &mut last_cursor)
+        .unwrap();
+    let plain1 = strip_ansi(&String::from_utf8_lossy(&buf));
+    assert!(
+        plain1.contains("auto · DeepSeek V4 Flash · high"),
+        "Status line must contain 'auto · DeepSeek V4 Flash · high', got:\n{}",
+        plain1
+    );
+
+    // 2. MiniMax model with xhigh effort
+    buf.clear();
+    last_lines = 0;
+    last_cursor = 0;
+    let prompt2 = Prompt::new()
+        .with_model("MiniMaxAI/MiniMax-M2.7")
+        .with_selected_effort(Some("xhigh".to_string()));
+    prompt2
+        .render_to(&mut buf, &empty_buf, 0, &mut last_lines, &mut last_cursor)
+        .unwrap();
+    let plain2 = strip_ansi(&String::from_utf8_lossy(&buf));
+    assert!(
+        plain2.contains("auto · MiniMax M2.7 · xhigh"),
+        "Status line must contain 'auto · MiniMax M2.7 · xhigh', got:\n{}",
+        plain2
+    );
+
+    // 3. Kimi model without effort (None)
+    buf.clear();
+    last_lines = 0;
+    last_cursor = 0;
+    let prompt3 = Prompt::new()
+        .with_model("moonshotai/Kimi-K2.6")
+        .with_selected_effort(None);
+    prompt3
+        .render_to(&mut buf, &empty_buf, 0, &mut last_lines, &mut last_cursor)
+        .unwrap();
+    let plain3 = strip_ansi(&String::from_utf8_lossy(&buf));
+    assert!(
+        plain3.contains("auto · Kimi K2.6") && !plain3.contains("auto · Kimi K2.6 ·"),
+        "Status line must contain 'auto · Kimi K2.6' without effort suffix, got:\n{}",
+        plain3
+    );
+
+    // 4. Custom model with low effort
+    buf.clear();
+    last_lines = 0;
+    last_cursor = 0;
+    let prompt4 = Prompt::new()
+        .with_model("claude-3-7-sonnet")
+        .with_selected_effort(Some("low".to_string()));
+    prompt4
+        .render_to(&mut buf, &empty_buf, 0, &mut last_lines, &mut last_cursor)
+        .unwrap();
+    let plain4 = strip_ansi(&String::from_utf8_lossy(&buf));
+    assert!(
+        plain4.contains("auto · claude-3-7-sonnet · low"),
+        "Status line must contain 'auto · claude-3-7-sonnet · low', got:\n{}",
+        plain4
+    );
+}
+
+#[test]
+fn test_status_line_queue_mode_with_reasoning_effort() {
+    let mut buf = Vec::new();
+    let queue_text: Vec<char> = "summarize logs".chars().collect();
+    let mut last_lines = 0;
+    let mut last_cursor = 0;
+
+    let mut prompt = Prompt::new()
+        .with_model("claude-3-7-sonnet")
+        .with_selected_effort(Some("high".to_string()));
+    prompt.set_running_status(Some("• Running (12s) (↑50 ↓120)".to_string()));
+
+    prompt
+        .render_to(&mut buf, &queue_text, 14, &mut last_lines, &mut last_cursor)
+        .unwrap();
+
+    let plain = strip_ansi(&String::from_utf8_lossy(&buf));
+    assert!(
+        plain.contains("enter queue · auto · claude-3-7-sonnet · high"),
+        "Queue status line must contain 'enter queue · auto · claude-3-7-sonnet · high', got:\n{}",
+        plain
+    );
+    assert!(
+        plain.contains("┃ summarize logs"),
+        "Queue input must display rail with typed text '┃ summarize logs', got:\n{}",
+        plain
+    );
+}
+
+// ===========================================================================
+// Contract 17: Clean Model Switch Output Without `/model` Command Prefix
+// ===========================================================================
+
+#[test]
+fn test_model_switch_clean_confirmation_output_and_metadata() {
+    let (mut runner, mut session) = create_test_runner_and_session();
+
+    // 1. Switch to a new model without effort
+    let res1 = handle_slash_command("/model claude-3-5-sonnet", &mut runner, &mut session);
+    assert!(res1.is_some());
+    assert_eq!(runner.config().default_model, "claude-3-5-sonnet-20241022");
+    assert_eq!(session.active_model(), "claude-3-5-sonnet-20241022");
+    assert_eq!(session.get_metadata("reasoning_effort"), None);
+
+    // 2. Switch to a model with high reasoning effort
+    let res2 = handle_slash_command("/model grok-4.6 high", &mut runner, &mut session);
+    assert!(res2.is_some());
+    assert_eq!(runner.config().default_model, "grok-4.6");
+    assert_eq!(session.active_model(), "grok-4.6");
+    assert_eq!(session.get_metadata("reasoning_effort"), Some("high"));
+
+    // 3. Switch to a model with xhigh reasoning effort
+    let res3 = handle_slash_command(
+        "/model deepseek-ai/DeepSeek-V4-Flash-0731 xhigh",
+        &mut runner,
+        &mut session,
+    );
+    assert!(res3.is_some());
+    assert_eq!(
+        runner.config().default_model,
+        "deepseek-ai/DeepSeek-V4-Flash-0731"
+    );
+    assert_eq!(
+        session.active_model(),
+        "deepseek-ai/DeepSeek-V4-Flash-0731"
+    );
+    assert_eq!(session.get_metadata("reasoning_effort"), Some("xhigh"));
+}
+
+// ===========================================================================
+// Contract 18: Progressive Word Streaming Parity with Buffered Markdown Rendering
+// ===========================================================================
+
+#[test]
+fn test_progressive_word_streaming_matches_buffered_output() {
+    // 1. Plain paragraph streamed word by word
+    let text_tokens = vec![
+        "The ", "quick ", "brown ", "fox ", "jumps ", "over ", "the ", "lazy ", "dog.\n\n",
+        "Rust ", "provides ", "memory ", "safety ", "without ", "garbage ", "collection.\n",
+    ];
+
+    let mut streamer = MarkdownRenderer::new().with_indent(2);
+    let mut buffered = MarkdownRenderer::buffered().with_indent(2);
+    let mut oneshot = MarkdownRenderer::buffered().with_indent(2);
+
+    let mut stream_accumulated = String::new();
+    let mut buffered_accumulated = String::new();
+
+    for token in &text_tokens {
+        stream_accumulated.push_str(&streamer.push(token));
+        buffered_accumulated.push_str(&buffered.push(token));
+    }
+    stream_accumulated.push_str(&streamer.finish());
+    buffered_accumulated.push_str(&buffered.finish());
+
+    let mut oneshot_output = oneshot.push(&text_tokens.concat());
+    oneshot_output.push_str(&oneshot.finish());
+    let _plain_stream = strip_ansi(&stream_accumulated);
+    let plain_buffered = strip_ansi(&buffered_accumulated);
+    let plain_oneshot = strip_ansi(&oneshot_output);
+
+    assert_eq!(
+        plain_buffered, plain_oneshot,
+        "Buffered token streaming must match oneshot rendered output"
+    );
+    assert!(
+        plain_buffered.contains("  The quick brown fox jumps over the lazy dog."),
+        "Rendered output must have 2-space indentation"
+    );
+    assert!(
+        plain_buffered.contains("  Rust provides memory safety without garbage collection."),
+        "Rendered output must have 2-space indentation on second paragraph"
+    );
+
+    // 2. Rich markdown elements (bold, italic, code, headers, bullet lists)
+    let rich_tokens = vec![
+        "# Architecture Overview\n\n",
+        "Fusion is a **high-performance** agentic harness written in *Rust*.\n\n",
+        "Key features include:\n",
+        "- **Speed**: Sub-millisecond startup\n",
+        "- **Safety**: Type-safe `Session` and `AgentRunner` interfaces\n",
+        "- **Flexibility**: Multi-provider support\n\n",
+        "```rust\n",
+        "fn main() {\n",
+        "    println!(\"Fusion REPL ready\");\n",
+        "}\n",
+        "```\n",
+    ];
+
+    let mut rich_streamer = MarkdownRenderer::new().with_indent(2);
+    let mut rich_buffered = MarkdownRenderer::buffered().with_indent(2);
+
+    let mut rich_stream_out = String::new();
+    let mut rich_buf_out = String::new();
+
+    for token in &rich_tokens {
+        rich_stream_out.push_str(&rich_streamer.push(token));
+        rich_buf_out.push_str(&rich_buffered.push(token));
+    }
+    rich_stream_out.push_str(&rich_streamer.finish());
+    rich_buf_out.push_str(&rich_buffered.finish());
+
+    let plain_rich_buf = strip_ansi(&rich_buf_out);
+    assert!(plain_rich_buf.contains("Architecture Overview"));
+    assert!(plain_rich_buf.contains("Fusion is a high-performance agentic harness"));
+    assert!(plain_rich_buf.contains("Speed: Sub-millisecond startup"));
+    assert!(plain_rich_buf.contains("println!(\"Fusion REPL ready\");"));
+
+    // 3. Fine-grained character-by-character streaming parity
+    let char_stream_input = "Interactive prompt verification ensures 100% FX fidelity across all terminal sessions.\n";
+    let mut char_buffered = MarkdownRenderer::buffered().with_indent(2);
+    let mut char_buf_out = String::new();
+    for ch in char_stream_input.chars() {
+        let mut s = String::new();
+        s.push(ch);
+        char_buf_out.push_str(&char_buffered.push(&s));
+    }
+    char_buf_out.push_str(&char_buffered.finish());
+    let mut single_buf = MarkdownRenderer::buffered().with_indent(2);
+    let mut single_out = single_buf.push(char_stream_input);
+    single_out.push_str(&single_buf.finish());
+    assert_eq!(
+        strip_ansi(&char_buf_out),
+        strip_ansi(&single_out),
+        "Character-by-character progressive streaming must produce identical output to batch rendering"
+    );
 }

@@ -22,9 +22,9 @@ pub enum PromptResult {
     /// User requested exit / EOF (Ctrl+D on empty input).
     Exit,
 }
+pub const EFFORT_OPTIONS: &[&str] = &["default", "xhigh", "high", "medium", "low"];
 
 /// Interactive terminal prompt supporting line editing, multiline input,
-/// history navigation, and ANSI indicators.
 pub struct Prompt {
     history: Vec<String>,
     history_idx: Option<usize>,
@@ -50,6 +50,10 @@ pub struct Prompt {
     saved_current: String,
     pub last_rendered_lines: usize,
     pub last_cursor_row: usize,
+    pub effort_picker_active: bool,
+    pub effort_selection: usize,
+    pub pending_model_id: String,
+    pub selected_effort: Option<String>,
 }
 impl Default for Prompt {
     fn default() -> Self {
@@ -80,6 +84,10 @@ impl Prompt {
             saved_current: String::new(),
             last_rendered_lines: 0,
             last_cursor_row: 0,
+            effort_picker_active: false,
+            effort_selection: 0,
+            pending_model_id: String::new(),
+            selected_effort: None,
         }
     }
 
@@ -140,6 +148,70 @@ impl Prompt {
     /// Get the selected index for the model picker dialog.
     pub fn model_selection(&self) -> usize {
         self.model_selection
+    }
+
+    /// Toggle whether the effort picker dialog is active.
+    pub fn with_effort_picker_active(mut self, active: bool) -> Self {
+        self.effort_picker_active = active;
+        self
+    }
+
+    /// Set whether the effort picker dialog is active.
+    pub fn set_effort_picker_active(&mut self, active: bool) {
+        self.effort_picker_active = active;
+    }
+
+    /// Whether the effort picker dialog is active.
+    pub fn effort_picker_active(&self) -> bool {
+        self.effort_picker_active
+    }
+
+    /// Set the selected index for the effort picker dialog.
+    pub fn with_effort_selection(mut self, sel: usize) -> Self {
+        self.effort_selection = sel;
+        self
+    }
+
+    /// Set the selected index for the effort picker dialog.
+    pub fn set_effort_selection(&mut self, sel: usize) {
+        self.effort_selection = sel;
+    }
+
+    /// Get the selected index for the effort picker dialog.
+    pub fn effort_selection(&self) -> usize {
+        self.effort_selection
+    }
+
+    /// Set pending model ID for effort picker dialog.
+    pub fn with_pending_model_id(mut self, model: impl Into<String>) -> Self {
+        self.pending_model_id = model.into();
+        self
+    }
+
+    /// Set pending model ID for effort picker dialog.
+    pub fn set_pending_model_id(&mut self, model: impl Into<String>) {
+        self.pending_model_id = model.into();
+    }
+
+    /// Get pending model ID for effort picker dialog.
+    pub fn pending_model_id(&self) -> &str {
+        &self.pending_model_id
+    }
+
+    /// Set selected reasoning effort.
+    pub fn with_selected_effort(mut self, effort: Option<String>) -> Self {
+        self.selected_effort = effort;
+        self
+    }
+
+    /// Set selected reasoning effort.
+    pub fn set_selected_effort(&mut self, effort: Option<String>) {
+        self.selected_effort = effort;
+    }
+
+    /// Get selected reasoning effort.
+    pub fn selected_effort(&self) -> Option<&str> {
+        self.selected_effort.as_deref()
     }
 
     /// Set the selected index for the slash command dialog.
@@ -262,6 +334,9 @@ impl Prompt {
         self.slash_selection = 0;
         self.model_selection = 0;
         self.model_picker_active = false;
+        self.effort_picker_active = false;
+        self.effort_selection = 0;
+        self.pending_model_id.clear();
         self.last_rendered_lines = 0;
         self.last_cursor_row = 0;
         self.running_status = None;
@@ -312,6 +387,15 @@ impl Prompt {
 
                 // Esc or Ctrl+C handling
                 if key.code == KeyCode::Esc {
+                    if self.effort_picker_active {
+                        self.effort_picker_active = false;
+                        self.effort_selection = 0;
+                        self.pending_model_id.clear();
+                        self.buffer.clear();
+                        self.cursor_pos = 0;
+                        self.render_current()?;
+                        return Ok(None);
+                    }
                     if self.model_picker_active {
                         self.model_picker_active = false;
                         self.buffer.clear();
@@ -333,6 +417,10 @@ impl Prompt {
                 if key.modifiers.contains(KeyModifiers::CONTROL)
                     && (key.code == KeyCode::Char('c') || key.code == KeyCode::Char('C'))
                 {
+                    self.effort_picker_active = false;
+                    self.effort_selection = 0;
+                    self.pending_model_id.clear();
+                    self.model_picker_active = false;
                     self.clear_frame()?;
                     return Ok(Some(PromptResult::Cancel));
                 }
@@ -343,6 +431,49 @@ impl Prompt {
                     if self.buffer.is_empty() {
                         self.clear_frame()?;
                         return Ok(Some(PromptResult::Exit));
+                    }
+                }
+
+                // Effort picker dialog mode
+                if self.effort_picker_active {
+                    match key.code {
+                        KeyCode::Tab | KeyCode::Down => {
+                            self.effort_selection =
+                                (self.effort_selection + 1) % EFFORT_OPTIONS.len();
+                            self.render_current()?;
+                            return Ok(None);
+                        }
+                        KeyCode::BackTab | KeyCode::Up => {
+                            self.effort_selection = if self.effort_selection == 0 {
+                                EFFORT_OPTIONS.len() - 1
+                            } else {
+                                self.effort_selection - 1
+                            };
+                            self.render_current()?;
+                            return Ok(None);
+                        }
+                        KeyCode::Enter => {
+                            let effort = EFFORT_OPTIONS[self.effort_selection.min(EFFORT_OPTIONS.len() - 1)];
+                            let cmd = if effort == "default" {
+                                format!("/model {}", self.pending_model_id)
+                            } else {
+                                format!("/model {} {}", self.pending_model_id, effort)
+                            };
+                            self.selected_effort = if effort == "default" {
+                                None
+                            } else {
+                                Some(effort.to_string())
+                            };
+                            self.clear_frame()?; // Do NOT print ┃ /model ...
+                            self.effort_picker_active = false;
+                            self.effort_selection = 0;
+                            self.pending_model_id.clear();
+                            self.buffer.clear();
+                            self.cursor_pos = 0;
+                            self.add_history(cmd.clone());
+                            return Ok(Some(PromptResult::Submit(cmd)));
+                        }
+                        _ => return Ok(None),
                     }
                 }
 
@@ -384,18 +515,17 @@ impl Prompt {
                             if let Some(sel) = filtered
                                 .get(self.model_selection.min(filtered.len().saturating_sub(1)))
                             {
-                                let text = format!("/model {}", sel.0);
-                                self.clear_frame()?;
-                                let mut out = stdout();
-                                let _ = write!(out, "\x1b[1m┃ {}\x1b[0m\r\n\r\n", text);
-                                let _ = out.flush();
-
+                                let model_id = sel.0.clone();
+                                self.pending_model_id = model_id.clone();
                                 self.model_picker_active = false;
                                 self.model_selection = 0;
-                                self.buffer.clear();
-                                self.cursor_pos = 0;
-                                self.add_history(text.clone());
-                                return Ok(Some(PromptResult::Submit(text)));
+                                self.effort_picker_active = true;
+                                self.effort_selection = 0;
+                                let prompt_text = format!("/model {} ", model_id);
+                                self.buffer = prompt_text.chars().collect();
+                                self.cursor_pos = self.buffer.len();
+                                self.render_current()?;
+                                return Ok(None);
                             }
                             return Ok(None);
                         }
@@ -614,7 +744,7 @@ impl Prompt {
 
         // Check for slash suggestions
         let first_line = lines.first().copied().unwrap_or("");
-        let slash_suggestions = if !self.model_picker_active && first_line.starts_with('/') {
+        let slash_suggestions = if !self.model_picker_active && !self.effort_picker_active && first_line.starts_with('/') {
             slash_matches(first_line)
         } else {
             Vec::new()
@@ -660,7 +790,59 @@ impl Prompt {
         let divider = "─".repeat(term_cols);
 
         // 2. Dropdown menu below the input line (matching fx)
-        if self.model_picker_active {
+        if self.effort_picker_active {
+            // Top divider
+            write!(out, "\x1b[38;5;240m{}\x1b[0m\r\n", divider)?;
+            total_lines += 1;
+
+            // 5 effort options
+            for (idx, &opt) in EFFORT_OPTIONS.iter().enumerate() {
+                let is_selected = idx == self.effort_selection;
+                if is_selected {
+                    write!(out, "\x1b[1;37m{}\x1b[0m\r\n", opt)?;
+                } else {
+                    write!(out, "\x1b[2;37m{}\x1b[0m\r\n", opt)?;
+                }
+                total_lines += 1;
+            }
+
+            // Bottom divider
+            write!(out, "\x1b[38;5;240m{}\x1b[0m\r\n", divider)?;
+            total_lines += 1;
+
+            // Status line dynamically updates to auto · <model> or auto · <model> · <effort>
+            let model_label = if !self.pending_model_id.is_empty() {
+                crate::ui::repl::format_model_label(&self.pending_model_id)
+            } else {
+                crate::ui::repl::format_model_label(&self.active_model)
+            };
+            let current_effort = EFFORT_OPTIONS[self.effort_selection.min(EFFORT_OPTIONS.len() - 1)];
+            let mut status_body = format!("auto · {}", model_label);
+            if current_effort != "default" {
+                status_body.push_str(&format!(" · {}", current_effort));
+            }
+            let status_text = if self.running_status.is_some() {
+                format!("enter queue · {}", status_body)
+            } else {
+                status_body
+            };
+            write!(out, "\x1b[2;37m{}\x1b[0m", status_text)?;
+            total_lines += 1;
+
+            let lines_up = (lines.len() - 1 - target_row) + EFFORT_OPTIONS.len() + 3;
+            execute!(out, cursor::MoveUp(lines_up as u16))?;
+            let prefix = if target_row == 0 {
+                &self.prompt_symbol
+            } else {
+                &self.multiline_symbol
+            };
+            let prefix_col = visible_width(prefix);
+            let target_x = (prefix_col + target_col) as u16;
+            execute!(out, cursor::MoveToColumn(target_x))?;
+
+            *last_rendered_lines = total_lines;
+            *last_cursor_row = running_lines + target_row;
+        } else if self.model_picker_active {
             let sel = if filtered_models.is_empty() {
                 0
             } else {
@@ -820,10 +1002,14 @@ impl Prompt {
             write!(out, "\r\n")?;
             total_lines += 1;
             let model_label = crate::ui::repl::format_model_label(&self.active_model);
+            let mut status_body = format!("auto · {}", model_label);
+            if let Some(effort) = &self.selected_effort {
+                status_body.push_str(&format!(" · {}", effort));
+            }
             let status_text = if self.running_status.is_some() {
-                format!("enter queue · auto · {}", model_label)
+                format!("enter queue · {}", status_body)
             } else {
-                format!("auto · {}", model_label)
+                status_body
             };
             write!(out, "\x1b[2;37m{}\x1b[0m", status_text)?;
             total_lines += 1;
@@ -1227,5 +1413,158 @@ mod tests {
         assert_eq!(model_category_label("MiniMaxAI/MiniMax-M2.7", "MiniMax M2.7"), "Reasoning");
         assert_eq!(model_category_label("qwen/qwen-coder-32b", "Qwen Coder"), "Coding");
         assert_eq!(model_category_label("custom-model", "Custom Model"), "Model");
+    }
+
+    #[test]
+    fn test_render_effort_picker_menu_layout() {
+        let prompt = Prompt::new()
+            .with_model("deepseek-ai/DeepSeek-V4-Flash-0731")
+            .with_pending_model_id("deepseek-ai/DeepSeek-V4-Flash-0731")
+            .with_effort_picker_active(true)
+            .with_effort_selection(0);
+
+        let mut buf = Vec::new();
+        let buffer: Vec<char> = "/model deepseek-ai/DeepSeek-V4-Flash-0731 ".chars().collect();
+        let mut last_lines = 0;
+        let mut last_cursor = 0;
+
+        prompt
+            .render_to(&mut buf, &buffer, buffer.len(), &mut last_lines, &mut last_cursor)
+            .expect("render_to effort picker failed");
+
+        let raw = String::from_utf8_lossy(&buf);
+        // Dividers
+        assert!(raw.contains("\x1b[38;5;240m"), "Missing divider color in:\n{}", raw);
+        // 5 options
+        for opt in EFFORT_OPTIONS {
+            assert!(raw.contains(opt), "Missing effort option {} in:\n{}", opt, raw);
+        }
+        // Selected item 0 (default) bold white
+        assert!(raw.contains("\x1b[1;37mdefault\x1b[0m"), "Selected item not bold white in:\n{}", raw);
+        // Unselected item (xhigh) dim
+        assert!(raw.contains("\x1b[2;37mxhigh\x1b[0m"), "Unselected item not dim in:\n{}", raw);
+        // Status line for default effort
+        assert!(raw.contains("auto · DeepSeek V4 Flash"), "Missing status line in:\n{}", raw);
+    }
+
+    #[test]
+    fn test_render_effort_picker_menu_with_effort_selected() {
+        let prompt = Prompt::new()
+            .with_pending_model_id("moonshotai/Kimi-K2.6")
+            .with_effort_picker_active(true)
+            .with_effort_selection(1); // xhigh
+
+        let mut buf = Vec::new();
+        let buffer: Vec<char> = "/model moonshotai/Kimi-K2.6 ".chars().collect();
+        let mut last_lines = 0;
+        let mut last_cursor = 0;
+
+        prompt
+            .render_to(&mut buf, &buffer, buffer.len(), &mut last_lines, &mut last_cursor)
+            .expect("render_to effort picker failed");
+
+        let raw = String::from_utf8_lossy(&buf);
+        // Selected item 1 (xhigh) bold white
+        assert!(raw.contains("\x1b[1;37mxhigh\x1b[0m"), "Selected xhigh not bold white in:\n{}", raw);
+        // Unselected default dim
+        assert!(raw.contains("\x1b[2;37mdefault\x1b[0m"), "Unselected default not dim in:\n{}", raw);
+        // Status line dynamically shows effort
+        assert!(raw.contains("auto · Kimi K2.6 · xhigh"), "Missing dynamic status line in:\n{}", raw);
+    }
+
+    #[test]
+    fn test_status_line_with_selected_effort_when_not_in_picker() {
+        let prompt = Prompt::new()
+            .with_model("MiniMaxAI/MiniMax-M2.7")
+            .with_selected_effort(Some("high".to_string()));
+
+        let mut buf = Vec::new();
+        let buffer: Vec<char> = Vec::new();
+        let mut last_lines = 0;
+        let mut last_cursor = 0;
+
+        prompt
+            .render_to(&mut buf, &buffer, 0, &mut last_lines, &mut last_cursor)
+            .expect("render_to status line with effort failed");
+
+        let raw = String::from_utf8_lossy(&buf);
+        assert!(raw.contains("auto · MiniMax M2.7 · high"), "Status line missing effort in:\n{}", raw);
+    }
+
+    #[test]
+    fn test_effort_picker_handle_event_navigation_and_submit() {
+        use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
+
+        let models = vec![
+            ("deepseek-ai/DeepSeek-V4-Flash-0731".to_string(), "DeepSeek V4 Flash".to_string()),
+        ];
+        let mut prompt = Prompt::new()
+            .with_models(models)
+            .with_model_picker_active(true);
+
+        // 1. Enter on model picker -> enters effort picker
+        let res = prompt.handle_event(Event::Key(KeyEvent::new(KeyCode::Enter, KeyModifiers::NONE))).unwrap();
+        assert_eq!(res, None);
+        assert!(!prompt.model_picker_active());
+        assert!(prompt.effort_picker_active());
+        assert_eq!(prompt.pending_model_id(), "deepseek-ai/DeepSeek-V4-Flash-0731");
+        assert_eq!(prompt.effort_selection(), 0);
+        let buf_str: String = prompt.buffer.iter().collect();
+        assert_eq!(buf_str, "/model deepseek-ai/DeepSeek-V4-Flash-0731 ");
+
+        // 2. Down -> selects xhigh (idx 1)
+        prompt.handle_event(Event::Key(KeyEvent::new(KeyCode::Down, KeyModifiers::NONE))).unwrap();
+        assert_eq!(prompt.effort_selection(), 1);
+
+        // 3. Down -> selects high (idx 2)
+        prompt.handle_event(Event::Key(KeyEvent::new(KeyCode::Down, KeyModifiers::NONE))).unwrap();
+        assert_eq!(prompt.effort_selection(), 2);
+
+        // 4. Up -> selects xhigh (idx 1)
+        prompt.handle_event(Event::Key(KeyEvent::new(KeyCode::Up, KeyModifiers::NONE))).unwrap();
+        assert_eq!(prompt.effort_selection(), 1);
+
+        // 5. Enter -> submits command with effort
+        let res = prompt.handle_event(Event::Key(KeyEvent::new(KeyCode::Enter, KeyModifiers::NONE))).unwrap();
+        assert_eq!(
+            res,
+            Some(PromptResult::Submit("/model deepseek-ai/DeepSeek-V4-Flash-0731 xhigh".to_string()))
+        );
+        assert!(!prompt.effort_picker_active());
+        assert_eq!(prompt.selected_effort(), Some("xhigh"));
+    }
+
+    #[test]
+    fn test_effort_picker_handle_event_default_effort_submit() {
+        use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
+
+        let mut prompt = Prompt::new()
+            .with_pending_model_id("gpt-4o")
+            .with_effort_picker_active(true)
+            .with_effort_selection(0);
+
+        let res = prompt.handle_event(Event::Key(KeyEvent::new(KeyCode::Enter, KeyModifiers::NONE))).unwrap();
+        assert_eq!(res, Some(PromptResult::Submit("/model gpt-4o".to_string())));
+        assert!(!prompt.effort_picker_active());
+        assert_eq!(prompt.selected_effort(), None);
+    }
+
+    #[test]
+    fn test_effort_picker_handle_event_esc() {
+        use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
+
+        let mut prompt = Prompt::new()
+            .with_pending_model_id("gpt-4o")
+            .with_effort_picker_active(true)
+            .with_effort_selection(2);
+        prompt.buffer = "/model gpt-4o ".chars().collect();
+        prompt.cursor_pos = prompt.buffer.len();
+
+        let res = prompt.handle_event(Event::Key(KeyEvent::new(KeyCode::Esc, KeyModifiers::NONE))).unwrap();
+        assert_eq!(res, None);
+        assert!(!prompt.effort_picker_active());
+        assert_eq!(prompt.effort_selection(), 0);
+        assert!(prompt.pending_model_id().is_empty());
+        assert!(prompt.buffer.is_empty());
     }
 }

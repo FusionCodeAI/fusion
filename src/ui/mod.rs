@@ -43,7 +43,7 @@ pub use inline::{
     StatusInfo,
 };
 pub use markdown::{print_markdown, render_inline, render_line, render_markdown, MarkdownRenderer};
-pub use prompt::{Prompt, PromptResult, RawModeGuard};
+pub use prompt::{Prompt, PromptResult, RawModeGuard, EFFORT_OPTIONS};
 pub use repl::{
     format_activity_status, format_duration_compact as format_repl_duration_compact,
     format_model_label, format_thinking_status, format_tokens_compact as format_repl_tokens_compact,

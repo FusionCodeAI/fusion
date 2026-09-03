@@ -563,7 +563,11 @@ impl SlashCommand {
                 SlashCommand::Palette { filter }
             }
             "/model" | "/m" => {
-                let name = args.first().cloned();
+                let name = if args.is_empty() {
+                    None
+                } else {
+                    Some(args.join(" "))
+                };
                 SlashCommand::Model { name }
             }
             "/login" | "/auth" | "/signin" => SlashCommand::Login,
@@ -1924,19 +1928,29 @@ fn sanitize_filename(name: &str) -> String {
 }
 
 fn handle_model(name: Option<&str>, runner: &mut AgentRunner, session: &mut Session) {
-    if let Some(model_name) = name {
-        let trimmed = model_name.trim();
-        if trimmed.is_empty() {
-            print_model_info(runner, session);
-            return;
-        }
+    if let Some(raw_name) = name {
+        let mut parts = raw_name.split_whitespace();
+        let model_part = parts.next();
+        let effort_part = parts.next();
 
-        let (provider, canonical_model) =
-            Config::resolve_model(trimmed, Some(&runner.config().default_provider));
-        runner.config_mut().default_provider = provider.clone();
-        runner.config_mut().default_model = canonical_model.clone();
-        session.set_active_model(&canonical_model);
-        println!("\x1b[2;37m● Switched to {}\x1b[0m\r\n", canonical_model);
+        if let Some(model_name) = model_part {
+            if model_name.is_empty() {
+                print_model_info(runner, session);
+                return;
+            }
+
+            let (provider, canonical_model) =
+                Config::resolve_model(model_name, Some(&runner.config().default_provider));
+            runner.config_mut().default_provider = provider.clone();
+            runner.config_mut().default_model = canonical_model.clone();
+            session.set_active_model(&canonical_model);
+            if let Some(effort) = effort_part {
+                session.set_metadata("reasoning_effort", effort);
+            }
+            println!("\x1b[2;37m● Switched to {}\x1b[0m\r\n", canonical_model);
+        } else {
+            print_model_info(runner, session);
+        }
     } else {
         print_model_info(runner, session);
     }
@@ -3389,6 +3403,12 @@ mod tests {
                 name: Some("deepseek-chat".to_string())
             })
         );
+        assert_eq!(
+            SlashCommand::parse("/model grok-4.6 high"),
+            Some(SlashCommand::Model {
+                name: Some("grok-4.6 high".to_string())
+            })
+        );
     }
 
     #[test]
@@ -3650,8 +3670,24 @@ mod tests {
         let res = handle_slash_command("/model claude-3-5-sonnet", &mut runner, &mut session);
         assert!(res.is_some());
         assert!(!res.unwrap().is_exit());
-        assert_eq!(runner.config().default_model, "claude-3-5-sonnet");
-        assert_eq!(session.active_model(), "claude-3-5-sonnet");
+        assert_eq!(runner.config().default_model, "claude-3-5-sonnet-20241022");
+        assert_eq!(session.active_model(), "claude-3-5-sonnet-20241022");
+
+        let res2 = handle_slash_command("/model grok-4.6 high", &mut runner, &mut session);
+        assert!(res2.is_some());
+        assert_eq!(runner.config().default_model, "grok-4.6");
+        assert_eq!(session.active_model(), "grok-4.6");
+        assert_eq!(session.get_metadata("reasoning_effort"), Some("high"));
+
+        let res3 = handle_slash_command("/m flash xhigh", &mut runner, &mut session);
+        assert!(res3.is_some());
+        assert_eq!(runner.config().default_model, "deepseek-ai/DeepSeek-V4-Flash-0731");
+        assert_eq!(session.active_model(), "deepseek-ai/DeepSeek-V4-Flash-0731");
+        assert_eq!(session.get_metadata("reasoning_effort"), Some("xhigh"));
+
+        let res4 = handle_slash_command("/model", &mut runner, &mut session);
+        assert!(res4.is_some());
+        assert_eq!(session.active_model(), "deepseek-ai/DeepSeek-V4-Flash-0731");
     }
 
     #[test]

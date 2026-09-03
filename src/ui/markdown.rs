@@ -26,6 +26,7 @@ pub struct MarkdownRenderer {
     spinner_frame_idx: usize,
     indent: usize,
     mermaid_buffer: Vec<String>,
+    line_has_prefix: bool,
 }
 /// Inline spinner rendered at the start of the current streaming line.
 /// Mirrors the visual language of `super::spinner` without spawning a task.
@@ -76,6 +77,7 @@ impl MarkdownRenderer {
             spinner_frame_idx: 0,
             indent: 0,
             mermaid_buffer: Vec::new(),
+            line_has_prefix: false,
         }
     }
 
@@ -91,6 +93,7 @@ impl MarkdownRenderer {
             spinner_frame_idx: 0,
             indent: 0,
             mermaid_buffer: Vec::new(),
+            line_has_prefix: false,
         }
     }
 
@@ -99,9 +102,15 @@ impl MarkdownRenderer {
         self.indent = indent;
         self
     }
+
     /// Returns whether the renderer is currently inside a fenced code block.
     pub fn is_in_code_block(&self) -> bool {
         self.in_code_block
+    }
+
+    /// Returns whether the current streaming line has already had its indentation/prefix emitted.
+    pub fn line_has_prefix(&self) -> bool {
+        self.line_has_prefix
     }
 
     /// Returns the language identifier of the active code block, if any.
@@ -138,8 +147,8 @@ impl MarkdownRenderer {
         self.table_streamer = super::table::MarkdownTableStreamer::new();
         self.spinner = None;
         self.spinner_frame_idx = 0;
+        self.line_has_prefix = false;
     }
-
     /// Emit a fully rendered line: into the output buffer and, when streaming,
     /// straight to stdout with an inline flush.
     fn emit(&mut self, formatted: &str, output: &mut String) {
@@ -236,11 +245,63 @@ impl MarkdownRenderer {
 
         let mut output = String::new();
 
-        while let Some(newline_pos) = self.buffer.find('\n') {
-            // Take the complete line including the newline in one memmove.
-            let line: String = self.buffer.drain(..=newline_pos).collect();
-            let line = line.trim_end_matches('\n');
-            self.render_buffered_line(line, &mut output);
+        if self.stream_stdout {
+            while let Some(newline_pos) = self.buffer.find('\n') {
+                let line_content: String = self.buffer.drain(..=newline_pos).collect();
+                let line = line_content.trim_end_matches('\n');
+
+                if self.in_code_block {
+                    self.render_buffered_line(line, &mut output);
+                    self.line_has_prefix = false;
+                } else {
+                    let is_special = is_special_block_prefix(line) || self.table_streamer.is_buffering();
+
+                    if is_special {
+                        self.render_buffered_line(line, &mut output);
+                        self.line_has_prefix = false;
+                    } else {
+                        if !self.line_has_prefix {
+                            if self.indent > 0 {
+                                print!("{}{}\r\n", " ".repeat(self.indent), line);
+                            } else {
+                                print!("{}\r\n", line);
+                            }
+                        } else {
+                            print!("{}\r\n", line);
+                        }
+                        let _ = stdout().flush();
+                        self.line_has_prefix = false;
+                    }
+                }
+            }
+
+            // Progressive word streaming for normal paragraph text outside code blocks:
+            if !self.in_code_block && !self.buffer.is_empty() {
+                let is_special = is_special_block_prefix(&self.buffer) || self.table_streamer.is_buffering();
+                if !is_special {
+                    if let Some(last_space_idx) = self.buffer.rfind(' ') {
+                        let to_print: String = self.buffer.drain(..=last_space_idx).collect();
+                        if !self.line_has_prefix {
+                            if self.indent > 0 {
+                                print!("{}{}", " ".repeat(self.indent), to_print);
+                            } else {
+                                print!("{}", to_print);
+                            }
+                            self.line_has_prefix = true;
+                        } else {
+                            print!("{}", to_print);
+                        }
+                        let _ = stdout().flush();
+                    }
+                }
+            }
+        } else {
+            while let Some(newline_pos) = self.buffer.find('\n') {
+                // Take the complete line including the newline in one memmove.
+                let line: String = self.buffer.drain(..=newline_pos).collect();
+                let line = line.trim_end_matches('\n');
+                self.render_buffered_line(line, &mut output);
+            }
         }
 
         output
@@ -251,8 +312,34 @@ impl MarkdownRenderer {
         let mut output = String::new();
 
         if !self.buffer.is_empty() {
-            let line = std::mem::take(&mut self.buffer);
-            self.render_buffered_line(&line, &mut output);
+            if self.stream_stdout {
+                if self.in_code_block {
+                    let line = std::mem::take(&mut self.buffer);
+                    self.render_buffered_line(&line, &mut output);
+                } else {
+                    let is_special = is_special_block_prefix(&self.buffer) || self.table_streamer.is_buffering();
+                    if is_special {
+                        let line = std::mem::take(&mut self.buffer);
+                        self.render_buffered_line(&line, &mut output);
+                    } else {
+                        let line = std::mem::take(&mut self.buffer);
+                        if !self.line_has_prefix {
+                            if self.indent > 0 {
+                                print!("{}{}\r\n", " ".repeat(self.indent), line);
+                            } else {
+                                print!("{}\r\n", line);
+                            }
+                        } else {
+                            print!("{}\r\n", line);
+                        }
+                        let _ = stdout().flush();
+                    }
+                }
+                self.line_has_prefix = false;
+            } else {
+                let line = std::mem::take(&mut self.buffer);
+                self.render_buffered_line(&line, &mut output);
+            }
         }
 
         if self.table_streamer.is_buffering() {
@@ -278,8 +365,21 @@ impl MarkdownRenderer {
             self.emit(&end_border, &mut output);
         }
 
+        self.line_has_prefix = false;
+
         output
     }
+}
+
+/// Helper to detect if a line starts with special block markdown syntax that should
+/// not be progressively word-streamed without full line formatting.
+fn is_special_block_prefix(text: &str) -> bool {
+    let trimmed = text.trim_start();
+    trimmed.starts_with('#')
+        || trimmed.starts_with("```")
+        || trimmed.starts_with('|')
+        || trimmed.starts_with("---")
+        || trimmed.starts_with("***")
 }
 
 impl Default for MarkdownRenderer {
@@ -1175,5 +1275,115 @@ mod tests {
             let rendered = render_line(line, &mut in_code, &mut lang);
             assert_eq!(rendered, "  +---+  ", "Language {} should not have left bar", lang_name);
         }
+    }
+
+    #[test]
+    fn test_progressive_word_streaming_state_transitions() {
+        let mut renderer = MarkdownRenderer::new().with_indent(2);
+        assert!(!renderer.line_has_prefix());
+
+        // Pushing word without space stays in buffer, prefix not set yet
+        renderer.push("Hello");
+        assert_eq!(renderer.pending(), "Hello");
+        assert!(!renderer.line_has_prefix());
+
+        // Pushing space flushes "Hello " and sets line_has_prefix to true
+        renderer.push(" ");
+        assert_eq!(renderer.pending(), "");
+        assert!(renderer.line_has_prefix());
+
+        // Pushing next word with space flushes and keeps line_has_prefix true
+        renderer.push("world! ");
+        assert_eq!(renderer.pending(), "");
+        assert!(renderer.line_has_prefix());
+
+        // Pushing newline resets line_has_prefix to false
+        renderer.push("Done.\n");
+        assert_eq!(renderer.pending(), "");
+        assert!(!renderer.line_has_prefix());
+    }
+
+    #[test]
+    fn test_progressive_streaming_special_blocks_buffered_until_newline() {
+        let mut renderer = MarkdownRenderer::new().with_indent(2);
+
+        // Header syntax should not stream word-by-word
+        renderer.push("# Heading");
+        assert_eq!(renderer.pending(), "# Heading");
+        assert!(!renderer.line_has_prefix());
+
+        renderer.push(" with spaces ");
+        assert_eq!(renderer.pending(), "# Heading with spaces ");
+        assert!(!renderer.line_has_prefix());
+
+        renderer.push("\n");
+        assert_eq!(renderer.pending(), "");
+        assert!(!renderer.line_has_prefix());
+    }
+
+    #[test]
+    fn test_progressive_streaming_finish_flushes_pending() {
+        let mut renderer = MarkdownRenderer::new().with_indent(2);
+        renderer.push("Pending without newline");
+        assert_eq!(renderer.pending(), "newline");
+        assert!(renderer.line_has_prefix());
+
+        renderer.finish();
+        assert_eq!(renderer.pending(), "");
+        assert!(!renderer.line_has_prefix());
+    }
+
+    #[test]
+    fn test_progressive_streaming_list_items() {
+        let mut renderer = MarkdownRenderer::new().with_indent(2);
+
+        // List items are normal streamable text
+        renderer.push("- Item ");
+        assert_eq!(renderer.pending(), "");
+        assert!(renderer.line_has_prefix());
+
+        renderer.push("one\n");
+        assert_eq!(renderer.pending(), "");
+        assert!(!renderer.line_has_prefix());
+    }
+
+    #[test]
+    fn test_progressive_streaming_code_block_transition() {
+        let mut renderer = MarkdownRenderer::new().with_indent(2);
+
+        // Start code block
+        renderer.push("```rust\n");
+        assert!(renderer.is_in_code_block());
+        assert!(!renderer.line_has_prefix());
+
+        // Code inside block is not word-streamed
+        renderer.push("let x = ");
+        assert_eq!(renderer.pending(), "let x = ");
+        assert!(!renderer.line_has_prefix());
+
+        renderer.push("42;\n");
+        assert_eq!(renderer.pending(), "");
+        assert!(!renderer.line_has_prefix());
+
+        // Close code block
+        renderer.push("```\n");
+        assert!(!renderer.is_in_code_block());
+        assert!(!renderer.line_has_prefix());
+
+        // Normal text after code block streams progressively
+        renderer.push("Now back to normal ");
+        assert_eq!(renderer.pending(), "");
+        assert!(renderer.line_has_prefix());
+    }
+
+    #[test]
+    fn test_progressive_streaming_reset() {
+        let mut renderer = MarkdownRenderer::new().with_indent(2);
+        renderer.push("Starting word ");
+        assert!(renderer.line_has_prefix());
+
+        renderer.reset();
+        assert!(!renderer.line_has_prefix());
+        assert_eq!(renderer.pending(), "");
     }
 }
