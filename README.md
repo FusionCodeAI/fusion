@@ -195,10 +195,3 @@ See [docs/development.md](docs/development.md) for CI/CD, Termux support, and co
 ## License
 
 Licensed under [MIT](LICENSE).
-
-<div align="center">
-
-**Built with passion by Aung Myat Moe and the Fusion Community.**
-*Fast. Sovereign. Pure Rust.*
-
-</div>
