@@ -818,9 +818,14 @@ pub fn build_openai_payload(
             && msg.tool_calls.as_ref().map_or(false, |tc| !tc.is_empty());
 
         let mut item = if is_tool_call_assistant {
+            let content = if msg.content.trim().is_empty() || msg.content.starts_with("<think>") {
+                Value::Null
+            } else {
+                json!(msg.content)
+            };
             json!({
                 "role": "assistant",
-                "content": Value::Null,
+                "content": content,
             })
         } else {
             let content = if msg.content.trim().is_empty() {
@@ -1160,7 +1165,7 @@ mod tests {
         assert_eq!(msgs[1]["role"], "user");
         assert_eq!(msgs[1]["content"], "(empty message)");
         assert_eq!(msgs[2]["role"], "assistant");
-        assert_eq!(msgs[2]["content"], "Executing tools...");
+        assert_eq!(msgs[2]["content"], Value::Null);
         assert_eq!(msgs[3]["role"], "assistant");
         assert_eq!(msgs[3]["content"], "(continuing)");
         assert_eq!(msgs[4]["role"], "tool");

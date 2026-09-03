@@ -2002,7 +2002,7 @@ mod tests {
             .sound(true)
             .priority(NotificationPriority::Error)
             .category("serde_test")
-            .duration_secs(3.14);
+            .duration_secs(3.25);
 
         let json = serde_json::to_string(&notif).unwrap();
         let parsed: Notification = serde_json::from_str(&json).unwrap();

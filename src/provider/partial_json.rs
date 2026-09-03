@@ -1236,7 +1236,7 @@ mod tests {
         assert_eq!(parse_partial_json("null").unwrap(), json!(null));
         assert_eq!(parse_partial_json("123").unwrap(), json!(123));
         assert_eq!(parse_partial_json("-456").unwrap(), json!(-456));
-        assert_eq!(parse_partial_json("3.1415").unwrap(), json!(3.1415));
+        assert_eq!(parse_partial_json("3.25").unwrap(), json!(3.25));
         assert_eq!(
             parse_partial_json("\"hello world\"").unwrap(),
             json!("hello world")

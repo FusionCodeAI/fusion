@@ -1128,8 +1128,7 @@ pub async fn scan_ports(
 pub async fn find_free_ports(host: &str, start_port: u16, count: usize) -> Vec<u16> {
     let mut free_ports = Vec::new();
     let mut candidate = start_port;
-
-    while free_ports.len() < count && candidate <= 65535 {
+    while free_ports.len() < count {
         let addr = format!("{}:{}", host, candidate);
         // Try binding to the port to verify it's available
         if let Ok(listener) = TcpListener::bind(&addr).await {

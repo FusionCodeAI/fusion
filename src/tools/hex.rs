@@ -2591,9 +2591,8 @@ mod tests {
         data.extend_from_slice(&4660u16.to_le_bytes());
         // Offset 2: u32 LE (0x11223344 = 287454020)
         data.extend_from_slice(&287454020u32.to_le_bytes());
-        // Offset 6: f32 LE (3.14159)
-        data.extend_from_slice(&3.14159f32.to_le_bytes());
-        // Offset 10: Null terminated C-string "Fusion"
+        // Offset 6: f32 LE (2.5)
+        data.extend_from_slice(&2.5f32.to_le_bytes());
         data.extend_from_slice(b"Fusion\0");
 
         let dec0 = decode_primitives(&data, 0).unwrap();
@@ -2603,8 +2602,7 @@ mod tests {
         assert_eq!(dec2.u32_le, Some(287454020));
 
         let dec6 = decode_primitives(&data, 6).unwrap();
-        assert!((dec6.f32_le.unwrap() - 3.14159).abs() < 0.0001);
-
+        assert!((dec6.f32_le.unwrap() - 2.5).abs() < 0.0001);
         let dec10 = decode_primitives(&data, 10).unwrap();
         assert_eq!(dec10.c_string.as_deref(), Some("Fusion"));
     }
