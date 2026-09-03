@@ -3,7 +3,7 @@ class Fusion < Formula
   homepage "https://fusioncode.app"
   url "https://github.com/theaungmyatmoe/fusion/archive/refs/tags/v0.3.0.tar.gz"
   sha256 "0000000000000000000000000000000000000000000000000000000000000000"
-  license any_of: ["MIT", "Apache-2.0"]
+  license "MIT"
   head "https://github.com/theaungmyatmoe/fusion.git", branch: "main"
 
   depends_on "rust" => :build

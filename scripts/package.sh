@@ -413,7 +413,7 @@ Report issues at: https://github.com/theaungmyatmoe/fusion/issues
 Fusion Authors and Contributors.
 
 .SH COPYRIGHT
-Dual-licensed under MIT or Apache-2.0.
+Licensed under MIT.
 EOF
 
     # Replace version placeholder
@@ -564,11 +564,7 @@ bundle_licenses_and_docs() {
         found_license=true
     fi
     if [ -f "LICENSE-MIT" ]; then
-        cp "LICENSE-MIT" "${stage_dir}/"
-        found_license=true
-    fi
-    if [ -f "LICENSE-APACHE" ]; then
-        cp "LICENSE-APACHE" "${stage_dir}/"
+        cp "LICENSE-MIT" "${stage_dir}/LICENSE"
         found_license=true
     fi
     if [ -f "sdk/LICENSE" ] && [ "$found_license" = false ]; then

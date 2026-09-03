@@ -65,7 +65,7 @@
     "typescript"
   ],
   "author": "Aung Myat Moe",
-  "license": "MIT OR Apache-2.0",
+  "license": "MIT",
   "bugs": {
     "url": "https://github.com/theaungmyatmoe/fusion/issues"
   },

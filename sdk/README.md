@@ -6,7 +6,7 @@
 > multi-agent advisors, session checkpoints, and a turnkey xterm.js terminal adapter.
 
 [![npm version](https://img.shields.io/npm/v/@theaungmyatmoe/fusion.svg?style=flat-square)](https://www.npmjs.com/package/@theaungmyatmoe/fusion)
-[![License](https://img.shields.io/badge/License-MIT%20OR%20Apache--2.0-blue.svg?style=flat-square)](LICENSE)
+[![License](https://img.shields.io/badge/License-MIT-blue.svg?style=flat-square)](LICENSE)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.6%2B-blue.svg?style=flat-square)](#type-reference)
 [![WebAssembly](https://img.shields.io/badge/Core-Pure%20Rust%20WASM-purple.svg?style=flat-square)](#cross-environment-notes)
 [![Engines](https://img.shields.io/badge/node-%E2%89%A518-green.svg?style=flat-square)](#cross-environment-notes)
@@ -682,4 +682,4 @@ export default function Page() {
 
 ## License
 
-Dual licensed under [MIT](LICENSE) OR [Apache-2.0](http://www.apache.org/licenses/LICENSE-2.0).
+Licensed under [MIT](LICENSE).
