@@ -1,5 +1,6 @@
 pub mod inline;
 pub mod markdown;
+pub mod mermaid_ascii;
 pub mod prompt;
 pub mod repl;
 pub mod spinner;
@@ -44,10 +45,12 @@ pub use inline::{
 pub use markdown::{print_markdown, render_inline, render_line, render_markdown, MarkdownRenderer};
 pub use prompt::{Prompt, PromptResult, RawModeGuard};
 pub use repl::{
-    format_duration_compact as format_repl_duration_compact,
+    format_activity_status, format_duration_compact as format_repl_duration_compact,
     format_model_label, format_thinking_status, format_tokens_compact as format_repl_tokens_compact,
-    format_tool_tree, format_turn_summary, handle_command, parse_tool_info, print_banner,
-    print_help, render_tool_tree, render_tool_tree_to, run_repl, run_turn_ui, ToolCallItem,
+    format_tool_duration, format_tool_tree, format_turn_summary, handle_command,
+    parse_tool_active_label, parse_tool_info, print_banner, print_help, render_thinking_frame,
+    render_thinking_frame_to, render_tool_tree, render_tool_tree_to, run_repl,
+    run_repl_with_session, run_turn_ui, ToolCallItem,
 };
 pub use spinner::{format_duration, Spinner, SpinnerHandle};
 pub use slash::{

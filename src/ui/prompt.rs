@@ -58,8 +58,8 @@ impl Prompt {
         Self {
             history: Vec::new(),
             history_idx: None,
-            prompt_symbol: "\x1b[38;5;75m┃\x1b[0m ".to_string(),
-            multiline_symbol: "\x1b[38;5;75m┃\x1b[0m ".to_string(),
+            prompt_symbol: "\x1b[1m┃\x1b[0m ".to_string(),
+            multiline_symbol: "\x1b[1m┃\x1b[0m ".to_string(),
             placeholder: None,
             key_handler: KeyHandler::new(KeybindingProfile::Default),
             show_mode_indicator: false,
@@ -97,6 +97,59 @@ impl Prompt {
     /// Get active model displayed in the prompt.
     pub fn active_model(&self) -> &str {
         &self.active_model
+    }
+
+    /// Toggle whether the model picker dialog is active.
+    pub fn with_model_picker_active(mut self, active: bool) -> Self {
+        self.model_picker_active = active;
+        self
+    }
+
+    /// Set whether the model picker dialog is active.
+    pub fn set_model_picker_active(&mut self, active: bool) {
+        self.model_picker_active = active;
+    }
+
+    /// Whether the model picker dialog is active.
+    pub fn model_picker_active(&self) -> bool {
+        self.model_picker_active
+    }
+
+    /// Set the selected index for the model picker dialog.
+    pub fn with_model_selection(mut self, sel: usize) -> Self {
+        self.model_selection = sel;
+        self
+    }
+
+    /// Set the selected index for the model picker dialog.
+    pub fn set_model_selection(&mut self, sel: usize) {
+        self.model_selection = sel;
+    }
+
+    /// Get the selected index for the model picker dialog.
+    pub fn model_selection(&self) -> usize {
+        self.model_selection
+    }
+
+    /// Set the selected index for the slash command dialog.
+    pub fn with_slash_selection(mut self, sel: usize) -> Self {
+        self.slash_selection = sel;
+        self
+    }
+
+    /// Set the selected index for the slash command dialog.
+    pub fn set_slash_selection(&mut self, sel: usize) {
+        self.slash_selection = sel;
+    }
+
+    /// Get the selected index for the slash command dialog.
+    pub fn slash_selection(&self) -> usize {
+        self.slash_selection
+    }
+
+    /// Available models for the model picker dialog.
+    pub fn models(&self) -> &[(String, String)] {
+        &self.models
     }
 
     /// Set a custom prompt symbol for the first line.
@@ -573,56 +626,7 @@ impl Prompt {
 
         let mut total_lines = 0;
 
-        // 1. Clean suggestions list (if active)
-        if self.model_picker_active && !filtered_models.is_empty() {
-            let sel = self.model_selection.min(filtered_models.len().saturating_sub(1));
-            let window_start = if sel >= 6 { sel - 5 } else { 0 };
-            write!(out, "  \x1b[2;37mModels\x1b[0m\r\n")?;
-            total_lines += 1;
-            for (idx, (id, name)) in filtered_models.iter().enumerate().skip(window_start).take(6) {
-                if idx == sel {
-                    write!(
-                        out,
-                        "  \x1b[1;36m▶\x1b[0m \x1b[1;37m{:<32}\x1b[0m \x1b[2;37m{}\x1b[0m\r\n",
-                        id, name
-                    )?;
-                } else {
-                    write!(
-                        out,
-                        "    \x1b[2;37m{:<32} {}\x1b[0m\r\n",
-                        id, name
-                    )?;
-                }
-                total_lines += 1;
-            }
-            write!(out, "\r\n")?;
-            total_lines += 1;
-        } else if !slash_suggestions.is_empty() {
-            let sel = self.slash_selection.min(slash_suggestions.len().saturating_sub(1));
-            let window_start = if sel >= 6 { sel - 5 } else { 0 };
-            for (idx, item) in slash_suggestions.iter().enumerate().skip(window_start).take(6) {
-                if idx == sel {
-                    write!(
-                        out,
-                        "  \x1b[1;36m▶\x1b[0m \x1b[1;37m{:<16}\x1b[0m \x1b[2;37m{}\x1b[0m\r\n",
-                        item.name, item.description
-                    )?;
-                } else {
-                    write!(
-                        out,
-                        "    \x1b[2;37m{:<16} {}\x1b[0m\r\n",
-                        item.name, item.description
-                    )?;
-                }
-                total_lines += 1;
-            }
-            write!(out, "\r\n")?;
-            total_lines += 1;
-        }
-
-        let dialog_lines = total_lines;
-
-        // 2. Input lines with clean vertical rail symbol (┃ )
+        // 1. Input lines with clean vertical rail symbol (┃ )
         for (idx, line) in lines.iter().enumerate() {
             let prefix = if idx == 0 {
                 &self.prompt_symbol
@@ -642,39 +646,191 @@ impl Prompt {
             total_lines += 1;
         }
 
-        // 3. Blank line between input and status
-        write!(out, "\r\n")?;
-        total_lines += 1;
+        let term_cols = terminal::size().map(|(w, _)| w as usize).unwrap_or(80);
+        let divider = "─".repeat(term_cols);
 
-        // 4. Status line at the bottom: mode and model name
-        let model_label = match self.active_model.as_str() {
-            "deepseek-ai/DeepSeek-V4-Flash-0731" | "flash" | "v4" => "DeepSeek V4 Flash",
-            "MiniMaxAI/MiniMax-M2.7" | "minimax" => "MiniMax M2.7",
-            "moonshotai/Kimi-K2.6" | "kimi" => "Kimi K2.6",
-            other => {
-                if let Some((_, name)) = other.split_once('/') {
-                    name
-                } else if other.is_empty() {
-                    "auto"
+        // 2. Dropdown menu below the input line (matching fx)
+        if self.model_picker_active {
+            let sel = if filtered_models.is_empty() {
+                0
+            } else {
+                self.model_selection.min(filtered_models.len().saturating_sub(1))
+            };
+            let window_start = if sel >= 6 { sel - 5 } else { 0 };
+            let visible_models: Vec<_> = filtered_models
+                .iter()
+                .enumerate()
+                .skip(window_start)
+                .take(6)
+                .collect();
+            let visible_count = visible_models.len();
+            let window_end = if filtered_models.is_empty() {
+                0
+            } else {
+                window_start + visible_count
+            };
+
+            write!(out, "\x1b[38;5;240m{}\x1b[0m\r\n", divider)?;
+            total_lines += 1;
+
+            let left = format!("Models {} · Type to filter", filtered_models.len());
+            let right = if filtered_models.is_empty() {
+                "0-0".to_string()
+            } else {
+                format!("{}-{}", window_start + 1, window_end)
+            };
+            let gap = term_cols.saturating_sub(left.len() + right.len());
+            write!(out, "\x1b[2;37m{}{}{}\x1b[0m\r\n", left, " ".repeat(gap), right)?;
+            total_lines += 1;
+
+            write!(out, "\r\n")?;
+            total_lines += 1;
+
+            for (idx, (id, name)) in visible_models {
+                let is_selected = idx == sel;
+                let cat = model_category_label(id, name);
+                let col1_w = 34.min(term_cols.saturating_sub(30));
+                let col3_w = 12;
+                let col2_w = term_cols.saturating_sub(col1_w + col3_w + 4);
+
+                let col1 = truncate_fit(id, col1_w);
+                let col2 = truncate_fit(name, col2_w);
+
+                if is_selected {
+                    write!(
+                        out,
+                        "\x1b[1;37m{:<c1$}\x1b[0m \x1b[37m{:<c2$}\x1b[0m \x1b[2;37m{:>c3$}\x1b[0m\r\n",
+                        col1, col2, cat, c1 = col1_w, c2 = col2_w, c3 = col3_w
+                    )?;
                 } else {
-                    other
+                    write!(
+                        out,
+                        "\x1b[2;37m{:<c1$} {:<c2$} {:>c3$}\x1b[0m\r\n",
+                        col1, col2, cat, c1 = col1_w, c2 = col2_w, c3 = col3_w
+                    )?;
                 }
+                total_lines += 1;
             }
-        };
 
-        write!(out, "\x1b[2;37mauto · {}\x1b[0m", model_label)?;
-        total_lines += 1;
+            write!(out, "\x1b[38;5;240m{}\x1b[0m\r\n", divider)?;
+            total_lines += 1;
 
-        // Reposition cursor inside input box on active input row
-        let lines_up = (lines.len() - 1 - target_row) + 2;
-        execute!(out, cursor::MoveUp(lines_up as u16))?;
+            write!(out, "\x1b[2;37m↑↓ Navigate     Enter Use     Esc Close\x1b[0m")?;
+            total_lines += 1;
 
-        let prefix_col = 2; // "┃ " occupies 2 terminal cells
-        let target_x = (prefix_col + target_col) as u16;
-        execute!(out, cursor::MoveToColumn(target_x))?;
+            let lines_up = (lines.len() - 1 - target_row) + visible_count + 5;
+            execute!(out, cursor::MoveUp(lines_up as u16))?;
+            let prefix = if target_row == 0 {
+                &self.prompt_symbol
+            } else {
+                &self.multiline_symbol
+            };
+            let prefix_col = visible_width(prefix);
+            let target_x = (prefix_col + target_col) as u16;
+            execute!(out, cursor::MoveToColumn(target_x))?;
 
-        *last_rendered_lines = total_lines;
-        *last_cursor_row = dialog_lines + target_row;
+            *last_rendered_lines = total_lines;
+            *last_cursor_row = target_row;
+        } else if !slash_suggestions.is_empty() {
+            let sel = self.slash_selection.min(slash_suggestions.len().saturating_sub(1));
+            let window_start = if sel >= 6 { sel - 5 } else { 0 };
+            let visible_items: Vec<_> = slash_suggestions
+                .iter()
+                .enumerate()
+                .skip(window_start)
+                .take(6)
+                .collect();
+            let visible_count = visible_items.len();
+            let window_end = window_start + visible_count;
+
+            write!(out, "\x1b[38;5;240m{}\x1b[0m\r\n", divider)?;
+            total_lines += 1;
+
+            let noun = if first_line == "/" { "Commands" } else { "Results" };
+            let left = if first_line == "/" {
+                format!("{} {} · Type to filter", noun, slash_suggestions.len())
+            } else {
+                format!("{} {}", noun, slash_suggestions.len())
+            };
+            let right = format!("{}-{}", window_start + 1, window_end);
+            let gap = term_cols.saturating_sub(left.len() + right.len());
+            write!(out, "\x1b[2;37m{}{}{}\x1b[0m\r\n", left, " ".repeat(gap), right)?;
+            total_lines += 1;
+
+            write!(out, "\r\n")?;
+            total_lines += 1;
+
+            for (idx, item) in visible_items {
+                let is_selected = idx == sel;
+                let cat = slash_category_label(item.category);
+                let col1_w = 14;
+                let col3_w = 10;
+                let col2_w = term_cols.saturating_sub(col1_w + col3_w + 4);
+
+                let col1 = truncate_fit(item.name, col1_w);
+                let col2 = truncate_fit(item.description, col2_w);
+
+                if is_selected {
+                    write!(
+                        out,
+                        "\x1b[1;37m{:<c1$}\x1b[0m \x1b[37m{:<c2$}\x1b[0m \x1b[2;37m{:>c3$}\x1b[0m\r\n",
+                        col1, col2, cat, c1 = col1_w, c2 = col2_w, c3 = col3_w
+                    )?;
+                } else {
+                    write!(
+                        out,
+                        "\x1b[2;37m{:<c1$} {:<c2$} {:>c3$}\x1b[0m\r\n",
+                        col1, col2, cat, c1 = col1_w, c2 = col2_w, c3 = col3_w
+                    )?;
+                }
+                total_lines += 1;
+            }
+
+            write!(out, "\x1b[38;5;240m{}\x1b[0m\r\n", divider)?;
+            total_lines += 1;
+
+            write!(out, "\x1b[2;37m↑↓ Navigate     Enter Use     Esc Close\x1b[0m")?;
+            total_lines += 1;
+
+            let lines_up = (lines.len() - 1 - target_row) + visible_count + 5;
+            execute!(out, cursor::MoveUp(lines_up as u16))?;
+            let prefix = if target_row == 0 {
+                &self.prompt_symbol
+            } else {
+                &self.multiline_symbol
+            };
+            let prefix_col = visible_width(prefix);
+            let target_x = (prefix_col + target_col) as u16;
+            execute!(out, cursor::MoveToColumn(target_x))?;
+
+            *last_rendered_lines = total_lines;
+            *last_cursor_row = target_row;
+        } else {
+            // 3. Blank line between input and status
+            write!(out, "\r\n")?;
+            total_lines += 1;
+
+            // 4. Status line at the bottom: mode and model name
+            let model_label = crate::ui::repl::format_model_label(&self.active_model);
+            write!(out, "\x1b[2;37mauto · {}\x1b[0m", model_label)?;
+            total_lines += 1;
+
+            // Reposition cursor inside input box on active input row
+            let lines_up = (lines.len() - 1 - target_row) + 2;
+            execute!(out, cursor::MoveUp(lines_up as u16))?;
+
+            let prefix = if target_row == 0 {
+                &self.prompt_symbol
+            } else {
+                &self.multiline_symbol
+            };
+            let prefix_col = visible_width(prefix);
+            let target_x = (prefix_col + target_col) as u16;
+            execute!(out, cursor::MoveToColumn(target_x))?;
+
+            *last_rendered_lines = total_lines;
+            *last_cursor_row = target_row;
+        }
 
         out.flush()?;
         Ok(())
@@ -696,6 +852,40 @@ impl Prompt {
         let _ = Self::render_submitted_prompt_to(&mut stdout(), text);
     }
 }
+fn truncate_fit(s: &str, max_len: usize) -> String {
+    if max_len == 0 {
+        return String::new();
+    }
+    if s.chars().count() <= max_len {
+        s.to_string()
+    } else {
+        let keep: String = s.chars().take(max_len.saturating_sub(1)).collect();
+        format!("{}…", keep)
+    }
+}
+
+fn slash_category_label(cat: crate::ui::slash::CommandCategory) -> &'static str {
+    match cat {
+        crate::ui::slash::CommandCategory::Core => "General",
+        crate::ui::slash::CommandCategory::Session => "Session",
+        crate::ui::slash::CommandCategory::Model => "Model",
+        crate::ui::slash::CommandCategory::Config => "Config",
+    }
+}
+
+fn model_category_label(id: &str, name: &str) -> &'static str {
+    let lower = format!("{} {}", id, name).to_lowercase();
+    if lower.contains("flash") || lower.contains("fast") {
+        "Fast"
+    } else if lower.contains("reason") || lower.contains("kimi") || lower.contains("minimax") {
+        "Reasoning"
+    } else if lower.contains("code") || lower.contains("coding") {
+        "Coding"
+    } else {
+        "Model"
+    }
+}
+
 
 /// Match slash commands whose name or aliases start with the typed prefix.
 fn slash_matches(typed: &str) -> Vec<&'static crate::ui::slash::CommandDescriptor> {
@@ -931,5 +1121,98 @@ mod tests {
             let keep: String = s.chars().take(max_chars.saturating_sub(1)).collect();
             format!("{}…", keep)
         }
+    }
+
+    #[test]
+    fn test_render_model_picker_menu() {
+        let models = vec![
+            ("deepseek-ai/DeepSeek-V4-Flash-0731".to_string(), "DeepSeek V4 Flash".to_string()),
+            ("MiniMaxAI/MiniMax-M2.7".to_string(), "MiniMax M2.7".to_string()),
+            ("moonshotai/Kimi-K2.6".to_string(), "Kimi K2.6".to_string()),
+        ];
+        let prompt = Prompt::new()
+            .with_models(models)
+            .with_model_picker_active(true);
+
+        let mut buf = Vec::new();
+        let buffer: Vec<char> = Vec::new();
+        let mut last_lines = 0;
+        let mut last_cursor = 0;
+
+        prompt
+            .render_to(&mut buf, &buffer, 0, &mut last_lines, &mut last_cursor)
+            .expect("render_to model picker failed");
+
+        let raw = String::from_utf8_lossy(&buf);
+        // Header row
+        assert!(raw.contains("Models 3 · Type to filter"), "Missing header in:\n{}", raw);
+        assert!(raw.contains("1-3"), "Missing range indicator in:\n{}", raw);
+        // Top and bottom divider color
+        assert!(raw.contains("\x1b[38;5;240m"), "Missing divider color in:\n{}", raw);
+        // Footer hints
+        assert!(
+            raw.contains("↑↓ Navigate     Enter Use     Esc Close"),
+            "Missing footer in:\n{}",
+            raw
+        );
+        // Selected item bold
+        assert!(raw.contains("\x1b[1;37m"), "Missing selected bold item in:\n{}", raw);
+        // Categories
+        assert!(raw.contains("Fast"), "Missing Fast category in:\n{}", raw);
+        assert!(raw.contains("Reasoning"), "Missing Reasoning category in:\n{}", raw);
+    }
+
+    #[test]
+    fn test_render_model_picker_with_filter() {
+        let models = vec![
+            ("deepseek-ai/DeepSeek-V4-Flash-0731".to_string(), "DeepSeek V4 Flash".to_string()),
+            ("MiniMaxAI/MiniMax-M2.7".to_string(), "MiniMax M2.7".to_string()),
+        ];
+        let prompt = Prompt::new()
+            .with_models(models)
+            .with_model_picker_active(true);
+
+        let mut buf = Vec::new();
+        let buffer: Vec<char> = "flash".chars().collect();
+        let mut last_lines = 0;
+        let mut last_cursor = 0;
+
+        prompt
+            .render_to(&mut buf, &buffer, 5, &mut last_lines, &mut last_cursor)
+            .expect("render_to filtered model picker failed");
+
+        let raw = String::from_utf8_lossy(&buf);
+        assert!(raw.contains("Models 1 · Type to filter"));
+        assert!(raw.contains("deepseek-ai/DeepSeek-V4-Flash"));
+        assert!(!raw.contains("MiniMax-M2.7"));
+    }
+
+    #[test]
+    fn test_render_slash_suggestions_menu() {
+        let prompt = Prompt::new();
+        let mut buf = Vec::new();
+        let buffer: Vec<char> = "/".chars().collect();
+        let mut last_lines = 0;
+        let mut last_cursor = 0;
+
+        prompt
+            .render_to(&mut buf, &buffer, 1, &mut last_lines, &mut last_cursor)
+            .expect("render_to slash suggestions failed");
+
+        let raw = String::from_utf8_lossy(&buf);
+        assert!(raw.contains("Commands"), "Missing Commands header in:\n{}", raw);
+        assert!(raw.contains("Type to filter"), "Missing filter hint in:\n{}", raw);
+        assert!(raw.contains("↑↓ Navigate     Enter Use     Esc Close"));
+        assert!(raw.contains("/help") || raw.contains("/model") || raw.contains("/clear"));
+    }
+
+    #[test]
+    fn test_model_category_labels() {
+        assert_eq!(model_category_label("gpt-4o-fast", "Fast GPT"), "Fast");
+        assert_eq!(model_category_label("deepseek-ai/DeepSeek-V4-Flash-0731", "DeepSeek V4 Flash"), "Fast");
+        assert_eq!(model_category_label("moonshotai/Kimi-K2.6", "Kimi K2.6"), "Reasoning");
+        assert_eq!(model_category_label("MiniMaxAI/MiniMax-M2.7", "MiniMax M2.7"), "Reasoning");
+        assert_eq!(model_category_label("qwen/qwen-coder-32b", "Qwen Coder"), "Coding");
+        assert_eq!(model_category_label("custom-model", "Custom Model"), "Model");
     }
 }

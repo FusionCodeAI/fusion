@@ -1936,10 +1936,7 @@ fn handle_model(name: Option<&str>, runner: &mut AgentRunner, session: &mut Sess
         runner.config_mut().default_provider = provider.clone();
         runner.config_mut().default_model = canonical_model.clone();
         session.set_active_model(&canonical_model);
-        println!(
-            "\x1b[1;32m✓\x1b[0m Switched active model to \x1b[1;37m{}\x1b[0m (provider: \x1b[1;33m{}\x1b[0m)\n",
-            canonical_model, provider
-        );
+        println!("\x1b[2;37m● Switched to {}\x1b[0m\r\n", canonical_model);
     } else {
         print_model_info(runner, session);
     }

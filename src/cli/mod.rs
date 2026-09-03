@@ -42,6 +42,10 @@ pub struct Cli {
     /// Generate shell completion script (bash, zsh, fish, powershell, elvish)
     #[arg(long = "generate-completion", value_name = "SHELL")]
     pub generate_completion: Option<clap_complete::Shell>,
+
+    /// Resume a previously saved session by id or prefix
+    #[arg(short = 'r', long, value_name = "SESSION_ID")]
+    pub resume: Option<String>,
 }
 
 #[cfg(test)]

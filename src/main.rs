@@ -108,9 +108,19 @@ async fn main() -> anyhow::Result<()> {
         }
     } else {
         // Interactive REPL with inline Ratatui UI
-        fusion::ui::run_repl(runner).await?;
+        let initial_session = if let Some(session_id) = &cli.resume {
+            match fusion::agent::Session::load_from_str(session_id) {
+                Ok(s) => Some(s),
+                Err(e) => {
+                    eprintln!("Failed to resume session '{}': {}", session_id, e);
+                    None
+                }
+            }
+        } else {
+            None
+        };
+        fusion::ui::run_repl_with_session(runner, initial_session).await?;
     }
-
     Ok(())
 }
 

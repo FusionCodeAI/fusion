@@ -25,6 +25,7 @@ pub struct MarkdownRenderer {
     /// Frames consumed so far; advanced each time a spinner frame is printed.
     spinner_frame_idx: usize,
     indent: usize,
+    mermaid_buffer: Vec<String>,
 }
 /// Inline spinner rendered at the start of the current streaming line.
 /// Mirrors the visual language of `super::spinner` without spawning a task.
@@ -74,6 +75,7 @@ impl MarkdownRenderer {
             spinner: None,
             spinner_frame_idx: 0,
             indent: 0,
+            mermaid_buffer: Vec::new(),
         }
     }
 
@@ -88,6 +90,7 @@ impl MarkdownRenderer {
             spinner: None,
             spinner_frame_idx: 0,
             indent: 0,
+            mermaid_buffer: Vec::new(),
         }
     }
 
@@ -131,6 +134,7 @@ impl MarkdownRenderer {
         self.buffer.clear();
         self.in_code_block = false;
         self.code_lang.clear();
+        self.mermaid_buffer.clear();
         self.table_streamer = super::table::MarkdownTableStreamer::new();
         self.spinner = None;
         self.spinner_frame_idx = 0;
@@ -141,33 +145,30 @@ impl MarkdownRenderer {
     fn emit(&mut self, formatted: &str, output: &mut String) {
         if self.indent > 0 {
             let indent_prefix = " ".repeat(self.indent);
-            let mut first = true;
             for line in formatted.split('\n') {
-                if !first {
-                    output.push('\n');
-                    if self.stream_stdout {
-                        println!();
-                    }
-                }
-                first = false;
                 if !line.is_empty() {
                     output.push_str(&indent_prefix);
                     output.push_str(line);
                     if self.stream_stdout {
-                        print!("{}{}", indent_prefix, line);
+                        print!("{}{}\r\n", indent_prefix, line);
                     }
+                } else if self.stream_stdout {
+                    print!("\r\n");
                 }
+                output.push('\n');
             }
-            output.push('\n');
             if self.stream_stdout {
-                println!();
                 let _ = stdout().flush();
             }
         } else {
-            output.push_str(formatted);
-            output.push('\n');
+            for line in formatted.split('\n') {
+                output.push_str(line);
+                output.push('\n');
+                if self.stream_stdout {
+                    print!("{}\r\n", line);
+                }
+            }
             if self.stream_stdout {
-                println!("{}", formatted);
                 let _ = stdout().flush();
             }
         }
@@ -180,16 +181,38 @@ impl MarkdownRenderer {
             self.table_streamer.feed_line(line);
             return;
         }
-
         if self.table_streamer.is_buffering() {
             let table_out = self.table_streamer.flush();
             self.emit(&table_out, output);
         }
 
+        // Handle buffering and rendering of Mermaid diagram code blocks
+        if self.in_code_block && self.code_lang.eq_ignore_ascii_case("mermaid") {
+            if trimmed.starts_with("```") {
+                let mermaid_src = self.mermaid_buffer.join("\n");
+                self.mermaid_buffer.clear();
+                self.in_code_block = false;
+                self.code_lang.clear();
+
+                if let Some(ascii_art) = super::mermaid_ascii::render_mermaid_ascii(&mermaid_src) {
+                    self.emit(ascii_art.trim_end(), output);
+                } else {
+                    for l in mermaid_src.lines() {
+                        self.emit(l, output);
+                    }
+                }
+                let end_border = format!("\x1b[38;5;240m└{}\x1b[0m", "─".repeat(BORDER_WIDTH));
+                self.emit(&end_border, output);
+                return;
+            } else {
+                self.mermaid_buffer.push(line.to_string());
+                return;
+            }
+        }
+
         let formatted = render_line(line, &mut self.in_code_block, &mut self.code_lang);
         self.emit(&formatted, output);
     }
-
     /// Feed a streaming token or text chunk into the renderer.
     /// Returns any newly formatted output produced.
     pub fn push(&mut self, chunk: &str) -> String {
@@ -236,16 +259,23 @@ impl MarkdownRenderer {
             let table_out = self.table_streamer.flush();
             self.emit(&table_out, &mut output);
         }
+        if self.in_code_block && self.code_lang.eq_ignore_ascii_case("mermaid") {
+            let mermaid_src = self.mermaid_buffer.join("\n");
+            self.mermaid_buffer.clear();
+            if let Some(ascii_art) = super::mermaid_ascii::render_mermaid_ascii(&mermaid_src) {
+                self.emit(ascii_art.trim_end(), &mut output);
+            } else {
+                for l in mermaid_src.lines() {
+                    self.emit(l, &mut output);
+                }
+            }
+        }
 
         if self.in_code_block {
             self.in_code_block = false;
             self.code_lang.clear();
-            let end_border = format!("\x1b[38;5;240m└{}\x1b[0m\n", "─".repeat(BORDER_WIDTH));
-            output.push_str(&end_border);
-            if self.stream_stdout {
-                print!("{}", end_border);
-                let _ = stdout().flush();
-            }
+            let end_border = format!("\x1b[38;5;240m└{}\x1b[0m", "─".repeat(BORDER_WIDTH));
+            self.emit(&end_border, &mut output);
         }
 
         output
@@ -259,7 +289,8 @@ impl Default for MarkdownRenderer {
 }
 pub fn print_markdown(text: &str) {
     let rendered = render_markdown(text);
-    print!("{}", rendered);
+    let normalized = rendered.replace("\r\n", "\n").replace('\n', "\r\n");
+    print!("{}", normalized);
     let _ = stdout().flush();
 }
 
@@ -338,8 +369,12 @@ pub fn render_line(line: &str, in_code_block: &mut bool, code_lang: &mut String)
         }
     }
 
-    // Inside code block: render with left border and syntax coloring
+    // Inside code block: render diagrams and plain text cleanly without left bar
     if *in_code_block {
+        let is_plain = matches!(code_lang.to_lowercase().as_str(), "text" | "ascii" | "mermaid" | "");
+        if is_plain {
+            return line.to_string();
+        }
         let highlighted = highlight_code_line(line, code_lang);
         return format!("\x1b[38;5;240m│\x1b[0m {}", highlighted);
     }
@@ -1103,5 +1138,32 @@ mod tests {
         renderer.reset();
         assert!(!renderer.is_in_code_block());
         assert_eq!(renderer.code_lang(), "");
+    }
+    #[test]
+    fn test_renderer_indent_and_blank_lines() {
+        let mut renderer = MarkdownRenderer::buffered().with_indent(2);
+        let output = renderer.push("Line 1\n\nLine 2\n");
+        assert_eq!(output, "  Line 1\n\n  Line 2\n");
+    }
+
+    #[test]
+    fn test_renderer_indent_unclosed_code_block() {
+        let mut renderer = MarkdownRenderer::buffered().with_indent(4);
+        let chunk = renderer.push("```python\nprint('hi')\n");
+        assert!(chunk.starts_with("    \x1b[38;5;240m┌──"));
+        let finished = renderer.finish();
+        assert!(finished.starts_with("    \x1b[38;5;240m└"));
+    }
+
+    #[test]
+    fn test_mermaid_block_renders_ascii_diagram() {
+        let mut renderer = MarkdownRenderer::buffered();
+        let mut output = renderer.push("```mermaid\ngraph TD\n    A[Start] --> B[Process]\n    B --> C[End]\n```\n");
+        output.push_str(&renderer.finish());
+        assert!(output.contains("+---------"));
+        assert!(output.contains("Start"));
+        assert!(output.contains("Process"));
+        assert!(output.contains("End"));
+        assert!(output.contains("v"));
     }
 }

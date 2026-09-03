@@ -2978,7 +2978,11 @@ fn truncate_output(s: &str, max_chars: usize) -> String {
     if s.len() <= max_chars {
         s.to_string()
     } else {
-        format!("{}... [truncated {} chars]", &s[..max_chars], s.len() - max_chars)
+        let mut boundary = max_chars;
+        while boundary > 0 && !s.is_char_boundary(boundary) {
+            boundary -= 1;
+        }
+        format!("{}... [truncated {} chars]", &s[..boundary], s.len().saturating_sub(boundary))
     }
 }
 
@@ -3015,6 +3019,15 @@ fn get_hostname() -> Option<String> {
 mod tests {
     use super::*;
     use tempfile::tempdir;
+
+    #[test]
+    fn test_truncate_output_utf8_char_boundary() {
+        // '├' is 3 bytes (E2 94 9C)
+        let s = "a".repeat(2046) + "├── [ 174 KB] acp/";
+        let truncated = truncate_output(&s, 2048);
+        assert!(truncated.contains("... [truncated"));
+        assert!(truncated.starts_with(&"a".repeat(2046)));
+    }
 
     #[test]
     fn test_recovery_state_creation() {
@@ -3794,7 +3807,7 @@ mod tests {
             1,
             Some(&session),
             0,
-            &["gpt-4o".into(), "claude-3-5-sonnet".into(), "deepseek-chat".into(), "gpt-4o-mini".into()],
+            &["gpt-4o".into(), "claude-3-5-sonnet".into(), "deepseek-chat".into(), "gpt-4o-mini".into(), "gemini-1.5-pro".into()],
         );
 
         assert_eq!(decision.error_class.name(), "AuthenticationOrQuota");
