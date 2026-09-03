@@ -230,27 +230,41 @@ pub fn parse_tool_info(name: &str, args: &serde_json::Value) -> (String, String)
             let pattern = args
                 .get("pattern")
                 .or_else(|| args.get("glob"))
+                .or_else(|| args.get("path"))
                 .and_then(|v| v.as_str())
                 .unwrap_or("*");
             (format!("Matched {}", pattern), "list".to_string())
         }
         "grep" | "file_grep" | "grep_files" => {
-            let pattern = args
-                .get("pattern")
-                .or_else(|| args.get("query"))
+            let query = args
+                .get("query")
+                .or_else(|| args.get("pattern"))
+                .or_else(|| args.get("q"))
                 .and_then(|v| v.as_str())
                 .unwrap_or("");
-            (format!("Searched {}", pattern), "list".to_string())
+            (format!("Searched {}", query), "read".to_string())
         }
-        "file" | "read" | "file_read" | "read_file" => {
+        "read" | "file_read" | "read_file" => {
+            let path = args
+                .get("path")
+                .or_else(|| args.get("file"))
+                .or_else(|| args.get("filepath"))
+                .and_then(|v| v.as_str())
+                .unwrap_or("file");
+            (format!("Read {}", path), "read".to_string())
+        }
+        "file" => {
             let action = args.get("action").and_then(|v| v.as_str()).unwrap_or("read");
             let path = args
                 .get("path")
                 .or_else(|| args.get("file"))
+                .or_else(|| args.get("filepath"))
                 .and_then(|v| v.as_str())
                 .unwrap_or("file");
             if action == "write" {
                 (format!("Wrote {}", path), "write".to_string())
+            } else if action == "edit" {
+                (format!("Edited {}", path), "edit".to_string())
             } else {
                 (format!("Read {}", path), "read".to_string())
             }
@@ -259,6 +273,7 @@ pub fn parse_tool_info(name: &str, args: &serde_json::Value) -> (String, String)
             let path = args
                 .get("path")
                 .or_else(|| args.get("file"))
+                .or_else(|| args.get("filepath"))
                 .and_then(|v| v.as_str())
                 .unwrap_or("file");
             (format!("Wrote {}", path), "write".to_string())
@@ -267,6 +282,7 @@ pub fn parse_tool_info(name: &str, args: &serde_json::Value) -> (String, String)
             let path = args
                 .get("path")
                 .or_else(|| args.get("file"))
+                .or_else(|| args.get("filepath"))
                 .and_then(|v| v.as_str())
                 .unwrap_or("file");
             (format!("Edited {}", path), "edit".to_string())
@@ -275,11 +291,12 @@ pub fn parse_tool_info(name: &str, args: &serde_json::Value) -> (String, String)
             let path = args
                 .get("path")
                 .or_else(|| args.get("file"))
+                .or_else(|| args.get("filepath"))
                 .and_then(|v| v.as_str())
                 .unwrap_or("file");
             (format!("Patched {}", path), "edit".to_string())
         }
-        "bash" | "shell" | "process" => {
+        "bash" | "shell" | "process" | "cmd" | "command" | "exec" => {
             let cmd = args
                 .get("command")
                 .or_else(|| args.get("cmd"))
@@ -300,16 +317,30 @@ pub fn parse_tool_info(name: &str, args: &serde_json::Value) -> (String, String)
             };
             (format!("Ran {}", preview), "command".to_string())
         }
-        "web_search" => {
+        "tree" | "list" | "list_dir" | "dir_list" => {
+            let path = args
+                .get("path")
+                .or_else(|| args.get("dir"))
+                .or_else(|| args.get("directory"))
+                .and_then(|v| v.as_str())
+                .unwrap_or(".");
+            (format!("Listed {}", path), "list".to_string())
+        }
+        "web_search" | "search" => {
             let q = args
                 .get("query")
                 .or_else(|| args.get("q"))
+                .or_else(|| args.get("pattern"))
                 .and_then(|v| v.as_str())
                 .unwrap_or("");
             (format!("Searched {}", q), "read".to_string())
         }
         "fetch" | "web_fetch" => {
-            let url = args.get("url").and_then(|v| v.as_str()).unwrap_or("");
+            let url = args
+                .get("url")
+                .or_else(|| args.get("uri"))
+                .and_then(|v| v.as_str())
+                .unwrap_or("");
             (format!("Fetched {}", url), "read".to_string())
         }
         other => (format!("Used {}", other), "other".to_string()),
@@ -332,27 +363,41 @@ pub fn parse_tool_active_label(name: &str, args: &serde_json::Value) -> String {
             let pattern = args
                 .get("pattern")
                 .or_else(|| args.get("glob"))
+                .or_else(|| args.get("path"))
                 .and_then(|v| v.as_str())
                 .unwrap_or("*");
             format!("Matching {}", pattern)
         }
         "grep" | "file_grep" | "grep_files" => {
             let pattern = args
-                .get("pattern")
-                .or_else(|| args.get("query"))
+                .get("query")
+                .or_else(|| args.get("pattern"))
+                .or_else(|| args.get("q"))
                 .and_then(|v| v.as_str())
                 .unwrap_or("");
             format!("Searching {}", pattern)
         }
-        "file" | "read" | "file_read" | "read_file" => {
+        "read" | "file_read" | "read_file" => {
+            let path = args
+                .get("path")
+                .or_else(|| args.get("file"))
+                .or_else(|| args.get("filepath"))
+                .and_then(|v| v.as_str())
+                .unwrap_or("file");
+            format!("Reading {}", path)
+        }
+        "file" => {
             let action = args.get("action").and_then(|v| v.as_str()).unwrap_or("read");
             let path = args
                 .get("path")
                 .or_else(|| args.get("file"))
+                .or_else(|| args.get("filepath"))
                 .and_then(|v| v.as_str())
                 .unwrap_or("file");
             if action == "write" {
                 format!("Writing {}", path)
+            } else if action == "edit" {
+                format!("Editing {}", path)
             } else {
                 format!("Reading {}", path)
             }
@@ -361,6 +406,7 @@ pub fn parse_tool_active_label(name: &str, args: &serde_json::Value) -> String {
             let path = args
                 .get("path")
                 .or_else(|| args.get("file"))
+                .or_else(|| args.get("filepath"))
                 .and_then(|v| v.as_str())
                 .unwrap_or("file");
             format!("Writing {}", path)
@@ -369,6 +415,7 @@ pub fn parse_tool_active_label(name: &str, args: &serde_json::Value) -> String {
             let path = args
                 .get("path")
                 .or_else(|| args.get("file"))
+                .or_else(|| args.get("filepath"))
                 .and_then(|v| v.as_str())
                 .unwrap_or("file");
             format!("Editing {}", path)
@@ -377,11 +424,12 @@ pub fn parse_tool_active_label(name: &str, args: &serde_json::Value) -> String {
             let path = args
                 .get("path")
                 .or_else(|| args.get("file"))
+                .or_else(|| args.get("filepath"))
                 .and_then(|v| v.as_str())
                 .unwrap_or("file");
             format!("Patching {}", path)
         }
-        "bash" | "shell" | "process" => {
+        "bash" | "shell" | "process" | "cmd" | "command" | "exec" => {
             let cmd = args
                 .get("command")
                 .or_else(|| args.get("cmd"))
@@ -402,16 +450,30 @@ pub fn parse_tool_active_label(name: &str, args: &serde_json::Value) -> String {
             };
             format!("Running {}", preview)
         }
-        "web_search" => {
+        "tree" | "list" | "list_dir" | "dir_list" => {
+            let path = args
+                .get("path")
+                .or_else(|| args.get("dir"))
+                .or_else(|| args.get("directory"))
+                .and_then(|v| v.as_str())
+                .unwrap_or(".");
+            format!("Listing {}", path)
+        }
+        "web_search" | "search" => {
             let q = args
                 .get("query")
                 .or_else(|| args.get("q"))
+                .or_else(|| args.get("pattern"))
                 .and_then(|v| v.as_str())
                 .unwrap_or("");
             format!("Searching {}", q)
         }
         "fetch" | "web_fetch" => {
-            let url = args.get("url").and_then(|v| v.as_str()).unwrap_or("");
+            let url = args
+                .get("url")
+                .or_else(|| args.get("uri"))
+                .and_then(|v| v.as_str())
+                .unwrap_or("");
             format!("Fetching {}", url)
         }
         other => format!("Using {}", other),
@@ -453,7 +515,17 @@ pub fn format_tool_tree(tool_batch: &[ToolCallItem]) -> String {
     let mut out = format!("● {} {}{}\n", total, call_label, breakdown_str);
     for (i, item) in tool_batch.iter().enumerate() {
         let connector = if i == total - 1 { "└ " } else { "├ " };
-        out.push_str(&format!("{}{}\n", connector, item.label));
+        let display_label = if item.failed && !item.label.starts_with("Failed ") && !item.label.starts_with("Exited ") {
+            if item.category == "command" {
+                let cmd = item.label.strip_prefix("Ran ").unwrap_or(&item.label);
+                format!("Exited 1 {}", cmd)
+            } else {
+                format!("Failed {}", item.label)
+            }
+        } else {
+            item.label.clone()
+        };
+        out.push_str(&format!("{}{}\n", connector, display_label));
     }
     out
 }
@@ -504,7 +576,21 @@ pub fn render_tool_tree_to<W: std::io::Write>(out: &mut W, tool_batch: &[ToolCal
     write!(out, "\r\n\x1b[2;37m● {} {}{}\x1b[0m\r\n", total, call_label, breakdown_str)?;
     for (i, item) in tool_batch.iter().enumerate() {
         let connector = if i == total - 1 { "└ " } else { "├ " };
-        write!(out, "\x1b[2;37m{}{}\x1b[0m\r\n", connector, item.label)?;
+        let display_label = if item.failed && !item.label.starts_with("Failed ") && !item.label.starts_with("Exited ") {
+            if item.category == "command" {
+                let cmd = item.label.strip_prefix("Ran ").unwrap_or(&item.label);
+                format!("Exited 1 {}", cmd)
+            } else {
+                format!("Failed {}", item.label)
+            }
+        } else {
+            item.label.clone()
+        };
+        if item.failed {
+            write!(out, "\x1b[2;37m{}\x1b[31m{}\x1b[0m\r\n", connector, display_label)?;
+        } else {
+            write!(out, "\x1b[2;37m{}{}\x1b[0m\r\n", connector, display_label)?;
+        }
     }
     write!(out, "\r\n")?;
     out.flush()?;
@@ -568,6 +654,7 @@ pub async fn run_turn_ui(
     let mut ticker = tokio::time::interval(std::time::Duration::from_millis(200));
 
     prompt.reset_input();
+    prompt.set_running(true);
 
     loop {
         tokio::select! {
@@ -613,6 +700,7 @@ pub async fn run_turn_ui(
                             }
                             PromptResult::Cancel => {
                                 let _ = prompt.clear_frame();
+                                prompt.set_running(false);
                                 prompt.set_running_status(None);
                                 prompt.set_queued_count(0);
                                 let mut out = stdout();
@@ -627,6 +715,7 @@ pub async fn run_turn_ui(
                             }
                             PromptResult::Exit => {
                                 let _ = prompt.clear_frame();
+                                prompt.set_running(false);
                                 prompt.set_running_status(None);
                                 prompt.set_queued_count(0);
                                 return Ok((String::new(), queued_prompts));
@@ -649,8 +738,15 @@ pub async fn run_turn_ui(
                             }
                             output_tokens += crate::agent::tokens::estimate_text_tokens(&d) as u64;
                             md.push(&d);
+                            let _ = prompt.render_current();
                         }
                         AgentEvent::ThinkingDelta(th) => {
+                            if !tool_batch.is_empty() {
+                                let _ = prompt.clear_frame();
+                                prompt.set_running_status(None);
+                                render_tool_tree(&tool_batch);
+                                tool_batch.clear();
+                            }
                             output_tokens += crate::agent::tokens::estimate_text_tokens(&th) as u64;
                         }
                         AgentEvent::ToolStarted { name, args, .. } => {
@@ -684,11 +780,15 @@ pub async fn run_turn_ui(
                             }
                             let _ = prompt.clear_frame();
                             prompt.set_running_status(None);
-                            if !tool_batch.is_empty() {
+                            is_thinking = true;
+                        }
+                        AgentEvent::Status(msg) => {
+                            if msg.contains("Waiting for model response") && !tool_batch.is_empty() {
+                                let _ = prompt.clear_frame();
+                                prompt.set_running_status(None);
                                 render_tool_tree(&tool_batch);
                                 tool_batch.clear();
                             }
-                            is_thinking = true;
                         }
                         AgentEvent::Finished { usage } => {
                             if let Some(u) = &usage {
@@ -704,6 +804,7 @@ pub async fn run_turn_ui(
                     }
                 }
                 let _ = prompt.clear_frame();
+                prompt.set_running(false);
                 prompt.set_running_status(None);
                 prompt.set_queued_count(0);
                 if !tool_batch.is_empty() {
@@ -725,6 +826,12 @@ pub async fn run_turn_ui(
             Some(event) = rx.recv() => {
                 match event {
                     AgentEvent::ThinkingDelta(th) => {
+                        if !tool_batch.is_empty() {
+                            let _ = prompt.clear_frame();
+                            prompt.set_running_status(None);
+                            render_tool_tree(&tool_batch);
+                            tool_batch.clear();
+                        }
                         output_tokens += crate::agent::tokens::estimate_text_tokens(&th) as u64;
                     }
                     AgentEvent::TextDelta(d) => {
@@ -738,6 +845,7 @@ pub async fn run_turn_ui(
                         }
                         output_tokens += crate::agent::tokens::estimate_text_tokens(&d) as u64;
                         md.push(&d);
+                        let _ = prompt.render_current();
                     }
                     AgentEvent::ToolStarted { name, args, .. } => {
                         let active_label = parse_tool_active_label(&name, &args);
@@ -770,14 +878,19 @@ pub async fn run_turn_ui(
                         }
                         let _ = prompt.clear_frame();
                         prompt.set_running_status(None);
-                        if !tool_batch.is_empty() {
+                        is_thinking = true;
+                    }
+                    AgentEvent::Status(msg) => {
+                        if msg.contains("Waiting for model response") && !tool_batch.is_empty() {
+                            let _ = prompt.clear_frame();
+                            prompt.set_running_status(None);
                             render_tool_tree(&tool_batch);
                             tool_batch.clear();
                         }
-                        is_thinking = true;
                     }
                     AgentEvent::Error(err) => {
                         let _ = prompt.clear_frame();
+                        prompt.set_running(false);
                         prompt.set_running_status(None);
                         let mut out = stdout();
                         let _ = write!(out, "\r\n\x1b[31m❌ Error: {}\x1b[0m\r\n\r\n", err);
@@ -792,11 +905,14 @@ pub async fn run_turn_ui(
                                 output_tokens = ct;
                             }
                         }
+                        let _ = prompt.clear_frame();
+                        prompt.set_running_status(None);
                         if !tool_batch.is_empty() {
                             render_tool_tree(&tool_batch);
                             tool_batch.clear();
                         }
                         md.finish();
+                        let _ = prompt.render_current();
                     }
                     _ => {}
                 }
@@ -1000,7 +1116,7 @@ mod tests {
 
         let (label, cat) = parse_tool_info("grep", &serde_json::json!({ "pattern": "mermaid" }));
         assert_eq!(label, "Searched mermaid");
-        assert_eq!(cat, "list");
+        assert_eq!(cat, "read");
 
         let (label, cat) = parse_tool_info("file", &serde_json::json!({ "action": "read", "path": "README.md" }));
         assert_eq!(label, "Read README.md");
@@ -1010,9 +1126,25 @@ mod tests {
         assert_eq!(label, "Wrote test.txt");
         assert_eq!(cat, "write");
 
+        let (label, cat) = parse_tool_info("edit", &serde_json::json!({ "path": "src/main.rs" }));
+        assert_eq!(label, "Edited src/main.rs");
+        assert_eq!(cat, "edit");
+
         let (label, cat) = parse_tool_info("bash", &serde_json::json!({ "command": "which browser-use || python3 -m site --user-base" }));
         assert_eq!(label, "Ran which browser-use || python3 -m site --user-base");
         assert_eq!(cat, "command");
+
+        let (label, cat) = parse_tool_info("tree", &serde_json::json!({ "path": "src/ui" }));
+        assert_eq!(label, "Listed src/ui");
+        assert_eq!(cat, "list");
+
+        let (label, cat) = parse_tool_info("web_search", &serde_json::json!({ "query": "rust async" }));
+        assert_eq!(label, "Searched rust async");
+        assert_eq!(cat, "read");
+
+        let (label, cat) = parse_tool_info("fetch", &serde_json::json!({ "url": "https://example.com" }));
+        assert_eq!(label, "Fetched https://example.com");
+        assert_eq!(cat, "read");
     }
 
     #[test]
@@ -1075,6 +1207,48 @@ mod tests {
             formatted_cmds,
             "● 2 tool calls · 2 commands\n├ Ran echo 1\n└ Ran echo 2\n"
         );
+
+        let batch_4 = vec![
+            ToolCallItem::new("glob", "Matched **/*.{md,mmd,puml,dot,svg,drawio,excalidraw}", "list"),
+            ToolCallItem::new("glob", "Matched **/*diagram*", "list"),
+            ToolCallItem::new("grep", "Searched mermaid", "read"),
+            ToolCallItem::new("glob", "Matched README*", "list"),
+        ];
+        let formatted_4 = format_tool_tree(&batch_4);
+        assert_eq!(
+            formatted_4,
+            "● 4 tool calls · 3 list · 1 read\n├ Matched **/*.{md,mmd,puml,dot,svg,drawio,excalidraw}\n├ Matched **/*diagram*\n├ Searched mermaid\n└ Matched README*\n"
+        );
+
+        let batch_8 = vec![
+            ToolCallItem::new("file", "Read docs/architecture.md", "read"),
+            ToolCallItem::new("file", "Read README.md", "read"),
+            ToolCallItem::new("grep", "Searched ```mermaid", "read"),
+            ToolCallItem::new("glob", "Matched docs/**/*", "list"),
+            ToolCallItem::new("grep", "Searched graph TD", "read"),
+            ToolCallItem::new("file", "Read docs/agents.md", "read"),
+            ToolCallItem::new("file", "Read docs/vision.md", "read"),
+            ToolCallItem::new("grep", "Searched ```text", "read"),
+        ];
+        let formatted_8 = format_tool_tree(&batch_8);
+        assert_eq!(
+            formatted_8,
+            "● 8 tool calls · 7 read · 1 list\n├ Read docs/architecture.md\n├ Read README.md\n├ Searched ```mermaid\n├ Matched docs/**/*\n├ Searched graph TD\n├ Read docs/agents.md\n├ Read docs/vision.md\n└ Searched ```text\n"
+        );
+    }
+
+    #[test]
+    fn test_render_tool_tree_ansi_colors() {
+        let mut buf = Vec::new();
+        let items = vec![
+            ToolCallItem::new("bash", "Ran echo hello", "command"),
+            ToolCallItem::new("bash", "Ran false", "command").with_failed(true),
+        ];
+        render_tool_tree_to(&mut buf, &items).unwrap();
+        let s = String::from_utf8_lossy(&buf);
+        assert!(s.contains("● 2 tool calls · 2 commands · 1 failed"));
+        assert!(s.contains("├ Ran echo hello"));
+        assert!(s.contains("\x1b[31mExited 1 false\x1b[0m"));
     }
 
     #[test]

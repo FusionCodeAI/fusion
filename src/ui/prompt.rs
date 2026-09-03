@@ -46,6 +46,7 @@ pub struct Prompt {
     active_model: String,
     pub running_status: Option<String>,
     pub queued_count: usize,
+    pub is_running: bool,
     pub buffer: Vec<char>,
     pub cursor_pos: usize,
     saved_current: String,
@@ -81,6 +82,7 @@ impl Prompt {
             active_model: String::new(),
             running_status: None,
             queued_count: 0,
+            is_running: false,
             buffer: Vec::new(),
             cursor_pos: 0,
             saved_current: String::new(),
@@ -343,6 +345,7 @@ impl Prompt {
         self.last_cursor_row = 0;
         self.running_status = None;
         self.queued_count = 0;
+        self.is_running = false;
         if self.key_handler.profile() == KeybindingProfile::Vi {
             self.key_handler.set_vi_mode(ViMode::Insert);
         }
@@ -368,6 +371,21 @@ impl Prompt {
     /// Get number of queued messages.
     pub fn queued_count(&self) -> usize {
         self.queued_count
+    }
+    /// Update active running state of the prompt.
+    pub fn set_running(&mut self, running: bool) {
+        self.is_running = running;
+    }
+
+    /// Builder method to set active running state.
+    pub fn with_running(mut self, running: bool) -> Self {
+        self.is_running = running;
+        self
+    }
+
+    /// Check whether the prompt is currently in an active running state.
+    pub fn is_running(&self) -> bool {
+        self.is_running
     }
     /// Render current prompt state to stdout.
     pub fn render_current(&mut self) -> std::io::Result<()> {
@@ -640,13 +658,15 @@ impl Prompt {
                             return Ok(None);
                         }
                         self.clear_frame()?;
-                        let mut out = stdout();
-                        let lines: Vec<&str> = text.split('\n').collect();
-                        for line in &lines {
-                            let _ = write!(out, "\x1b[1m┃ {}\x1b[0m\r\n", line);
+                        if !self.is_running && self.running_status.is_none() && self.queued_count == 0 {
+                            let mut out = stdout();
+                            let lines: Vec<&str> = text.split('\n').collect();
+                            for line in &lines {
+                                let _ = write!(out, "\x1b[1m┃ {}\x1b[0m\r\n", line);
+                            }
+                            let _ = write!(out, "\r\n");
+                            let _ = out.flush();
                         }
-                        let _ = write!(out, "\r\n");
-                        let _ = out.flush();
                         self.add_history(text.clone());
                         self.buffer.clear();
                         self.cursor_pos = 0;
@@ -853,7 +873,7 @@ impl Prompt {
             }
             let status_text = if self.queued_count > 0 {
                 format!("queued {} · enter queue · {}", self.queued_count, status_body)
-            } else if self.running_status.is_some() {
+            } else if self.running_status.is_some() || self.is_running {
                 format!("enter queue · {}", status_body)
             } else {
                 status_body
@@ -1040,7 +1060,7 @@ impl Prompt {
             }
             let status_text = if self.queued_count > 0 {
                 format!("queued {} · enter queue · {}", self.queued_count, status_body)
-            } else if self.running_status.is_some() {
+            } else if self.running_status.is_some() || self.is_running {
                 format!("enter queue · {}", status_body)
             } else {
                 status_body
@@ -1701,5 +1721,47 @@ mod tests {
         assert!(!raw.contains("enter queue"), "Idle status should not contain enter queue");
         assert!(raw.contains("auto · grok-4.6"), "Missing auto status in:\n{}", raw);
         assert_eq!(last_cursor, 0, "last_cursor_row should be 0 (0 running + 0 queue banner + 0 target_row)");
+    }
+
+    #[test]
+    fn test_running_state_lifecycle_and_render() {
+        let mut prompt = Prompt::new().with_model("xai/grok-4.6");
+        assert!(!prompt.is_running());
+
+        prompt.set_running(true);
+        assert!(prompt.is_running());
+
+        let mut buf = Vec::new();
+        let buffer: Vec<char> = Vec::new();
+        let mut last_lines = 0;
+        let mut last_cursor = 0;
+
+        prompt
+            .render_to(&mut buf, &buffer, 0, &mut last_lines, &mut last_cursor)
+            .expect("render_to running flag status failed");
+
+        let raw = String::from_utf8_lossy(&buf);
+        assert!(raw.contains("enter queue · auto · grok-4.6"), "Missing enter queue status in:\n{}", raw);
+        assert!(!raw.contains("queued message"), "Should not have queue banner");
+
+        prompt.reset_input();
+        assert!(!prompt.is_running());
+    }
+
+    #[test]
+    fn test_submit_while_running_does_not_print_to_scrollback() {
+        use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
+
+        let mut prompt = Prompt::new().with_running(true);
+        assert!(prompt.is_running());
+        prompt.buffer = "queued question".chars().collect();
+        prompt.cursor_pos = prompt.buffer.len();
+
+        let res = prompt
+            .handle_event(Event::Key(KeyEvent::new(KeyCode::Enter, KeyModifiers::NONE)))
+            .unwrap();
+        assert_eq!(res, Some(PromptResult::Submit("queued question".to_string())));
+        assert!(prompt.buffer.is_empty());
+        assert_eq!(prompt.cursor_pos, 0);
     }
 }

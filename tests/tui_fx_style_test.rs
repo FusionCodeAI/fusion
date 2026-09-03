@@ -348,7 +348,7 @@ fn test_parse_tool_info_action_labels_and_categories() {
     // 3. Grep / Searched
     let (lbl, cat) = parse_tool_info("grep", &json!({"pattern": "fn run_turn"}));
     assert_eq!(lbl, "Searched fn run_turn");
-    assert_eq!(cat, "list");
+    assert_eq!(cat, "read");
 
     // 4. Read / Read
     let (lbl, cat) = parse_tool_info("file", &json!({"action": "read", "path": "src/ui/repl.rs"}));
@@ -516,8 +516,11 @@ fn test_markdown_renderer_indent_and_code_blocks() {
     // Code block header and footer
     assert!(plain.contains("rust"), "Should contain language tag");
     assert!(plain.contains("let x = 42;"), "Should contain code line");
-    // Standard code block should have left border `│ `
-    assert!(plain.contains("│ let x = 42;"), "Standard code block lines should have │ border: {}", plain);
+    // Standard code block should have 2-space indent and no left bar `│`
+    assert!(!plain.contains("│"), "Standard code block lines should not have │ border: {}", plain);
+    assert!(plain.contains("  let x = 42;"), "Standard code block lines should have 2-space indent: {}", plain);
+    assert!(plain.contains("─ rust ──"), "Should contain top border: {}", plain);
+    assert!(plain.contains("────"), "Should contain bottom border: {}", plain);
 }
 
 #[test]
@@ -549,29 +552,33 @@ fn test_markdown_ascii_diagram_rendering_omits_left_border() {
 }
 
 #[test]
-fn test_markdown_mermaid_to_ascii_diagram_rendering() {
+fn test_markdown_mermaid_codeblock_rendering_with_borders() {
     let mut md = MarkdownRenderer::buffered().with_indent(2);
-    let input = "```mermaid\ngraph TD\n    A[Start<br/>Node] --> B[End&nbsp;Node]\n```\n";
+    let input = "```mermaid\ngraph TD\n    A[Start] --> B[End]\n```\n";
     
     let output = md.push(input);
     let finish = md.finish();
     let total = format!("{}{}", output, finish);
     let plain = strip_ansi(&total);
 
-    // Verify ASCII boxes and arrows were rendered from mermaid
-    assert!(plain.contains("+---------"), "Mermaid should render as ASCII box: {}", plain);
-    assert!(plain.contains("Start / Node") || plain.contains("Start"), "Sanitized label should be present: {}", plain);
-    assert!(plain.contains("End Node") || plain.contains("End"), "Sanitized &nbsp; label should be present: {}", plain);
-    assert!(plain.contains("v") || plain.contains("-->"), "Arrow/connector should be present: {}", plain);
+    // Verify mermaid code block renders with top and bottom borders matching fx
+    assert!(plain.contains("─ mermaid ──"), "Mermaid should have ─ mermaid ── top border: {}", plain);
+    assert!(plain.contains("────"), "Mermaid should have ──── bottom border: {}", plain);
+    assert!(plain.contains("graph TD"), "Mermaid source lines should be preserved: {}", plain);
+    assert!(plain.contains("A[Start] --> B[End]"), "Mermaid connection lines preserved: {}", plain);
 
-    // Verify HTML tags were stripped/cleaned
-    assert!(!plain.contains("<br/>"), "<br/> should be sanitized: {}", plain);
-    assert!(!plain.contains("&nbsp;"), "&nbsp; should be sanitized: {}", plain);
+    // Verify ASCII boxes are disabled in favor of clean codeblock borders
+    assert!(!plain.contains("+---------"), "Mermaid should NOT render as ASCII box: {}", plain);
+    // Verify left bar │ is omitted
+    assert!(!plain.contains("│"), "Mermaid code block lines should not have left bar │: {}", plain);
 
-    // Verify left border `│ ` is omitted so diagram remains clean
-    assert!(!plain.contains("│ +---------"), "Mermaid diagram box lines should not have left bar │: {}", plain);
+    // Indentation check: all non-empty lines are 2-space indented
+    for line in plain.lines() {
+        if !line.trim().is_empty() {
+            assert!(line.starts_with("  "), "Every line must be indented with 2 spaces: {:?}", line);
+        }
+    }
 }
-
 
 // ===========================================================================
 // Contract 9: Full In-Memory REPL Turn Lifecycle Simulation
@@ -2019,4 +2026,404 @@ fn test_model_persistence_across_turns_and_components() {
     prompt.render_to(&mut buf3, &[], 0, &mut last_lines3, &mut last_cursor3).unwrap();
     let plain3 = strip_ansi(&String::from_utf8_lossy(&buf3));
     assert!(plain3.contains("queued 2 · enter queue · auto · grok-4.6"), "Status line must display 'queued 2 · enter queue · auto · grok-4.6', got:\n{}", plain3);
+}
+
+// ===========================================================================
+// Contract 23: Tool Group Header and Branch Formatting Parity (FX Attachment)
+// ===========================================================================
+
+#[test]
+fn test_tool_group_header_and_branches_4_calls_exact_fx_parity() {
+    // Exact 4 tool calls from user attachment:
+    // ● 4 tool calls · 3 list · 1 read
+    // ├ Matched **/*.{md,mmd,puml,dot,svg,drawio,excalidraw}
+    // ├ Matched **/*diagram*
+    // ├ Searched mermaid
+    // └ Matched README*
+
+    let raw_tools = vec![
+        ("glob", json!({"pattern": "**/*.{md,mmd,puml,dot,svg,drawio,excalidraw}"})),
+        ("glob", json!({"pattern": "**/*diagram*"})),
+        ("grep", json!({"pattern": "mermaid"})),
+        ("glob", json!({"pattern": "README*"})),
+    ];
+
+    let mut items = Vec::new();
+    for (name, args) in raw_tools {
+        let (label, category) = parse_tool_info(name, &args);
+        items.push(ToolCallItem::new(name, label, category));
+    }
+
+    assert_eq!(items.len(), 4);
+    assert_eq!(items[0].label, "Matched **/*.{md,mmd,puml,dot,svg,drawio,excalidraw}");
+    assert_eq!(items[0].category, "list");
+    assert_eq!(items[1].label, "Matched **/*diagram*");
+    assert_eq!(items[1].category, "list");
+    assert_eq!(items[2].label, "Searched mermaid");
+    assert_eq!(items[2].category, "read");
+    assert_eq!(items[3].label, "Matched README*");
+    assert_eq!(items[3].category, "list");
+
+    let formatted = format_tool_tree(&items);
+    let lines: Vec<&str> = formatted.lines().collect();
+    assert_eq!(lines.len(), 5, "Expected 1 header + 4 branch lines");
+
+    // Header check
+    assert_eq!(lines[0], "● 4 tool calls · 3 list · 1 read");
+
+    // Branch connector check: ├ for indices 0..2, └ for index 3
+    assert_eq!(lines[1], "├ Matched **/*.{md,mmd,puml,dot,svg,drawio,excalidraw}");
+    assert_eq!(lines[2], "├ Matched **/*diagram*");
+    assert_eq!(lines[3], "├ Searched mermaid");
+    assert_eq!(lines[4], "└ Matched README*");
+
+    // Ensure none of the branches use ├─ or └─ (exact single space after symbol)
+    for line in &lines[1..4] {
+        assert!(line.starts_with("├ "), "Intermediate branch must start with '├ ': {}", line);
+        assert!(!line.starts_with("├─"), "Branch must not use '├─': {}", line);
+    }
+    assert!(lines[4].starts_with("└ "), "Terminal branch must start with '└ ': {}", lines[4]);
+    assert!(!lines[4].starts_with("└─"), "Terminal branch must not use '└─': {}", lines[4]);
+
+    // Render with ANSI styling to writer and verify plain text matches exactly
+    let mut buf = Vec::new();
+    render_tool_tree_to(&mut buf, &items).expect("render_tool_tree_to must succeed");
+    let raw_out = String::from_utf8_lossy(&buf);
+    let plain_out = strip_ansi(&raw_out);
+    assert_eq!(plain_out.trim().replace("\r\n", "\n"), formatted.trim());
+    // Verify ANSI codes are present for bullet and connectors
+    assert!(raw_out.contains("●"), "Should contain bullet in raw ANSI");
+    assert!(raw_out.contains("├ "), "Should contain branch connector in raw ANSI");
+    assert!(raw_out.contains("└ "), "Should contain terminal connector in raw ANSI");
+}
+
+#[test]
+fn test_tool_group_header_and_branches_8_calls_exact_fx_parity() {
+    // Exact 8 tool calls from user attachment:
+    // ● 8 tool calls · 7 read · 1 list
+    // ├ Read docs/architecture.md
+    // ├ Read README.md
+    // ├ Searched ```mermaid
+    // ├ Matched docs/**/*
+    // ├ Searched graph TD
+    // ├ Read docs/agents.md
+    // ├ Read docs/vision.md
+    // └ Searched ```text
+
+    let raw_tools = vec![
+        ("read", json!({"path": "docs/architecture.md"})),
+        ("read", json!({"path": "README.md"})),
+        ("grep", json!({"query": "```mermaid"})),
+        ("glob", json!({"pattern": "docs/**/*"})),
+        ("grep", json!({"query": "graph TD"})),
+        ("read", json!({"path": "docs/agents.md"})),
+        ("read", json!({"path": "docs/vision.md"})),
+        ("grep", json!({"query": "```text"})),
+    ];
+
+    let mut items = Vec::new();
+    for (name, args) in raw_tools {
+        let (label, category) = parse_tool_info(name, &args);
+        items.push(ToolCallItem::new(name, label, category));
+    }
+
+    assert_eq!(items.len(), 8);
+    let formatted = format_tool_tree(&items);
+    let lines: Vec<&str> = formatted.lines().collect();
+    assert_eq!(lines.len(), 9, "Expected 1 header + 8 branch lines");
+
+    // Header check: 7 read, 1 list
+    assert_eq!(lines[0], "● 8 tool calls · 7 read · 1 list");
+
+    // Branches 1..=7 must start with ├ 
+    assert_eq!(lines[1], "├ Read docs/architecture.md");
+    assert_eq!(lines[2], "├ Read README.md");
+    assert_eq!(lines[3], "├ Searched ```mermaid");
+    assert_eq!(lines[4], "├ Matched docs/**/*");
+    assert_eq!(lines[5], "├ Searched graph TD");
+    assert_eq!(lines[6], "├ Read docs/agents.md");
+    assert_eq!(lines[7], "├ Read docs/vision.md");
+
+    // Branch 8 (last) must start with └ 
+    assert_eq!(lines[8], "└ Searched ```text");
+
+    for line in &lines[1..8] {
+        assert!(line.starts_with("├ "), "Branch 0..6 must start with '├ ': {}", line);
+    }
+    assert!(lines[8].starts_with("└ "), "Branch 7 must start with '└ ': {}", lines[8]);
+
+    let mut buf = Vec::new();
+    render_tool_tree_to(&mut buf, &items).expect("render_tool_tree_to must succeed");
+    let plain_out = strip_ansi(&String::from_utf8_lossy(&buf));
+    assert_eq!(plain_out.trim().replace("\r\n", "\n"), formatted.trim());
+}
+
+#[test]
+fn test_tool_group_branch_formatting_single_and_failure_variations() {
+    // Single tool call: only └
+    let single = vec![ToolCallItem::new("bash", "Ran cargo check", "command")];
+    let single_out = format_tool_tree(&single);
+    assert_eq!(single_out, "● 1 tool call · 1 command\n└ Ran cargo check\n");
+
+    // Two tool calls: ├ followed by └
+    let two = vec![
+        ToolCallItem::new("glob", "Matched src/*.rs", "list"),
+        ToolCallItem::new("read", "Read src/main.rs", "read"),
+    ];
+    let two_out = format_tool_tree(&two);
+    assert_eq!(
+        two_out,
+        "● 2 tool calls · 1 list · 1 read\n├ Matched src/*.rs\n└ Read src/main.rs\n"
+    );
+
+    // Failed call formatting: Exited 1 for command or Failed for other
+    let failed = vec![
+        ToolCallItem::new("bash", "Ran ls /nonexistent", "command").with_failed(true),
+        ToolCallItem::new("read", "Read /nonexistent", "read").with_failed(true),
+    ];
+    let failed_out = format_tool_tree(&failed);
+    assert_eq!(
+        failed_out,
+        "● 2 tool calls · 1 command · 1 read · 2 failed\n├ Exited 1 ls /nonexistent\n└ Failed Read /nonexistent\n"
+    );
+}
+
+// ===========================================================================
+// Contract 24: Codeblock Formatting Parity (FX Attachment)
+// ===========================================================================
+
+#[test]
+fn test_codeblock_mermaid_top_and_bottom_border_fx_parity() {
+    // Exact diagram scenario from attachment:
+    // Architecture diagram from docs/architecture.md:
+    //
+    // ─ mermaid ────────────────────────────────────────────────────────────────────
+    // graph TD
+    //     subgraph UI_Layer["Interface Layer"]
+    //         CLI["CLI Command Parser (Clap)"]
+    // ...
+    // ──────────────────────────────────────────────────────────────────────────────
+
+    let mut md = MarkdownRenderer::buffered().with_indent(2);
+    let input = r#"Architecture diagram from docs/architecture.md:
+
+```mermaid
+graph TD
+    subgraph UI_Layer["Interface Layer"]
+        CLI["CLI Command Parser (Clap)"]
+```
+"#;
+
+    let output = md.push(input);
+    let finish = md.finish();
+    let total = format!("{}{}", output, finish);
+    let plain = strip_ansi(&total);
+
+    // 1. Paragraph indentation: leading text paragraph has 2 spaces
+    assert!(
+        plain.contains("  Architecture diagram from docs/architecture.md:"),
+        "Paragraph must be 2-space indented:\n{}",
+        plain
+    );
+
+    // 2. Top border: starts with '  ─ mermaid ──'
+    assert!(
+        plain.contains("  ─ mermaid ──"),
+        "Top border must match '  ─ mermaid ──':\n{}",
+        plain
+    );
+
+    // 3. Bottom border: starts with '  ────'
+    assert!(
+        plain.contains("  ────"),
+        "Bottom border must match '  ────':\n{}",
+        plain
+    );
+
+    // 4. Code block content: lines indented by 2 spaces without vertical pipe
+    assert!(
+        plain.contains("  graph TD"),
+        "Code lines must be indented by 2 spaces:\n{}",
+        plain
+    );
+    assert!(
+        plain.contains("subgraph UI_Layer[\"Interface Layer\"]"),
+        "Code lines preserved:\n{}",
+        plain
+    );
+    assert!(
+        plain.contains("CLI[\"CLI Command Parser (Clap)\"]"),
+        "Code lines preserved:\n{}",
+        plain
+    );
+
+    // 5. No vertical pipe │ anywhere in the code block
+    assert!(
+        !plain.contains("│"),
+        "Codeblock must not contain vertical pipe border │:\n{}",
+        plain
+    );
+
+    // 6. No ASCII box formatting (+---------)
+    assert!(
+        !plain.contains("+---------"),
+        "Mermaid must not render as ASCII box:\n{}",
+        plain
+    );
+}
+
+#[test]
+fn test_codeblock_multiple_languages_borders_and_clean_formatting() {
+    let languages = ["rust", "bash", "python", "text", ""];
+    for lang in languages {
+        let mut md = MarkdownRenderer::buffered().with_indent(2);
+        let input = format!("```{lang}\necho hello\n```\n");
+        let output = md.push(&input);
+        let finish = md.finish();
+        let total = format!("{}{}", output, finish);
+        let plain = strip_ansi(&total);
+
+        if lang.is_empty() {
+            assert!(plain.contains("  ────"), "Empty lang codeblock must have top border: {}", plain);
+        } else {
+            let expected_top = format!("  ─ {} ──", lang);
+            assert!(plain.contains(&expected_top), "Lang '{}' must have top border '{}': {}", lang, expected_top, plain);
+        }
+        assert!(plain.contains("  ────"), "Codeblock must have bottom border: {}", plain);
+        assert!(plain.contains("echo hello"), "Code content preserved: {}", plain);
+        assert!(!plain.contains("│"), "Codeblock must not have │ border: {}", plain);
+    }
+}
+
+// ===========================================================================
+// Contract 25: Prompt Queue Display and Streaming Persistence
+// ===========================================================================
+
+#[test]
+fn test_prompt_queue_display_multi_level_banners_and_status() {
+    let mut prompt = Prompt::new().with_model("xai/grok-4.6");
+
+    // 1. Idle state: no queue, clean status line
+    let mut buf = Vec::new();
+    let mut last_lines = 0;
+    let mut last_cursor = 0;
+    prompt.render_to(&mut buf, &[], 0, &mut last_lines, &mut last_cursor).unwrap();
+    let plain = strip_ansi(&String::from_utf8_lossy(&buf));
+    assert!(plain.contains("auto · grok-4.6"));
+    assert!(!plain.contains("queued"));
+    assert!(!plain.contains("enter queue"));
+
+    // 2. Active running state without queue: `enter queue · auto · grok-4.6`
+    prompt.set_running(true);
+    let mut buf2 = Vec::new();
+    let mut last_lines2 = 0;
+    let mut last_cursor2 = 0;
+    prompt.render_to(&mut buf2, &[], 0, &mut last_lines2, &mut last_cursor2).unwrap();
+    let plain2 = strip_ansi(&String::from_utf8_lossy(&buf2));
+    assert!(plain2.contains("enter queue · auto · grok-4.6"), "Status line must display 'enter queue':\n{}", plain2);
+
+    // 3. 1 queued message: banner `1 queued message · ↑ to edit`, status `queued 1 · enter queue · auto · grok-4.6`
+    prompt.set_queued_count(1);
+    let mut buf3 = Vec::new();
+    let mut last_lines3 = 0;
+    let mut last_cursor3 = 0;
+    prompt.render_to(&mut buf3, &[], 0, &mut last_lines3, &mut last_cursor3).unwrap();
+    let plain3 = strip_ansi(&String::from_utf8_lossy(&buf3));
+    assert!(plain3.contains("1 queued message · ↑ to edit"), "Banner must show singular queued message:\n{}", plain3);
+    assert!(plain3.contains("queued 1 · enter queue · auto · grok-4.6"), "Status line must show 'queued 1':\n{}", plain3);
+
+    // 4. 2 queued messages: banner `2 queued messages · ↑ to edit`, status `queued 2 · enter queue · auto · grok-4.6`
+    prompt.set_queued_count(2);
+    let mut buf4 = Vec::new();
+    let mut last_lines4 = 0;
+    let mut last_cursor4 = 0;
+    prompt.render_to(&mut buf4, &[], 0, &mut last_lines4, &mut last_cursor4).unwrap();
+    let plain4 = strip_ansi(&String::from_utf8_lossy(&buf4));
+    assert!(plain4.contains("2 queued messages · ↑ to edit"), "Banner must show plural queued messages:\n{}", plain4);
+    assert!(plain4.contains("queued 2 · enter queue · auto · grok-4.6"), "Status line must show 'queued 2':\n{}", plain4);
+}
+
+#[test]
+fn test_prompt_queue_streaming_persistence_lifecycle() {
+    let mut prompt = Prompt::new().with_model("xai/grok-4.6");
+    let mut md = MarkdownRenderer::buffered().with_indent(2);
+    let mut queue: VecDeque<String> = VecDeque::new();
+
+    // 1. User submits first prompt: `┃ show me diagram`
+    let first_prompt = "show me diagram";
+    let mut transcript = Vec::new();
+    Prompt::render_submitted_prompt_to(&mut transcript, first_prompt).unwrap();
+    let transcript_plain = strip_ansi(&String::from_utf8_lossy(&transcript));
+    assert_eq!(transcript_plain, "┃ show me diagram\r\n\r\n");
+
+    // 2. Turn starts: running state set, prompt footer shows thinking
+    prompt.set_running(true);
+    prompt.set_running_status(Some("Thinking (2s) (↑4 ↓1.3k)".to_string()));
+    assert!(prompt.is_running());
+
+    // 3. User types a prompt during streaming: "explain UI layer"
+    // Simulate typing: buffer has characters
+    prompt.buffer = "explain UI layer".chars().collect();
+    prompt.cursor_pos = prompt.buffer.len();
+
+    // Verify rendered frame contains the typing buffer AND queue hint in status line
+    let mut frame1 = Vec::new();
+    let mut last_lines = 0;
+    let mut last_cursor = 0;
+    let buffer_copy = prompt.buffer.clone();
+    prompt.render_to(&mut frame1, &buffer_copy, prompt.cursor_pos, &mut last_lines, &mut last_cursor).unwrap();
+    let frame1_plain = strip_ansi(&String::from_utf8_lossy(&frame1));
+    assert!(frame1_plain.contains("┃ explain UI layer"), "Active typing buffer must be shown:\n{}", frame1_plain);
+    assert!(frame1_plain.contains("enter queue · auto · grok-4.6"), "Running status line must show 'enter queue':\n{}", frame1_plain);
+
+    // 4. User presses Enter: prompt is queued into queue VecDeque
+    // KeyResult::Submit behavior while running: buffer cleared, frame cleared, queued_count increments
+    queue.push_back(prompt.buffer.iter().collect::<String>());
+    prompt.buffer.clear();
+    prompt.cursor_pos = 0;
+    prompt.set_queued_count(queue.len());
+    assert_eq!(prompt.queued_count(), 1);
+
+    // 5. Streaming text deltas arrive from model
+    let chunk1 = "  I'll look through the repo for existing diagrams and related docs.\n\n";
+    let formatted_chunk1 = md.push(chunk1);
+    assert!(formatted_chunk1.contains("I'll look through the repo"));
+
+    // Verify prompt re-render below streaming output preserves queued banner & status line
+    let mut frame2 = Vec::new();
+    prompt.render_to(&mut frame2, &[], 0, &mut last_lines, &mut last_cursor).unwrap();
+    let frame2_plain = strip_ansi(&String::from_utf8_lossy(&frame2));
+    assert!(frame2_plain.contains("1 queued message · ↑ to edit"), "Queued banner must persist during streaming:\n{}", frame2_plain);
+    assert!(frame2_plain.contains("queued 1 · enter queue · auto · grok-4.6"), "Status line must reflect queued 1:\n{}", frame2_plain);
+
+    // 6. User types and queues another message: "add error handling"
+    queue.push_back("add error handling".to_string());
+    prompt.set_queued_count(queue.len());
+    assert_eq!(prompt.queued_count(), 2);
+
+    let mut frame3 = Vec::new();
+    prompt.render_to(&mut frame3, &[], 0, &mut last_lines, &mut last_cursor).unwrap();
+    let frame3_plain = strip_ansi(&String::from_utf8_lossy(&frame3));
+    assert!(frame3_plain.contains("2 queued messages · ↑ to edit"), "Queued banner must show 2 queued messages:\n{}", frame3_plain);
+    assert!(frame3_plain.contains("queued 2 · enter queue · auto · grok-4.6"), "Status line must show queued 2:\n{}", frame3_plain);
+
+    // 7. Turn completes: agent prints completed turn summary `  1m26s (↑4 ↓1.3k)`
+    let summary = format_turn_summary(Duration::from_secs(86), 4, 1300);
+    assert_eq!(strip_ansi(&summary), "  1m26s (↑4 ↓1.3k)\r\n\r\n");
+
+    // Reset running status for turn completion
+    prompt.set_running(false);
+    prompt.set_running_status(None);
+
+    // Next turn consumes first queued prompt in FIFO order
+    let next_prompt = queue.pop_front().expect("Queue must have item");
+    assert_eq!(next_prompt, "explain UI layer");
+    prompt.set_queued_count(queue.len());
+    assert_eq!(prompt.queued_count(), 1);
+
+    // Render next prompt submission to transcript
+    let mut next_transcript = Vec::new();
+    Prompt::render_submitted_prompt_to(&mut next_transcript, &next_prompt).unwrap();
+    let next_plain = strip_ansi(&String::from_utf8_lossy(&next_transcript));
+    assert_eq!(next_plain, "┃ explain UI layer\r\n\r\n");
 }

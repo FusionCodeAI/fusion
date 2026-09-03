@@ -1,6 +1,6 @@
 [package]
 name = "fusion"
-version = "0.3.0"
+version = "2.0.0"
 edition = "2021"
 description = "Fast, lightweight, cross-platform AI coding assistant with subagents and advisors"
 license = "MIT"

@@ -3,7 +3,13 @@ use std::io::{stdout, Write};
 use super::spinner::SpinnerStyle;
 
 /// Fixed width (in characters) of rendered code-block borders and horizontal rules.
-const BORDER_WIDTH: usize = 60;
+pub const BORDER_WIDTH: usize = 78;
+
+/// Returns the effective border width, clamped to the terminal width minus 2 (for indentation).
+pub fn get_border_width() -> usize {
+    let term_width = super::table::get_terminal_width();
+    term_width.saturating_sub(2).min(BORDER_WIDTH).max(20)
+}
 
 /// Streaming markdown renderer for the terminal.
 /// Supports ANSI-formatted headers, bullet/numbered lists, task lists, bold, italic,
@@ -25,7 +31,6 @@ pub struct MarkdownRenderer {
     /// Frames consumed so far; advanced each time a spinner frame is printed.
     spinner_frame_idx: usize,
     indent: usize,
-    mermaid_buffer: Vec<String>,
     line_has_prefix: bool,
 }
 /// Inline spinner rendered at the start of the current streaming line.
@@ -76,7 +81,6 @@ impl MarkdownRenderer {
             spinner: None,
             spinner_frame_idx: 0,
             indent: 0,
-            mermaid_buffer: Vec::new(),
             line_has_prefix: false,
         }
     }
@@ -92,7 +96,6 @@ impl MarkdownRenderer {
             spinner: None,
             spinner_frame_idx: 0,
             indent: 0,
-            mermaid_buffer: Vec::new(),
             line_has_prefix: false,
         }
     }
@@ -143,7 +146,6 @@ impl MarkdownRenderer {
         self.buffer.clear();
         self.in_code_block = false;
         self.code_lang.clear();
-        self.mermaid_buffer.clear();
         self.table_streamer = super::table::MarkdownTableStreamer::new();
         self.spinner = None;
         self.spinner_frame_idx = 0;
@@ -195,29 +197,6 @@ impl MarkdownRenderer {
             self.emit(&table_out, output);
         }
 
-        // Handle buffering and rendering of Mermaid diagram code blocks
-        if self.in_code_block && self.code_lang.eq_ignore_ascii_case("mermaid") {
-            if trimmed.starts_with("```") {
-                let mermaid_src = self.mermaid_buffer.join("\n");
-                self.mermaid_buffer.clear();
-                self.in_code_block = false;
-                self.code_lang.clear();
-
-                if let Some(ascii_art) = super::mermaid_ascii::render_mermaid_ascii(&mermaid_src) {
-                    self.emit(ascii_art.trim_end(), output);
-                } else {
-                    for l in mermaid_src.lines() {
-                        self.emit(l, output);
-                    }
-                }
-                let end_border = format!("  \x1b[38;5;240m─{}\x1b[0m", "─".repeat(BORDER_WIDTH.saturating_sub(1)));
-                self.emit(&end_border, output);
-                return;
-            } else {
-                self.mermaid_buffer.push(line.to_string());
-                return;
-            }
-        }
 
         let formatted = render_line(line, &mut self.in_code_block, &mut self.code_lang);
         self.emit(&formatted, output);
@@ -346,22 +325,11 @@ impl MarkdownRenderer {
             let table_out = self.table_streamer.flush();
             self.emit(&table_out, &mut output);
         }
-        if self.in_code_block && self.code_lang.eq_ignore_ascii_case("mermaid") {
-            let mermaid_src = self.mermaid_buffer.join("\n");
-            self.mermaid_buffer.clear();
-            if let Some(ascii_art) = super::mermaid_ascii::render_mermaid_ascii(&mermaid_src) {
-                self.emit(ascii_art.trim_end(), &mut output);
-            } else {
-                for l in mermaid_src.lines() {
-                    self.emit(l, &mut output);
-                }
-            }
-        }
-
         if self.in_code_block {
             self.in_code_block = false;
             self.code_lang.clear();
-            let end_border = format!("  \x1b[38;5;240m─{}\x1b[0m", "─".repeat(BORDER_WIDTH.saturating_sub(1)));
+            let width = get_border_width();
+            let end_border = format!("  \x1b[38;5;240m{}\x1b[0m", "─".repeat(width));
             self.emit(&end_border, &mut output);
         }
 
@@ -435,7 +403,8 @@ pub fn render_markdown(text: &str) -> String {
     flush_table(&mut output, &mut table_lines, &mut in_code_block, &mut code_lang);
 
     if in_code_block {
-        output.push_str(&format!("  \x1b[38;5;240m─{}\x1b[0m\n", "─".repeat(BORDER_WIDTH.saturating_sub(1))));
+        let width = get_border_width();
+        output.push_str(&format!("  \x1b[38;5;240m{}\x1b[0m\n", "─".repeat(width)));
     }
 
     output
@@ -450,15 +419,17 @@ pub fn render_line(line: &str, in_code_block: &mut bool, code_lang: &mut String)
         if *in_code_block {
             *in_code_block = false;
             code_lang.clear();
-            return format!("  \x1b[38;5;240m─{}\x1b[0m", "─".repeat(BORDER_WIDTH.saturating_sub(1)));
+            let width = get_border_width();
+            return format!("  \x1b[38;5;240m{}\x1b[0m", "─".repeat(width));
         } else {
             *in_code_block = true;
             let lang = trimmed.trim_start_matches('`').trim();
             *code_lang = lang.to_string();
+            let width = get_border_width();
             if lang.is_empty() {
-                return format!("  \x1b[38;5;240m─{}\x1b[0m", "─".repeat(BORDER_WIDTH.saturating_sub(1)));
+                return format!("  \x1b[38;5;240m{}\x1b[0m", "─".repeat(width));
             } else {
-                let border_len = BORDER_WIDTH.saturating_sub(lang.len() + 3);
+                let border_len = width.saturating_sub(lang.len() + 3);
                 return format!(
                     "  \x1b[38;5;240m─\x1b[0m \x1b[1;37m{}\x1b[0m \x1b[38;5;240m{}\x1b[0m",
                     lang,
@@ -468,14 +439,18 @@ pub fn render_line(line: &str, in_code_block: &mut bool, code_lang: &mut String)
         }
     }
 
-    // Inside code block: render diagrams and plain text cleanly without left bar
+    // Inside code block: render diagrams and code indented by 2 spaces with syntax or clean terminal styling
     if *in_code_block {
         let is_plain = matches!(code_lang.to_lowercase().as_str(), "text" | "ascii" | "mermaid" | "");
-        if is_plain {
-            return line.to_string();
+        if line.is_empty() {
+            return String::new();
         }
-        let highlighted = highlight_code_line(line, code_lang);
-        return format!("\x1b[38;5;240m│\x1b[0m {}", highlighted);
+        let styled = if is_plain {
+            line.to_string()
+        } else {
+            highlight_code_line(line, code_lang)
+        };
+        return format!("  {}", styled);
     }
 
     // Horizontal rules: --- or *** or ___ (3 or more chars)
@@ -571,8 +546,12 @@ pub fn render_line(line: &str, in_code_block: &mut bool, code_lang: &mut String)
         return table_row;
     }
 
-    // Standard paragraph line with inline markdown
-    render_inline(line)
+    // Standard paragraph line with inline markdown indented by 2 spaces
+    if trimmed.is_empty() {
+        String::new()
+    } else {
+        format!("  {}", render_inline(trimmed))
+    }
 }
 
 /// Helper to parse numbered list item e.g. "1. Hello" -> (1, "Hello")
@@ -1084,10 +1063,10 @@ mod tests {
         assert!(top.contains("─"));
 
         let code_line = render_line("let x = 42;", &mut in_code, &mut lang);
-        assert!(code_line.contains("│"));
+        assert!(code_line.starts_with("  "));
+        assert!(!code_line.contains("│"));
         assert!(code_line.contains("let"));
         assert!(code_line.contains("42"));
-
         let bottom = render_line("```", &mut in_code, &mut lang);
         assert!(!in_code);
         assert!(bottom.contains("─"));
@@ -1240,7 +1219,7 @@ mod tests {
     }
     #[test]
     fn test_renderer_indent_and_blank_lines() {
-        let mut renderer = MarkdownRenderer::buffered().with_indent(2);
+        let mut renderer = MarkdownRenderer::buffered();
         let output = renderer.push("Line 1\n\nLine 2\n");
         assert_eq!(output, "  Line 1\n\n  Line 2\n");
     }
@@ -1255,15 +1234,16 @@ mod tests {
     }
 
     #[test]
-    fn test_mermaid_block_renders_ascii_diagram() {
+    fn test_mermaid_block_renders_codeblock() {
         let mut renderer = MarkdownRenderer::buffered();
         let mut output = renderer.push("```mermaid\ngraph TD\n    A[Start] --> B[Process]\n    B --> C[End]\n```\n");
         output.push_str(&renderer.finish());
-        assert!(output.contains("+---------"));
-        assert!(output.contains("Start"));
-        assert!(output.contains("Process"));
-        assert!(output.contains("End"));
-        assert!(output.contains("v"));
+        let plain = super::super::table::strip_ansi(&output);
+        assert!(plain.contains("─ mermaid ─"));
+        assert!(output.contains("graph TD"));
+        assert!(output.contains("A[Start] --> B[Process]"));
+        assert!(output.contains("B --> C[End]"));
+        assert!(!output.contains("+---------"));
     }
 
     #[test]
@@ -1271,9 +1251,9 @@ mod tests {
         for lang_name in &["text", "ascii", "mermaid", ""] {
             let mut in_code = true;
             let mut lang = lang_name.to_string();
-            let line = "  +---+  ";
+            let line = "+---+";
             let rendered = render_line(line, &mut in_code, &mut lang);
-            assert_eq!(rendered, "  +---+  ", "Language {} should not have left bar", lang_name);
+            assert_eq!(rendered, "  +---+", "Language {} should have 2-space indent without left bar", lang_name);
         }
     }
 
@@ -1385,5 +1365,56 @@ mod tests {
         renderer.reset();
         assert!(!renderer.line_has_prefix());
         assert_eq!(renderer.pending(), "");
+    }
+
+    #[test]
+    fn test_fx_code_block_format() {
+        let mut in_code = false;
+        let mut lang = String::new();
+
+        let top = render_line("```rust", &mut in_code, &mut lang);
+        let stripped_top = super::super::table::strip_ansi(&top);
+        assert!(stripped_top.starts_with("  ─ rust "));
+        assert!(stripped_top.ends_with('─'));
+
+        let content = render_line("let x = 1;", &mut in_code, &mut lang);
+        let stripped_content = super::super::table::strip_ansi(&content);
+        assert_eq!(stripped_content, "  let x = 1;");
+        assert!(!content.contains('│'));
+
+        let bottom = render_line("```", &mut in_code, &mut lang);
+        let stripped_bottom = super::super::table::strip_ansi(&bottom);
+        assert!(stripped_bottom.starts_with("  ─"));
+        assert!(stripped_bottom.chars().skip(2).all(|c| c == '─'));
+    }
+
+    #[test]
+    fn test_fx_paragraph_indentation() {
+        let mut in_code = false;
+        let mut lang = String::new();
+
+        let p = render_line("Architecture diagram from docs/architecture.md:", &mut in_code, &mut lang);
+        assert_eq!(p, "  Architecture diagram from docs/architecture.md:");
+
+        let empty = render_line("", &mut in_code, &mut lang);
+        assert_eq!(empty, "");
+
+        let whitespace = render_line("   ", &mut in_code, &mut lang);
+        assert_eq!(whitespace, "");
+    }
+
+    #[test]
+    fn test_fx_mermaid_rendering_parity() {
+        let input = "Architecture diagram from docs/architecture.md:\n\n```mermaid\ngraph TD\n    subgraph UI_Layer[\"Interface Layer\"]\n        CLI[\"CLI Command Parser (Clap)\"]\n```\n";
+        let rendered = render_markdown(input);
+        let plain = super::super::table::strip_ansi(&rendered);
+
+        assert!(plain.contains("  Architecture diagram from docs/architecture.md:"));
+        assert!(plain.contains("  ─ mermaid ──"));
+        assert!(plain.contains("  graph TD"));
+        assert!(plain.contains("      subgraph UI_Layer[\"Interface Layer\"]"));
+        assert!(plain.contains("          CLI[\"CLI Command Parser (Clap)\"]"));
+        assert!(!plain.contains("+---------"));
+        assert!(!plain.contains('│'));
     }
 }
