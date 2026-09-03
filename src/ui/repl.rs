@@ -139,6 +139,7 @@ pub fn render_thinking_frame_to<W: std::io::Write>(
     out_tokens: u64,
     model_label: &str,
     queue_text: &str,
+    queue_cursor: usize,
 ) -> std::io::Result<()> {
     let elapsed_str = format_duration_compact(elapsed);
     let in_str = format_tokens_compact(in_tokens);
@@ -153,7 +154,7 @@ pub fn render_thinking_frame_to<W: std::io::Write>(
         "  \x1b[2;37m{} ({}) (↑{} ↓{})\x1b[0m\r\n\r\n\x1b[1m┃\x1b[0m {}\r\n\r\n\x1b[2;37menter queue · auto · {}\x1b[0m",
         status, elapsed_str, in_str, out_str, queue_text, model_label
     )?;
-    let col = 2 + queue_text.len() as u16;
+    let col = (2 + queue_cursor) as u16;
     execute!(out, cursor::MoveUp(2), cursor::MoveToColumn(col))?;
     out.flush()?;
     Ok(())
@@ -166,6 +167,7 @@ pub fn render_thinking_frame(
     out_tokens: u64,
     model_label: &str,
     queue_text: &str,
+    queue_cursor: usize,
 ) {
     let _ = render_thinking_frame_to(
         &mut stdout(),
@@ -175,6 +177,7 @@ pub fn render_thinking_frame(
         out_tokens,
         model_label,
         queue_text,
+        queue_cursor,
     );
 }
 
@@ -579,9 +582,8 @@ pub async fn run_turn_ui(
                     output_tokens,
                     &model_label,
                     &queue_text,
+                    queue_cursor,
                 );
-                let target_col = (2 + queue_cursor) as u16;
-                let _ = execute!(out, cursor::MoveUp(2), cursor::MoveToColumn(target_col));
                 let _ = out.flush();
                 thinking_displayed = true;
             }
@@ -628,9 +630,8 @@ pub async fn run_turn_ui(
                                         output_tokens,
                                         &model_label,
                                         &queue_text,
+                                        queue_cursor,
                                     );
-                                    let target_col = (2 + queue_cursor) as u16;
-                                    let _ = execute!(out, cursor::MoveUp(2), cursor::MoveToColumn(target_col));
                                     let _ = out.flush();
                                     thinking_displayed = true;
                                 }
@@ -656,9 +657,8 @@ pub async fn run_turn_ui(
                                             output_tokens,
                                             &model_label,
                                             &queue_text,
+                                            queue_cursor,
                                         );
-                                        let target_col = (2 + queue_cursor) as u16;
-                                        let _ = execute!(out, cursor::MoveUp(2), cursor::MoveToColumn(target_col));
                                         let _ = out.flush();
                                         thinking_displayed = true;
                                     }
@@ -703,8 +703,8 @@ pub async fn run_turn_ui(
                                         output_tokens,
                                         &model_label,
                                         "",
+                                        0,
                                     );
-                                    let _ = execute!(out, cursor::MoveUp(2), cursor::MoveToColumn(2));
                                     let _ = out.flush();
                                     thinking_displayed = true;
                                 }

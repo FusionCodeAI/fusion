@@ -583,6 +583,7 @@ fn test_queue_prompt_rendering_with_active_buffer() {
         30,
         "DeepSeek V4 Flash",
         "refactor auth module",
+        20,
     ).unwrap();
 
     let plain = strip_ansi(&String::from_utf8_lossy(&buf));
@@ -834,6 +835,7 @@ fn test_single_inplace_thinking_frame_no_line_duplication() {
             out_tok,
             "DeepSeek V4 Flash",
             queue_buf,
+            queue_buf.len(),
         ).unwrap();
     };
 
@@ -997,6 +999,7 @@ fn test_fx_image1_live_tool_and_turn_lifecycle_no_double_bar() {
         0,
         "claude-3-7-sonnet",
         "",
+        0,
     )
     .unwrap();
     log.extend_from_slice(&thinking_buf);
@@ -1030,6 +1033,7 @@ fn test_fx_image1_live_tool_and_turn_lifecycle_no_double_bar() {
         641,
         "claude-3-7-sonnet",
         "",
+        0,
     )
     .unwrap();
 
