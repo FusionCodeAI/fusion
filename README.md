@@ -1,13 +1,11 @@
 <div align="center">
 
+<img src="assets/logo.svg" width="80" height="80" alt="Fusion Logo">
+
 # Fusion
 
 **Fast, ultra-lightweight, cross-platform AI coding assistant written in 100% pure Rust.**
 *Runs natively on macOS, Linux, Windows, Android/Termux, and in the Browser via WebAssembly.*
-
-[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
-
-[**Quick Install**](#quick-install) • [**Quickstart**](#quickstart) • [**Configuration**](#configuration) • [**Documentation**](#documentation) • [**Development**](#development)
 
 </div>
 
