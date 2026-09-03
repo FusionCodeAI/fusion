@@ -136,10 +136,130 @@ impl WebSearchTool {
                 }
             }
         }
+        // Automatic fallbacks when DuckDuckGo HTML/Lite are blocked by CAPTCHA
+        if let Ok(gh) = self.search_github(query, limit).await {
+            if !gh.is_empty() {
+                return Ok(gh);
+            }
+        }
+
+        if let Ok(wiki) = self.search_wikipedia(query, limit).await {
+            if !wiki.is_empty() {
+                return Ok(wiki);
+            }
+        }
 
         Ok(Vec::new())
     }
 
+    /// Fallback search using Wikipedia Search API.
+    pub async fn search_wikipedia(&self, query: &str, limit: usize) -> anyhow::Result<Vec<SearchResult>> {
+        let encoded = url_encode(query);
+        let url = format!(
+            "https://en.wikipedia.org/w/api.php?action=query&list=search&srsearch={}&format=json&utf8=1",
+            encoded
+        );
+
+        let res = self
+            .client
+            .get(&url)
+            .header(reqwest::header::USER_AGENT, DEFAULT_USER_AGENT)
+            .send()
+            .await?;
+
+        if !res.status().is_success() {
+            anyhow::bail!("Wikipedia API returned status: {}", res.status());
+        }
+
+        let val: Value = res.json().await?;
+        let mut results = Vec::new();
+
+        if let Some(items) = val.pointer("/query/search").and_then(|v| v.as_array()) {
+            for item in items.iter().take(limit) {
+                let title = item.get("title").and_then(|v| v.as_str()).unwrap_or_default();
+                let snippet = item.get("snippet").and_then(|v| v.as_str()).unwrap_or_default();
+                let clean_snippet = decode_html_entities(&strip_html_tags(snippet));
+                let page_url = format!("https://en.wikipedia.org/wiki/{}", url_encode(title));
+
+                if !title.is_empty() {
+                    results.push(SearchResult {
+                        title: title.to_string(),
+                        url: page_url,
+                        snippet: clean_snippet,
+                    });
+                }
+            }
+        }
+
+        Ok(results)
+    }
+
+    /// Fallback search using GitHub API for developers, organizations, and repositories.
+    pub async fn search_github(&self, query: &str, limit: usize) -> anyhow::Result<Vec<SearchResult>> {
+        let encoded = url_encode(query);
+        let mut results = Vec::new();
+
+        // 1. Search GitHub users / orgs
+        let user_url = format!("https://api.github.com/search/users?q={}&per_page={}", encoded, limit.min(5));
+        if let Ok(res) = self
+            .client
+            .get(&user_url)
+            .header(reqwest::header::USER_AGENT, DEFAULT_USER_AGENT)
+            .send()
+            .await
+        {
+            if res.status().is_success() {
+                if let Ok(val) = res.json::<Value>().await {
+                    if let Some(items) = val.get("items").and_then(|v| v.as_array()) {
+                        for item in items {
+                            let login = item.get("login").and_then(|v| v.as_str()).unwrap_or_default();
+                            let html_url = item.get("html_url").and_then(|v| v.as_str()).unwrap_or_default();
+                            let user_type = item.get("type").and_then(|v| v.as_str()).unwrap_or("User");
+                            if !login.is_empty() && !html_url.is_empty() {
+                                results.push(SearchResult {
+                                    title: format!("{} ({}) on GitHub", login, user_type),
+                                    url: html_url.to_string(),
+                                    snippet: format!("GitHub profile for {} ({}).", login, user_type),
+                                });
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // 2. Search GitHub repositories
+        let repo_url = format!("https://api.github.com/search/repositories?q={}&per_page={}", encoded, limit.min(5));
+        if let Ok(res) = self
+            .client
+            .get(&repo_url)
+            .header(reqwest::header::USER_AGENT, DEFAULT_USER_AGENT)
+            .send()
+            .await
+        {
+            if res.status().is_success() {
+                if let Ok(val) = res.json::<Value>().await {
+                    if let Some(items) = val.get("items").and_then(|v| v.as_array()) {
+                        for item in items {
+                            let full_name = item.get("full_name").and_then(|v| v.as_str()).unwrap_or_default();
+                            let html_url = item.get("html_url").and_then(|v| v.as_str()).unwrap_or_default();
+                            let desc = item.get("description").and_then(|v| v.as_str()).unwrap_or_default();
+                            if !full_name.is_empty() && !html_url.is_empty() {
+                                results.push(SearchResult {
+                                    title: format!("{} on GitHub", full_name),
+                                    url: html_url.to_string(),
+                                    snippet: desc.to_string(),
+                                });
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        results.truncate(limit);
+        Ok(results)
+    }
     /// Execute a search against a SearXNG instance JSON endpoint.
     pub async fn search_searxng(
         &self,

@@ -834,38 +834,43 @@ pub fn build_openai_payload(
 
     let mut messages_json = Vec::new();
     for msg in messages {
-        let content = if msg.content.trim().is_empty() {
-            if msg.role == Role::Assistant
-                && msg
-                    .tool_calls
-                    .as_ref()
-                    .map_or(false, |tc| !tc.is_empty())
-            {
-                "Executing tools...".to_string()
-            } else if msg.role == Role::Assistant {
-                "(continuing)".to_string()
-            } else if msg.role == Role::User {
-                "(empty message)".to_string()
-            } else if msg.role == Role::Tool {
-                "(empty output)".to_string()
-            } else if msg.role == Role::System {
-                "You are a helpful assistant.".to_string()
-            } else {
-                "(empty)".to_string()
-            }
-        } else {
-            msg.content.clone()
-        };
+        let is_tool_call_assistant = msg.role == Role::Assistant
+            && msg
+                .tool_calls
+                .as_ref()
+                .map_or(false, |tc| !tc.is_empty());
 
-        let mut item = json!({
-            "role": match msg.role {
-                Role::System => "system",
-                Role::User => "user",
-                Role::Assistant => "assistant",
-                Role::Tool => "tool",
-            },
-            "content": content,
-        });
+        let mut item = if is_tool_call_assistant {
+            json!({
+                "role": "assistant",
+                "content": Value::Null,
+            })
+        } else {
+            let content = if msg.content.trim().is_empty() {
+                if msg.role == Role::Assistant {
+                    "(continuing)".to_string()
+                } else if msg.role == Role::User {
+                    "(empty message)".to_string()
+                } else if msg.role == Role::Tool {
+                    "(empty output)".to_string()
+                } else if msg.role == Role::System {
+                    "You are a helpful assistant.".to_string()
+                } else {
+                    "(empty)".to_string()
+                }
+            } else {
+                msg.content.clone()
+            };
+            json!({
+                "role": match msg.role {
+                    Role::System => "system",
+                    Role::User => "user",
+                    Role::Assistant => "assistant",
+                    Role::Tool => "tool",
+                },
+                "content": content,
+            })
+        };
         if let Some(name) = &msg.name {
             item["name"] = json!(name);
         }
