@@ -2149,12 +2149,14 @@ fn open_browser(url: &str) -> bool {
     use std::process::Command as Shell;
     #[cfg(target_os = "macos")]
     let result = Shell::new("open").arg(url).spawn().map(|_| ());
-    #[cfg(target_os = "linux")]
+    #[cfg(target_os = "android")]
+    let result = Shell::new("termux-open-url").arg(url).spawn().map(|_| ());
+    #[cfg(all(target_os = "linux", not(target_os = "android")))]
     let result = Shell::new("xdg-open").arg(url).spawn().map(|_| ());
     #[cfg(target_os = "windows")]
     let result = Shell::new("cmd").args(["/c", "start", url]).spawn().map(|_| ());
-    #[cfg(not(any(target_os = "macos", target_os = "linux", target_os = "windows")))]
-    let result = Err(std::io::Error::new(std::io::ErrorKind::Other, "unsupported platform"));
+    #[cfg(not(any(target_os = "macos", target_os = "linux", target_os = "windows", target_os = "android")))]
+    let result: std::io::Result<()> = Err(std::io::Error::new(std::io::ErrorKind::Other, "unsupported platform"));
     result.is_ok()
 }
 

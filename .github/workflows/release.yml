@@ -4,14 +4,12 @@ name: Release
   push:
     tags:
       - 'v*'
-    branches:
-      - v2
   workflow_dispatch:
     inputs:
       tag:
-        description: 'Release version tag (e.g. v2.0.0)'
+        description: 'Release version tag (e.g. v2.0.0-alpha.1)'
         required: false
-        default: ''
+        default: 'v2.0.0-alpha.1'
 concurrency:
   group: release-${{ github.ref }}
   cancel-in-progress: false
@@ -33,9 +31,9 @@ jobs:
     outputs:
       version: ${{ steps.version.outputs.version }}
       tag: ${{ steps.version.outputs.tag }}
+      prerelease: ${{ steps.version.outputs.prerelease }}
     steps:
       - uses: actions/checkout@v4
-
       - name: Resolve and Validate Version
         id: version
         shell: bash
@@ -58,11 +56,15 @@ jobs:
             tag="v${cargo_ver}"
             tag_ver="${cargo_ver}"
           fi
+          if [[ "${tag}" == *"alpha"* || "${tag}" == *"beta"* || "${tag}" == *"rc"* || "${tag}" == *"v2"* ]]; then
+            echo "prerelease=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "prerelease=false" >> "$GITHUB_OUTPUT"
+          fi
 
           echo "version=${tag_ver}" >> "$GITHUB_OUTPUT"
           echo "tag=${tag}" >> "$GITHUB_OUTPUT"
-          echo "Target Release: ${tag} (version ${tag_ver})"
-
+          echo "Target Release: ${tag} (version ${tag_ver}, prerelease=${tag_ver})"
   # ── Multi-Platform Binary Matrix Build ──────────────────────────────────────
   build:
     name: Build (${{ matrix.target }})
@@ -310,7 +312,7 @@ jobs:
             release-assets/*
           generate_release_notes: true
           draft: false
-          prerelease: false
+          prerelease: ${{ needs.tag-check.outputs.prerelease == 'true' }}
           body: |
             ## Fusion ${{ needs.tag-check.outputs.tag }}
 
