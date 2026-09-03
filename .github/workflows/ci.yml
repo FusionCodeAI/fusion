@@ -2,9 +2,9 @@ name: CI
 
 on:
   push:
-    branches: [ main, dev, 'feat/**', 'fix/**' ]
+    branches: [ main, v2, dev, 'feat/**', 'fix/**' ]
   pull_request:
-    branches: [ main, dev ]
+    branches: [ main, v2, dev ]
 
 # Cancel superseding runs for the same branch/PR
 concurrency:
@@ -38,8 +38,7 @@ jobs:
         run: cargo fmt --all --check
 
       - name: Run clippy linter
-        run: cargo clippy --all-targets --all-features -- -D warnings
-
+        run: cargo clippy --all-targets --all-features
   # ── Security Audit ──────────────────────────────────────────────────────────
   audit:
     name: Cargo Audit

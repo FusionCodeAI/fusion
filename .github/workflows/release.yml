@@ -4,13 +4,14 @@ name: Release
   push:
     tags:
       - 'v*'
+    branches:
+      - v2
   workflow_dispatch:
     inputs:
       tag:
-        description: 'Release version tag (e.g. v0.3.0)'
+        description: 'Release version tag (e.g. v2.0.0)'
         required: false
         default: ''
-
 concurrency:
   group: release-${{ github.ref }}
   cancel-in-progress: false
@@ -227,7 +228,13 @@ jobs:
           mkdir -p dist staging
           cp "${BIN_SRC}" "staging/${BINARY}"
           chmod +x "staging/${BINARY}"
-
+          # Bundle fusion2 alias binary as well
+          if [[ "${BINARY}" == *".exe" ]]; then
+            cp "${BIN_SRC}" "staging/fusion2.exe"
+          else
+            cp "${BIN_SRC}" "staging/fusion2"
+            chmod +x "staging/fusion2"
+          fi
           [ -f "README.md" ] && cp "README.md" "staging/"
           [ -f "LICENSE" ] && cp "LICENSE" "staging/"
 
