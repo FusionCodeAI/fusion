@@ -201,7 +201,7 @@ impl MarkdownRenderer {
                         self.emit(l, output);
                     }
                 }
-                let end_border = format!("\x1b[38;5;240m└{}\x1b[0m", "─".repeat(BORDER_WIDTH));
+                let end_border = format!("  \x1b[38;5;240m─{}\x1b[0m", "─".repeat(BORDER_WIDTH.saturating_sub(1)));
                 self.emit(&end_border, output);
                 return;
             } else {
@@ -274,7 +274,7 @@ impl MarkdownRenderer {
         if self.in_code_block {
             self.in_code_block = false;
             self.code_lang.clear();
-            let end_border = format!("\x1b[38;5;240m└{}\x1b[0m", "─".repeat(BORDER_WIDTH));
+            let end_border = format!("  \x1b[38;5;240m─{}\x1b[0m", "─".repeat(BORDER_WIDTH.saturating_sub(1)));
             self.emit(&end_border, &mut output);
         }
 
@@ -335,7 +335,7 @@ pub fn render_markdown(text: &str) -> String {
     flush_table(&mut output, &mut table_lines, &mut in_code_block, &mut code_lang);
 
     if in_code_block {
-        output.push_str(&format!("\x1b[38;5;240m└{}\x1b[0m\n", "─".repeat(BORDER_WIDTH)));
+        output.push_str(&format!("  \x1b[38;5;240m─{}\x1b[0m\n", "─".repeat(BORDER_WIDTH.saturating_sub(1))));
     }
 
     output
@@ -350,22 +350,21 @@ pub fn render_line(line: &str, in_code_block: &mut bool, code_lang: &mut String)
         if *in_code_block {
             *in_code_block = false;
             code_lang.clear();
-            return format!("\x1b[38;5;240m└{}\x1b[0m", "─".repeat(BORDER_WIDTH));
+            return format!("  \x1b[38;5;240m─{}\x1b[0m", "─".repeat(BORDER_WIDTH.saturating_sub(1)));
         } else {
             *in_code_block = true;
             let lang = trimmed.trim_start_matches('`').trim();
             *code_lang = lang.to_string();
-            let lang_label = if lang.is_empty() {
-                String::new()
+            if lang.is_empty() {
+                return format!("  \x1b[38;5;240m─{}\x1b[0m", "─".repeat(BORDER_WIDTH.saturating_sub(1)));
             } else {
-                format!(" {} ", lang)
-            };
-            let border_len = BORDER_WIDTH.saturating_sub(lang_label.len() + 3);
-            return format!(
-                "\x1b[38;5;240m┌──\x1b[1;33m{}\x1b[38;5;240m{}\x1b[0m",
-                lang_label,
-                "─".repeat(border_len)
-            );
+                let border_len = BORDER_WIDTH.saturating_sub(lang.len() + 3);
+                return format!(
+                    "  \x1b[38;5;240m─\x1b[0m \x1b[1;37m{}\x1b[0m \x1b[38;5;240m{}\x1b[0m",
+                    lang,
+                    "─".repeat(border_len)
+                );
+            }
         }
     }
 
@@ -982,7 +981,7 @@ mod tests {
         assert!(in_code);
         assert_eq!(lang, "rust");
         assert!(top.contains("rust"));
-        assert!(top.contains("┌──"));
+        assert!(top.contains("─"));
 
         let code_line = render_line("let x = 42;", &mut in_code, &mut lang);
         assert!(code_line.contains("│"));
@@ -991,7 +990,7 @@ mod tests {
 
         let bottom = render_line("```", &mut in_code, &mut lang);
         assert!(!in_code);
-        assert!(bottom.contains("└"));
+        assert!(bottom.contains("─"));
     }
 
     #[test]
@@ -1069,9 +1068,9 @@ mod tests {
 
         let chunk2 = renderer.push("** markdown.\n```rust\nfn main() {}\n```\n");
         assert!(chunk2.contains("streaming"));
-        assert!(chunk2.contains("┌──"));
+        assert!(chunk2.contains("─"));
         assert!(chunk2.contains("main"));
-        assert!(chunk2.contains("└"));
+        assert!(chunk2.contains("─"));
 
         let finished = renderer.finish();
         assert_eq!(finished, "");
@@ -1084,7 +1083,7 @@ mod tests {
         assert!(renderer.is_in_code_block());
         let finish = renderer.finish();
         assert!(!renderer.is_in_code_block());
-        assert!(finish.contains("└"));
+        assert!(finish.contains("─"));
     }
 
     #[test]
@@ -1095,9 +1094,9 @@ mod tests {
         assert!(rendered.contains("bold"));
         assert!(rendered.contains("•"));
         assert!(rendered.contains("Point A"));
-        assert!(rendered.contains("┌──"));
+        assert!(rendered.contains("─"));
         assert!(rendered.contains("echo"));
-        assert!(rendered.contains("└"));
+        assert!(rendered.contains("─"));
     }
 
     #[test]
@@ -1150,9 +1149,9 @@ mod tests {
     fn test_renderer_indent_unclosed_code_block() {
         let mut renderer = MarkdownRenderer::buffered().with_indent(4);
         let chunk = renderer.push("```python\nprint('hi')\n");
-        assert!(chunk.starts_with("    \x1b[38;5;240m┌──"));
+        assert!(chunk.starts_with("      \x1b[38;5;240m─"));
         let finished = renderer.finish();
-        assert!(finished.starts_with("    \x1b[38;5;240m└"));
+        assert!(finished.starts_with("      \x1b[38;5;240m─"));
     }
 
     #[test]
@@ -1165,5 +1164,16 @@ mod tests {
         assert!(output.contains("Process"));
         assert!(output.contains("End"));
         assert!(output.contains("v"));
+    }
+
+    #[test]
+    fn test_plain_code_blocks_omit_left_border() {
+        for lang_name in &["text", "ascii", "mermaid", ""] {
+            let mut in_code = true;
+            let mut lang = lang_name.to_string();
+            let line = "  +---+  ";
+            let rendered = render_line(line, &mut in_code, &mut lang);
+            assert_eq!(rendered, "  +---+  ", "Language {} should not have left bar", lang_name);
+        }
     }
 }

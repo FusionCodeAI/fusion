@@ -97,11 +97,15 @@ pub fn format_activity_status(
     let elapsed_str = format_duration_compact(elapsed);
     let in_str = format_tokens_compact(in_tokens);
     let out_str = format_tokens_compact(out_tokens);
-    let status = if status_text.is_empty() {
-        "• Running"
+    let half_periods = elapsed.as_millis() / 500;
+    let dot = if half_periods % 2 == 0 { "• " } else { "  " };
+    let raw = if status_text.is_empty() {
+        "Running"
     } else {
         status_text
     };
+    let verb = raw.strip_prefix("• ").unwrap_or(raw);
+    let status = format!("{}{}", dot, verb);
     format!(
         "  \x1b[2;37m{} ({}) (↑{} ↓{})\x1b[0m\r\n\r\n\x1b[1m┃\x1b[0m \r\n\r\n\x1b[2;37menter queue · auto · {}\x1b[0m\r\n",
         status, elapsed_str, in_str, out_str, model_label
@@ -115,7 +119,7 @@ pub fn format_thinking_status(
     out_tokens: u64,
     model_label: &str,
 ) -> String {
-    format_activity_status("• Running", elapsed, in_tokens, out_tokens, model_label)
+    format_activity_status("Running", elapsed, in_tokens, out_tokens, model_label)
 }
 
 /// Format completed turn summary: duration and tokens.
@@ -144,11 +148,15 @@ pub fn render_thinking_frame_to<W: std::io::Write>(
     let elapsed_str = format_duration_compact(elapsed);
     let in_str = format_tokens_compact(in_tokens);
     let out_str = format_tokens_compact(out_tokens);
-    let status = if status_text.is_empty() {
-        "• Running"
+    let half_periods = elapsed.as_millis() / 500;
+    let dot = if half_periods % 2 == 0 { "• " } else { "  " };
+    let raw = if status_text.is_empty() {
+        "Running"
     } else {
         status_text
     };
+    let verb = raw.strip_prefix("• ").unwrap_or(raw);
+    let status = format!("{}{}", dot, verb);
     write!(
         out,
         "  \x1b[2;37m{} ({}) (↑{} ↓{})\x1b[0m\r\n\r\n\x1b[1m┃\x1b[0m {}\r\n\r\n\x1b[2;37menter queue · auto · {}\x1b[0m",
@@ -564,11 +572,13 @@ pub async fn run_turn_ui(
         tokio::select! {
             _ = ticker.tick(), if is_thinking => {
                 let elapsed = start_time.elapsed();
-                let status_verb = match active_tool_label.as_deref() {
-                    Some(label) => format!("• {}", label),
-                    None => "• Running".to_string(),
+                let half_periods = elapsed.as_millis() / 500;
+                let dot = if half_periods % 2 == 0 { "• " } else { "  " };
+                let verb = match active_tool_label.as_deref() {
+                    Some(label) => label.strip_prefix("• ").unwrap_or(label),
+                    None => "Running",
                 };
-                let status = format!("• {} ({}) (↑{} ↓{})", status_verb, format_duration_compact(elapsed), format_tokens_compact(input_tokens), format_tokens_compact(output_tokens));
+                let status = format!("{}{} ({}) (↑{} ↓{})", dot, verb, format_duration_compact(elapsed), format_tokens_compact(input_tokens), format_tokens_compact(output_tokens));
                 prompt.set_running_status(Some(status));
                 let _ = prompt.render_current();
             }
@@ -629,7 +639,10 @@ pub async fn run_turn_ui(
                             md.finish();
                             is_thinking = true;
                             let elapsed = start_time.elapsed();
-                            let status = format!("• {} ({}) (↑{} ↓{})", active_label, format_duration_compact(elapsed), format_tokens_compact(input_tokens), format_tokens_compact(output_tokens));
+                            let half_periods = elapsed.as_millis() / 500;
+                            let dot = if half_periods % 2 == 0 { "• " } else { "  " };
+                            let verb = active_label.strip_prefix("• ").unwrap_or(&active_label);
+                            let status = format!("{}{} ({}) (↑{} ↓{})", dot, verb, format_duration_compact(elapsed), format_tokens_compact(input_tokens), format_tokens_compact(output_tokens));
                             prompt.set_running_status(Some(status));
                             let _ = prompt.render_current();
                         }
@@ -711,7 +724,10 @@ pub async fn run_turn_ui(
                         md.finish();
                         is_thinking = true;
                         let elapsed = start_time.elapsed();
-                        let status = format!("• {} ({}) (↑{} ↓{})", active_label, format_duration_compact(elapsed), format_tokens_compact(input_tokens), format_tokens_compact(output_tokens));
+                        let half_periods = elapsed.as_millis() / 500;
+                        let dot = if half_periods % 2 == 0 { "• " } else { "  " };
+                        let verb = active_label.strip_prefix("• ").unwrap_or(&active_label);
+                        let status = format!("{}{} ({}) (↑{} ↓{})", dot, verb, format_duration_compact(elapsed), format_tokens_compact(input_tokens), format_tokens_compact(output_tokens));
                         prompt.set_running_status(Some(status));
                         let _ = prompt.render_current();
                     }
@@ -1015,7 +1031,50 @@ mod tests {
             "DeepSeek V4 Flash",
         );
         assert!(status.contains("• Running (1m10s) (↑9 ↓641)"));
+        assert!(!status.contains("• •"));
         assert!(status.contains("┃"));
         assert!(status.contains("enter queue · auto · DeepSeek V4 Flash"));
+    }
+
+    #[test]
+    fn test_format_activity_status_blinking() {
+        let status_on = format_activity_status(
+            "Running",
+            Duration::from_millis(0),
+            0,
+            0,
+            "auto",
+        );
+        assert!(status_on.contains("• Running"));
+
+        let status_off = format_activity_status(
+            "Running",
+            Duration::from_millis(500),
+            0,
+            0,
+            "auto",
+        );
+        assert!(status_off.contains("  Running"));
+        assert!(!status_off.contains("• Running"));
+
+        let status_on_2 = format_activity_status(
+            "• Running",
+            Duration::from_millis(1000),
+            0,
+            0,
+            "auto",
+        );
+        assert!(status_on_2.contains("• Running"));
+        assert!(!status_on_2.contains("• •"));
+
+        let status_off_2 = format_activity_status(
+            "• Running",
+            Duration::from_millis(1500),
+            0,
+            0,
+            "auto",
+        );
+        assert!(status_off_2.contains("  Running"));
+        assert!(!status_off_2.contains("• •"));
     }
 }

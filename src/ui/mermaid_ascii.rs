@@ -42,6 +42,27 @@ struct FlowEdge {
     dashed: bool,
 }
 
+/// Cleans HTML tags, non-breaking spaces, and line breaks from node/edge labels.
+pub fn clean_label(label: &str) -> String {
+    let mut s = label.to_string();
+    // Normalize newlines and HTML break tags to " / "
+    for br in &["<br/>", "<br>", "<br />", "<br\\>", "\\n", "\r\n", "\n", "\r"] {
+        s = s.replace(br, " / ");
+    }
+    // Replace non-breaking spaces with standard space
+    s = s.replace("&nbsp;", " ");
+
+    // Clean up duplicate spaces and slashes
+    while s.contains("  ") {
+        s = s.replace("  ", " ");
+    }
+    while s.contains(" / / ") || s.contains("/ /") {
+        s = s.replace(" / / ", " / ").replace("/ /", " / ");
+    }
+
+    s.trim().trim_matches('"').trim().to_string()
+}
+
 fn parse_node_spec(token: &str) -> Option<FlowNode> {
     let s = token.trim();
     if s.is_empty() {
@@ -53,7 +74,7 @@ fn parse_node_spec(token: &str) -> Option<FlowNode> {
         if let Some((label, _)) = rest.split_once(")]") {
             return Some(FlowNode {
                 id: id.trim().to_string(),
-                label: label.trim().trim_matches('"').to_string(),
+                label: clean_label(label),
                 shape: NodeShape::Database,
             });
         }
@@ -64,7 +85,7 @@ fn parse_node_spec(token: &str) -> Option<FlowNode> {
         if let Some((label, _)) = rest.split_once('}') {
             return Some(FlowNode {
                 id: id.trim().to_string(),
-                label: label.trim().trim_matches('"').to_string(),
+                label: clean_label(label),
                 shape: NodeShape::Diamond,
             });
         }
@@ -75,7 +96,7 @@ fn parse_node_spec(token: &str) -> Option<FlowNode> {
         if let Some((label, _)) = rest.split_once(')') {
             return Some(FlowNode {
                 id: id.trim().to_string(),
-                label: label.trim().trim_matches('"').to_string(),
+                label: clean_label(label),
                 shape: NodeShape::Round,
             });
         }
@@ -86,7 +107,7 @@ fn parse_node_spec(token: &str) -> Option<FlowNode> {
         if let Some((label, _)) = rest.split_once(']') {
             return Some(FlowNode {
                 id: id.trim().to_string(),
-                label: label.trim().trim_matches('"').to_string(),
+                label: clean_label(label),
                 shape: NodeShape::Box,
             });
         }
@@ -95,7 +116,7 @@ fn parse_node_spec(token: &str) -> Option<FlowNode> {
     // Bare identifier
     Some(FlowNode {
         id: s.to_string(),
-        label: s.to_string(),
+        label: clean_label(s),
         shape: NodeShape::Box,
     })
 }
@@ -146,7 +167,7 @@ fn render_flowchart_ascii(source: &str) -> Option<String> {
                 if right_str.starts_with('|') {
                     if let Some(rest) = right_str.strip_prefix('|') {
                         if let Some((lbl, remaining)) = rest.split_once('|') {
-                            edge_label = Some(lbl.trim().to_string());
+                            edge_label = Some(clean_label(lbl));
                             right_str = remaining.trim();
                         }
                     }
@@ -176,7 +197,7 @@ fn render_flowchart_ascii(source: &str) -> Option<String> {
         }
     }
 
-    if nodes.is_empty() {
+    if nodes.is_empty() || nodes.len() > 12 {
         return None;
     }
 
@@ -326,7 +347,7 @@ fn render_td_ascii(nodes: &HashMap<String, FlowNode>, edges: &[FlowEdge]) -> Opt
             out.push_str(&format!("  {}v\n", " ".repeat(center_indent)));
         }
 
-        // Render nodes in this layer side-by-side
+        // Render nodes in this layer side-by-side or stacked vertically if total width exceeds 72
         let mut row_boxes: Vec<Vec<String>> = Vec::new();
         for id in node_ids {
             if let Some(node) = nodes.get(id) {
@@ -334,15 +355,37 @@ fn render_td_ascii(nodes: &HashMap<String, FlowNode>, edges: &[FlowEdge]) -> Opt
             }
         }
 
-        for row_i in 0..3 {
-            out.push_str("  ");
+        let total_layer_width = if row_boxes.is_empty() {
+            0
+        } else {
+            2 + row_boxes.len() * box_width + (row_boxes.len().saturating_sub(1)) * 4
+        };
+
+        if total_layer_width > 72 && row_boxes.len() > 1 {
+            // Stack vertically
+            let center_indent = (box_width / 2).saturating_sub(1);
             for (b_idx, b) in row_boxes.iter().enumerate() {
                 if b_idx > 0 {
-                    out.push_str("    ");
+                    out.push_str(&format!("  {}|\n", " ".repeat(center_indent)));
+                    out.push_str(&format!("  {}v\n", " ".repeat(center_indent)));
                 }
-                out.push_str(&b[row_i]);
+                for row in b {
+                    out.push_str("  ");
+                    out.push_str(row);
+                    out.push('\n');
+                }
             }
-            out.push('\n');
+        } else {
+            for row_i in 0..3 {
+                out.push_str("  ");
+                for (b_idx, b) in row_boxes.iter().enumerate() {
+                    if b_idx > 0 {
+                        out.push_str("    ");
+                    }
+                    out.push_str(&b[row_i]);
+                }
+                out.push('\n');
+            }
         }
     }
 
@@ -420,8 +463,9 @@ fn render_sequence_ascii(source: &str) -> Option<String> {
             } else {
                 part
             };
-            if !participants.contains(&name.to_string()) {
-                participants.push(name.to_string());
+            let cleaned = clean_label(name);
+            if !participants.contains(&cleaned) {
+                participants.push(cleaned);
             }
             continue;
         }
@@ -436,11 +480,11 @@ fn render_sequence_ascii(source: &str) -> Option<String> {
 
         for &(arrow, is_dotted) in &arrows {
             if let Some((left, right)) = trimmed.split_once(arrow) {
-                let from = left.trim().to_string();
+                let from = clean_label(left.trim());
                 let (to, msg) = if let Some((to_part, msg_part)) = right.split_once(':') {
-                    (to_part.trim().to_string(), msg_part.trim().to_string())
+                    (clean_label(to_part.trim()), clean_label(msg_part.trim()))
                 } else {
-                    (right.trim().to_string(), String::new())
+                    (clean_label(right.trim()), String::new())
                 };
 
                 if !participants.contains(&from) {
@@ -455,7 +499,7 @@ fn render_sequence_ascii(source: &str) -> Option<String> {
         }
     }
 
-    if participants.is_empty() {
+    if participants.is_empty() || participants.len() > 12 {
         return None;
     }
 
@@ -558,5 +602,33 @@ mod tests {
         assert!(ascii.contains("Server"));
         assert!(ascii.contains("Request"));
         assert!(ascii.contains("Response"));
+    }
+
+    #[test]
+    fn test_clean_label() {
+        assert_eq!(clean_label("Line1<br/>Line2"), "Line1 / Line2");
+        assert_eq!(clean_label("Line1<br>Line2"), "Line1 / Line2");
+        assert_eq!(clean_label("Line1<br />Line2"), "Line1 / Line2");
+        assert_eq!(clean_label("Word1&nbsp;Word2"), "Word1 Word2");
+        assert_eq!(clean_label("\"Quoted<br/>Text\""), "Quoted / Text");
+    }
+
+    #[test]
+    fn test_large_graph_returns_none() {
+        let mut src = String::from("graph TD\n");
+        for i in 0..15 {
+            src.push_str(&format!("    N{} --> N{}\n", i, i + 1));
+        }
+        assert!(render_mermaid_ascii(&src).is_none());
+    }
+
+    #[test]
+    fn test_wide_layer_vertical_stacking() {
+        let src = "graph TD\n    A[Start] --> B[Option1]\n    A --> C[Option2]\n    A --> D[Option3]\n    A --> E[Option4]\n    A --> F[Option5]";
+        let ascii = render_mermaid_ascii(src).expect("should render ascii flowchart");
+        assert!(ascii.contains("Option1"));
+        assert!(ascii.contains("Option5"));
+        // Vertically stacked means each option is in its own box vertically
+        assert!(ascii.contains("v\n"));
     }
 }

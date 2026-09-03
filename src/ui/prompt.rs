@@ -487,6 +487,10 @@ impl Prompt {
                         Ok(None)
                     }
                     KeyResult::Submit(text) => {
+                        let trimmed = text.trim();
+                        if trimmed.is_empty() {
+                            return Ok(None);
+                        }
                         self.clear_frame()?;
                         let mut out = stdout();
                         let lines: Vec<&str> = text.split('\n').collect();
@@ -495,9 +499,7 @@ impl Prompt {
                         }
                         let _ = write!(out, "\r\n");
                         let _ = out.flush();
-                        if !text.trim().is_empty() {
-                            self.add_history(text.clone());
-                        }
+                        self.add_history(text.clone());
                         self.buffer.clear();
                         self.cursor_pos = 0;
                         Ok(Some(PromptResult::Submit(text)))

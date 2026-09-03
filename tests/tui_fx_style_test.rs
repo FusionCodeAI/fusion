@@ -207,9 +207,15 @@ fn test_thinking_status_full_frame() {
     );
     let plain = strip_ansi(&frame);
 
+    // Must have a single dot and NEVER double dots
     assert!(
         plain.contains("• Running (1s) (↑1 ↓0)"),
         "Thinking status must contain '• Running (1s) (↑1 ↓0)', got:\n{}",
+        plain
+    );
+    assert!(
+        !plain.contains("• •"),
+        "Thinking status must never contain double dots '• •', got:\n{}",
         plain
     );
     assert!(
@@ -222,6 +228,44 @@ fn test_thinking_status_full_frame() {
         "Thinking status frame must include queue hint, got:\n{}",
         plain
     );
+}
+
+#[test]
+fn test_thinking_status_single_dot_and_500ms_blinking() {
+    // 1. At 0ms (even 500ms interval): dot is ON ("• Running")
+    let frame_0ms = format_activity_status("Running", Duration::from_millis(0), 10, 20, "auto");
+    let plain_0ms = strip_ansi(&frame_0ms);
+    assert!(plain_0ms.contains("• Running (0s) (↑10 ↓20)"), "At 0ms dot should be ON: {}", plain_0ms);
+    assert!(!plain_0ms.contains("• •"), "Must not contain double dot: {}", plain_0ms);
+
+    // 2. At 500ms (odd 500ms interval): dot is OFF ("  Running")
+    let frame_500ms = format_activity_status("Running", Duration::from_millis(500), 10, 20, "auto");
+    let plain_500ms = strip_ansi(&frame_500ms);
+    assert!(plain_500ms.contains("  Running (0s) (↑10 ↓20)"), "At 500ms dot should be OFF: {}", plain_500ms);
+    assert!(!plain_500ms.contains("•"), "At 500ms no dot should appear: {}", plain_500ms);
+
+    // 3. At 1000ms (even 500ms interval): dot is ON ("• Running")
+    let frame_1000ms = format_activity_status("Running", Duration::from_millis(1000), 10, 20, "auto");
+    let plain_1000ms = strip_ansi(&frame_1000ms);
+    assert!(plain_1000ms.contains("• Running (1s) (↑10 ↓20)"), "At 1000ms dot should be ON: {}", plain_1000ms);
+    assert!(!plain_1000ms.contains("• •"), "Must not contain double dot: {}", plain_1000ms);
+
+    // 4. At 1500ms (odd 500ms interval): dot is OFF ("  Running")
+    let frame_1500ms = format_activity_status("Running", Duration::from_millis(1500), 10, 20, "auto");
+    let plain_1500ms = strip_ansi(&frame_1500ms);
+    assert!(plain_1500ms.contains("  Running (1s) (↑10 ↓20)"), "At 1500ms dot should be OFF: {}", plain_1500ms);
+    assert!(!plain_1500ms.contains("•"), "At 1500ms no dot should appear: {}", plain_1500ms);
+
+    // 5. Passing "• Running" or "• • Running" is sanitized so only single blinking dot is produced
+    let frame_prefixed = format_activity_status("• Running", Duration::from_millis(0), 10, 20, "auto");
+    let plain_prefixed = strip_ansi(&frame_prefixed);
+    assert!(plain_prefixed.contains("• Running (0s) (↑10 ↓20)"));
+    assert!(!plain_prefixed.contains("• •"), "Must sanitize leading dot to avoid double dots: {}", plain_prefixed);
+
+    let frame_prefixed_off = format_activity_status("• Running", Duration::from_millis(500), 10, 20, "auto");
+    let plain_prefixed_off = strip_ansi(&frame_prefixed_off);
+    assert!(plain_prefixed_off.contains("  Running (0s) (↑10 ↓20)"));
+    assert!(!plain_prefixed_off.contains("•"), "Must be off at 500ms even with prefixed input: {}", plain_prefixed_off);
 }
 
 // ===========================================================================
@@ -452,7 +496,62 @@ fn test_markdown_renderer_indent_and_code_blocks() {
     // Code block header and footer
     assert!(plain.contains("rust"), "Should contain language tag");
     assert!(plain.contains("let x = 42;"), "Should contain code line");
+    // Standard code block should have left border `│ `
+    assert!(plain.contains("│ let x = 42;"), "Standard code block lines should have │ border: {}", plain);
 }
+
+#[test]
+fn test_markdown_ascii_diagram_rendering_omits_left_border() {
+    let mut md = MarkdownRenderer::buffered().with_indent(2);
+    let input = "```text\n+-------+      +-------+\n| Client| ---> | Server|\n+-------+      +-------+\n```\n";
+    
+    let output = md.push(input);
+    let finish = md.finish();
+    let total = format!("{}{}", output, finish);
+    let plain = strip_ansi(&total);
+
+    // Verify code block dividers
+    assert!(plain.contains("text"), "Should contain text lang tag in header");
+    assert!(plain.contains("─ text ──"), "Should contain top border: {}", plain);
+    assert!(plain.contains("────"), "Should contain bottom border: {}", plain);
+
+    // Diagrams in text/ascii block must NOT have left border `│ ` prepended
+    assert!(!plain.contains("│ +-------+"), "Diagram line should not have left bar │: {}", plain);
+    assert!(plain.contains("+-------+"), "Diagram box should be preserved: {}", plain);
+    assert!(plain.contains("| Client| ---> | Server|"), "Diagram connection should be preserved: {}", plain);
+
+    // Indentation check: all non-empty lines are 2-space indented
+    for line in plain.lines() {
+        if !line.trim().is_empty() {
+            assert!(line.starts_with("  "), "Every line must be indented with 2 spaces: {:?}", line);
+        }
+    }
+}
+
+#[test]
+fn test_markdown_mermaid_to_ascii_diagram_rendering() {
+    let mut md = MarkdownRenderer::buffered().with_indent(2);
+    let input = "```mermaid\ngraph TD\n    A[Start<br/>Node] --> B[End&nbsp;Node]\n```\n";
+    
+    let output = md.push(input);
+    let finish = md.finish();
+    let total = format!("{}{}", output, finish);
+    let plain = strip_ansi(&total);
+
+    // Verify ASCII boxes and arrows were rendered from mermaid
+    assert!(plain.contains("+---------"), "Mermaid should render as ASCII box: {}", plain);
+    assert!(plain.contains("Start / Node") || plain.contains("Start"), "Sanitized label should be present: {}", plain);
+    assert!(plain.contains("End Node") || plain.contains("End"), "Sanitized &nbsp; label should be present: {}", plain);
+    assert!(plain.contains("v") || plain.contains("-->"), "Arrow/connector should be present: {}", plain);
+
+    // Verify HTML tags were stripped/cleaned
+    assert!(!plain.contains("<br/>"), "<br/> should be sanitized: {}", plain);
+    assert!(!plain.contains("&nbsp;"), "&nbsp; should be sanitized: {}", plain);
+
+    // Verify left border `│ ` is omitted so diagram remains clean
+    assert!(!plain.contains("│ +---------"), "Mermaid diagram box lines should not have left bar │: {}", plain);
+}
+
 
 // ===========================================================================
 // Contract 9: Full In-Memory REPL Turn Lifecycle Simulation

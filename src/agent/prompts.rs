@@ -196,13 +196,15 @@ impl PromptPreset {
 
     /// Detects preset from an individual file path based on extension.
     pub fn detect_from_path(path: &Path) -> Option<Self> {
-        if let Some(ext) = path.extension().and_then(|e| e.to_str()) {
-            Self::from_file_extension(ext)
-        } else if let Some(file_name) = path.file_name().and_then(|n| n.to_str()) {
-            Self::from_manifest_filename(file_name)
-        } else {
-            None
+        if let Some(file_name) = path.file_name().and_then(|n| n.to_str()) {
+            if let Some(preset) = Self::from_manifest_filename(file_name) {
+                return Some(preset);
+            }
         }
+        if let Some(ext) = path.extension().and_then(|e| e.to_str()) {
+            return Self::from_file_extension(ext);
+        }
+        None
     }
 
     /// Detects dominant project preset from directory contents.
@@ -224,8 +226,8 @@ Operating Principles:
 2. Tool-Driven Discovery: Use provided tools (read, write, edit, grep, glob, bash) to inspect real code state before acting.
 3. Targeted Work: Avoid dumping large files; prefer surgical reads and line-anchored edits.
 4. Cross-Platform Rigor: Respect target operating systems, architecture nuances, and filesystem paths.
-5. Zero-Cost Engineering: Avoid unnecessary allocations, unhandled errors, and speculative assumptions."#;
-
+5. Zero-Cost Engineering: Avoid unnecessary allocations, unhandled errors, and speculative assumptions.
+6. Universal Terminal Diagrams: When illustrating architecture, data flow, or system diagrams, default to clean ASCII/Unicode box art (using `+---+`, `|`, `v`, `-->`, or `┌───┐`, `│`, `└───┘`) inside ```text or ```ascii blocks so they render universally and cleanly on all terminal screens without distortion. Avoid raw Mermaid syntax unless explicitly requested."#;
 /// Curated domain-optimized system prompt for Rust engineering.
 pub const RUST_SYSTEM_PROMPT: &str = r#"You are Fusion, an expert Rust systems and application engineer.
 Your mission is to produce idiomatic, zero-cost, memory-safe, and robust Rust code.
@@ -963,6 +965,14 @@ mod tests {
             PromptPreset::Custom("embedded".into()).to_string(),
             "custom:embedded"
         );
+    }
+    #[test]
+    fn test_general_system_prompt_content() {
+        let prompt = general_system_prompt();
+        assert!(prompt.contains("Universal Terminal Diagrams"));
+        assert!(prompt.contains("ASCII/Unicode box art"));
+        assert!(prompt.contains("```text or ```ascii"));
+        assert!(prompt.contains("Avoid raw Mermaid syntax unless explicitly requested."));
     }
 
     #[test]
