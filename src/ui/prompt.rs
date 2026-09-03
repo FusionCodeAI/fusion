@@ -58,11 +58,11 @@ impl Prompt {
         Self {
             history: Vec::new(),
             history_idx: None,
-            prompt_symbol: "\x1b[1;36m❯\x1b[0m ".to_string(),
-            multiline_symbol: "\x1b[2;37m···\x1b[0m ".to_string(),
-            placeholder: Some("Type a message or /help...".to_string()),
+            prompt_symbol: "\x1b[38;5;75m┃\x1b[0m ".to_string(),
+            multiline_symbol: "\x1b[38;5;75m┃\x1b[0m ".to_string(),
+            placeholder: None,
             key_handler: KeyHandler::new(KeybindingProfile::Default),
-            show_mode_indicator: true,
+            show_mode_indicator: false,
             slash_selection: 0,
             model_selection: 0,
             model_picker_active: false,
@@ -94,6 +94,11 @@ impl Prompt {
     pub fn set_model(&mut self, model: impl Into<String>) {
         self.active_model = model.into();
     }
+    /// Get active model displayed in the prompt.
+    pub fn active_model(&self) -> &str {
+        &self.active_model
+    }
+
     /// Set a custom prompt symbol for the first line.
     pub fn with_prompt_symbol(mut self, symbol: impl Into<String>) -> Self {
         self.prompt_symbol = symbol.into();
@@ -106,6 +111,15 @@ impl Prompt {
         self
     }
 
+    /// Get current prompt symbol.
+    pub fn prompt_symbol(&self) -> &str {
+        &self.prompt_symbol
+    }
+
+    /// Get current multiline symbol.
+    pub fn multiline_symbol(&self) -> &str {
+        &self.multiline_symbol
+    }
     /// Set placeholder text shown when buffer is empty.
     pub fn with_placeholder(mut self, placeholder: impl Into<String>) -> Self {
         self.placeholder = Some(placeholder.into());
@@ -265,7 +279,7 @@ impl Prompt {
                                         let _ = execute!(out, cursor::MoveUp(last_cursor_row as u16));
                                     }
                                     let _ = execute!(out, cursor::MoveToColumn(0), terminal::Clear(ClearType::FromCursorDown));
-                                    let _ = write!(out, "{}{}\r\n", self.prompt_symbol, text);
+                                    let _ = write!(out, "\x1b[1m┃ {}\x1b[0m\r\n\r\n", text);
                                     let _ = out.flush();
 
                                     self.model_picker_active = false;
@@ -416,13 +430,10 @@ impl Prompt {
                             let _ = execute!(out, cursor::MoveToColumn(0), terminal::Clear(ClearType::FromCursorDown));
 
                             let lines: Vec<&str> = text.split('\n').collect();
-                            for (idx, line) in lines.iter().enumerate() {
-                                if idx == 0 {
-                                    let _ = write!(out, "\x1b[1;36m❯\x1b[0m {}\r\n", line);
-                                } else {
-                                    let _ = write!(out, "\x1b[2;37m···\x1b[0m {}\r\n", line);
-                                }
+                            for line in &lines {
+                                let _ = write!(out, "\x1b[1m┃ {}\x1b[0m\r\n", line);
                             }
+                            let _ = write!(out, "\r\n");
                             let _ = out.flush();
                             if !text.trim().is_empty() {
                                 self.add_history(text.clone());
@@ -505,30 +516,31 @@ impl Prompt {
         last_rendered_lines: &mut usize,
         last_cursor_row: &mut usize,
     ) -> std::io::Result<()> {
-        let mut out = stdout();
-        let (term_cols, _) = terminal::size().unwrap_or((80, 24));
-        let box_width = (term_cols as usize).saturating_sub(2).max(40);
-        let inner_width = box_width.saturating_sub(2);
+        self.render_to(
+            &mut stdout(),
+            buffer,
+            cursor_pos,
+            last_rendered_lines,
+            last_cursor_row,
+        )
+    }
 
+    /// Render the prompt buffer into a generic writer.
+    pub fn render_to<W: std::io::Write>(
+        &self,
+        out: &mut W,
+        buffer: &[char],
+        cursor_pos: usize,
+        last_rendered_lines: &mut usize,
+        last_cursor_row: &mut usize,
+    ) -> std::io::Result<()> {
         let text: String = buffer.iter().collect();
         let lines: Vec<&str> = text.split('\n').collect();
 
         // Compute cursor row & column
         let (target_row, target_col, _) = get_line_info(buffer, cursor_pos);
 
-        let first_line_symbol = if self.show_mode_indicator {
-            if let Some(indicator) = self.key_handler.mode_indicator() {
-                format!("{} {}", indicator, self.prompt_symbol)
-            } else {
-                self.prompt_symbol.clone()
-            }
-        } else {
-            self.prompt_symbol.clone()
-        };
-
-        // Determine dialog matches & rows
-        // Count dialog rows (only model picker active!)
-        let mut dialog_rows = 0usize;
+        // Filter models if model picker is active
         let mut filtered_models = Vec::new();
         if self.model_picker_active && !self.models.is_empty() {
             let query = text.to_lowercase();
@@ -543,8 +555,15 @@ impl Prompt {
                     })
                     .collect()
             };
-            dialog_rows = filtered_models.len().min(8);
         }
+
+        // Check for slash suggestions
+        let first_line = lines.first().copied().unwrap_or("");
+        let slash_suggestions = if !self.model_picker_active && first_line.starts_with('/') {
+            slash_matches(first_line)
+        } else {
+            Vec::new()
+        };
 
         // Clear previous frame using exact relative cursor movement
         if *last_cursor_row > 0 {
@@ -552,128 +571,129 @@ impl Prompt {
         }
         execute!(out, cursor::MoveToColumn(0), terminal::Clear(ClearType::FromCursorDown))?;
 
-        // 1. Top border and Dialog rows (dialog placed on TOP of input line!)
-        if dialog_rows > 0 {
-            let dialog_title = " Models ";
-            let title_vis = visible_width(dialog_title);
-            let top_fill = box_width.saturating_sub(title_vis + 3);
-            write!(
-                out,
-                "\x1b[38;5;244m╭─\x1b[1;36m{}\x1b[38;5;244m{}╮\x1b[0m\r\n",
-                dialog_title,
-                "─".repeat(top_fill)
-            )?;
+        let mut total_lines = 0;
 
-            if self.model_picker_active && !filtered_models.is_empty() {
-                let sel = self.model_selection.min(filtered_models.len().saturating_sub(1));
-                for (i, (id, name)) in filtered_models.iter().take(8).enumerate() {
-                    let (indicator, item_name, item_desc) = if i == sel {
-                        ("\x1b[1;33m▶\x1b[0m", format!("\x1b[1;37m{:<36}\x1b[0m", id), format!("\x1b[1;36m{}\x1b[0m", name))
-                    } else {
-                        (" ", format!("\x1b[2;37m{:<36}\x1b[0m", id), format!("\x1b[2;90m{}\x1b[0m", name))
-                    };
-                    let vis_len = 2 + 1 + visible_width(id).max(36) + 1 + visible_width(name);
-                    let pad = inner_width.saturating_sub(vis_len);
+        // 1. Clean suggestions list (if active)
+        if self.model_picker_active && !filtered_models.is_empty() {
+            let sel = self.model_selection.min(filtered_models.len().saturating_sub(1));
+            let window_start = if sel >= 6 { sel - 5 } else { 0 };
+            write!(out, "  \x1b[2;37mModels\x1b[0m\r\n")?;
+            total_lines += 1;
+            for (idx, (id, name)) in filtered_models.iter().enumerate().skip(window_start).take(6) {
+                if idx == sel {
                     write!(
                         out,
-                        "\x1b[38;5;244m│\x1b[0m  {} {} {}{}\x1b[38;5;244m│\x1b[0m\r\n",
-                        indicator,
-                        item_name,
-                        item_desc,
-                        " ".repeat(pad)
+                        "  \x1b[1;36m▶\x1b[0m \x1b[1;37m{:<32}\x1b[0m \x1b[2;37m{}\x1b[0m\r\n",
+                        id, name
+                    )?;
+                } else {
+                    write!(
+                        out,
+                        "    \x1b[2;37m{:<32} {}\x1b[0m\r\n",
+                        id, name
                     )?;
                 }
+                total_lines += 1;
             }
-
-            // Divider between dialog and input row
-            let divider_fill = box_width.saturating_sub(2);
-            write!(
-                out,
-                "\x1b[38;5;244m├{}┤\x1b[0m\r\n",
-                "─".repeat(divider_fill)
-            )?;
-        } else {
-            let top_fill = box_width.saturating_sub(2);
-            write!(
-                out,
-                "\x1b[38;5;244m╭{}╮\x1b[0m\r\n",
-                "─".repeat(top_fill)
-            )?;
+            write!(out, "\r\n")?;
+            total_lines += 1;
+        } else if !slash_suggestions.is_empty() {
+            let sel = self.slash_selection.min(slash_suggestions.len().saturating_sub(1));
+            let window_start = if sel >= 6 { sel - 5 } else { 0 };
+            for (idx, item) in slash_suggestions.iter().enumerate().skip(window_start).take(6) {
+                if idx == sel {
+                    write!(
+                        out,
+                        "  \x1b[1;36m▶\x1b[0m \x1b[1;37m{:<16}\x1b[0m \x1b[2;37m{}\x1b[0m\r\n",
+                        item.name, item.description
+                    )?;
+                } else {
+                    write!(
+                        out,
+                        "    \x1b[2;37m{:<16} {}\x1b[0m\r\n",
+                        item.name, item.description
+                    )?;
+                }
+                total_lines += 1;
+            }
+            write!(out, "\r\n")?;
+            total_lines += 1;
         }
 
-        // 2. Input lines with side borders (always right above bottom border)
+        let dialog_lines = total_lines;
+
+        // 2. Input lines with clean vertical rail symbol (┃ )
         for (idx, line) in lines.iter().enumerate() {
-            let (prefix_str, prefix_vis) = if idx == 0 {
-                (&first_line_symbol, visible_width(&first_line_symbol))
+            let prefix = if idx == 0 {
+                &self.prompt_symbol
             } else {
-                (&self.multiline_symbol, visible_width(&self.multiline_symbol))
+                &self.multiline_symbol
             };
 
-            write!(out, "\x1b[38;5;244m│\x1b[0m {}", prefix_str)?;
-            let mut line_vis = prefix_vis + 1;
-
+            write!(out, "{}", prefix)?;
             if idx == 0 && line.is_empty() && lines.len() == 1 {
-                let ph = if self.model_picker_active {
-                    "Select model with ↑/↓, Enter to confirm, Esc to close"
-                } else {
-                    self.placeholder.as_deref().unwrap_or("Type a message or /help...")
-                };
-                write!(out, "\x1b[2;37m{}\x1b[0m", ph)?;
-                line_vis += visible_width(ph);
+                if let Some(ph) = &self.placeholder {
+                    write!(out, "\x1b[2;37m{}\x1b[0m", ph)?;
+                }
             } else {
                 write!(out, "{}", line)?;
-                line_vis += visible_width(line);
             }
-
-            let pad = inner_width.saturating_sub(line_vis);
-            write!(out, "{}\x1b[38;5;244m│\x1b[0m\r\n", " ".repeat(pad))?;
+            write!(out, "\r\n")?;
+            total_lines += 1;
         }
 
-        // 3. Bottom border: Active model shown on the RIGHT BOTTOM
+        // 3. Blank line between input and status
+        write!(out, "\r\n")?;
+        total_lines += 1;
+
+        // 4. Status line at the bottom: mode and model name
         let model_label = match self.active_model.as_str() {
+            "deepseek-ai/DeepSeek-V4-Flash-0731" | "flash" | "v4" => "DeepSeek V4 Flash",
             "MiniMaxAI/MiniMax-M2.7" | "minimax" => "MiniMax M2.7",
             "moonshotai/Kimi-K2.6" | "kimi" => "Kimi K2.6",
-            "deepseek-ai/DeepSeek-V4-Flash-0731" | "flash" | "v4" | "deepseek" | "fusion" => "DeepSeek V4 Flash",
             other => {
                 if let Some((_, name)) = other.split_once('/') {
                     name
                 } else if other.is_empty() {
-                    "DeepSeek V4 Flash"
+                    "auto"
                 } else {
                     other
                 }
             }
         };
-        let bot_label = format!(" {} ", model_label);
-        let bot_vis = visible_width(&bot_label);
-        let left_fill = box_width.saturating_sub(bot_vis + 4);
-        write!(
-            out,
-            "\x1b[38;5;244m╰{}─\x1b[1;36m{}\x1b[38;5;244m─╯\x1b[0m",
-            "─".repeat(left_fill),
-            bot_label
-        )?;
 
-        let dialog_offset = if dialog_rows > 0 { 1 + dialog_rows } else { 0 };
-        let total_lines = 1 + dialog_offset + lines.len() + 1;
-        *last_rendered_lines = total_lines;
-        *last_cursor_row = 1 + dialog_offset + target_row;
+        write!(out, "\x1b[2;37mauto · {}\x1b[0m", model_label)?;
+        total_lines += 1;
 
         // Reposition cursor inside input box on active input row
-        let lines_up = (lines.len() - target_row);
-        if lines_up > 0 {
-            execute!(out, cursor::MoveUp(lines_up as u16))?;
-        }
-        let prefix_len = if target_row == 0 {
-            visible_width(&first_line_symbol)
-        } else {
-            visible_width(&self.multiline_symbol)
-        };
-        let target_x = (2 + prefix_len + target_col) as u16;
+        let lines_up = (lines.len() - 1 - target_row) + 2;
+        execute!(out, cursor::MoveUp(lines_up as u16))?;
+
+        let prefix_col = 2; // "┃ " occupies 2 terminal cells
+        let target_x = (prefix_col + target_col) as u16;
         execute!(out, cursor::MoveToColumn(target_x))?;
+
+        *last_rendered_lines = total_lines;
+        *last_cursor_row = dialog_lines + target_row;
 
         out.flush()?;
         Ok(())
+    }
+
+    /// Render a submitted user input prompt to a generic writer.
+    pub fn render_submitted_prompt_to<W: std::io::Write>(out: &mut W, text: &str) -> std::io::Result<()> {
+        let lines: Vec<&str> = text.split('\n').collect();
+        for line in &lines {
+            write!(out, "\x1b[1m┃ {}\x1b[0m\r\n", line)?;
+        }
+        write!(out, "\r\n")?;
+        out.flush()?;
+        Ok(())
+    }
+
+    /// Render a submitted user input prompt to stdout.
+    pub fn render_submitted_prompt(text: &str) {
+        let _ = Self::render_submitted_prompt_to(&mut stdout(), text);
     }
 }
 

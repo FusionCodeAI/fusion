@@ -24,8 +24,8 @@ pub struct MarkdownRenderer {
     spinner: Option<StreamSpinner>,
     /// Frames consumed so far; advanced each time a spinner frame is printed.
     spinner_frame_idx: usize,
+    indent: usize,
 }
-
 /// Inline spinner rendered at the start of the current streaming line.
 /// Mirrors the visual language of `super::spinner` without spawning a task.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -73,6 +73,7 @@ impl MarkdownRenderer {
             table_streamer: super::table::MarkdownTableStreamer::new(),
             spinner: None,
             spinner_frame_idx: 0,
+            indent: 0,
         }
     }
 
@@ -86,9 +87,15 @@ impl MarkdownRenderer {
             table_streamer: super::table::MarkdownTableStreamer::new(),
             spinner: None,
             spinner_frame_idx: 0,
+            indent: 0,
         }
     }
 
+    /// Configure indentation (number of leading spaces) for each emitted line.
+    pub fn with_indent(mut self, indent: usize) -> Self {
+        self.indent = indent;
+        self
+    }
     /// Returns whether the renderer is currently inside a fenced code block.
     pub fn is_in_code_block(&self) -> bool {
         self.in_code_block
@@ -132,11 +139,37 @@ impl MarkdownRenderer {
     /// Emit a fully rendered line: into the output buffer and, when streaming,
     /// straight to stdout with an inline flush.
     fn emit(&mut self, formatted: &str, output: &mut String) {
-        output.push_str(formatted);
-        output.push('\n');
-        if self.stream_stdout {
-            print!("{}\n", formatted);
-            let _ = stdout().flush();
+        if self.indent > 0 {
+            let indent_prefix = " ".repeat(self.indent);
+            let mut first = true;
+            for line in formatted.split('\n') {
+                if !first {
+                    output.push('\n');
+                    if self.stream_stdout {
+                        println!();
+                    }
+                }
+                first = false;
+                if !line.is_empty() {
+                    output.push_str(&indent_prefix);
+                    output.push_str(line);
+                    if self.stream_stdout {
+                        print!("{}{}", indent_prefix, line);
+                    }
+                }
+            }
+            output.push('\n');
+            if self.stream_stdout {
+                println!();
+                let _ = stdout().flush();
+            }
+        } else {
+            output.push_str(formatted);
+            output.push('\n');
+            if self.stream_stdout {
+                println!("{}", formatted);
+                let _ = stdout().flush();
+            }
         }
     }
 

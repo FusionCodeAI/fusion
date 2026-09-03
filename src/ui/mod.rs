@@ -43,7 +43,12 @@ pub use inline::{
 };
 pub use markdown::{print_markdown, render_inline, render_line, render_markdown, MarkdownRenderer};
 pub use prompt::{Prompt, PromptResult, RawModeGuard};
-pub use repl::{handle_command, print_banner, print_help, run_repl, run_turn_ui};
+pub use repl::{
+    format_duration_compact as format_repl_duration_compact,
+    format_model_label, format_thinking_status, format_tokens_compact as format_repl_tokens_compact,
+    format_tool_tree, format_turn_summary, handle_command, parse_tool_info, print_banner,
+    print_help, render_tool_tree, render_tool_tree_to, run_repl, run_turn_ui, ToolCallItem,
+};
 pub use spinner::{format_duration, Spinner, SpinnerHandle};
 pub use slash::{
     execute_slash_command, get_command_palette, handle_slash_command, print_command_palette,
