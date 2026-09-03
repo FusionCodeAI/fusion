@@ -804,7 +804,9 @@ pub async fn run_turn_ui(
                         _ => {}
                     }
                 }
-                let _ = prompt.clear_frame();
+                if is_thinking {
+                    let _ = prompt.clear_frame();
+                }
                 prompt.set_running(false);
                 prompt.set_running_status(None);
                 prompt.set_queued_count(0);
@@ -907,8 +909,10 @@ pub async fn run_turn_ui(
                                 output_tokens = ct;
                             }
                         }
-                        let _ = prompt.clear_frame();
-                        prompt.set_running_status(None);
+                        if is_thinking {
+                            let _ = prompt.clear_frame();
+                            prompt.set_running_status(None);
+                        }
                         if !tool_batch.is_empty() {
                             render_tool_tree(&tool_batch);
                             tool_batch.clear();
