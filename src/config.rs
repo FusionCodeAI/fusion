@@ -739,15 +739,10 @@ impl Config {
         crate::ui::notify::NotificationConfig {
             enabled: self.notify_enabled,
             desktop_enabled: true,
-            terminal_enabled: true,
+            terminal_enabled: false,
             sound: self.sound_enabled,
             min_duration_secs: self.notify_min_duration_secs,
-            urgency: crate::ui::notify::NotificationUrgency::Normal,
-            app_name: "Fusion".to_string(),
-            icon: None,
-            timeout_ms: Some(crate::ui::notify::DEFAULT_TIMEOUT_MS),
-            backend: None,
-            tty_only: true,
+            ..Default::default()
         }
     }
 

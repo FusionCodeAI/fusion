@@ -728,17 +728,18 @@ pub async fn run_turn_ui(
                 while let Ok(event) = rx.try_recv() {
                     match event {
                         AgentEvent::TextDelta(d) => {
-                            let _ = prompt.clear_frame();
-                            prompt.set_running_status(None);
-                            is_thinking = false;
-                            active_tool_label = None;
+                            if is_thinking {
+                                let _ = prompt.clear_frame();
+                                prompt.set_running_status(None);
+                                is_thinking = false;
+                                active_tool_label = None;
+                            }
                             if !tool_batch.is_empty() {
                                 render_tool_tree(&tool_batch);
                                 tool_batch.clear();
                             }
                             output_tokens += crate::agent::tokens::estimate_text_tokens(&d) as u64;
                             md.push(&d);
-                            let _ = prompt.render_current();
                         }
                         AgentEvent::ThinkingDelta(th) => {
                             if !tool_batch.is_empty() {
@@ -835,17 +836,18 @@ pub async fn run_turn_ui(
                         output_tokens += crate::agent::tokens::estimate_text_tokens(&th) as u64;
                     }
                     AgentEvent::TextDelta(d) => {
-                        let _ = prompt.clear_frame();
-                        prompt.set_running_status(None);
-                        is_thinking = false;
-                        active_tool_label = None;
+                        if is_thinking {
+                            let _ = prompt.clear_frame();
+                            prompt.set_running_status(None);
+                            is_thinking = false;
+                            active_tool_label = None;
+                        }
                         if !tool_batch.is_empty() {
                             render_tool_tree(&tool_batch);
                             tool_batch.clear();
                         }
                         output_tokens += crate::agent::tokens::estimate_text_tokens(&d) as u64;
                         md.push(&d);
-                        let _ = prompt.render_current();
                     }
                     AgentEvent::ToolStarted { name, args, .. } => {
                         let active_label = parse_tool_active_label(&name, &args);
@@ -912,7 +914,6 @@ pub async fn run_turn_ui(
                             tool_batch.clear();
                         }
                         md.finish();
-                        let _ = prompt.render_current();
                     }
                     _ => {}
                 }
@@ -1030,10 +1031,6 @@ pub async fn run_repl_with_session(
                     trimmed,
                     session.active_model(),
                     Some(turn_elapsed.as_secs_f64()),
-                );
-                crate::ui::notify::emit_terminal_notification(
-                    "Fusion",
-                    &format!("Turn complete ({})", session.active_model()),
                 );
             }
             Err(e) => {

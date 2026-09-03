@@ -50,6 +50,11 @@ web-sys = { version = "0.3", optional = true, features = ["console", "Window", "
 [lib]
 crate-type = ["cdylib", "rlib"]
 
+[[bin]]
+name = "fusion"
+path = "src/main.rs"
+
+
 [features]
 default = []
 wasm = ["dep:wasm-bindgen", "dep:wasm-bindgen-futures", "dep:js-sys", "dep:web-sys"]

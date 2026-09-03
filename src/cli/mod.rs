@@ -7,7 +7,7 @@ use std::path::PathBuf;
 #[derive(Parser, Debug, Clone)]
 #[command(
     name = "fusion",
-    version = "0.3.0",
+    version = env!("CARGO_PKG_VERSION"),
     about = "Fast, lightweight AI coding assistant with subagents and advisors"
 )]
 pub struct Cli {
