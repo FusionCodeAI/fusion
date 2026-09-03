@@ -535,180 +535,69 @@ pub async fn run_turn_ui(
     runner: &AgentRunner,
     session: &mut Session,
     user_input: &str,
+    prompt: &mut Prompt,
 ) -> anyhow::Result<(String, Option<String>)> {
     let start_time = Instant::now();
     let mut input_tokens = (crate::agent::tokens::estimate_text_tokens(user_input)
         + session.estimate_tokens())
     .max(1) as u64;
     let mut output_tokens = 0u64;
-    let model_label = format_model_label(session.active_model()).to_string();
     let mut md = MarkdownRenderer::new().with_indent(2);
 
     let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel();
     let runner_task = runner.run_turn_stream(session, user_input, tx);
     tokio::pin!(runner_task);
 
-    // Enter raw mode to allow interactive typing and Esc cancel without OS line-buffering
+    // Enter raw mode to allow interactive typing, slash suggestions, and Esc cancel
     let _raw_guard = crate::ui::prompt::RawModeGuard::enter().ok();
     let mut event_stream = EventStream::new();
-    let mut queue_buffer: Vec<char> = Vec::new();
-    let mut queue_cursor: usize = 0;
     let mut queued_prompt: Option<String> = None;
     let mut active_tool_label: Option<String> = None;
 
     let mut is_thinking = true;
-    let mut thinking_displayed = false;
     let mut tool_batch: Vec<ToolCallItem> = Vec::new();
     let mut ticker = tokio::time::interval(std::time::Duration::from_millis(200));
+
+    prompt.reset_input();
 
     loop {
         tokio::select! {
             _ = ticker.tick(), if is_thinking => {
                 let elapsed = start_time.elapsed();
-                let mut out = stdout();
-                if thinking_displayed {
-                    clear_thinking_frame();
-                }
-                let queue_text: String = queue_buffer.iter().collect();
                 let status_verb = match active_tool_label.as_deref() {
                     Some(label) => format!("• {}", label),
                     None => "• Running".to_string(),
                 };
-                let _ = render_thinking_frame_to(
-                    &mut out,
-                    &status_verb,
-                    elapsed,
-                    input_tokens,
-                    output_tokens,
-                    &model_label,
-                    &queue_text,
-                    queue_cursor,
-                );
-                let _ = out.flush();
-                thinking_displayed = true;
+                let status = format!("• {} ({}) (↑{} ↓{})", status_verb, format_duration_compact(elapsed), format_tokens_compact(input_tokens), format_tokens_compact(output_tokens));
+                prompt.set_running_status(Some(status));
+                let _ = prompt.render_current();
             }
             Some(event_res) = event_stream.next() => {
-                if let Ok(Event::Key(key)) = event_res {
-                    if key.kind == crossterm::event::KeyEventKind::Press {
-                        // Esc key or Ctrl+C immediately cancels running / thinking!
-                        if key.code == KeyCode::Esc || (key.modifiers.contains(KeyModifiers::CONTROL) && (key.code == KeyCode::Char('c') || key.code == KeyCode::Char('C'))) {
-                            if thinking_displayed {
-                                clear_thinking_frame();
-                                thinking_displayed = false;
+                if let Ok(ev) = event_res {
+                    if let Some(res) = prompt.handle_event(ev)? {
+                        match res {
+                            PromptResult::Submit(text) => {
+                                let trimmed = text.trim().to_string();
+                                if !trimmed.is_empty() {
+                                    queued_prompt = Some(trimmed);
+                                }
+                                prompt.reset_input();
                             }
-                            let mut out = stdout();
-                            if let Some(tool) = &active_tool_label {
-                                let _ = write!(out, "■ Cancelled {} · What can fusion do differently?\r\n\r\n", tool);
-                            } else {
-                                let _ = write!(out, "  \x1b[2;37m(Turn canceled)\x1b[0m\r\n\r\n");
+                            PromptResult::Cancel => {
+                                let _ = prompt.clear_frame();
+                                let mut out = stdout();
+                                if let Some(tool) = &active_tool_label {
+                                    let _ = write!(out, "■ Cancelled {} · What can fusion do differently?\r\n\r\n", tool);
+                                } else {
+                                    let _ = write!(out, "  \x1b[2;37m(Turn canceled)\x1b[0m\r\n\r\n");
+                                }
+                                let _ = execute!(out, cursor::MoveToColumn(0));
+                                let _ = out.flush();
+                                return Ok((String::new(), None));
                             }
-                            let _ = execute!(out, cursor::MoveToColumn(0));
-                            let _ = out.flush();
-                            return Ok((String::new(), None));
-                        }
-
-                        if is_thinking {
-                            match key.code {
-                                KeyCode::Char(c) => {
-                                    queue_buffer.insert(queue_cursor, c);
-                                    queue_cursor += 1;
-                                    let mut out = stdout();
-                                    if thinking_displayed {
-                                        clear_thinking_frame();
-                                    }
-                                    let queue_text: String = queue_buffer.iter().collect();
-                                    let elapsed = start_time.elapsed();
-                                    let status_verb = match active_tool_label.as_deref() {
-                                        Some(label) => format!("• {}", label),
-                                        None => "• Running".to_string(),
-                                    };
-                                    let _ = render_thinking_frame_to(
-                                        &mut out,
-                                        &status_verb,
-                                        elapsed,
-                                        input_tokens,
-                                        output_tokens,
-                                        &model_label,
-                                        &queue_text,
-                                        queue_cursor,
-                                    );
-                                    let _ = out.flush();
-                                    thinking_displayed = true;
-                                }
-                                KeyCode::Backspace => {
-                                    if queue_cursor > 0 {
-                                        queue_buffer.remove(queue_cursor - 1);
-                                        queue_cursor -= 1;
-                                        let mut out = stdout();
-                                        if thinking_displayed {
-                                            clear_thinking_frame();
-                                        }
-                                        let queue_text: String = queue_buffer.iter().collect();
-                                        let elapsed = start_time.elapsed();
-                                        let status_verb = match active_tool_label.as_deref() {
-                                            Some(label) => format!("• {}", label),
-                                            None => "• Running".to_string(),
-                                        };
-                                        let _ = render_thinking_frame_to(
-                                            &mut out,
-                                            &status_verb,
-                                            elapsed,
-                                            input_tokens,
-                                            output_tokens,
-                                            &model_label,
-                                            &queue_text,
-                                            queue_cursor,
-                                        );
-                                        let _ = out.flush();
-                                        thinking_displayed = true;
-                                    }
-                                }
-                                KeyCode::Left => {
-                                    if queue_cursor > 0 {
-                                        queue_cursor -= 1;
-                                        let mut out = stdout();
-                                        let _ = execute!(out, cursor::MoveToColumn((2 + queue_cursor) as u16));
-                                        let _ = out.flush();
-                                    }
-                                }
-                                KeyCode::Right => {
-                                    if queue_cursor < queue_buffer.len() {
-                                        queue_cursor += 1;
-                                        let mut out = stdout();
-                                        let _ = execute!(out, cursor::MoveToColumn((2 + queue_cursor) as u16));
-                                        let _ = out.flush();
-                                    }
-                                }
-                                KeyCode::Enter => {
-                                    let text: String = queue_buffer.drain(..).collect();
-                                    let trimmed = text.trim().to_string();
-                                    queue_cursor = 0;
-                                    if !trimmed.is_empty() {
-                                        queued_prompt = Some(trimmed);
-                                    }
-                                    let mut out = stdout();
-                                    if thinking_displayed {
-                                        clear_thinking_frame();
-                                    }
-                                    let elapsed = start_time.elapsed();
-                                    let status_verb = match active_tool_label.as_deref() {
-                                        Some(label) => format!("• {}", label),
-                                        None => "• Running".to_string(),
-                                    };
-                                    let _ = render_thinking_frame_to(
-                                        &mut out,
-                                        &status_verb,
-                                        elapsed,
-                                        input_tokens,
-                                        output_tokens,
-                                        &model_label,
-                                        "",
-                                        0,
-                                    );
-                                    let _ = out.flush();
-                                    thinking_displayed = true;
-                                }
-                                _ => {}
+                            PromptResult::Exit => {
+                                let _ = prompt.clear_frame();
+                                return Ok((String::new(), None));
                             }
                         }
                     }
@@ -718,13 +607,10 @@ pub async fn run_turn_ui(
                 while let Ok(event) = rx.try_recv() {
                     match event {
                         AgentEvent::TextDelta(d) => {
-                            if thinking_displayed {
-                                clear_thinking_frame();
-                                thinking_displayed = false;
-                            }
-                            if is_thinking {
-                                is_thinking = false;
-                            }
+                            let _ = prompt.clear_frame();
+                            prompt.set_running_status(None);
+                            is_thinking = false;
+                            active_tool_label = None;
                             if !tool_batch.is_empty() {
                                 render_tool_tree(&tool_batch);
                                 tool_batch.clear();
@@ -736,16 +622,19 @@ pub async fn run_turn_ui(
                             output_tokens += crate::agent::tokens::estimate_text_tokens(&th) as u64;
                         }
                         AgentEvent::ToolStarted { name, args, .. } => {
-                            if thinking_displayed {
-                                clear_thinking_frame();
-                                thinking_displayed = false;
-                            }
-                            is_thinking = false;
+                            let active_label = parse_tool_active_label(&name, &args);
+                            let (completed_label, category) = parse_tool_info(&name, &args);
+                            active_tool_label = Some(active_label.clone());
+                            tool_batch.push(ToolCallItem::new(name, completed_label, category));
                             md.finish();
-                            let (label, category) = parse_tool_info(&name, &args);
-                            tool_batch.push(ToolCallItem::new(name, label, category));
+                            is_thinking = true;
+                            let elapsed = start_time.elapsed();
+                            let status = format!("• {} ({}) (↑{} ↓{})", active_label, format_duration_compact(elapsed), format_tokens_compact(input_tokens), format_tokens_compact(output_tokens));
+                            prompt.set_running_status(Some(status));
+                            let _ = prompt.render_current();
                         }
                         AgentEvent::ToolFinished { success, output, .. } => {
+                            active_tool_label = None;
                             if let Some(item) = tool_batch.last_mut() {
                                 if !success {
                                     item.failed = true;
@@ -758,6 +647,8 @@ pub async fn run_turn_ui(
                                     }
                                 }
                             }
+                            let _ = prompt.clear_frame();
+                            prompt.set_running_status(None);
                             if !tool_batch.is_empty() {
                                 render_tool_tree(&tool_batch);
                                 tool_batch.clear();
@@ -777,10 +668,8 @@ pub async fn run_turn_ui(
                         _ => {}
                     }
                 }
-                if thinking_displayed {
-                    clear_thinking_frame();
-                    thinking_displayed = false;
-                }
+                let _ = prompt.clear_frame();
+                prompt.set_running_status(None);
                 if !tool_batch.is_empty() {
                     render_tool_tree(&tool_batch);
                     tool_batch.clear();
@@ -803,13 +692,10 @@ pub async fn run_turn_ui(
                         output_tokens += crate::agent::tokens::estimate_text_tokens(&th) as u64;
                     }
                     AgentEvent::TextDelta(d) => {
-                        if thinking_displayed {
-                            clear_thinking_frame();
-                            thinking_displayed = false;
-                        }
-                        if is_thinking {
-                            is_thinking = false;
-                        }
+                        let _ = prompt.clear_frame();
+                        prompt.set_running_status(None);
+                        is_thinking = false;
+                        active_tool_label = None;
                         if !tool_batch.is_empty() {
                             render_tool_tree(&tool_batch);
                             tool_batch.clear();
@@ -818,16 +704,19 @@ pub async fn run_turn_ui(
                         md.push(&d);
                     }
                     AgentEvent::ToolStarted { name, args, .. } => {
-                        if thinking_displayed {
-                            clear_thinking_frame();
-                            thinking_displayed = false;
-                        }
-                        is_thinking = false;
+                        let active_label = parse_tool_active_label(&name, &args);
+                        let (completed_label, category) = parse_tool_info(&name, &args);
+                        active_tool_label = Some(active_label.clone());
+                        tool_batch.push(ToolCallItem::new(name, completed_label, category));
                         md.finish();
-                        let (label, category) = parse_tool_info(&name, &args);
-                        tool_batch.push(ToolCallItem::new(name, label, category));
+                        is_thinking = true;
+                        let elapsed = start_time.elapsed();
+                        let status = format!("• {} ({}) (↑{} ↓{})", active_label, format_duration_compact(elapsed), format_tokens_compact(input_tokens), format_tokens_compact(output_tokens));
+                        prompt.set_running_status(Some(status));
+                        let _ = prompt.render_current();
                     }
                     AgentEvent::ToolFinished { success, output, .. } => {
+                        active_tool_label = None;
                         if let Some(item) = tool_batch.last_mut() {
                             if !success {
                                 item.failed = true;
@@ -840,6 +729,8 @@ pub async fn run_turn_ui(
                                 }
                             }
                         }
+                        let _ = prompt.clear_frame();
+                        prompt.set_running_status(None);
                         if !tool_batch.is_empty() {
                             render_tool_tree(&tool_batch);
                             tool_batch.clear();
@@ -847,11 +738,11 @@ pub async fn run_turn_ui(
                         is_thinking = true;
                     }
                     AgentEvent::Error(err) => {
-                        if thinking_displayed {
-                            clear_thinking_frame();
-                            thinking_displayed = false;
-                        }
-                        eprintln!("\n\x1b[31m❌ Error: {}\x1b[0m", err);
+                        let _ = prompt.clear_frame();
+                        prompt.set_running_status(None);
+                        let mut out = stdout();
+                        let _ = write!(out, "\r\n\x1b[31m❌ Error: {}\x1b[0m\r\n\r\n", err);
+                        let _ = out.flush();
                     }
                     AgentEvent::Finished { usage } => {
                         if let Some(u) = &usage {
@@ -906,8 +797,6 @@ pub async fn run_repl_with_session(
 
     loop {
         let input = if let Some(queued) = pending_prompt.take() {
-            print!("\x1b[1m┃ {}\x1b[0m\r\n\r\n", queued);
-            let _ = stdout().flush();
             queued
         } else {
             prompt.set_model(&runner.config().default_model);
@@ -955,7 +844,7 @@ pub async fn run_repl_with_session(
         }
 
         // Execute turn with live streaming and capture any queued prompt
-        match run_turn_ui(&runner, &mut session, trimmed).await {
+        match run_turn_ui(&runner, &mut session, trimmed, &mut prompt).await {
             Ok((_content, queued)) => {
                 pending_prompt = queued;
             }

@@ -1,6 +1,6 @@
 use crossterm::{
     cursor,
-    event::{self, Event, KeyEventKind},
+    event::{self, Event, KeyCode, KeyEventKind, KeyModifiers},
     execute,
     terminal::{self, ClearType},
 };
@@ -43,8 +43,13 @@ pub struct Prompt {
     cancel_pressed: bool,
     /// Available models as `(id, display_name)` for the `/model` picker dialog.
     models: Vec<(String, String)>,
-    /// Active model name shown in the prompt title bar.
     active_model: String,
+    pub running_status: Option<String>,
+    pub buffer: Vec<char>,
+    pub cursor_pos: usize,
+    saved_current: String,
+    pub last_rendered_lines: usize,
+    pub last_cursor_row: usize,
 }
 impl Default for Prompt {
     fn default() -> Self {
@@ -69,6 +74,12 @@ impl Prompt {
             cancel_pressed: false,
             models: Vec::new(),
             active_model: String::new(),
+            running_status: None,
+            buffer: Vec::new(),
+            cursor_pos: 0,
+            saved_current: String::new(),
+            last_rendered_lines: 0,
+            last_cursor_row: 0,
         }
     }
 
@@ -242,320 +253,309 @@ impl Prompt {
         }
     }
 
-    /// Read an interactive line / multiline input from user.
-    pub fn read_input(&mut self) -> std::io::Result<PromptResult> {
-        let _raw_guard = RawModeGuard::enter()?;
-        let mut buffer: Vec<char> = Vec::new();
-        let mut cursor_pos: usize = 0;
-        let mut saved_current = String::new();
+    /// Reset internal state for a fresh input line.
+    pub fn reset_input(&mut self) {
+        self.buffer.clear();
+        self.cursor_pos = 0;
+        self.saved_current.clear();
         self.history_idx = None;
-
-        // Reset Vi mode to Insert at the beginning of each user turn
+        self.slash_selection = 0;
+        self.model_selection = 0;
+        self.model_picker_active = false;
+        self.last_rendered_lines = 0;
+        self.last_cursor_row = 0;
+        self.running_status = None;
         if self.key_handler.profile() == KeybindingProfile::Vi {
             self.key_handler.set_vi_mode(ViMode::Insert);
         }
         self.key_handler.clear_pending();
+    }
 
-        let mut last_rendered_lines = 0;
-        let mut last_cursor_row = 0;
+    /// Update active running/thinking status banner displayed above the prompt.
+    pub fn set_running_status(&mut self, status: Option<String>) {
+        self.running_status = status;
+    }
 
-        // Render initial state
-        self.render(
-            &buffer,
-            cursor_pos,
-            &mut last_rendered_lines,
-            &mut last_cursor_row,
-        )?;
+    /// Render current prompt state to stdout.
+    pub fn render_current(&mut self) -> std::io::Result<()> {
+        let mut out = stdout();
+        let buffer = self.buffer.clone();
+        let cursor_pos = self.cursor_pos;
+        let mut last_lines = self.last_rendered_lines;
+        let mut last_row = self.last_cursor_row;
+        self.render_to(&mut out, &buffer, cursor_pos, &mut last_lines, &mut last_row)?;
+        self.last_rendered_lines = last_lines;
+        self.last_cursor_row = last_row;
+        Ok(())
+    }
 
-        loop {
-            match event::read()? {
-                Event::Key(key) => {
-                    // In crossterm, ignore Release events
-                    if key.kind == KeyEventKind::Release {
-                        continue;
-                    }
+    /// Erase the rendered prompt frame from screen.
+    pub fn clear_frame(&mut self) -> std::io::Result<()> {
+        let mut out = stdout();
+        if self.last_cursor_row > 0 {
+            execute!(out, cursor::MoveUp(self.last_cursor_row as u16))?;
+        }
+        execute!(out, cursor::MoveToColumn(0), terminal::Clear(ClearType::FromCursorDown))?;
+        out.flush()?;
+        self.last_rendered_lines = 0;
+        self.last_cursor_row = 0;
+        Ok(())
+    }
 
-                    // Model picker dialog mode (FX-style): opened by selecting
-                    // `/model` from the command dialog. Buffer holds the filter
-                    // query (no `/model` prefix). Enter picks, Esc closes back
-                    // to normal input.
+    /// Handle a single crossterm event, updating input state and re-rendering.
+    pub fn handle_event(&mut self, event: Event) -> std::io::Result<Option<PromptResult>> {
+        match event {
+            Event::Key(key) => {
+                if key.kind == KeyEventKind::Release {
+                    return Ok(None);
+                }
+
+                // Esc or Ctrl+C handling
+                if key.code == KeyCode::Esc {
                     if self.model_picker_active {
-                        use crossterm::event::KeyCode;
-                        let query: String = buffer.iter().collect::<String>().to_lowercase();
-                        let filtered: Vec<&(String, String)> = if query.is_empty() {
-                            self.models.iter().collect()
-                        } else {
-                            self.models
-                                .iter()
-                                .filter(|(id, name)| {
-                                    id.to_lowercase().contains(&query)
-                                        || name.to_lowercase().contains(&query)
-                                })
-                                .collect()
-                        };
+                        self.model_picker_active = false;
+                        self.buffer.clear();
+                        self.cursor_pos = 0;
+                        self.render_current()?;
+                        return Ok(None);
+                    }
+                    let text_so_far: String = self.buffer.iter().collect();
+                    if text_so_far.starts_with('/') {
+                        self.buffer.clear();
+                        self.cursor_pos = 0;
+                        self.render_current()?;
+                        return Ok(None);
+                    }
+                    self.clear_frame()?;
+                    return Ok(Some(PromptResult::Cancel));
+                }
+
+                if key.modifiers.contains(KeyModifiers::CONTROL)
+                    && (key.code == KeyCode::Char('c') || key.code == KeyCode::Char('C'))
+                {
+                    self.clear_frame()?;
+                    return Ok(Some(PromptResult::Cancel));
+                }
+
+                if key.modifiers.contains(KeyModifiers::CONTROL)
+                    && (key.code == KeyCode::Char('d') || key.code == KeyCode::Char('D'))
+                {
+                    if self.buffer.is_empty() {
+                        self.clear_frame()?;
+                        return Ok(Some(PromptResult::Exit));
+                    }
+                }
+
+                // Model picker dialog mode
+                if self.model_picker_active {
+                    let query: String = self.buffer.iter().collect::<String>().to_lowercase();
+                    let filtered: Vec<&(String, String)> = if query.is_empty() {
+                        self.models.iter().collect()
+                    } else {
+                        self.models
+                            .iter()
+                            .filter(|(id, name)| {
+                                id.to_lowercase().contains(&query)
+                                    || name.to_lowercase().contains(&query)
+                            })
+                            .collect()
+                    };
+                    match key.code {
+                        KeyCode::Tab | KeyCode::Down => {
+                            if !filtered.is_empty() {
+                                self.model_selection =
+                                    (self.model_selection + 1) % filtered.len();
+                            }
+                            self.render_current()?;
+                            return Ok(None);
+                        }
+                        KeyCode::BackTab | KeyCode::Up => {
+                            if !filtered.is_empty() {
+                                self.model_selection = if self.model_selection == 0 {
+                                    filtered.len() - 1
+                                 } else {
+                                    self.model_selection - 1
+                                };
+                            }
+                            self.render_current()?;
+                            return Ok(None);
+                        }
+                        KeyCode::Enter => {
+                            if let Some(sel) = filtered
+                                .get(self.model_selection.min(filtered.len().saturating_sub(1)))
+                            {
+                                let text = format!("/model {}", sel.0);
+                                self.clear_frame()?;
+                                let mut out = stdout();
+                                let _ = write!(out, "\x1b[1m┃ {}\x1b[0m\r\n\r\n", text);
+                                let _ = out.flush();
+
+                                self.model_picker_active = false;
+                                self.model_selection = 0;
+                                self.buffer.clear();
+                                self.cursor_pos = 0;
+                                self.add_history(text.clone());
+                                return Ok(Some(PromptResult::Submit(text)));
+                            }
+                            return Ok(None);
+                        }
+                        KeyCode::Backspace => {
+                            if self.cursor_pos > 0 {
+                                self.buffer.remove(self.cursor_pos - 1);
+                                self.cursor_pos -= 1;
+                            }
+                            self.model_selection = 0;
+                            self.render_current()?;
+                            return Ok(None);
+                        }
+                        KeyCode::Char(c) => {
+                            self.buffer.insert(self.cursor_pos, c);
+                            self.cursor_pos += 1;
+                            self.model_selection = 0;
+                            self.render_current()?;
+                            return Ok(None);
+                        }
+                        _ => return Ok(None),
+                    }
+                }
+
+                // Slash autocomplete dialog navigation
+                let text_so_far: String = self.buffer.iter().collect();
+                let first_line = text_so_far.split('\n').next().unwrap_or("");
+                if first_line.starts_with('/') {
+                    let matches = slash_matches(first_line);
+                    if !matches.is_empty() {
                         match key.code {
                             KeyCode::Tab | KeyCode::Down => {
-                                if !filtered.is_empty() {
-                                    self.model_selection = (self.model_selection + 1) % filtered.len();
-                                }
-                                self.render(
-                                    &buffer,
-                                    cursor_pos,
-                                    &mut last_rendered_lines,
-                                    &mut last_cursor_row,
-                                )?;
-                                continue;
+                                self.slash_selection =
+                                    (self.slash_selection + 1) % matches.len();
+                                self.render_current()?;
+                                return Ok(None);
                             }
                             KeyCode::BackTab | KeyCode::Up => {
-                                if !filtered.is_empty() {
-                                    self.model_selection = if self.model_selection == 0 {
-                                        filtered.len() - 1
-                                    } else {
-                                        self.model_selection - 1
-                                    };
-                                }
-                                self.render(
-                                    &buffer,
-                                    cursor_pos,
-                                    &mut last_rendered_lines,
-                                    &mut last_cursor_row,
-                                )?;
-                                continue;
+                                self.slash_selection = if self.slash_selection == 0 {
+                                    matches.len() - 1
+                                } else {
+                                    self.slash_selection - 1
+                                };
+                                self.render_current()?;
+                                return Ok(None);
                             }
                             KeyCode::Enter => {
                                 if let Some(sel) =
-                                    filtered.get(self.model_selection.min(filtered.len().saturating_sub(1)))
+                                    matches.get(self.slash_selection.min(matches.len() - 1))
                                 {
-                                    let text = format!("/model {}", sel.0);
-                                    let mut out = stdout();
-                                    if last_cursor_row > 0 {
-                                        let _ = execute!(out, cursor::MoveUp(last_cursor_row as u16));
+                                    if sel.name == "/model" || sel.aliases.contains(&"/model") {
+                                        self.buffer.clear();
+                                        self.cursor_pos = 0;
+                                        self.model_picker_active = true;
+                                        self.model_selection = 0;
+                                        self.render_current()?;
+                                        return Ok(None);
                                     }
-                                    let _ = execute!(out, cursor::MoveToColumn(0), terminal::Clear(ClearType::FromCursorDown));
-                                    let _ = write!(out, "\x1b[1m┃ {}\x1b[0m\r\n\r\n", text);
-                                    let _ = out.flush();
-
-                                    self.model_picker_active = false;
-                                    self.model_selection = 0;
-                                    self.add_history(text.clone());
-                                    return Ok(PromptResult::Submit(text));
+                                    let cmd = sel.name.to_string();
+                                    let rest: String = text_so_far
+                                        .split_once('\n')
+                                        .map(|(_, r)| r.to_string())
+                                        .unwrap_or_default();
+                                    let new_text = format!("{} {}", cmd, rest);
+                                    self.buffer.clear();
+                                    self.buffer.extend(new_text.chars());
+                                    self.cursor_pos = cmd.len() + 1;
+                                    self.slash_selection = 0;
+                                    self.render_current()?;
+                                    return Ok(None);
                                 }
-                            }
-                            KeyCode::Esc => {
-                                // Close the picker, return to a blank prompt.
-                                buffer.clear();
-                                cursor_pos = 0;
-                                self.model_picker_active = false;
-                                self.model_selection = 0;
-                                self.render(
-                                    &buffer,
-                                    cursor_pos,
-                                    &mut last_rendered_lines,
-                                    &mut last_cursor_row,
-                                )?;
-                                continue;
-                            }
-                            KeyCode::Backspace => {
-                                if cursor_pos > 0 {
-                                    buffer.remove(cursor_pos - 1);
-                                    cursor_pos -= 1;
-                                }
-                                self.model_selection = 0;
-                                self.render(
-                                    &buffer,
-                                    cursor_pos,
-                                    &mut last_rendered_lines,
-                                    &mut last_cursor_row,
-                                )?;
-                                continue;
-                            }
-                            KeyCode::Char(c) => {
-                                buffer.insert(cursor_pos, c);
-                                cursor_pos += 1;
-                                self.model_selection = 0;
-                                self.render(
-                                    &buffer,
-                                    cursor_pos,
-                                    &mut last_rendered_lines,
-                                    &mut last_cursor_row,
-                                )?;
-                                continue;
                             }
                             _ => {}
                         }
                     }
-
-                    // Slash autocomplete dialog navigation (FX-style):
-                    // active whenever the first line starts with '/'.
-                    let text_so_far: String = buffer.iter().collect();
-                    let first_line = text_so_far.split('\n').next().unwrap_or("");
-                    if first_line.starts_with('/') {
-                        let matches = slash_matches(first_line);
-                        if !matches.is_empty() {
-                            use crossterm::event::KeyCode;
-                            match key.code {
-                                KeyCode::Tab | KeyCode::Down => {
-                                    self.slash_selection =
-                                        (self.slash_selection + 1) % matches.len();
-                                    self.render(
-                                        &buffer,
-                                        cursor_pos,
-                                        &mut last_rendered_lines,
-                                        &mut last_cursor_row,
-                                    )?;
-                                    continue;
-                                }
-                                KeyCode::BackTab | KeyCode::Up => {
-                                    self.slash_selection = if self.slash_selection == 0 {
-                                        matches.len() - 1
-                                    } else {
-                                        self.slash_selection - 1
-                                    };
-                                    self.render(
-                                        &buffer,
-                                        cursor_pos,
-                                        &mut last_rendered_lines,
-                                        &mut last_cursor_row,
-                                    )?;
-                                    continue;
-                                }
-                                KeyCode::Enter => {
-                                    // Accept the highlighted command: replace the
-                                    // first line with the selected command name.
-                                    if let Some(sel) =
-                                        matches.get(self.slash_selection.min(matches.len() - 1))
-                                    {
-                                        // Selecting `/model` opens the model picker
-                                        // dialog directly (no prefix text).
-                                        if sel.name == "/model" || sel.aliases.contains(&"/model") {
-                                            buffer.clear();
-                                            cursor_pos = 0;
-                                            self.model_picker_active = true;
-                                            self.model_selection = 0;
-                                            self.render(
-                                                &buffer,
-                                                cursor_pos,
-                                                &mut last_rendered_lines,
-                                                &mut last_cursor_row,
-                                            )?;
-                                            continue;
-                                        }
-                                        let cmd = sel.name.to_string();
-                                        let rest: String = text_so_far
-                                            .split_once('\n')
-                                            .map(|(_, r)| r.to_string())
-                                            .unwrap_or_default();
-                                        let new_text = format!("{} {}", cmd, rest);
-                                        buffer.clear();
-                                        buffer.extend(new_text.chars());
-                                        cursor_pos = cmd.len() + 1;
-                                        self.slash_selection = 0;
-                                        self.render(
-                                            &buffer,
-                                            cursor_pos,
-                                            &mut last_rendered_lines,
-                                            &mut last_cursor_row,
-                                        )?;
-                                        continue;
-                                    }
-                                }
-                                _ => {}
-                            }
-                        }
-                    }
-
-                    let mut state = PromptState::new(
-                        &mut buffer,
-                        &mut cursor_pos,
-                        &self.history,
-                        &mut self.history_idx,
-                        &mut saved_current,
-                    );
-
-                    match self.key_handler.handle_key(key, &mut state) {
-                        KeyResult::Continue => {}
-                        KeyResult::Noop => continue,
-                        KeyResult::Submit(text) => {
-                            let mut out = stdout();
-                            if last_cursor_row > 0 {
-                                let _ = execute!(out, cursor::MoveUp(last_cursor_row as u16));
-                            }
-                            let _ = execute!(out, cursor::MoveToColumn(0), terminal::Clear(ClearType::FromCursorDown));
-
-                            let lines: Vec<&str> = text.split('\n').collect();
-                            for line in &lines {
-                                let _ = write!(out, "\x1b[1m┃ {}\x1b[0m\r\n", line);
-                            }
-                            let _ = write!(out, "\r\n");
-                            let _ = out.flush();
-                            if !text.trim().is_empty() {
-                                self.add_history(text.clone());
-                            }
-                            return Ok(PromptResult::Submit(text));
-                        }
-                        KeyResult::Cancel => {
-                            let has_text: bool = buffer.iter().any(|c| !c.is_whitespace());
-                            let mut out = stdout();
-                            if last_cursor_row > 0 {
-                                let _ = execute!(out, cursor::MoveUp(last_cursor_row as u16));
-                            }
-                            let _ = execute!(out, cursor::MoveToColumn(0), terminal::Clear(ClearType::FromCursorDown));
-                            let _ = out.flush();
-                            if !has_text && self.cancel_pressed {
-                                return Ok(PromptResult::Exit);
-                            }
-                            self.cancel_pressed = !has_text;
-                            if has_text {
-                                self.cancel_pressed = false;
-                            }
-                            return Ok(PromptResult::Cancel);
-                        }
-                        KeyResult::Exit => {
-                            let mut out = stdout();
-                            if last_cursor_row > 0 {
-                                let _ = execute!(out, cursor::MoveUp(last_cursor_row as u16));
-                            }
-                            let _ = execute!(out, cursor::MoveToColumn(0), terminal::Clear(ClearType::FromCursorDown));
-                            let _ = out.flush();
-                            return Ok(PromptResult::Exit);
-                        }
-                        KeyResult::ClearScreen => {
-                            let _ = execute!(stdout(), terminal::Clear(ClearType::All), cursor::MoveTo(0, 0));
-                            last_rendered_lines = 0;
-                            last_cursor_row = 0;
-                        }
-                    }
                 }
 
-                // Handle bracketed paste / multi-character paste stream.
-                // CRLF and lone CR are normalized to LF so pasted Windows text
-                // renders and submits consistently.
-                Event::Paste(text) => {
-                    self.key_handler.snapshot_undo(&buffer, cursor_pos);
-                    let normalized = if text.contains('\r') {
-                        text.replace("\r\n", "\n").replace('\r', "\n")
-                    } else {
-                        text
-                    };
-                    for c in normalized.chars() {
-                        buffer.insert(cursor_pos, c);
-                        cursor_pos += 1;
+                // Standard input editing
+                let mut state = PromptState::new(
+                    &mut self.buffer,
+                    &mut self.cursor_pos,
+                    &self.history,
+                    &mut self.history_idx,
+                    &mut self.saved_current,
+                );
+
+                match self.key_handler.handle_key(key, &mut state) {
+                    KeyResult::Continue => {
+                        self.render_current()?;
+                        Ok(None)
+                    }
+                    KeyResult::Submit(text) => {
+                        self.clear_frame()?;
+                        let mut out = stdout();
+                        let lines: Vec<&str> = text.split('\n').collect();
+                        for line in &lines {
+                            let _ = write!(out, "\x1b[1m┃ {}\x1b[0m\r\n", line);
+                        }
+                        let _ = write!(out, "\r\n");
+                        let _ = out.flush();
+                        if !text.trim().is_empty() {
+                            self.add_history(text.clone());
+                        }
+                        self.buffer.clear();
+                        self.cursor_pos = 0;
+                        Ok(Some(PromptResult::Submit(text)))
+                    }
+                    KeyResult::Cancel => {
+                        self.clear_frame()?;
+                        Ok(Some(PromptResult::Cancel))
+                    }
+                    KeyResult::Exit => {
+                        self.clear_frame()?;
+                        Ok(Some(PromptResult::Exit))
+                    }
+                    KeyResult::ClearScreen => {
+                        let _ = execute!(
+                            stdout(),
+                            terminal::Clear(ClearType::All),
+                            cursor::MoveTo(0, 0)
+                        );
+                        self.last_rendered_lines = 0;
+                        self.last_cursor_row = 0;
+                        self.render_current()?;
+                        Ok(None)
+                    }
+                    _ => {
+                        self.render_current()?;
+                        Ok(None)
                     }
                 }
-
-                // Window resize event
-                Event::Resize(_, _) => {}
-
-                _ => {}
             }
+            Event::Paste(text) => {
+                self.key_handler.snapshot_undo(&self.buffer, self.cursor_pos);
+                let normalized = text.replace("\r\n", "\n").replace('\r', "\n");
+                for c in normalized.chars() {
+                    self.buffer.insert(self.cursor_pos, c);
+                    self.cursor_pos += 1;
+                }
+                self.render_current()?;
+                Ok(None)
+            }
+            Event::Resize(_, _) => {
+                self.render_current()?;
+                Ok(None)
+            }
+            _ => Ok(None),
+        }
+    }
 
-            // Re-render after input event
-            self.render(
-                &buffer,
-                cursor_pos,
-                &mut last_rendered_lines,
-                &mut last_cursor_row,
-            )?;
+    /// Read an interactive line / multiline input from user.
+    pub fn read_input(&mut self) -> std::io::Result<PromptResult> {
+        let _raw_guard = RawModeGuard::enter()?;
+        self.reset_input();
+        self.render_current()?;
+
+        loop {
+            let ev = event::read()?;
+            if let Some(res) = self.handle_event(ev)? {
+                return Ok(res);
+            }
         }
     }
 
@@ -625,6 +625,14 @@ impl Prompt {
         execute!(out, cursor::MoveToColumn(0), terminal::Clear(ClearType::FromCursorDown))?;
 
         let mut total_lines = 0;
+
+        let running_lines = if let Some(status) = &self.running_status {
+            write!(out, "  \x1b[2;37m{}\x1b[0m\r\n\r\n", status)?;
+            2
+        } else {
+            0
+        };
+        total_lines += running_lines;
 
         // 1. Input lines with clean vertical rail symbol (┃ )
         for (idx, line) in lines.iter().enumerate() {
@@ -730,7 +738,7 @@ impl Prompt {
             execute!(out, cursor::MoveToColumn(target_x))?;
 
             *last_rendered_lines = total_lines;
-            *last_cursor_row = target_row;
+            *last_cursor_row = running_lines + target_row;
         } else if !slash_suggestions.is_empty() {
             let sel = self.slash_selection.min(slash_suggestions.len().saturating_sub(1));
             let window_start = if sel >= 6 { sel - 5 } else { 0 };
@@ -804,15 +812,18 @@ impl Prompt {
             execute!(out, cursor::MoveToColumn(target_x))?;
 
             *last_rendered_lines = total_lines;
-            *last_cursor_row = target_row;
+            *last_cursor_row = running_lines + target_row;
         } else {
             // 3. Blank line between input and status
             write!(out, "\r\n")?;
             total_lines += 1;
-
-            // 4. Status line at the bottom: mode and model name
             let model_label = crate::ui::repl::format_model_label(&self.active_model);
-            write!(out, "\x1b[2;37mauto · {}\x1b[0m", model_label)?;
+            let status_text = if self.running_status.is_some() {
+                format!("enter queue · auto · {}", model_label)
+            } else {
+                format!("auto · {}", model_label)
+            };
+            write!(out, "\x1b[2;37m{}\x1b[0m", status_text)?;
             total_lines += 1;
 
             // Reposition cursor inside input box on active input row
@@ -829,7 +840,7 @@ impl Prompt {
             execute!(out, cursor::MoveToColumn(target_x))?;
 
             *last_rendered_lines = total_lines;
-            *last_cursor_row = target_row;
+            *last_cursor_row = running_lines + target_row;
         }
 
         out.flush()?;
