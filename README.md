@@ -4,9 +4,12 @@
 
 # Fusion
 
-**Fast, ultra-lightweight, cross-platform AI coding assistant written in 100% pure Rust.**
+**Fast, ultra-lightweight, cross-platform AI coding assistant written in 100% pure Rust.**  
 *Runs natively on macOS, Linux, Windows, Android/Termux, and in the Browser via WebAssembly.*
 
+[![Paper](https://img.shields.io/badge/DOI-10.5281%2Fzenodo.22289167-blue.svg)](https://doi.org/10.5281/zenodo.22289167)
+[![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
+[![CI](https://github.com/FusionCodeAI/fusion/actions/workflows/ci.yml/badge.svg)](https://github.com/FusionCodeAI/fusion/actions/workflows/ci.yml)
 </div>
 
 ## Quick Install
