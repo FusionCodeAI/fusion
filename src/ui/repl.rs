@@ -705,6 +705,7 @@ pub async fn run_turn_ui(
     let mut is_thinking = true;
     let mut tool_batch: Vec<ToolCallItem> = Vec::new();
     let mut ticker = tokio::time::interval(std::time::Duration::from_millis(300));
+    let mut last_prompt_render = Instant::now();
 
     clear_prompt_frame(prompt);
     prompt.reset_input();
@@ -718,7 +719,8 @@ pub async fn run_turn_ui(
                                   output_tokens: &mut u64,
                                   input_tokens: &mut u64,
                                   md: &mut MarkdownRenderer,
-                                  prompt: &mut Prompt| {
+                                  prompt: &mut Prompt,
+                                  last_prompt_render: &mut Instant| {
         match event {
             AgentEvent::TextDelta(d) => {
                 clear_prompt_frame(prompt);
@@ -742,6 +744,11 @@ pub async fn run_turn_ui(
                 *output_tokens += crate::agent::tokens::estimate_text_tokens(&d) as u64;
                 md.push(&d);
                 reset_prompt_render_state(prompt);
+                // Throttle prompt re-renders to avoid flicker on rapid deltas
+                if last_prompt_render.elapsed() >= std::time::Duration::from_millis(50) {
+                    let _ = prompt.render_current();
+                    *last_prompt_render = Instant::now();
+                }
             }
             AgentEvent::ThinkingDelta(th) => {
                 if !tool_batch.is_empty() {
@@ -753,6 +760,7 @@ pub async fn run_turn_ui(
                     render_tool_tree(tool_batch);
                     tool_batch.clear();
                     reset_prompt_render_state(prompt);
+                    let _ = prompt.render_current();
                 }
                 *output_tokens += crate::agent::tokens::estimate_text_tokens(&th) as u64;
             }
@@ -806,6 +814,7 @@ pub async fn run_turn_ui(
                 prompt.set_running_status(None);
                 *is_thinking = true;
                 reset_prompt_render_state(prompt);
+                let _ = prompt.render_current();
             }
             AgentEvent::Status(msg) => {
                 clear_prompt_frame(prompt);
@@ -821,6 +830,7 @@ pub async fn run_turn_ui(
                     }
                 }
                 reset_prompt_render_state(prompt);
+                let _ = prompt.render_current();
             }
             AgentEvent::Error(err) => {
                 clear_prompt_frame(prompt);
@@ -963,6 +973,7 @@ pub async fn run_turn_ui(
                         &mut input_tokens,
                         &mut md,
                         prompt,
+                        &mut last_prompt_render,
                     );
                 }
                 clear_prompt_frame(prompt);
@@ -998,6 +1009,7 @@ pub async fn run_turn_ui(
                     &mut input_tokens,
                     &mut md,
                     prompt,
+                    &mut last_prompt_render,
                 );
             }
         }

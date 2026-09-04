@@ -884,7 +884,7 @@ impl Prompt {
             };
 
             write!(out, "{}", prefix)?;
-            if idx == 0 && line.is_empty() && lines.len() == 1 {
+            if idx == 0 && line.is_empty() && lines.len() == 1 && !self.is_running {
                 let ph = self
                     .placeholder
                     .as_deref()
