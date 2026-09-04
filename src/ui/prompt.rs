@@ -69,6 +69,14 @@ pub struct Prompt {
     pub selected_effort: Option<String>,
     /// Dynamic skill entries for the slash autocomplete dropdown.
     skill_suggestions: Vec<SlashSuggestion>,
+    /// Whether the skill picker panel is active (opened from `/skills`).
+    pub skill_picker_active: bool,
+    /// Highlighted index inside the skill picker.
+    pub skill_picker_selection: usize,
+    /// Active source filter tab index (0 = All).
+    pub skill_picker_source: usize,
+    /// Currently active skill: (name, source_label).
+    pub active_skill: Option<(String, String)>,
 }
 impl Default for Prompt {
     fn default() -> Self {
@@ -106,6 +114,10 @@ impl Prompt {
             pending_model_id: String::new(),
             selected_effort: None,
             skill_suggestions: Vec::new(),
+            skill_picker_active: false,
+            skill_picker_selection: 0,
+            skill_picker_source: 0,
+            active_skill: None,
         }
     }
 
@@ -666,6 +678,17 @@ impl Prompt {
                                         self.cursor_pos = 0;
                                         self.model_picker_active = true;
                                         self.model_selection = 0;
+                                        self.render_current()?;
+                                        return Ok(None);
+                                    }
+                                    if !sel.is_skill
+                                        && (sel.name == "/skills" || sel.name == "/skill")
+                                    {
+                                        self.buffer.clear();
+                                        self.cursor_pos = 0;
+                                        self.skill_picker_active = true;
+                                        self.skill_picker_selection = 0;
+                                        self.skill_picker_source = 0;
                                         self.render_current()?;
                                         return Ok(None);
                                     }

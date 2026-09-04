@@ -134,7 +134,7 @@ pub fn format_turn_summary(
     let in_str = format_tokens_compact(in_tokens);
     let out_str = format_tokens_compact(out_tokens);
     format!(
-        "  \x1b[2;37m{} (↑{} ↓{})\x1b[0m\r\n\r\n",
+        "\r\n  \x1b[2;37m{} (↑{} ↓{})\x1b[0m\r\n\r\n",
         elapsed_str, in_str, out_str
     )
 }
@@ -995,7 +995,7 @@ pub async fn run_turn_ui(
                 let in_str = format_tokens_compact(input_tokens);
                 let out_str = format_tokens_compact(output_tokens);
                 let mut out = stdout();
-                let _ = write!(out, "  \x1b[2;37m{} (↑{} ↓{})\x1b[0m\r\n\r\n", elapsed_str, in_str, out_str);
+                let _ = write!(out, "\r\n  \x1b[2;37m{} (↑{} ↓{})\x1b[0m\r\n\r\n", elapsed_str, in_str, out_str);
                 let _ = execute!(out, cursor::MoveToColumn(0));
                 let _ = out.flush();
                 reset_prompt_render_state(prompt);
