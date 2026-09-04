@@ -73,22 +73,6 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          # ── Linux x86_64 (glibc on Ubuntu 22.04 for broad compat) ──────────
-          - target: x86_64-unknown-linux-gnu
-            os: ubuntu-22.04
-            binary: fusion
-            archive_ext: tar.gz
-            use_cross: false
-            android: false
-
-          # ── Linux x86_64 (static musl) ──────────────────────────────────────
-          - target: x86_64-unknown-linux-musl
-            os: ubuntu-latest
-            binary: fusion
-            archive_ext: tar.gz
-            use_cross: false
-            android: false
-
           # ── Linux AArch64 (static musl via cross) ───────────────────────────
           - target: aarch64-unknown-linux-musl
             os: ubuntu-latest
@@ -108,14 +92,6 @@ jobs:
           # ── macOS Apple Silicon (ARM64) ─────────────────────────────────────
           - target: aarch64-apple-darwin
             os: macos-latest
-            binary: fusion
-            archive_ext: tar.gz
-            use_cross: false
-            android: false
-
-          # ── macOS Intel (x86_64) ───────────────────────────────────────────
-          - target: x86_64-apple-darwin
-            os: macos-13
             binary: fusion
             archive_ext: tar.gz
             use_cross: false
