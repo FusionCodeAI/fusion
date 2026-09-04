@@ -1437,37 +1437,32 @@ mod tests {
     #[test]
     fn test_format_activity_status() {
         let status = format_activity_status(
-            "• Running",
+            "Running",
             Duration::from_secs(70),
             9,
             641,
             "DeepSeek V4 Flash",
         );
-        assert!(status.contains("• Running (1m10s) (↑9 ↓641)"));
-        assert!(!status.contains("• •"));
+        assert!(status.contains("Running (1m10s) (↑9 ↓641)"));
         assert!(status.contains("┃"));
         assert!(status.contains("enter queue · auto · DeepSeek V4 Flash"));
+        // Braille spinner frame is present (not a blinking dot)
+        let frames = crate::ui::spinner::BRAILLE_FRAMES;
+        assert!(frames.iter().any(|f| status.contains(f)));
     }
 
     #[test]
-    fn test_format_activity_status_blinking() {
-        let status_on = format_activity_status("Running", Duration::from_millis(0), 0, 0, "auto");
-        assert!(status_on.contains("• Running"));
-
-        let status_off =
-            format_activity_status("Running", Duration::from_millis(500), 0, 0, "auto");
-        assert!(status_off.contains("  Running"));
-        assert!(!status_off.contains("• Running"));
-
-        let status_on_2 =
-            format_activity_status("• Running", Duration::from_millis(1000), 0, 0, "auto");
-        assert!(status_on_2.contains("• Running"));
-        assert!(!status_on_2.contains("• •"));
-
-        let status_off_2 =
-            format_activity_status("• Running", Duration::from_millis(1500), 0, 0, "auto");
-        assert!(status_off_2.contains("  Running"));
-        assert!(!status_off_2.contains("• •"));
+    fn test_format_activity_status_braille_frames() {
+        let f0 = format_activity_status("Running", Duration::from_millis(0), 0, 0, "auto");
+        let f1 = format_activity_status("Running", Duration::from_millis(80), 0, 0, "auto");
+        let f2 = format_activity_status("Running", Duration::from_millis(160), 0, 0, "auto");
+        // Frames advance at 80ms intervals
+        assert_ne!(f0, f1);
+        assert_ne!(f1, f2);
+        // All render the same verb
+        assert!(f0.contains("Running"));
+        assert!(f1.contains("Running"));
+        assert!(f2.contains("Running"));
     }
 
     #[test]

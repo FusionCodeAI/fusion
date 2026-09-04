@@ -249,7 +249,7 @@ impl MarkdownRenderer {
             self.in_code_block = false;
             self.code_lang.clear();
             let width = get_border_width();
-            let end_border = format!("  \x1b[38;5;240m{}\x1b[0m", "─".repeat(width));
+            let end_border = format!("\x1b[38;5;240m{}\x1b[0m", "─".repeat(width));
             self.emit(&end_border, &mut output);
         }
 
@@ -303,6 +303,7 @@ pub fn render_markdown(text: &str) -> String {
         } else {
             for l in lines {
                 let rendered = render_line(l, in_code_block, code_lang);
+                output.push_str("  ");
                 output.push_str(&rendered);
                 output.push('\n');
             }
@@ -321,6 +322,7 @@ pub fn render_markdown(text: &str) -> String {
                 &mut code_lang,
             );
             let rendered = render_line(line, &mut in_code_block, &mut code_lang);
+            output.push_str("  ");
             output.push_str(&rendered);
             output.push('\n');
         }
@@ -1282,7 +1284,8 @@ mod tests {
         assert!(top.contains("─"));
 
         let code_line = render_line("let x = 42;", &mut in_code, &mut lang);
-        assert!(code_line.starts_with("  "));
+        // render_line is padding-free; the caller (emit/render_markdown) adds indent
+        assert!(!code_line.starts_with(' '));
         assert!(!code_line.contains("│"));
         assert!(code_line.contains("let"));
         assert!(code_line.contains("42"));
@@ -1438,7 +1441,7 @@ mod tests {
     }
     #[test]
     fn test_renderer_indent_and_blank_lines() {
-        let mut renderer = MarkdownRenderer::buffered();
+        let mut renderer = MarkdownRenderer::buffered().with_indent(2);
         let output = renderer.push("Line 1\n\nLine 2\n");
         assert_eq!(output, "  Line 1\n\n  Line 2\n");
     }
@@ -1447,9 +1450,9 @@ mod tests {
     fn test_renderer_indent_unclosed_code_block() {
         let mut renderer = MarkdownRenderer::buffered().with_indent(4);
         let chunk = renderer.push("```python\nprint('hi')\n");
-        assert!(chunk.starts_with("      \x1b[38;5;240m─"));
+        assert!(chunk.starts_with("    \x1b[38;5;240m─"));
         let finished = renderer.finish();
-        assert!(finished.starts_with("      \x1b[38;5;240m─"));
+        assert!(finished.starts_with("    \x1b[38;5;240m─"));
     }
 
     #[test]
@@ -1474,8 +1477,8 @@ mod tests {
             let line = "+---+";
             let rendered = render_line(line, &mut in_code, &mut lang);
             assert_eq!(
-                rendered, "  +---+",
-                "Language {} should have 2-space indent without left bar",
+                rendered, "+---+",
+                "Language {} should have no padding (caller adds indent)",
                 lang_name
             );
         }
@@ -1577,18 +1580,18 @@ mod tests {
 
         let top = render_line("```rust", &mut in_code, &mut lang);
         let stripped_top = super::super::table::strip_ansi(&top);
-        assert!(stripped_top.starts_with("  ─ rust "));
+        assert!(stripped_top.starts_with("─ rust "));
         assert!(stripped_top.ends_with('─'));
 
         let content = render_line("let x = 1;", &mut in_code, &mut lang);
         let stripped_content = super::super::table::strip_ansi(&content);
-        assert_eq!(stripped_content, "  let x = 1;");
+        assert_eq!(stripped_content, "let x = 1;");
         assert!(!content.contains('│'));
 
         let bottom = render_line("```", &mut in_code, &mut lang);
         let stripped_bottom = super::super::table::strip_ansi(&bottom);
-        assert!(stripped_bottom.starts_with("  ─"));
-        assert!(stripped_bottom.chars().skip(2).all(|c| c == '─'));
+        assert!(stripped_bottom.starts_with('─'));
+        assert!(stripped_bottom.chars().all(|c| c == '─'));
     }
 
     #[test]
@@ -1601,7 +1604,7 @@ mod tests {
             &mut in_code,
             &mut lang,
         );
-        assert_eq!(p, "  Architecture diagram from docs/architecture.md:");
+        assert_eq!(p, "Architecture diagram from docs/architecture.md:");
 
         let empty = render_line("", &mut in_code, &mut lang);
         assert_eq!(empty, "");

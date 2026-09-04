@@ -248,15 +248,22 @@ fn test_thinking_status_full_frame() {
     let frame = format_thinking_status(Duration::from_secs(1), 1, 0, "DeepSeek V4 Flash");
     let plain = strip_ansi(&frame);
 
-    // Must have a single dot and NEVER double dots
+    // Braille spinner frame with status verb
     assert!(
-        plain.contains("• Running (1s) (↑1 ↓0)"),
-        "Thinking status must contain '• Running (1s) (↑1 ↓0)', got:\n{}",
+        plain.contains("Running (1s) (↑1 ↓0)"),
+        "Thinking status must contain 'Running (1s) (↑1 ↓0)', got:\n{}",
         plain
     );
     assert!(
         !plain.contains("• •"),
         "Thinking status must never contain double dots '• •', got:\n{}",
+        plain
+    );
+    assert!(
+        fusion::ui::spinner::BRAILLE_FRAMES
+            .iter()
+            .any(|f| plain.contains(f)),
+        "Thinking status must include a Braille spinner frame, got:\n{}",
         plain
     );
     assert!(
@@ -272,13 +279,13 @@ fn test_thinking_status_full_frame() {
 }
 
 #[test]
-fn test_thinking_status_single_dot_and_500ms_blinking() {
-    // 1. At 0ms (even 500ms interval): dot is ON ("• Running")
+fn test_thinking_status_braille_spinner_frames() {
+    // 1. At 0ms frame index 0 ("⠋")
     let frame_0ms = format_activity_status("Running", Duration::from_millis(0), 10, 20, "auto");
     let plain_0ms = strip_ansi(&frame_0ms);
     assert!(
-        plain_0ms.contains("• Running (0s) (↑10 ↓20)"),
-        "At 0ms dot should be ON: {}",
+        plain_0ms.contains("Running (0s) (↑10 ↓20)"),
+        "Status verb and timing must be present: {}",
         plain_0ms
     );
     assert!(
@@ -287,27 +294,26 @@ fn test_thinking_status_single_dot_and_500ms_blinking() {
         plain_0ms
     );
 
-    // 2. At 500ms (odd 500ms interval): dot is OFF ("  Running")
-    let frame_500ms = format_activity_status("Running", Duration::from_millis(500), 10, 20, "auto");
-    let plain_500ms = strip_ansi(&frame_500ms);
-    assert!(
-        plain_500ms.contains("  Running (0s) (↑10 ↓20)"),
-        "At 500ms dot should be OFF: {}",
-        plain_500ms
+    // 2. At 80ms the Braille frame advances
+    let frame_80ms = format_activity_status("Running", Duration::from_millis(80), 10, 20, "auto");
+    let plain_80ms = strip_ansi(&frame_80ms);
+    assert_ne!(
+        plain_0ms, plain_80ms,
+        "Spinner frames must advance over time"
     );
     assert!(
-        !plain_500ms.contains("•"),
-        "At 500ms no dot should appear: {}",
-        plain_500ms
+        !plain_80ms.contains("•"),
+        "No blinking dot may appear: {}",
+        plain_80ms
     );
 
-    // 3. At 1000ms (even 500ms interval): dot is ON ("• Running")
+    // 3. At 1000ms the Braille frame is at index 12 % 10 = 2 ("⠹")
     let frame_1000ms =
         format_activity_status("Running", Duration::from_millis(1000), 10, 20, "auto");
     let plain_1000ms = strip_ansi(&frame_1000ms);
     assert!(
-        plain_1000ms.contains("• Running (1s) (↑10 ↓20)"),
-        "At 1000ms dot should be ON: {}",
+        plain_1000ms.contains("Running (1s) (↑10 ↓20)"),
+        "At 1000ms status must render: {}",
         plain_1000ms
     );
     assert!(
@@ -316,40 +322,30 @@ fn test_thinking_status_single_dot_and_500ms_blinking() {
         plain_1000ms
     );
 
-    // 4. At 1500ms (odd 500ms interval): dot is OFF ("  Running")
+    // 4. At 1500ms frame index 18 % 10 = 8 ("⠇")
     let frame_1500ms =
         format_activity_status("Running", Duration::from_millis(1500), 10, 20, "auto");
     let plain_1500ms = strip_ansi(&frame_1500ms);
     assert!(
-        plain_1500ms.contains("  Running (1s) (↑10 ↓20)"),
-        "At 1500ms dot should be OFF: {}",
+        plain_1500ms.contains("Running (1s) (↑10 ↓20)"),
+        "At 1500ms status must render: {}",
         plain_1500ms
     );
     assert!(
         !plain_1500ms.contains("•"),
-        "At 1500ms no dot should appear: {}",
+        "No blinking dot may appear: {}",
         plain_1500ms
     );
 
-    // 5. Passing "• Running" or "• • Running" is sanitized so only single blinking dot is produced
+    // 5. Passing a "• " prefixed verb is sanitized so the prefix never doubles
     let frame_prefixed =
         format_activity_status("• Running", Duration::from_millis(0), 10, 20, "auto");
     let plain_prefixed = strip_ansi(&frame_prefixed);
-    assert!(plain_prefixed.contains("• Running (0s) (↑10 ↓20)"));
+    assert!(plain_prefixed.contains("Running (0s) (↑10 ↓20)"));
     assert!(
         !plain_prefixed.contains("• •"),
         "Must sanitize leading dot to avoid double dots: {}",
         plain_prefixed
-    );
-
-    let frame_prefixed_off =
-        format_activity_status("• Running", Duration::from_millis(500), 10, 20, "auto");
-    let plain_prefixed_off = strip_ansi(&frame_prefixed_off);
-    assert!(plain_prefixed_off.contains("  Running (0s) (↑10 ↓20)"));
-    assert!(
-        !plain_prefixed_off.contains("•"),
-        "Must be off at 500ms even with prefixed input: {}",
-        plain_prefixed_off
     );
 }
 
@@ -541,20 +537,20 @@ fn test_render_tool_tree_to_writer() {
 
 #[test]
 fn test_completed_turn_summary_formatting() {
-    // 5s (↑1 ↓57)
+    // 5s (↑1 ↓57) with leading blank line before the summary
     let summary1 = format_turn_summary(Duration::from_secs(5), 1, 57);
     let plain1 = strip_ansi(&summary1);
-    assert_eq!(plain1, "  5s (↑1 ↓57)\r\n\r\n");
+    assert_eq!(plain1, "\r\n  5s (↑1 ↓57)\r\n\r\n");
 
     // 1m7s (↑5 ↓1.2k)
     let summary2 = format_turn_summary(Duration::from_secs(67), 5, 1200);
     let plain2 = strip_ansi(&summary2);
-    assert_eq!(plain2, "  1m7s (↑5 ↓1.2k)\r\n\r\n");
+    assert_eq!(plain2, "\r\n  1m7s (↑5 ↓1.2k)\r\n\r\n");
 
     // 1h2m3s (↑45k ↓120k)
     let summary3 = format_turn_summary(Duration::from_secs(3723), 45000, 120000);
     let plain3 = strip_ansi(&summary3);
-    assert_eq!(plain3, "  1h2m3s (↑45k ↓120k)\r\n\r\n");
+    assert_eq!(plain3, "\r\n  1h2m3s (↑45k ↓120k)\r\n\r\n");
 }
 
 // ===========================================================================
@@ -766,7 +762,7 @@ fn test_full_turn_lifecycle_in_memory() {
     let plain_log = strip_ansi(&String::from_utf8_lossy(&session_log));
 
     assert!(plain_log.contains("┃ Find and fix memory leak"));
-    assert!(plain_log.contains("• Running (1s) (↑120 ↓0)"));
+    assert!(plain_log.contains("Running (1s) (↑120 ↓0)"));
     assert!(plain_log.contains("enter queue · auto · DeepSeek V4 Flash"));
     assert!(plain_log.contains("● 3 tool calls · 1 edit · 1 list · 1 read"));
     assert!(plain_log.contains("├ Searched Arc::clone"));
@@ -856,7 +852,13 @@ fn test_queue_prompt_rendering_with_active_buffer() {
     .unwrap();
 
     let plain = strip_ansi(&String::from_utf8_lossy(&buf));
-    assert!(plain.contains("• Running (2s) (↑150 ↓30)"));
+    assert!(plain.contains("Running (2s) (↑150 ↓30)"));
+    assert!(
+        fusion::ui::spinner::BRAILLE_FRAMES
+            .iter()
+            .any(|f| plain.contains(f)),
+        "Running frame must show a Braille spinner"
+    );
     assert!(
         plain.contains("┃ refactor auth module"),
         "Prompt rail must display the interactive queue buffer text"
@@ -1193,7 +1195,7 @@ fn test_single_inplace_thinking_frame_no_line_duplication() {
     render_frame(&mut terminal_stream, 0, 100, 0, "", false);
     let frame1_bytes = terminal_stream.clone();
     let frame1_raw = String::from_utf8_lossy(&frame1_bytes);
-    assert!(frame1_raw.contains("• Running (0s) (↑100 ↓0)"));
+    assert!(frame1_raw.contains("Running (0s) (↑100 ↓0)"));
     assert!(frame1_raw.contains("enter queue · auto · DeepSeek V4 Flash"));
     // MoveUp(2) positions cursor on the queue input line
     assert!(
@@ -1310,10 +1312,11 @@ fn test_fx_image1_duration_compact_exact_format() {
 fn test_fx_image1_running_status_frame_exact_layout() {
     let frame = format_thinking_status(Duration::from_secs(70), 9, 641, "claude-3-7-sonnet");
     let plain = strip_ansi(&frame);
+    // 70s at 80ms/frame -> frame index 875 % 10 = 5 ("⠴")
     let expected =
-        "  • Running (1m10s) (↑9 ↓641)\r\n\r\n┃ \r\n\r\nenter queue · auto · claude-3-7-sonnet\r\n";
+        "  ⠴ Running (1m10s) (↑9 ↓641)\r\n\r\n┃ \r\n\r\nenter queue · auto · claude-3-7-sonnet\r\n";
     let expected_lf =
-        "  • Running (1m10s) (↑9 ↓641)\n\n┃ \n\nenter queue · auto · claude-3-7-sonnet\n";
+        "  ⠴ Running (1m10s) (↑9 ↓641)\n\n┃ \n\nenter queue · auto · claude-3-7-sonnet\n";
     assert!(
         plain == expected || plain == expected_lf,
         "Frame layout mismatch: got {:?}",
@@ -2882,9 +2885,9 @@ fn test_prompt_queue_streaming_persistence_lifecycle() {
         frame3_plain
     );
 
-    // 7. Turn completes: agent prints completed turn summary `  1m26s (↑4 ↓1.3k)`
+    // 7. Turn completes: agent prints completed turn summary with a blank line before
     let summary = format_turn_summary(Duration::from_secs(86), 4, 1300);
-    assert_eq!(strip_ansi(&summary), "  1m26s (↑4 ↓1.3k)\r\n\r\n");
+    assert_eq!(strip_ansi(&summary), "\r\n  1m26s (↑4 ↓1.3k)\r\n\r\n");
 
     // Reset running status for turn completion
     prompt.set_running(false);
