@@ -84,7 +84,7 @@ impl Prompt {
             history_idx: None,
             prompt_symbol: "\x1b[1m┃\x1b[0m ".to_string(),
             multiline_symbol: "\x1b[1m┃\x1b[0m ".to_string(),
-            placeholder: Some("Type a message or / for commands...".to_string()),
+            placeholder: None,
             key_handler: KeyHandler::new(KeybindingProfile::Default),
             show_mode_indicator: false,
             slash_selection: 0,
@@ -670,10 +670,9 @@ impl Prompt {
                                         return Ok(None);
                                     }
                                     if sel.is_skill {
-                                        // Submit /skills enable <name> to activate via slash command
                                         let skill_name =
                                             sel.name.strip_prefix("skill:").unwrap_or(&sel.name);
-                                        let cmd = format!("/skills enable {}", skill_name);
+                                        let cmd = format!("/skill {}", skill_name);
                                         self.clear_frame()?;
                                         self.add_history(cmd.clone());
                                         self.buffer.clear();
@@ -919,12 +918,10 @@ impl Prompt {
 
             write!(out, "{}", prefix)?;
             if idx == 0 && line.is_empty() && lines.len() == 1 && !self.is_running {
-                let ph = self
-                    .placeholder
-                    .as_deref()
-                    .unwrap_or("Type a message or / for commands...");
-                if !ph.is_empty() {
-                    write!(out, "\x1b[2;37m{}\x1b[0m", ph)?;
+                if let Some(ph) = &self.placeholder {
+                    if !ph.is_empty() {
+                        write!(out, "\x1b[2;37m{}\x1b[0m", ph)?;
+                    }
                 }
             } else {
                 write!(out, "{}", line)?;
@@ -2255,12 +2252,6 @@ mod tests {
 
         // 1. Input line has rail ┃
         assert!(raw.contains('┃'), "Must contain rail symbol '┃':\n{}", raw);
-        // 2. Placeholder text is present
-        assert!(
-            raw.contains("Type a message or / for commands..."),
-            "Empty buffer must render placeholder text:\n{}",
-            raw
-        );
         // 3. Status footer is present
         assert!(
             raw.contains("auto · DeepSeek V4 Flash"),

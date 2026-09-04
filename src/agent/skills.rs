@@ -680,8 +680,15 @@ impl SkillLoader {
     pub fn scan_all(&self, workspace_root: Option<&Path>) -> SkillRegistry {
         let mut registry = SkillRegistry::new();
 
-        // 1. Load global skills first
+        // 1. Load global skills (~/.fusion/skills/ and ~/.claude/skills/)
         for skill in self.scan_global() {
+            registry.register(skill);
+        }
+        let global_claude = dirs::home_dir()
+            .unwrap_or_default()
+            .join(".claude")
+            .join("skills");
+        for skill in self.scan_directory(&global_claude, |p| SkillSource::Global(p.to_path_buf())) {
             registry.register(skill);
         }
 
@@ -693,10 +700,15 @@ impl SkillLoader {
                 registry.register(skill);
             }
         }
-
         // 3. Load workspace project skills (overrides global skills with same name)
         if let Some(root) = workspace_root {
             for skill in self.scan_project(root) {
+                registry.register(skill);
+            }
+            // 4. Also scan .claude/skills/ for compatibility with Claude Code skills
+            let claude_dir = root.join(".claude").join("skills");
+            for skill in self.scan_directory(&claude_dir, |p| SkillSource::Project(p.to_path_buf()))
+            {
                 registry.register(skill);
             }
         }

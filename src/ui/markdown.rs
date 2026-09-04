@@ -351,18 +351,18 @@ pub fn render_line(line: &str, in_code_block: &mut bool, code_lang: &mut String)
             *in_code_block = false;
             code_lang.clear();
             let width = get_border_width();
-            return format!("  \x1b[38;5;240m{}\x1b[0m", "─".repeat(width));
+            return format!("\x1b[38;5;240m{}\x1b[0m", "─".repeat(width));
         } else {
             *in_code_block = true;
             let lang = trimmed.trim_start_matches('`').trim();
             *code_lang = lang.to_string();
             let width = get_border_width();
             if lang.is_empty() {
-                return format!("  \x1b[38;5;240m{}\x1b[0m", "─".repeat(width));
+                return format!("\x1b[38;5;240m{}\x1b[0m", "─".repeat(width));
             } else {
                 let border_len = width.saturating_sub(lang.len() + 3);
                 return format!(
-                    "  \x1b[38;5;240m─\x1b[0m \x1b[1;37m{}\x1b[0m \x1b[38;5;240m{}\x1b[0m",
+                    "\x1b[38;5;240m─\x1b[0m \x1b[1;37m{}\x1b[0m \x1b[38;5;240m{}\x1b[0m",
                     lang,
                     "─".repeat(border_len)
                 );
@@ -384,7 +384,7 @@ pub fn render_line(line: &str, in_code_block: &mut bool, code_lang: &mut String)
         } else {
             highlight_code_line(line, code_lang)
         };
-        return format!("  {}", styled);
+        return styled;
     }
 
     // Horizontal rules: --- or *** or ___ (3 or more chars)
@@ -445,11 +445,7 @@ pub fn render_line(line: &str, in_code_block: &mut bool, code_lang: &mut String)
         .or_else(|| trimmed.strip_prefix("+ [ ] "))
     {
         let indent = " ".repeat(line.len() - trimmed.len());
-        return format!(
-            "{}  \x1b[38;5;244m[ ]\x1b[0m {}",
-            indent,
-            render_inline(rest)
-        );
+        return format!("{}\x1b[38;5;244m[ ]\x1b[0m {}", indent, render_inline(rest));
     }
     if let Some(rest) = trimmed
         .strip_prefix("- [x] ")
@@ -460,7 +456,7 @@ pub fn render_line(line: &str, in_code_block: &mut bool, code_lang: &mut String)
         .or_else(|| trimmed.strip_prefix("+ [X] "))
     {
         let indent = " ".repeat(line.len() - trimmed.len());
-        return format!("{}  \x1b[32m[✓]\x1b[0m {}", indent, render_inline(rest));
+        return format!("{}\x1b[32m[✓]\x1b[0m {}", indent, render_inline(rest));
     }
 
     // Bullet lists: - item, * item, + item
@@ -470,18 +466,13 @@ pub fn render_line(line: &str, in_code_block: &mut bool, code_lang: &mut String)
         .or_else(|| trimmed.strip_prefix("+ "))
     {
         let indent = " ".repeat(line.len() - trimmed.len());
-        return format!("{}  \x1b[36m•\x1b[0m {}", indent, render_inline(rest));
+        return format!("{}\x1b[36m•\x1b[0m {}", indent, render_inline(rest));
     }
 
     // Numbered lists: 1. item, 2. item, etc.
     if let Some((num, rest)) = parse_numbered_list(trimmed) {
         let indent = " ".repeat(line.len() - trimmed.len());
-        return format!(
-            "{}  \x1b[36m{}.\x1b[0m {}",
-            indent,
-            num,
-            render_inline(rest)
-        );
+        return format!("{}\x1b[36m{}.\x1b[0m {}", indent, num, render_inline(rest));
     }
 
     // Markdown tables: | col1 | col2 |
@@ -493,7 +484,7 @@ pub fn render_line(line: &str, in_code_block: &mut bool, code_lang: &mut String)
     if trimmed.is_empty() {
         String::new()
     } else {
-        format!("  {}", render_inline(trimmed))
+        render_inline(trimmed)
     }
 }
 

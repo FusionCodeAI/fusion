@@ -529,12 +529,12 @@ pub static COMMAND_PALETTE: &[CommandDescriptor] = &[
         examples: &["/preset", "/preset coding-fast", "/preset deep-reasoning", "/preset offline-ollama"],
     },
     CommandDescriptor {
-        name: "/skills",
-        aliases: &["/skill", "/sk"],
-        syntax: "/skills <list|info|reload|enable|disable|test>",
+        name: "/skill",
+        aliases: &["/sk"],
+        syntax: "/skill <name> | /skill reload",
         category: CommandCategory::Config,
-        description: "Manage domain skills loaded from .fusion/skills/ and ~/.fusion/skills/",
-        examples: &["/skills", "/skills list", "/skills info cloudflare", "/skills reload", "/skills test \"wrangler deploy\""],
+        description: "Enable a skill or reload all skills",
+        examples: &["/skill cloudflare", "/skill reload"],
     },
 ];
 
@@ -635,7 +635,36 @@ impl SlashCommand {
                 SlashCommand::File { query }
             }
             "/skills" | "/skill" | "/sk" => {
-                let skills_cmd = parse_skills_subcommand(args);
+                // Map to simplified skill command:
+                // /skill reload → SkillsCommand::Reload
+                // /skill <name> → SkillsCommand::Enable { name }
+                let skills_cmd = if args.is_empty() {
+                    SkillsCommand::List
+                } else if args[0].eq_ignore_ascii_case("reload")
+                    || args[0].eq_ignore_ascii_case("refresh")
+                {
+                    SkillsCommand::Reload
+                } else if args[0].eq_ignore_ascii_case("list") || args[0].eq_ignore_ascii_case("ls")
+                {
+                    SkillsCommand::List
+                } else if args[0].eq_ignore_ascii_case("info")
+                    || args[0].eq_ignore_ascii_case("show")
+                {
+                    let name = args.get(1).cloned().unwrap_or_default();
+                    SkillsCommand::Info { name }
+                } else if args[0].eq_ignore_ascii_case("disable")
+                    || args[0].eq_ignore_ascii_case("off")
+                {
+                    let name = args.get(1).cloned().unwrap_or_default();
+                    SkillsCommand::Disable { name }
+                } else {
+                    // /skill <name> → enable
+                    let name = args[0]
+                        .strip_prefix("skill:")
+                        .unwrap_or(&args[0])
+                        .to_string();
+                    SkillsCommand::Enable { name }
+                };
                 SlashCommand::Skills(skills_cmd)
             }
             "/snippet" | "/snip" | "/sn" => SlashCommand::Snippet {
@@ -824,34 +853,6 @@ fn parse_config_subcommand(args: &[String]) -> ConfigCommand {
             ConfigCommand::Preset { name }
         }
         _ => ConfigCommand::Show,
-    }
-}
-
-fn parse_skills_subcommand(args: &[String]) -> SkillsCommand {
-    if args.is_empty() {
-        return SkillsCommand::List;
-    }
-
-    match args[0].to_lowercase().as_str() {
-        "list" | "ls" => SkillsCommand::List,
-        "info" | "show" | "view" => {
-            let name = args.get(1).cloned().unwrap_or_default();
-            SkillsCommand::Info { name }
-        }
-        "reload" | "refresh" | "rescan" => SkillsCommand::Reload,
-        "enable" | "on" => {
-            let name = args.get(1).cloned().unwrap_or_default();
-            SkillsCommand::Enable { name }
-        }
-        "disable" | "off" => {
-            let name = args.get(1).cloned().unwrap_or_default();
-            SkillsCommand::Disable { name }
-        }
-        "test" | "eval" | "match" => {
-            let query = args[1..].join(" ");
-            SkillsCommand::Test { query }
-        }
-        _ => SkillsCommand::List,
     }
 }
 
