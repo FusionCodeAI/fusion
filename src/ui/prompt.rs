@@ -669,11 +669,19 @@ impl Prompt {
                                         self.render_current()?;
                                         return Ok(None);
                                     }
-                                    let cmd = if sel.is_skill {
-                                        format!("@skill:{}", sel.name)
-                                    } else {
-                                        sel.name.clone()
-                                    };
+                                    if sel.is_skill {
+                                        // Submit /skills enable <name> to activate via slash command
+                                        let skill_name =
+                                            sel.name.strip_prefix("skill:").unwrap_or(&sel.name);
+                                        let cmd = format!("/skills enable {}", skill_name);
+                                        self.clear_frame()?;
+                                        self.add_history(cmd.clone());
+                                        self.buffer.clear();
+                                        self.cursor_pos = 0;
+                                        self.slash_selection = 0;
+                                        return Ok(Some(PromptResult::Submit(cmd)));
+                                    }
+                                    let cmd = sel.name.clone();
                                     let rest: String = text_so_far
                                         .split_once('\n')
                                         .map(|(_, r)| r.to_string())
@@ -1289,7 +1297,12 @@ fn model_category_label(id: &str, name: &str) -> &'static str {
 /// Match slash commands whose name or aliases start with the typed prefix.
 fn slash_matches(typed: &str, skills: &[SlashSuggestion]) -> Vec<SlashSuggestion> {
     let query = typed.trim_start().to_lowercase();
-    let mut results: Vec<SlashSuggestion> = crate::ui::slash::COMMAND_PALETTE
+    let skill_query = query.strip_prefix('/').unwrap_or(&query);
+
+    // Check if user is specifically looking for skills (typed /skill: or /sk)
+    let wants_skills = skill_query.starts_with("sk") || skill_query.starts_with("skill");
+
+    let mut cmd_results: Vec<SlashSuggestion> = crate::ui::slash::COMMAND_PALETTE
         .iter()
         .filter(|d| {
             d.name.to_lowercase().starts_with(&query)
@@ -1304,17 +1317,46 @@ fn slash_matches(typed: &str, skills: &[SlashSuggestion]) -> Vec<SlashSuggestion
             is_skill: false,
         })
         .collect();
-    // Add matching skills
-    let skill_query = query.strip_prefix('/').unwrap_or(&query);
+
+    // Build skill entries with skill: prefix
+    let mut skill_results: Vec<SlashSuggestion> = Vec::new();
     for s in skills {
-        if s.name.to_lowercase().starts_with(skill_query)
+        let prefixed = format!("skill:{}", s.name);
+        let prefixed_lower = prefixed.to_lowercase();
+        if skill_query.is_empty()
+            || prefixed_lower.starts_with(skill_query)
+            || prefixed_lower.contains(skill_query)
             || s.name.to_lowercase().contains(skill_query)
         {
-            results.push(s.clone());
+            skill_results.push(SlashSuggestion {
+                name: prefixed,
+                description: s.description.clone(),
+                category: s.category.clone(),
+                is_skill: true,
+            });
         }
     }
-    results.truncate(8);
-    results
+
+    // When user specifically types /skill:, show only skills
+    if wants_skills && !skill_results.is_empty() {
+        // Put /skills command first, then all matching skills
+        let mut results = Vec::new();
+        for c in &cmd_results {
+            if c.name == "/skills" {
+                results.push(c.clone());
+            }
+        }
+        results.extend(skill_results);
+        results.truncate(12);
+        return results;
+    }
+
+    // Default: commands first, then skills, with room for both
+    let skill_count = skill_results.len().min(3);
+    let cmd_limit = 8usize.saturating_sub(skill_count);
+    cmd_results.truncate(cmd_limit);
+    cmd_results.extend(skill_results.into_iter().take(3));
+    cmd_results
 }
 
 /// Calculate visible character width by ignoring ANSI escape codes.
