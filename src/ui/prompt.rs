@@ -25,6 +25,17 @@ pub enum PromptResult {
 pub const EFFORT_OPTIONS: &[&str] = &["default", "xhigh", "high", "medium", "low"];
 
 /// Interactive terminal prompt supporting line editing, multiline input,
+/// An owned suggestion entry for the slash autocomplete dropdown.
+/// Merges static command palette entries with dynamic skill entries.
+#[derive(Debug, Clone)]
+pub struct SlashSuggestion {
+    pub name: String,
+    pub description: String,
+    pub category: String,
+    /// Whether this entry is a skill (vs a built-in command).
+    pub is_skill: bool,
+}
+
 pub struct Prompt {
     history: Vec<String>,
     history_idx: Option<usize>,
@@ -56,6 +67,8 @@ pub struct Prompt {
     pub effort_selection: usize,
     pub pending_model_id: String,
     pub selected_effort: Option<String>,
+    /// Dynamic skill entries for the slash autocomplete dropdown.
+    skill_suggestions: Vec<SlashSuggestion>,
 }
 impl Default for Prompt {
     fn default() -> Self {
@@ -92,6 +105,7 @@ impl Prompt {
             effort_selection: 0,
             pending_model_id: String::new(),
             selected_effort: None,
+            skill_suggestions: Vec::new(),
         }
     }
 

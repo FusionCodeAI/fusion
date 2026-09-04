@@ -723,7 +723,6 @@ pub async fn run_turn_ui(
             AgentEvent::TextDelta(d) => {
                 clear_prompt_frame(prompt);
                 if *is_thinking {
-                    prompt.set_running_status(None);
                     *is_thinking = false;
                     *active_tool_label = None;
                     let mut out = stdout();
@@ -867,7 +866,7 @@ pub async fn run_turn_ui(
 
     loop {
         tokio::select! {
-            _ = ticker.tick(), if is_thinking => {
+            _ = ticker.tick() => {
                 let elapsed = start_time.elapsed();
                 let current_secs = elapsed.as_secs();
                 let half_periods = elapsed.as_millis() / 500;
@@ -884,9 +883,13 @@ pub async fn run_turn_ui(
                 last_status_dot_frame = Some(dot_frame);
 
                 let dot = if dot_frame { "• " } else { "  " };
-                let verb = match active_tool_label.as_deref() {
-                    Some(label) => label.strip_prefix("• ").unwrap_or(label),
-                    None => "Running",
+                let verb = if is_thinking {
+                    match active_tool_label.as_deref() {
+                        Some(label) => label.strip_prefix("• ").unwrap_or(label),
+                        None => "Running",
+                    }
+                } else {
+                    "Streaming"
                 };
                 let status = format!(
                     "\r\x1b[2K{}{} ({}) (↑{} ↓{})",
@@ -896,7 +899,9 @@ pub async fn run_turn_ui(
                     format_tokens_compact(input_tokens),
                     format_tokens_compact(output_tokens)
                 );
+                clear_prompt_frame(prompt);
                 prompt.set_running_status(Some(status));
+                reset_prompt_render_state(prompt);
                 let _ = prompt.render_current();
             }
             Some(event_res) = event_stream.next() => {
