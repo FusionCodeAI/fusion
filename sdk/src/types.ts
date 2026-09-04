@@ -1,5 +1,5 @@
 /**
- * @fusion/sdk — TypeScript Definitions
+ * @fusioncode/sdk — TypeScript Definitions
  * Comprehensive type definitions for:
  * 1. Agent Client Protocol (ACP) JSON-RPC 2.0 messages & lifecycle
  * 2. Agent Mesh, Peer-to-Peer RPC, Subagents & Multi-Agent Advisors

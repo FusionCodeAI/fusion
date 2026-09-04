@@ -1,5 +1,5 @@
 /**
- * @fusion/sdk — WebAssembly Loader, Runtime Bridge & Virtual File System
+ * @fusioncode/sdk — WebAssembly Loader, Runtime Bridge & Virtual File System
  *
  * Provides:
  * 1. `loadFusionWasm`: Cross-environment WebAssembly loader for Browser & Node.js
@@ -86,7 +86,7 @@ export function isWasmInitialized(): boolean {
 export function getWasmModule(): FusionWasmModule {
   if (!wasmModuleInstance) {
     throw new Error(
-      '@fusion/sdk: WebAssembly module is not initialized. Please call `await loadFusionWasm()` before accessing agent bindings.'
+      '@fusioncode/sdk: WebAssembly module is not initialized. Please call `await loadFusionWasm()` before accessing agent bindings.'
     );
   }
   return wasmModuleInstance;
@@ -232,13 +232,13 @@ export async function loadFusionWasm(wasmSource?: WasmSourceInput): Promise<Fusi
             const fileBuf = await fs.readFile(urlStr);
             binaryBuffer = new Uint8Array(fileBuf.buffer, fileBuf.byteOffset, fileBuf.byteLength);
           } catch (err) {
-            throw new Error(`@fusion/sdk: Failed to read WASM file at "${urlStr}": ${(err as Error).message}`);
+            throw new Error(`@fusioncode/sdk: Failed to read WASM file at "${urlStr}": ${(err as Error).message}`);
           }
         } else if (typeof fetch !== 'undefined') {
           // Fetch from URL in Browser / Fetch environment
           const resp = await fetch(urlStr);
           if (!resp.ok) {
-            throw new Error(`@fusion/sdk: Failed to fetch WASM binary from "${urlStr}": ${resp.status} ${resp.statusText}`);
+            throw new Error(`@fusioncode/sdk: Failed to fetch WASM binary from "${urlStr}": ${resp.status} ${resp.statusText}`);
           }
           responseSource = resp;
         }
@@ -371,7 +371,7 @@ function decodeBase64ToUint8Array(base64: string): Uint8Array {
     }
     return bytes;
   }
-  throw new Error('@fusion/sdk: No base64 decoder available in current environment');
+  throw new Error('@fusioncode/sdk: No base64 decoder available in current environment');
 }
 
 /**
@@ -703,7 +703,7 @@ export class VirtualFileSystem {
     const cleanPath = this.normalizePath(path);
     const content = this.backend.read(cleanPath);
     if (content === null || content === undefined) {
-      throw new Error(`@fusion/sdk VFS: File not found: "${path}"`);
+      throw new Error(`@fusioncode/sdk VFS: File not found: "${path}"`);
     }
     return content;
   }
@@ -741,7 +741,7 @@ export class VirtualFileSystem {
     const content = this.readFile(cleanPath);
     if (!content.includes(oldStr)) {
       throw new Error(
-        `@fusion/sdk VFS: Target string to replace was not found in "${path}"`
+        `@fusioncode/sdk VFS: Target string to replace was not found in "${path}"`
       );
     }
     const updated = content.replace(oldStr, newStr);
@@ -1179,7 +1179,7 @@ export class WasmEventBridge implements AsyncIterable<FusionEvent> {
       try {
         observer.next?.(event);
       } catch (err) {
-        console.error('@fusion/sdk WasmEventBridge: Error in subscriber callback:', err);
+        console.error('@fusioncode/sdk WasmEventBridge: Error in subscriber callback:', err);
       }
     }
 

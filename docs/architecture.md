@@ -91,7 +91,7 @@ src/
   tools/        Sandboxed tool registry (files, search, git, sqlite, MCP, ...)
   ui/           Inline REPL, markdown renderer, slash commands, themes, voice
   wasm.rs       WASM bindings, VirtualFs, browser engine
-sdk/            TypeScript SDK (@fusion/sdk) — types, xterm adapter, WASM core
+sdk/            TypeScript SDK (@fusioncode/sdk) — types, xterm adapter, WASM core
 web/            Browser playground (xterm.js + WebSocket ACP)
 Formula/        Homebrew formula
 benches/        Criterion micro-benchmarks & provider comparison harness

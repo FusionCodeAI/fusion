@@ -1,5 +1,5 @@
 /**
- * @theaungmyatmoe/fusion — Official TypeScript & WebAssembly SDK for Fusion AI Coding Assistant
+ * @fusioncode/sdk — Official TypeScript & WebAssembly SDK for Fusion AI Coding Assistant
  *
  * Provides in-browser and Node.js agent execution, virtual filesystem operations,
  * multi-model orchestration, checkpoint serialization, and xterm.js terminal integration.

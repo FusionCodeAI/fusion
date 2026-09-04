@@ -124,7 +124,7 @@ describe('FusionAgent.initialize — ACP handshake', () => {
     assert.equal(initMsg.method, 'initialize');
     assert.equal(initMsg.params?.protocolVersion, 1);
     const clientInfo = initMsg.params?.clientInfo as { name: string };
-    assert.equal(clientInfo.name, '@fusion/sdk');
+    assert.equal(clientInfo.name, '@fusioncode/sdk');
 
     // Session adopted from session/new result.
     assert.equal(agent.getSessionId(), 'sess-mock-001');

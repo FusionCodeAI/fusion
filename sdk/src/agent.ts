@@ -1,5 +1,5 @@
 /**
- * @fusion/sdk — FusionAgent High-Level Controller & Transports
+ * @fusioncode/sdk — FusionAgent High-Level Controller & Transports
  *
  * Provides a unified client class `FusionAgent` supporting:
  * 1. Stdio child process transport (spawning `fusion --acp` over JSON-RPC 2.0 stdio)
@@ -260,7 +260,7 @@ export class StdioTransport implements AgentTransport {
         session: { streaming: true }
       },
       clientInfo: {
-        name: '@fusion/sdk',
+        name: '@fusioncode/sdk',
         version: '0.3.0'
       }
     };
@@ -949,7 +949,7 @@ export class FusionAgent {
    *
    * @example
    * ```typescript
-   * import { FusionAgent } from '@fusion/sdk';
+   * import { FusionAgent } from '@fusioncode/sdk';
    *
    * // 1. Stdio child process transport (IDE / CLI backend)
    * const agent = await FusionAgent.create({

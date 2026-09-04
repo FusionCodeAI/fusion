@@ -11,8 +11,6 @@
 [![WebAssembly](https://img.shields.io/badge/Core-Pure%20Rust%20WASM-purple.svg?style=flat-square)](#cross-environment-notes)
 [![Engines](https://img.shields.io/badge/node-%E2%89%A518-green.svg?style=flat-square)](#cross-environment-notes)
 
----
-
 ## Table of Contents
 
 - [Features](#features)
@@ -31,8 +29,6 @@
 - [Framework Integration](#framework-integration)
 - [License](#license)
 
----
-
 ## Features
 
 - 🦀 **Pure-Rust WebAssembly core** — zero C/C++ dependencies or native binaries; runs in every modern browser and Node.js ≥ 18.
@@ -43,8 +39,6 @@
 - 💻 **xterm.js terminal adapter** — REPL line editing, history navigation, ANSI themes, spinners, slash commands, and three pluggable backends (WASM / WebSocket / Mock).
 - 💾 **Session checkpoints** — one-call JSON snapshot and restore of messages, config, token stats, and the entire VFS.
 - 🌐 **Universal model support** — OpenRouter, Anthropic, OpenAI, DeepSeek, and local Ollama out of the box; custom endpoints via `custom_base_url`.
-
----
 
 ## Installation
 
@@ -76,8 +70,6 @@ Subpath exports:
 | `@fusioncode/sdk/types` | Type-only definitions |
 
 The Fusion CLI binary itself (needed for the stdio transport) is distributed separately — via [Homebrew](https://fusioncode.app) (`brew install fusion`), `cargo install fusion`, or a GitHub release download.
-
----
 
 ## Quick Start
 
@@ -169,8 +161,6 @@ for await (const chunk of (await agent.prompt('Explain the module layout')).getR
 > **Note** — `StdioTransport` requires `child_process` and therefore only works in
 > Node.js / Bun / Deno. Browser bundles must use the WASM (or a WebSocket) transport.
 
----
-
 ## Streaming Events
 
 Every turn dispatches a typed, discriminated-union event stream
@@ -234,8 +224,6 @@ for await (const event of bridge) {
 }
 ```
 
----
-
 ## Virtual File System (VFS)
 
 The agent operates in an isolated, in-memory virtual workspace. Seed it before
@@ -273,8 +261,6 @@ if (bindings) {
 VFS operations require an **active WASM agent instance** — they throw on the
 stdio transport, where the real filesystem of the spawned `fusion` process is
 used instead.
-
----
 
 ## xterm.js Terminal Adapter
 
@@ -383,8 +369,6 @@ adapter.registerCommand({
 });
 ```
 
----
-
 ## Model Switching
 
 Switch models per session or per turn:
@@ -406,8 +390,6 @@ Valid identifiers follow `provider/model` conventions, e.g.
 `anthropic/claude-3.5-sonnet`, `openai/gpt-4o`, `deepseek/deepseek-chat`, or any
 local Ollama tag. Build model-picker UIs from `ModelCatalogEntry` shapes
 (`id`, `name`, `provider`, `category`, `context`, `pricing`, `description`).
-
----
 
 ## Sessions & Checkpoints
 
@@ -458,8 +440,6 @@ agent.setSystemPrompt('You are a Rust refactor specialist.');
 await agent.cancel();      // cancel the in-flight turn (stdio transport)
 await agent.close();       // end session + disconnect transport
 ```
-
----
 
 ## Configuration Reference
 
@@ -519,8 +499,6 @@ interface PromptOptions {
   onEvent?: PromptTurnCallback;
 }
 ```
-
----
 
 ## Type Reference
 
@@ -594,8 +572,6 @@ All types are exported from the root package and `@fusioncode/sdk/types`.
 | `WasmEventBridge` / `createWasmEventBridge` | Callback → `AsyncIterable<FusionEvent>` normalization with `AbortSignal` support |
 | `Subscription` / `Observer<T>` | Minimal observable primitives |
 
----
-
 ## Cross-Environment Notes (Node vs Browser)
 
 | Capability | Node.js ≥ 18 / Bun / Deno | Browser |
@@ -614,8 +590,6 @@ Practical guidance:
 - **Custom WASM bundles:** pass `wasmOptions: { wasmUrl: new URL('/wasm/fusion.wasm', import.meta.url) }` or a pre-fetched `wasmBinary`/`Response` to `FusionAgent.create()` — useful for strict CSPs or pinned assets.
 - **`process.env` in browsers:** guard API-key reads (`typeof process !== 'undefined' && process.env.KEY`) or inject keys at build time; never ship secrets in client bundles — proxy through the WebSocket backend instead.
 - **SSR (Next.js/Nuxt/SvelteKit):** the adapter touches `document`/`localStorage`; load terminal components client-only (`dynamic(..., { ssr: false })` in Next.js).
-
----
 
 ## Framework Integration
 
@@ -677,8 +651,6 @@ export default function Page() {
   );
 }
 ```
-
----
 
 ## License
 

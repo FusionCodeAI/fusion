@@ -8,7 +8,7 @@ Compile and run the entire Fusion agent engine inside any WebAssembly-compatible
 - **Virtual Memory FS**: Sandboxed in-browser code exploration and editing with `read`, `write`, `edit`, `grep`, `glob`, and simulated `bash` tools.
 - **xterm.js Terminal**: WebSocket ACP bridge to a full in-browser terminal experience.
 
-## TypeScript SDK (`@fusion/sdk`)
+## TypeScript SDK (`@fusioncode/sdk`)
 
 The [official SDK](../sdk/README.md) wraps the pure-Rust WASM core for Browser and Node.js (>= 18):
 

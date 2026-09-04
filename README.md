@@ -19,14 +19,14 @@ Choose your preferred installation method:
 ### 1. One-Line Installer (macOS & Linux)
 
 ```bash
-curl -fsSL https://fusion.sh/install.sh | bash
+curl -fsSL https://fusioncode.app/install | bash
 ```
 
 ### 2. Android / Termux Bootstrap (Mobile Coding)
 
 ```bash
 pkg update && pkg install -y curl
-curl -fsSL https://fusion.sh/install-termux.sh | bash
+curl -fsSL https://raw.githubusercontent.com/FusionCodeAI/fusion/main/scripts/termux-bootstrap.sh | bash
 ```
 
 *Or build directly inside Termux:*
@@ -66,7 +66,7 @@ cargo install --locked fusion
 *Or clone and build locally:*
 
 ```bash
-git clone https://github.com/theaungmyatmoe/fusion.git
+git clone https://github.com/FusionCodeAI/fusion.git
 cd fusion
 cargo build --release
 # Executable located at ./target/release/fusion
@@ -100,7 +100,7 @@ fusion
 ```
 
 ```text
-  Fusion v0.3.0 (Pure-Rust AI Coding Assistant)
+  Fusion v2.0.0-alpha.1 (Pure-Rust AI Coding Assistant)
   Provider: deepseek  Model: deepseek-chat  Advisors: on
   Type your prompt, /help for commands, or Ctrl+D / /exit to quit.
 
@@ -118,11 +118,11 @@ git diff | fusion "Generate a conventional git commit message for these changes"
 ### 4. TypeScript SDK (Browser / Node.js)
 
 ```bash
-npm install @fusion/sdk
+npm install @fusioncode/sdk
 ```
 
 ```typescript
-import { FusionAgent, VirtualFs } from "@fusion/sdk";
+import { FusionAgent, VirtualFs } from "@fusioncode/sdk";
 
 const agent = new FusionAgent({
   provider: "openrouter",
