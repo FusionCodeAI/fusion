@@ -1,0 +1,34 @@
+cff-version: 1.2.0
+message: "If you use this software, please cite our research paper."
+title: "Ubiquitous Autonomous Coding Agents for Constrained Devices via Bounded Explicit State and Zero-C Native Runtimes"
+authors:
+  - family-names: "Moe"
+    given-names: "Aung Myat"
+    email: "aungmyatmoe834@gmail.com"
+  - name: "Fusion Code AI"
+doi: "10.5281/zenodo.22289167"
+url: "https://doi.org/10.5281/zenodo.22289167"
+repository-code: "https://github.com/FusionCodeAI/fusion"
+date-released: 2026-09-04
+version: 2.0.0
+keywords:
+  - "autonomous agents"
+  - "software engineering"
+  - "mobile computing"
+  - "termux"
+  - "webassembly"
+  - "prompt optimization"
+  - "prefix caching"
+  - "rust"
+license: MIT
+preferred-citation:
+  type: article
+  authors:
+    - family-names: "Moe"
+      given-names: "Aung Myat"
+    - name: "Fusion Code AI"
+  title: "Ubiquitous Autonomous Coding Agents for Constrained Devices via Bounded Explicit State and Zero-C Native Runtimes"
+  doi: "10.5281/zenodo.22289167"
+  year: 2026
+  month: 9
+  url: "https://doi.org/10.5281/zenodo.22289167"

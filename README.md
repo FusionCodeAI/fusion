@@ -192,6 +192,21 @@ WASM build: `cargo build --features wasm --target wasm32-unknown-unknown`
 SDK: `cd sdk && npm install && npx tsc --noEmit`
 
 See [docs/development.md](docs/development.md) for CI/CD, Termux support, and contribution guidelines.
+## Research Paper & Citation
+
+If you use Fusion in your research or systems, please cite our paper:
+
+```bibtex
+@article{moe2026fusion,
+  title   = {Ubiquitous Autonomous Coding Agents for Constrained Devices via Bounded Explicit State and Zero-C Native Runtimes},
+  author  = {Moe, Aung Myat and {Fusion Code AI}},
+  year    = {2026},
+  month   = {9},
+  doi     = {10.5281/zenodo.22289167},
+  url     = {https://doi.org/10.5281/zenodo.22289167}
+}
+```
+
 ## License
 
 Licensed under [MIT](LICENSE) © 2026 Aung Myat Moe and Fusion Code AI.
