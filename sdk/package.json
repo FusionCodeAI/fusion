@@ -44,7 +44,7 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/theaungmyatmoe/fusion.git",
+    "url": "git+https://github.com/FusionCodeAI/fusion.git",
     "directory": "sdk"
   },
   "keywords": [
@@ -64,12 +64,12 @@
     "subagents",
     "typescript"
   ],
-  "author": "Aung Myat Moe",
+  "author": "Aung Myat Moe and Fusion Code AI",
   "license": "MIT",
   "bugs": {
-    "url": "https://github.com/theaungmyatmoe/fusion/issues"
+    "url": "https://github.com/FusionCodeAI/fusion/issues"
   },
-  "homepage": "https://github.com/theaungmyatmoe/fusion#readme",
+  "homepage": "https://github.com/FusionCodeAI/fusion#readme",
   "peerDependencies": {
     "@xterm/xterm": "^5.0.0 || ^6.0.0"
   },

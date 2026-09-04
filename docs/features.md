@@ -28,7 +28,7 @@ Smart shorthands: `/model v3` (DeepSeek V3), `/model r1` (DeepSeek R1), `/model 
 - **Recovery Engine**: Automatic error diagnosis and correction attempts for transient failures; resumable sessions via `/recover [status|resume|diff|discard]`.
 - **Rate Throttling**: Token-bucket turn rate limits with wait-duration feedback and banner visualization when provider limits are hit.
 - **Retry Policies**: Configurable per-provider retry with retryable-status detection and exponential backoff.
-- **Automatic Offline Transition**: Detects connectivity loss and seamlessly transitions to local Ollama execution.
+- **Automatic Offline Transition**: Detects connectivity loss and switches directly to local Ollama execution.
 - **Context Compaction**: Budget-aware history compaction with aggressive/conservative strategies and thinking/tool prune policies; manual `/compact`.
 - **Session Pruner**: Preserve recent turns, initial goals, or tool results while aggressively pruning stale context.
 - **Undo / Redo & Checkpoints**: Every file mutation snapshots original content and permissions for instant restore; `/rewind [N]` rewinds sessions turn-by-turn.

@@ -189,7 +189,6 @@ WASM build: `cargo build --features wasm --target wasm32-unknown-unknown`
 SDK: `cd sdk && npm install && npx tsc --noEmit`
 
 See [docs/development.md](docs/development.md) for CI/CD, Termux support, and contribution guidelines.
-
 ## License
 
-Licensed under [MIT](LICENSE).
+Licensed under [MIT](LICENSE) © 2026 Aung Myat Moe and Fusion Code AI.

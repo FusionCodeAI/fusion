@@ -4,7 +4,7 @@ version = "2.0.0-alpha.1"
 edition = "2021"
 description = "Fast, lightweight, cross-platform AI coding assistant with subagents and advisors"
 license = "MIT"
-repository = "https://github.com/theaungmyatmoe/fusion"
+repository = "https://github.com/FusionCodeAI/fusion"
 
 [dependencies]
 # Async Runtime

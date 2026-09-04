@@ -7,7 +7,7 @@ Modern AI coding tools have grown bloated, sluggish, and fragile. Running on hea
 2. **Pure Rust Ecosystem**: Zero C/C++ dependencies, pure-Rust TLS via `rustls-tls-native-roots`, compile anywhere without system library headaches.
 3. **True Cross-Platform Ubiquity**: A first-class citizen on **macOS** (Apple Silicon & Intel), **Linux** (x86_64, aarch64, musl), **Windows**, **Android/Termux** (code from your phone or tablet on the go!), and **Browser WebAssembly (WASM)**.
 4. **Autonomous Intelligence with Guardrails**: Built-in parallel **Subagents** for delegated tasks alongside a concurrent **Advisory Committee** (Architecture, Security, and Code Quality) to catch bugs and vulnerabilities before they happen.
-5. **Open Protocols**: Native support for the **Agent Client Protocol (ACP)** over JSON-RPC 2.0 stdio, seamlessly integrating with Zed, Neovim, JetBrains, and modern editors.
+5. **Open Protocols**: Native support for the **Agent Client Protocol (ACP)** over JSON-RPC 2.0 stdio, integrating directly with Zed, Neovim, JetBrains, and other editors.
 
 ## Fusion vs. Heavyweight Alternatives
 

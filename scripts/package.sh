@@ -577,7 +577,7 @@ bundle_licenses_and_docs() {
         cat << 'EOF' > "${stage_dir}/LICENSE"
 MIT License
 
-Copyright (c) 2026 Fusion Authors
+Copyright (c) 2026 Aung Myat Moe and Fusion Code AI
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
