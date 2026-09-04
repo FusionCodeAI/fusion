@@ -705,169 +705,162 @@ pub async fn run_turn_ui(
     let mut is_thinking = true;
     let mut tool_batch: Vec<ToolCallItem> = Vec::new();
     let mut ticker = tokio::time::interval(std::time::Duration::from_millis(300));
-    let mut last_prompt_render = Instant::now();
 
     clear_prompt_frame(prompt);
     prompt.reset_input();
     reset_prompt_render_state(prompt);
     prompt.set_running(true);
 
-    let mut handle_agent_event =
-        |event: AgentEvent,
-         tool_batch: &mut Vec<ToolCallItem>,
-         active_tool_label: &mut Option<String>,
-         is_thinking: &mut bool,
-         output_tokens: &mut u64,
-         input_tokens: &mut u64,
-         md: &mut MarkdownRenderer,
-         prompt: &mut Prompt,
-         last_prompt_render: &mut Instant| {
-            match event {
-                AgentEvent::TextDelta(d) => {
-                    clear_prompt_frame(prompt);
-                    if *is_thinking {
-                        prompt.set_running_status(None);
-                        *is_thinking = false;
-                        *active_tool_label = None;
-                        let mut out = stdout();
-                        let _ = write!(out, "\r\x1b[2K");
-                        let _ = out.flush();
-                    }
-                    if !tool_batch.is_empty() {
-                        prompt.set_running_status(None);
-                        let mut out = stdout();
-                        let _ = write!(out, "\r\x1b[2K");
-                        let _ = out.flush();
-                        render_tool_tree(tool_batch);
-                        tool_batch.clear();
-                        reset_prompt_render_state(prompt);
-                    }
-                    *output_tokens += crate::agent::tokens::estimate_text_tokens(&d) as u64;
-                    md.push(&d);
-                    reset_prompt_render_state(prompt);
-                    // Throttle prompt re-renders to avoid flicker on rapid deltas
-                    if last_prompt_render.elapsed() >= std::time::Duration::from_millis(50) {
-                        let _ = prompt.render_current();
-                        *last_prompt_render = Instant::now();
-                    }
-                }
-                AgentEvent::ThinkingDelta(th) => {
-                    if !tool_batch.is_empty() {
-                        clear_prompt_frame(prompt);
-                        prompt.set_running_status(None);
-                        let mut out = stdout();
-                        let _ = write!(out, "\r\x1b[2K");
-                        let _ = out.flush();
-                        render_tool_tree(tool_batch);
-                        tool_batch.clear();
-                        reset_prompt_render_state(prompt);
-                        let _ = prompt.render_current();
-                    }
-                    *output_tokens += crate::agent::tokens::estimate_text_tokens(&th) as u64;
-                }
-                AgentEvent::ToolStarted { name, args, .. } => {
-                    clear_prompt_frame(prompt);
-                    let mut out = stdout();
-                    let _ = write!(out, "\r\x1b[2K");
-                    let _ = out.flush();
-                    let active_label = parse_tool_active_label(&name, &args);
-                    let (completed_label, category) = parse_tool_info(&name, &args);
-                    *active_tool_label = Some(active_label.clone());
-                    tool_batch.push(ToolCallItem::new(name, completed_label, category));
-                    md.finish();
-                    reset_prompt_render_state(prompt);
-                    *is_thinking = true;
-                    let elapsed = start_time.elapsed();
-                    let half_periods = elapsed.as_millis() / 500;
-                    let dot = if half_periods % 2 == 0 { "• " } else { "  " };
-                    let verb = active_label.strip_prefix("• ").unwrap_or(&active_label);
-                    let status = format!(
-                        "\r\x1b[2K{}{} ({}) (↑{} ↓{})",
-                        dot,
-                        verb,
-                        format_duration_compact(elapsed),
-                        format_tokens_compact(*input_tokens),
-                        format_tokens_compact(*output_tokens)
-                    );
-                    prompt.set_running_status(Some(status));
-                    let _ = prompt.render_current();
-                }
-                AgentEvent::ToolFinished {
-                    success, output, ..
-                } => {
-                    clear_prompt_frame(prompt);
-                    let mut out = stdout();
-                    let _ = write!(out, "\r\x1b[2K");
-                    let _ = out.flush();
+    let mut handle_agent_event = |event: AgentEvent,
+                                  tool_batch: &mut Vec<ToolCallItem>,
+                                  active_tool_label: &mut Option<String>,
+                                  is_thinking: &mut bool,
+                                  output_tokens: &mut u64,
+                                  input_tokens: &mut u64,
+                                  md: &mut MarkdownRenderer,
+                                  prompt: &mut Prompt| {
+        match event {
+            AgentEvent::TextDelta(d) => {
+                clear_prompt_frame(prompt);
+                if *is_thinking {
+                    prompt.set_running_status(None);
+                    *is_thinking = false;
                     *active_tool_label = None;
-                    if let Some(item) = tool_batch.last_mut() {
-                        if !success {
-                            item.failed = true;
-                            if item.category == "command" {
-                                let cmd = item.label.strip_prefix("Ran ").unwrap_or(&item.label);
-                                let code = parse_exit_code(&output);
-                                item.label = format!("Exited {} {}", code, cmd);
-                            } else if !item.label.starts_with("Failed ") {
-                                item.label = format!("Failed {}", item.label);
-                            }
-                        }
-                    }
-                    prompt.set_running_status(None);
-                    *is_thinking = true;
-                    reset_prompt_render_state(prompt);
-                    let _ = prompt.render_current();
+                    let mut out = stdout();
+                    let _ = write!(out, "\r\x1b[2K");
+                    let _ = out.flush();
                 }
-                AgentEvent::Status(msg) => {
-                    clear_prompt_frame(prompt);
-                    if msg.contains("Waiting for model response") || !tool_batch.is_empty() {
-                        if !tool_batch.is_empty() {
-                            prompt.set_running_status(None);
-                            let mut out = stdout();
-                            let _ = write!(out, "\r\x1b[2K");
-                            let _ = out.flush();
-                            render_tool_tree(tool_batch);
-                            tool_batch.clear();
-                            reset_prompt_render_state(prompt);
-                        }
-                    }
-                    reset_prompt_render_state(prompt);
-                    let _ = prompt.render_current();
-                }
-                AgentEvent::Error(err) => {
-                    clear_prompt_frame(prompt);
-                    prompt.set_running(false);
+                if !tool_batch.is_empty() {
                     prompt.set_running_status(None);
                     let mut out = stdout();
-                    let _ = write!(out, "\r\x1b[2K\r\n\x1b[31m❌ Error: {}\x1b[0m\r\n\r\n", err);
-                    let _ = execute!(out, cursor::MoveToColumn(0));
+                    let _ = write!(out, "\r\x1b[2K");
                     let _ = out.flush();
+                    render_tool_tree(tool_batch);
+                    tool_batch.clear();
                     reset_prompt_render_state(prompt);
                 }
-                AgentEvent::Finished { usage } => {
-                    if let Some(u) = &usage {
-                        if let Some(pt) = u.get("prompt_tokens").and_then(|v| v.as_u64()) {
-                            *input_tokens = pt;
-                        }
-                        if let Some(ct) = u.get("completion_tokens").and_then(|v| v.as_u64()) {
-                            *output_tokens = ct;
-                        }
-                    }
+                *output_tokens += crate::agent::tokens::estimate_text_tokens(&d) as u64;
+                md.push(&d);
+                reset_prompt_render_state(prompt);
+                let _ = prompt.render_current();
+            }
+            AgentEvent::ThinkingDelta(th) => {
+                if !tool_batch.is_empty() {
                     clear_prompt_frame(prompt);
                     prompt.set_running_status(None);
                     let mut out = stdout();
                     let _ = write!(out, "\r\x1b[2K");
                     let _ = out.flush();
+                    render_tool_tree(tool_batch);
+                    tool_batch.clear();
+                    reset_prompt_render_state(prompt);
+                    let _ = prompt.render_current();
+                }
+                *output_tokens += crate::agent::tokens::estimate_text_tokens(&th) as u64;
+            }
+            AgentEvent::ToolStarted { name, args, .. } => {
+                clear_prompt_frame(prompt);
+                let mut out = stdout();
+                let _ = write!(out, "\r\x1b[2K");
+                let _ = out.flush();
+                let active_label = parse_tool_active_label(&name, &args);
+                let (completed_label, category) = parse_tool_info(&name, &args);
+                *active_tool_label = Some(active_label.clone());
+                tool_batch.push(ToolCallItem::new(name, completed_label, category));
+                md.finish();
+                reset_prompt_render_state(prompt);
+                *is_thinking = true;
+                let elapsed = start_time.elapsed();
+                let half_periods = elapsed.as_millis() / 500;
+                let dot = if half_periods % 2 == 0 { "• " } else { "  " };
+                let verb = active_label.strip_prefix("• ").unwrap_or(&active_label);
+                let status = format!(
+                    "\r\x1b[2K{}{} ({}) (↑{} ↓{})",
+                    dot,
+                    verb,
+                    format_duration_compact(elapsed),
+                    format_tokens_compact(*input_tokens),
+                    format_tokens_compact(*output_tokens)
+                );
+                prompt.set_running_status(Some(status));
+                let _ = prompt.render_current();
+            }
+            AgentEvent::ToolFinished {
+                success, output, ..
+            } => {
+                clear_prompt_frame(prompt);
+                let mut out = stdout();
+                let _ = write!(out, "\r\x1b[2K");
+                let _ = out.flush();
+                *active_tool_label = None;
+                if let Some(item) = tool_batch.last_mut() {
+                    if !success {
+                        item.failed = true;
+                        if item.category == "command" {
+                            let cmd = item.label.strip_prefix("Ran ").unwrap_or(&item.label);
+                            let code = parse_exit_code(&output);
+                            item.label = format!("Exited {} {}", code, cmd);
+                        } else if !item.label.starts_with("Failed ") {
+                            item.label = format!("Failed {}", item.label);
+                        }
+                    }
+                }
+                prompt.set_running_status(None);
+                *is_thinking = true;
+                reset_prompt_render_state(prompt);
+                let _ = prompt.render_current();
+            }
+            AgentEvent::Status(msg) => {
+                clear_prompt_frame(prompt);
+                if msg.contains("Waiting for model response") || !tool_batch.is_empty() {
                     if !tool_batch.is_empty() {
+                        prompt.set_running_status(None);
+                        let mut out = stdout();
+                        let _ = write!(out, "\r\x1b[2K");
+                        let _ = out.flush();
                         render_tool_tree(tool_batch);
                         tool_batch.clear();
                         reset_prompt_render_state(prompt);
                     }
-                    md.finish();
+                }
+                reset_prompt_render_state(prompt);
+                let _ = prompt.render_current();
+            }
+            AgentEvent::Error(err) => {
+                clear_prompt_frame(prompt);
+                prompt.set_running(false);
+                prompt.set_running_status(None);
+                let mut out = stdout();
+                let _ = write!(out, "\r\x1b[2K\r\n\x1b[31m❌ Error: {}\x1b[0m\r\n\r\n", err);
+                let _ = execute!(out, cursor::MoveToColumn(0));
+                let _ = out.flush();
+                reset_prompt_render_state(prompt);
+            }
+            AgentEvent::Finished { usage } => {
+                if let Some(u) = &usage {
+                    if let Some(pt) = u.get("prompt_tokens").and_then(|v| v.as_u64()) {
+                        *input_tokens = pt;
+                    }
+                    if let Some(ct) = u.get("completion_tokens").and_then(|v| v.as_u64()) {
+                        *output_tokens = ct;
+                    }
+                }
+                clear_prompt_frame(prompt);
+                prompt.set_running_status(None);
+                let mut out = stdout();
+                let _ = write!(out, "\r\x1b[2K");
+                let _ = out.flush();
+                if !tool_batch.is_empty() {
+                    render_tool_tree(tool_batch);
+                    tool_batch.clear();
                     reset_prompt_render_state(prompt);
                 }
-                _ => {}
+                md.finish();
+                reset_prompt_render_state(prompt);
             }
-        };
+            _ => {}
+        }
+    };
 
     let mut last_status_secs: Option<u64> = None;
     let mut last_status_dot_frame: Option<bool> = None;
@@ -974,7 +967,6 @@ pub async fn run_turn_ui(
                         &mut input_tokens,
                         &mut md,
                         prompt,
-                        &mut last_prompt_render,
                     );
                 }
                 clear_prompt_frame(prompt);
@@ -1010,7 +1002,6 @@ pub async fn run_turn_ui(
                     &mut input_tokens,
                     &mut md,
                     prompt,
-                    &mut last_prompt_render,
                 );
             }
         }
