@@ -24,7 +24,7 @@
 
 set -eu
 
-REPO="${FUSION_REPO:-theaungmyatmoe/fusion}"
+REPO="${FUSION_REPO:-FusionCodeAI/fusion}"
 BINARY="fusion"
 VERSION="${FUSION_VERSION:-latest}"
 
@@ -349,7 +349,16 @@ Please install Rust & Cargo (https://rustup.rs) and re-run, or build manually:
 
 # ── 2. Download Release Binary ────────────────────────────────────────────────
 if [ "$VERSION" = "latest" ]; then
-    RELEASE_API_URL="https://api.github.com/repos/${REPO}/releases/latest"
+    # Fetch first release from /releases (includes latest release even if marked prerelease)
+    LATEST_TAG=$(curl -fsSL ${CURL_AUTH} "https://api.github.com/repos/${REPO}/releases" 2>/dev/null \
+        | grep -m1 '"tag_name":' \
+        | sed -E 's/.*"tag_name": *"([^"]+)".*/\1/' || true)
+    if [ -n "$LATEST_TAG" ]; then
+        RELEASE_API_URL="https://api.github.com/repos/${REPO}/releases/tags/${LATEST_TAG}"
+        VERSION="$LATEST_TAG"
+    else
+        RELEASE_API_URL="https://api.github.com/repos/${REPO}/releases/latest"
+    fi
 else
     RELEASE_API_URL="https://api.github.com/repos/${REPO}/releases/tags/${VERSION}"
 fi
