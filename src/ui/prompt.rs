@@ -120,6 +120,14 @@ impl Prompt {
         self.models = models;
         self
     }
+    pub fn with_skill_suggestions(mut self, suggestions: Vec<SlashSuggestion>) -> Self {
+        self.skill_suggestions = suggestions;
+        self
+    }
+
+    pub fn set_skill_suggestions(&mut self, suggestions: Vec<SlashSuggestion>) {
+        self.skill_suggestions = suggestions;
+    }
 
     /// Set active model displayed in the prompt box title.
     pub fn with_model(mut self, model: impl Into<String>) -> Self {
@@ -632,7 +640,7 @@ impl Prompt {
                 let text_so_far: String = self.buffer.iter().collect();
                 let first_line = text_so_far.split('\n').next().unwrap_or("");
                 if first_line.starts_with('/') {
-                    let matches = slash_matches(first_line);
+                    let matches = slash_matches(first_line, &self.skill_suggestions);
                     if !matches.is_empty() {
                         match key.code {
                             KeyCode::Tab | KeyCode::Down => {
@@ -653,7 +661,7 @@ impl Prompt {
                                 if let Some(sel) =
                                     matches.get(self.slash_selection.min(matches.len() - 1))
                                 {
-                                    if sel.name == "/model" || sel.aliases.contains(&"/model") {
+                                    if !sel.is_skill && sel.name == "/model" {
                                         self.buffer.clear();
                                         self.cursor_pos = 0;
                                         self.model_picker_active = true;
@@ -661,7 +669,11 @@ impl Prompt {
                                         self.render_current()?;
                                         return Ok(None);
                                     }
-                                    let cmd = sel.name.to_string();
+                                    let cmd = if sel.is_skill {
+                                        format!("@skill:{}", sel.name)
+                                    } else {
+                                        sel.name.clone()
+                                    };
                                     let rest: String = text_so_far
                                         .split_once('\n')
                                         .map(|(_, r)| r.to_string())
@@ -833,7 +845,7 @@ impl Prompt {
             && !self.effort_picker_active
             && first_line.starts_with('/')
         {
-            slash_matches(first_line)
+            slash_matches(first_line, &self.skill_suggestions)
         } else {
             Vec::new()
         };
@@ -1087,8 +1099,13 @@ impl Prompt {
             write!(out, "\x1b[38;5;240m{}\x1b[0m\r\n", divider)?;
             total_lines += 1;
 
+            let has_skills = slash_suggestions.iter().any(|s| s.is_skill);
             let noun = if first_line == "/" {
-                "Commands"
+                if has_skills {
+                    "Commands & Skills"
+                } else {
+                    "Commands"
+                }
             } else {
                 "Results"
             };
@@ -1113,13 +1130,13 @@ impl Prompt {
 
             for (idx, item) in visible_items {
                 let is_selected = idx == sel;
-                let cat = slash_category_label(item.category);
+                let cat = &item.category;
                 let col1_w = 14;
                 let col3_w = 10;
                 let col2_w = term_cols.saturating_sub(col1_w + col3_w + 4);
 
-                let col1 = truncate_fit(item.name, col1_w);
-                let col2 = truncate_fit(item.description, col2_w);
+                let col1 = truncate_fit(&item.name, col1_w);
+                let col2 = truncate_fit(&item.description, col2_w);
 
                 if is_selected {
                     write!(
@@ -1247,12 +1264,12 @@ fn truncate_fit(s: &str, max_len: usize) -> String {
     }
 }
 
-fn slash_category_label(cat: crate::ui::slash::CommandCategory) -> &'static str {
+fn slash_category_label_static(cat: crate::ui::slash::CommandCategory) -> String {
     match cat {
-        crate::ui::slash::CommandCategory::Core => "General",
-        crate::ui::slash::CommandCategory::Session => "Session",
-        crate::ui::slash::CommandCategory::Model => "Model",
-        crate::ui::slash::CommandCategory::Config => "Config",
+        crate::ui::slash::CommandCategory::Core => "General".to_string(),
+        crate::ui::slash::CommandCategory::Session => "Session".to_string(),
+        crate::ui::slash::CommandCategory::Model => "Model".to_string(),
+        crate::ui::slash::CommandCategory::Config => "Config".to_string(),
     }
 }
 
@@ -1270,9 +1287,9 @@ fn model_category_label(id: &str, name: &str) -> &'static str {
 }
 
 /// Match slash commands whose name or aliases start with the typed prefix.
-fn slash_matches(typed: &str) -> Vec<&'static crate::ui::slash::CommandDescriptor> {
+fn slash_matches(typed: &str, skills: &[SlashSuggestion]) -> Vec<SlashSuggestion> {
     let query = typed.trim_start().to_lowercase();
-    crate::ui::slash::COMMAND_PALETTE
+    let mut results: Vec<SlashSuggestion> = crate::ui::slash::COMMAND_PALETTE
         .iter()
         .filter(|d| {
             d.name.to_lowercase().starts_with(&query)
@@ -1280,8 +1297,24 @@ fn slash_matches(typed: &str) -> Vec<&'static crate::ui::slash::CommandDescripto
                     .iter()
                     .any(|a| a.to_lowercase().starts_with(&query))
         })
-        .take(8)
-        .collect()
+        .map(|d| SlashSuggestion {
+            name: d.name.to_string(),
+            description: d.description.to_string(),
+            category: slash_category_label_static(d.category),
+            is_skill: false,
+        })
+        .collect();
+    // Add matching skills
+    let skill_query = query.strip_prefix('/').unwrap_or(&query);
+    for s in skills {
+        if s.name.to_lowercase().starts_with(skill_query)
+            || s.name.to_lowercase().contains(skill_query)
+        {
+            results.push(s.clone());
+        }
+    }
+    results.truncate(8);
+    results
 }
 
 /// Calculate visible character width by ignoring ANSI escape codes.
@@ -1463,28 +1496,51 @@ mod tests {
     #[test]
     fn test_slash_matches_filters_by_prefix() {
         // "/hel" should match "/help"
-        let m = slash_matches("/hel");
+        let m = slash_matches("/hel", &[]);
         assert!(!m.is_empty());
         assert!(m.iter().any(|d| d.name == "/help"));
 
         // "/mo" should match "/model"
-        let m = slash_matches("/mo");
+        let m = slash_matches("/mo", &[]);
         assert!(m.iter().any(|d| d.name == "/model"));
 
         // Unknown prefix -> no matches
-        assert!(slash_matches("/zzz-nope").is_empty());
+        assert!(slash_matches("/zzz-nope", &[]).is_empty());
     }
 
     #[test]
     fn test_slash_matches_respects_alias() {
         // "/pal" is an alias of "/palette"
-        let m = slash_matches("/pal");
+        let m = slash_matches("/pal", &[]);
         assert!(m.iter().any(|d| d.name == "/palette"));
     }
 
     #[test]
     fn test_slash_matches_case_insensitive() {
-        assert!(slash_matches("/HEL").iter().any(|d| d.name == "/help"));
+        assert!(slash_matches("/HEL", &[]).iter().any(|d| d.name == "/help"));
+    }
+
+    #[test]
+    fn test_slash_matches_with_skills() {
+        let skills = vec![
+            SlashSuggestion {
+                name: "commit".to_string(),
+                description: "Generate Git commit message".to_string(),
+                category: "Skill".to_string(),
+                is_skill: true,
+            },
+            SlashSuggestion {
+                name: "review".to_string(),
+                description: "Code review".to_string(),
+                category: "Skill".to_string(),
+                is_skill: true,
+            },
+        ];
+        let m = slash_matches("/com", &skills);
+        assert!(m.iter().any(|s| s.name == "commit" && s.is_skill));
+
+        let m2 = slash_matches("/rev", &skills);
+        assert!(m2.iter().any(|s| s.name == "review" && s.is_skill));
     }
 
     #[test]

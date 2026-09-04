@@ -12,7 +12,7 @@ use std::time::Instant;
 use crate::agent::{AgentEvent, AgentRunner, Session};
 use crate::config::Config;
 use crate::ui::markdown::MarkdownRenderer;
-use crate::ui::prompt::{Prompt, PromptResult};
+use crate::ui::prompt::{Prompt, PromptResult, SlashSuggestion};
 
 pub fn print_banner(_config: &Config) {}
 
@@ -845,6 +845,7 @@ pub async fn run_turn_ui(
                     }
                 }
                 clear_prompt_frame(prompt);
+                prompt.set_running(false);
                 prompt.set_running_status(None);
                 let mut out = stdout();
                 let _ = write!(out, "\r\x1b[2K");
@@ -867,6 +868,9 @@ pub async fn run_turn_ui(
     loop {
         tokio::select! {
             _ = ticker.tick() => {
+                if !prompt.is_running() {
+                    continue;
+                }
                 let elapsed = start_time.elapsed();
                 let current_secs = elapsed.as_secs();
                 let half_periods = elapsed.as_millis() / 500;
@@ -1020,9 +1024,21 @@ pub async fn run_repl_with_session(
 ) -> anyhow::Result<()> {
     let mut session =
         initial_session.unwrap_or_else(|| Session::new(&runner.config().default_model));
+    let skill_suggestions: Vec<SlashSuggestion> = runner
+        .skills()
+        .list_enabled()
+        .iter()
+        .map(|s| SlashSuggestion {
+            name: s.name().to_string(),
+            description: s.description().to_string(),
+            category: "Skill".to_string(),
+            is_skill: true,
+        })
+        .collect();
     let mut prompt = Prompt::new()
         .with_model(session.active_model())
-        .with_models(model_picker_list(&crate::provider::catalog::get_catalog()));
+        .with_models(model_picker_list(&crate::provider::catalog::get_catalog()))
+        .with_skill_suggestions(skill_suggestions);
 
     // Clear terminal screen and place cursor at top left (clean startup like fx)
     let _ = execute!(
@@ -1119,6 +1135,19 @@ pub async fn run_repl_with_session(
             }
             prompt.set_model(session.active_model());
             runner.config_mut().default_model = session.active_model().to_string();
+            // Refresh skill suggestions (e.g. after /skills reload/enable/disable)
+            let refreshed: Vec<SlashSuggestion> = runner
+                .skills()
+                .list_enabled()
+                .iter()
+                .map(|s| SlashSuggestion {
+                    name: s.name().to_string(),
+                    description: s.description().to_string(),
+                    category: "Skill".to_string(),
+                    is_skill: true,
+                })
+                .collect();
+            prompt.set_skill_suggestions(refreshed);
             clear_prompt_frame(&mut prompt);
             continue;
         }
