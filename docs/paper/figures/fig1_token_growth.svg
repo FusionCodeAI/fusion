@@ -1,0 +1,82 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 680 320" width="100%" height="100%">
+  <style>
+    .title { font-family: "Times New Roman", serif; font-size: 14px; font-weight: bold; fill: #000; text-anchor: middle; }
+    .axis { stroke: #333; stroke-width: 1.2; }
+    .grid { stroke: #e5e5e5; stroke-dasharray: 3,3; stroke-width: 0.8; }
+    .label { font-family: "Times New Roman", serif; font-size: 11px; fill: #444; }
+    .axis-label { font-family: "Times New Roman", serif; font-size: 12px; font-style: italic; fill: #111; }
+    .legend { font-family: "Times New Roman", serif; font-size: 11px; fill: #222; }
+    .line-append { stroke: #dc2626; stroke-width: 2.5; fill: none; }
+    .line-summarize { stroke: #f59e0b; stroke-width: 2; stroke-dasharray: 4,3; fill: none; }
+    .line-fusion { stroke: #16a34a; stroke-width: 3; fill: none; }
+  </style>
+
+  <!-- Title -->
+  <text x="340" y="24" class="title">Figure 1: Context Window Growth across 50 Agent Steps</text>
+
+  <!-- Axes & Grid -->
+  <!-- Y Grid: 0, 20k, 40k, 60k, 80k, 100k -->
+  <line x1="70" y1="260" x2="630" y2="260" class="axis" />
+  <line x1="70" y1="50" x2="70" y2="260" class="axis" />
+
+  <line x1="70" y1="220" x2="630" y2="220" class="grid" />
+  <text x="62" y="224" class="label" text-anchor="end">20k</text>
+
+  <line x1="70" y1="180" x2="630" y2="180" class="grid" />
+  <text x="62" y="184" class="label" text-anchor="end">40k</text>
+
+  <line x1="70" y1="140" x2="630" y2="140" class="grid" />
+  <text x="62" y="144" class="label" text-anchor="end">60k</text>
+
+  <line x1="70" y1="100" x2="630" y2="100" class="grid" />
+  <text x="62" y="104" class="label" text-anchor="end">80k</text>
+
+  <line x1="70" y1="60" x2="630" y2="60" class="grid" />
+  <text x="62" y="64" class="label" text-anchor="end">100k</text>
+  <text x="62" y="264" class="label" text-anchor="end">0</text>
+
+  <!-- X Labels: Step 1, 10, 20, 30, 40, 50 -->
+  <text x="70" y="278" class="label" text-anchor="middle">1</text>
+  <text x="180" y="278" class="label" text-anchor="middle">10</text>
+  <text x="290" y="278" class="label" text-anchor="middle">20</text>
+  <text x="400" y="278" class="label" text-anchor="middle">30</text>
+  <text x="510" y="278" class="label" text-anchor="middle">40</text>
+  <text x="620" y="278" class="label" text-anchor="middle">50</text>
+
+  <text x="350" y="302" class="axis-label" text-anchor="middle">Agent Execution Step (Turn t)</text>
+  <text x="25" y="155" class="axis-label" text-anchor="middle" transform="rotate(-90 25 155)">Prompt Tokens len(Ct)</text>
+
+  <!-- Append-Only Curve: quadratic rise from 2k up to 90k -->
+  <!-- t=1: 70,256; t=10: 180,230; t=20: 290,195; t=30: 400,150; t=40: 510,105; t=50: 620,68 -->
+  <path d="M 70 256 Q 300 220, 620 72" class="line-append" />
+
+  <!-- Summarization baseline: stepped growth with saw-tooth degradation -->
+  <path d="M 70 256 L 200 230 L 210 245 L 340 210 L 350 230 L 480 185 L 490 215 L 620 165" class="line-summarize" />
+
+  <!-- Fusion Bounded State O(1): Flat line between 1,800 and 2,100 tokens -->
+  <!-- 2,000 tokens on scale (260 - 2000/100000*200) = 256 -->
+  <line x1="70" y1="256" x2="620" y2="255" class="line-fusion" />
+
+  <!-- Dots on Fusion line -->
+  <circle cx="70" cy="256" r="3.5" fill="#16a34a" />
+  <circle cx="290" cy="256" r="3.5" fill="#16a34a" />
+  <circle cx="620" cy="255" r="3.5" fill="#16a34a" />
+
+  <!-- Legend -->
+  <g transform="translate(85, 65)">
+    <rect x="0" y="0" width="225" height="75" fill="#ffffff" stroke="#ccc" stroke-width="0.8" rx="4" />
+    <line x1="12" y1="18" x2="36" y2="18" class="line-append" />
+    <text x="44" y="22" class="legend">Append-Only Baselines ($\mathcal{O}(T^2)$)</text>
+
+    <line x1="12" y1="38" x2="36" y2="38" class="line-summarize" />
+    <text x="44" y="42" class="legend">Lossy Summarization Compaction</text>
+
+    <line x1="12" y1="58" x2="36" y2="58" class="line-fusion" />
+    <circle cx="24" cy="58" r="3" fill="#16a34a" />
+    <text x="44" y="62" class="legend" font-weight="bold">Fusion SKILL.state ($\mathcal{O}(1)$ Bounded)</text>
+  </g>
+
+  <!-- Callout Annotations -->
+  <text x="618" y="60" class="label" fill="#dc2626" font-weight="bold" text-anchor="end">Claude Code / OpenCode: 94,500 tokens</text>
+  <text x="618" y="244" class="label" fill="#16a34a" font-weight="bold" text-anchor="end">Fusion: 2,080 tokens (Flat $\mathcal{O}(1)$)</text>
+</svg>

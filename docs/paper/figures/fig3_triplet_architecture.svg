@@ -1,0 +1,69 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 680 280" width="100%" height="100%">
+  <style>
+    .title { font-family: "Times New Roman", serif; font-size: 14px; font-weight: bold; fill: #000; text-anchor: middle; }
+    .box { fill: #fafafa; stroke: #222; stroke-width: 1.2; rx: 6; }
+    .box-p { fill: #f0fdf4; stroke: #16a34a; stroke-width: 1.5; rx: 6; }
+    .box-sigma { fill: #eff6ff; stroke: #2563eb; stroke-width: 1.5; rx: 6; }
+    .box-obs { fill: #fefce8; stroke: #ca8a04; stroke-width: 1.5; rx: 6; }
+    .box-discard { fill: #fef2f2; stroke: #dc2626; stroke-width: 1.2; stroke-dasharray: 4,3; rx: 6; }
+    .box-text { font-family: "Times New Roman", serif; font-size: 11px; fill: #111; text-anchor: middle; }
+    .header-text { font-family: "Times New Roman", serif; font-size: 12px; font-weight: bold; text-anchor: middle; }
+    .arrow { stroke: #333; stroke-width: 1.4; fill: none; marker-end: url(#arrowhead); }
+    .label { font-family: "Times New Roman", serif; font-size: 10px; fill: #555; }
+  </style>
+
+  <defs>
+    <marker id="arrowhead" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto">
+      <polygon points="0 0, 8 3, 0 6" fill="#333" />
+    </marker>
+  </defs>
+
+  <text x="340" y="24" class="title">Figure 3: Fusion &lt;P, Sigma_t, O_t&gt; Triplet Assembly and State Patch Cycle</text>
+
+  <!-- Step t Container -->
+  <!-- Box P: Immutable Prefix -->
+  <rect x="40" y="55" width="160" height="90" class="box-p" />
+  <text x="120" y="78" class="header-text" fill="#15803d">Prefix P (Immutable)</text>
+  <text x="120" y="98" class="box-text">Tool Contracts &amp; Specs</text>
+  <text x="120" y="116" class="box-text">Deterministic Byte 0</text>
+  <text x="120" y="132" class="box-text" font-weight="bold" fill="#15803d">100% Warm KV-Cache Hit</text>
+
+  <!-- Plus -->
+  <text x="215" y="105" font-family="Times New Roman" font-size="18" font-weight="bold" fill="#666" text-anchor="middle">+</text>
+
+  <!-- Box Sigma: Structured State -->
+  <rect x="230" y="55" width="170" height="90" class="box-sigma" />
+  <text x="315" y="78" class="header-text" fill="#1d4ed8">State &Sigma;_t (Bounded)</text>
+  <text x="315" y="98" class="box-text">Active Targets &amp; Phase</text>
+  <text x="315" y="116" class="box-text">Resolved Bug Identifiers</text>
+  <text x="315" y="132" class="box-text" font-weight="bold" fill="#1d4ed8">Canonical JSON Schema</text>
+
+  <!-- Plus -->
+  <text x="415" y="105" font-family="Times New Roman" font-size="18" font-weight="bold" fill="#666" text-anchor="middle">+</text>
+
+  <!-- Box Observation: Immediate Tool Result -->
+  <rect x="430" y="55" width="170" height="90" class="box-obs" />
+  <text x="515" y="78" class="header-text" fill="#a16207">Observation O_t</text>
+  <text x="515" y="98" class="box-text">Immediate Step Output</text>
+  <text x="515" y="116" class="box-text">Compiler Error / Diff</text>
+  <text x="515" y="132" class="box-text" font-weight="bold" fill="#a16207">Prior O_{1..t-1} Purged</text>
+
+  <!-- Arrow down to LLM Inference -->
+  <path d="M 315 145 L 315 180" class="arrow" />
+  <text x="325" y="168" class="label">Assemble Prompt C_t</text>
+
+  <!-- Model Inference Box -->
+  <rect x="180" y="180" width="270" height="40" class="box" />
+  <text x="315" y="205" class="header-text">LLM Inference (DeepSeek / Claude / vLLM)</text>
+
+  <!-- Output bifurcation -->
+  <!-- Left: Reasoning trace discarded -->
+  <path d="M 230 220 L 140 240" class="arrow" />
+  <rect x="50" y="240" width="180" height="32" class="box-discard" />
+  <text x="140" y="258" class="box-text" fill="#b91c1c" font-weight="bold">Reasoning r_t: Discarded</text>
+
+  <!-- Right: Delta State Patch applied -->
+  <path d="M 400 220 L 490 240" class="arrow" />
+  <rect x="410" y="240" width="220" height="32" class="box-sigma" />
+  <text x="520" y="258" class="box-text" fill="#1d4ed8" font-weight="bold">State Patch &Delta;&Sigma;_t: &Sigma;_{t+1} = &Sigma;_t &oplus; &Delta;&Sigma;</text>
+</svg>

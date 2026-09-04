@@ -1,0 +1,14 @@
+\section{Discussion, Related Work, \& Conclusion}
+\label{sec:conclusion}
+
+\subsection{Related Work}
+\noindent\textbf{Agent Context Management}:
+Prior attempts to manage context expansion in autonomous coding harnesses rely on two heuristics: (1) \emph{Sliding-window truncation}, which evicts older turns once context budgets are exceeded, and (2) \emph{Summarization compaction}, which invokes a secondary LLM call to condense historical dialogue. Both heuristics suffer from critical relational failures: sliding windows evict initial problem constraints, while summarization introduces semantic drift and loss of exact compiler logs. Fusion builds upon the SKILL.state foundation proposed by Badhe et al., proving that explicit state transitions outperform lossy conversational summarization in software engineering domains.
+
+\noindent\textbf{Edge & Mobile Developer Tooling}:
+Termux and mobile coding environments have historically been relegated to manual script execution or simple text editing due to the memory footprint of modern IDEs. Recent containerized solutions (e.g., Code-server, Gitpod) offload execution to remote cloud VMs but require continuous high-bandwidth internet connections and paid cloud hosting. Fusion is the first autonomous agent harness capable of executing long-horizon, 100-step refactoring workflows locally on mobile hardware within a 20~MB memory budget.
+
+\subsection{Ethical Considerations \& Commercial Viability}
+Ad-supported platforms attempt to subsidize quadratic token costs by injecting commercial advertisements into terminal outputs and compiler logs. This business model is economically fragile: display ads yield \$5--\$15 CPM (\$0.005--\$0.015 per view), whereas a 50-step quadratic agent task costs \$0.40--\$1.00 in LLM compute. By bounding per-step context to $\mathcal{O}(1)$ tokens, Fusion reduces per-task inference costs by $14.8\times$, enabling sustainable prepaid or pay-as-you-go micro-pricing without compromising developer trust or injecting intrusive advertisements.
+\subsection{Conclusion}
+We presented Fusion, a pure-Rust autonomous coding agent harness engineered for constrained devices. By replacing conversational append-only history with an explicit structured state triplet $\langle P, \Sigma_t, O_t \rangle$, Fusion achieves constant $\mathcal{O}(1)$ prompt token boundedness, sub-12ms startup times, and sub-20MB resident memory footprint. Our evaluations demonstrate that Fusion enables high-accuracy autonomous coding on Android/Termux AArch64 and in-browser WebAssembly without Low Memory Killer aborts, while slashing inference token consumption by $14.8\times$. Fusion establishes that AI agent harnesses do not require heavy workstation infrastructure to perform complex software engineering.

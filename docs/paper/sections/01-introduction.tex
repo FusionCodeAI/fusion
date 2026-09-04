@@ -1,0 +1,30 @@
+\section{Introduction}
+\label{sec:intro}
+
+The emergence of autonomous Large Language Model (LLM) agents has transformed software engineering. Modern tools autonomously explore repositories, run test suites, resolve build failures, and refactor codebases. However, existing commercial and open-source agents—such as Claude Code, Aider, and OpenCode—are built on an unspoken infrastructure assumption: that developers operate on unconstrained, high-end workstations with high-bandwidth network connectivity and multi-gigabyte memory budgets.
+
+In reality, an increasing share of modern engineering takes place on \textbf{resource-constrained devices}:
+\begin{enumerate}
+    \item \textbf{Mobile Workstations (Android / Termux AArch64)}: Developers in emerging software hubs and on-call engineers increasingly leverage high-performance ARM64 smartphones and tablets as primary or portable development environments.
+    \item \textbf{Edge Single-Board Computers (SBCs)}: Raspberry Pi 5, Rockchip RK3588, and localized embedded gateways managing automated CI/CD nodes under tight thermal and RAM constraints.
+    \item \textbf{Sandboxed Browser Environments (WebAssembly)}: Web-based IDEs and zero-setup playground environments executing inside 32-bit wasm linear memory ceilings.
+\end{enumerate}
+
+When conventional agent runtimes are deployed to constrained platforms, they experience catastrophic failure modes rooted in two architectural liabilities:
+
+\subsection{The Quadratic Token Death Spiral}
+Conventional harnesses accumulate all conversational interactions—including terminal outputs, stack traces, compiler logs, and intermediate reasoning—into an append-only message array. Over a multi-step task spanning $T$ turns, the cumulative tokens transmitted and processed scale quadratically as $\mathcal{O}(T^2)$. 
+
+On an Android mobile device connected via cellular data, an agent executing turn 40 must upload over 80,000 tokens (hundreds of kilobytes of payload) across high-latency radio interfaces. This creates excessive latency, rapid battery depletion, and high thermal throttling. More critically, when local memory consumption climbs past system thresholds, the Android kernel's \textbf{Low Memory Killer (LMK)} terminates the terminal process mid-task, destroying uncommitted workspace progress.
+
+\subsection{Heavyweight Runtime and C-Dependency Friction}
+Most modern agent harnesses are written in Python or Node.js/TypeScript. These ecosystems rely on dynamic runtime overhead ($250\text{--}800\text{ MB}$ of resident memory) and link against external C shared libraries (such as OpenSSL, glibc, and native node-gyp bindings). On Android, standard glibc is absent, replaced by the Bionic libc. Consequently, compiling and executing conventional harnesses on Termux requires fragile proot Linux emulation layers, which introduce 200--400\% execution latency penalties and frequent ABI crashes.
+
+\subsection{Our Contribution: Fusion}
+To solve these constraints, we present \textbf{Fusion}, a lightweight, high-performance coding agent harness engineered from the ground up for resource-constrained platforms while scaling symmetrically to cloud environments:
+\begin{itemize}
+    \item \textbf{Constrained-First Native Engine}: Written in pure asynchronous Rust with zero C dependencies. Using pure-Rust TLS (\texttt{rustls}) and asynchronous Tokio I/O, Fusion compiles natively to a single static 6.8~MB binary for \texttt{aarch64-linux-android} and \texttt{wasm32-unknown-unknown}.
+    \item \textbf{Bounded Explicit State Runtime ($\mathcal{O}(1)$ Prompts)}: Drawing upon the SKILL.state theoretical model, Fusion decouples agent reasoning from context accumulation. By transmitting an immutable prefix $P$, a canonical execution state $\Sigma_t$, and the latest environment observation $O_t$, prompt size remains strictly constant ($<1.2\times$ over 50 turns vs. $48\times$ baseline growth).
+    \item \textbf{Deterministic Edge Prefix Caching}: By guaranteeing bitwise invariance of the leading prefix $P$ across turns, Fusion achieves $>84\%$ prompt cache hit rates on modern transformer gateways (DeepSeek, Claude, vLLM), slashing Time-to-First-Token (TTFT) from 3,800~ms to $<250$~ms on mobile networks.
+    \item \textbf{Comprehensive Constrained Benchmarks}: We provide the first rigorous empirical evaluation of an autonomous agent operating on native mobile hardware (Android/Termux AArch64) and in-browser WASM, measuring memory consumption, cellular bandwidth efficiency, and task completion rates.
+\end{itemize}

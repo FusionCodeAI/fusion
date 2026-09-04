@@ -1,0 +1,84 @@
+\documentclass[10pt,journal,compsoc]{IEEEtran}
+
+\usepackage{amsmath,amssymb,amsfonts}
+\usepackage{algorithmic}
+\usepackage{graphicx}
+\usepackage{textcomp}
+\usepackage{xcolor}
+\usepackage{booktabs}
+\usepackage{multirow}
+\usepackage{url}
+\usepackage{listings}
+\usepackage{cite}
+
+\lstset{
+  basicstyle=\ttfamily\scriptsize,
+  breaklines=true,
+  frame=single,
+  columns=fullflexible
+}
+
+\begin{document}
+
+\title{Ubiquitous Autonomous Coding Agents for Constrained Devices via Bounded Explicit State and Zero-C Native Runtimes}
+
+\author{Aung~Myat~Moe~and~Fusion~Code~AI
+\thanks{Correspondence: Aung Myat Moe (aungmyatmoe834@gmail.com). Code and benchmarks available at: \url{https://github.com/FusionCodeAI/fusion}.}}
+
+\IEEEtitleabstractindextext{
+\begin{abstract}
+State-of-the-art AI coding assistants (e.g., Claude Code, Cursor, OpenCode) rely on conversational append-only history accumulation, resulting in quadratic $\mathcal{O}(T^2)$ cumulative token growth over $T$ interaction steps. While tolerable on high-end developer workstations, this design triggers severe execution failures on resource-constrained platforms—including Android devices running Termux (AArch64), embedded SBCs, and browser-sandboxed WebAssembly runtimes. On mobile hardware, quadratic prompt expansion incurs massive cellular bandwidth overhead, elevated battery drain, and process termination by operating system Low Memory Killers (LMK). Furthermore, dependencies on heavyweight Node.js runtimes, C shared libraries (OpenSSL, glibc), and Python packages preclude native cross-compilation on mobile operating systems without emulation overhead.
+
+We present \textbf{Fusion}, an open-source, sub-10ms native coding agent architecture explicitly designed for constrained devices while scaling symmetrically to desktop and cloud sandbox environments. Fusion decouples agent reasoning from context accumulation via an immutable prefix, explicit structured execution state, and immediate observation triplet $\langle P, \Sigma_t, O_t \rangle$. By discarding intermediate reasoning traces while maintaining a canonical JSON state patch $\Delta\Sigma_t$, Fusion bounds per-step prompt size to $\mathcal{O}(1)$ tokens. Written in pure asynchronous Rust with zero C dependencies and pure-Rust TLS, Fusion compiles natively to static binaries for Android/Termux AArch64 and wasm32. In long-horizon 50-step refactoring benchmarks on mobile hardware, Fusion maintains constant per-step prompt sizes ($<1.2\times$ growth vs. $48\times$ for append-only baselines), reduces cumulative token consumption by $14.8\times$, eliminates LMK process terminations, and keeps resident memory under 22~MB with cold start times under 12~ms.
+\end{abstract}
+
+\begin{IEEEkeywords}
+Autonomous Agents, Software Engineering, Mobile Computing, Edge AI, WebAssembly, Termux, Prompt Optimization, Prefix Caching.
+\end{IEEEkeywords}}
+
+\maketitle
+\IEEEdisplaynontitleabstractindextext
+\IEEEpeerreviewmaketitle
+
+\input{sections/01-introduction}
+\input{sections/02-formalism}
+\input{sections/03-architecture}
+\input{sections/04-benchmarks}
+\input{sections/05-discussion}
+
+\bibliographystyle{IEEEtran}
+\begin{thebibliography}{10}
+
+\bibitem{skillstate}
+S.~Badhe, P.~Tiwari, and J.~Chung,
+``SKILL.state: Scalable Long-Horizon Agent Skills,''
+\emph{arXiv preprint arXiv:2608.26263}, 2026.
+
+\bibitem{swebench}
+C.~E.~Jimenez, J.~Yang, A.~Wettig, S.~Yao, K.~Pei, O.~Press, and N.~Narasimhan,
+``SWE-bench: Can Language Models Resolve Real-World GitHub Issues?''
+in \emph{Proc. ICLR}, 2024.
+
+\bibitem{vllm}
+W.~Kwon, Z.~Li, S.~Zhuang, Y.~Sheng, L.~Zheng, C.~H.~Yu, J.~E.~Gonzalez, H.~Zhang, and I.~Stoica,
+``Efficient Memory Management for Large Language Model Serving with PagedAttention,''
+in \emph{Proc. ACM SOSP}, 2023.
+
+\bibitem{deepseekv3}
+DeepSeek-AI,
+``DeepSeek-V3 Technical Report,''
+\emph{arXiv preprint arXiv:2412.19437}, 2024.
+
+\bibitem{rustls}
+J.~Birkett,
+``Rustls: A modern, safe TLS library in Rust,''
+\emph{GitHub repository}, 2025.
+
+\bibitem{tokio}
+Tokio Contributors,
+``Tokio: An Asynchronous Runtime for the Rust Programming Language,''
+\url{https://tokio.rs}, 2025.
+
+\end{thebibliography}
+
+\end{document}

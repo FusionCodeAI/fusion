@@ -1,0 +1,66 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 680 300" width="100%" height="100%">
+  <style>
+    .title { font-family: "Times New Roman", serif; font-size: 14px; font-weight: bold; fill: #000; text-anchor: middle; }
+    .axis { stroke: #333; stroke-width: 1.2; }
+    .grid { stroke: #e5e5e5; stroke-dasharray: 3,3; stroke-width: 0.8; }
+    .label { font-family: "Times New Roman", serif; font-size: 11px; fill: #444; }
+    .axis-label { font-family: "Times New Roman", serif; font-size: 12px; font-style: italic; fill: #111; }
+    .legend { font-family: "Times New Roman", serif; font-size: 11px; fill: #222; }
+    .bar-claude { fill: #ef4444; }
+    .bar-aider { fill: #f97316; }
+    .bar-opencode { fill: #eab308; }
+    .bar-fusion { fill: #16a34a; }
+    .val-label { font-family: "Times New Roman", serif; font-size: 10px; font-weight: bold; text-anchor: middle; }
+  </style>
+
+  <text x="340" y="24" class="title">Figure 2: Peak Resident RAM (RSS) on Native Android / Termux AArch64</text>
+
+  <!-- Axes & Grid: Max 900 MB -->
+  <line x1="60" y1="240" x2="630" y2="240" class="axis" />
+  <line x1="60" y1="45" x2="60" y2="240" class="axis" />
+
+  <line x1="60" y1="195" x2="630" y2="195" class="grid" />
+  <text x="52" y="199" class="label" text-anchor="end">200 MB</text>
+
+  <line x1="60" y1="150" x2="630" y2="150" class="grid" />
+  <text x="52" y="154" class="label" text-anchor="end">400 MB</text>
+
+  <line x1="60" y1="105" x2="630" y2="105" class="grid" />
+  <text x="52" y="109" class="label" text-anchor="end">600 MB</text>
+
+  <line x1="60" y1="60" x2="630" y2="60" class="grid" />
+  <text x="52" y="64" class="label" text-anchor="end">800 MB</text>
+  <text x="52" y="244" class="label" text-anchor="end">0</text>
+
+  <!-- LMK Danger Zone (Threshold > 500 MB) -->
+  <rect x="60" y="60" width="570" height="68" fill="#fee2e2" opacity="0.4" />
+  <line x1="60" y1="128" x2="630" y2="128" stroke="#dc2626" stroke-dasharray="4,4" stroke-width="1.2" />
+  <text x="620" y="122" class="label" fill="#dc2626" font-weight="bold" text-anchor="end">Android LMK Kill Threshold (500 MB)</text>
+
+  <!-- Bars: 4 Categories: Claude Code, Aider, OpenCode, Fusion -->
+  <!-- 1. Claude Code: 680 MB -> height = 680/800 * 180 = 153px. y = 240 - 153 = 87 -->
+  <rect x="110" y="87" width="70" height="153" class="bar-claude" rx="3" />
+  <text x="145" y="78" class="val-label" fill="#dc2626">680 MB</text>
+  <text x="145" y="256" class="label" text-anchor="middle">Claude Code</text>
+  <text x="145" y="270" class="label" text-anchor="middle" fill="#dc2626">(3/5 Kills)</text>
+
+  <!-- 2. Aider: 520 MB -> height = 520/800 * 180 = 117px. y = 240 - 117 = 123 -->
+  <rect x="240" y="123" width="70" height="117" class="bar-aider" rx="3" />
+  <text x="275" y="114" class="val-label" fill="#d97706">520 MB</text>
+  <text x="275" y="256" class="label" text-anchor="middle">Aider</text>
+  <text x="275" y="270" class="label" text-anchor="middle" fill="#d97706">(1/5 Kills)</text>
+
+  <!-- 3. OpenCode: 810 MB -> height = 810/800 * 180 = 182px. y = 240 - 182 = 58 -->
+  <rect x="370" y="58" width="70" height="182" class="bar-opencode" rx="3" />
+  <text x="405" y="49" class="val-label" fill="#ca8a04">810 MB</text>
+  <text x="405" y="256" class="label" text-anchor="middle">OpenCode</text>
+  <text x="405" y="270" class="label" text-anchor="middle" fill="#ca8a04">(4/5 Kills)</text>
+
+  <!-- 4. Fusion: 28.5 MB -> height = 28.5/800 * 180 = 6.4px. y = 240 - 6.4 = 233.6 -->
+  <rect x="500" y="233" width="70" height="7" class="bar-fusion" rx="2" />
+  <text x="535" y="224" class="val-label" fill="#16a34a">28.5 MB</text>
+  <text x="535" y="256" class="label" text-anchor="middle" font-weight="bold">Fusion (Ours)</text>
+  <text x="535" y="270" class="label" text-anchor="middle" fill="#16a34a" font-weight="bold">(0 Kills · 100% OK)</text>
+
+  <text x="20" y="145" class="axis-label" text-anchor="middle" transform="rotate(-90 20 145)">Peak Resident RAM (MB)</text>
+</svg>
