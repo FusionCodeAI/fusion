@@ -1156,12 +1156,20 @@ impl Prompt {
             write!(out, "\r\n")?;
             total_lines += 1;
 
+            // Compute col1 width dynamically based on longest visible name
+            let col1_w = visible_items
+                .iter()
+                .map(|(_, item)| UnicodeWidthStr::width(item.name.as_str()))
+                .max()
+                .unwrap_or(14)
+                .max(14)
+                .min(term_cols.saturating_sub(20));
+            let col3_w = 10;
+            let col2_w = term_cols.saturating_sub(col1_w + col3_w + 4);
+
             for (idx, item) in visible_items {
                 let is_selected = idx == sel;
                 let cat = &item.category;
-                let col1_w = 14;
-                let col3_w = 10;
-                let col2_w = term_cols.saturating_sub(col1_w + col3_w + 4);
 
                 let col1 = truncate_fit(&item.name, col1_w);
                 let col2 = truncate_fit(&item.description, col2_w);

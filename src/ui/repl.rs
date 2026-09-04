@@ -99,8 +99,9 @@ pub fn format_activity_status(
     let elapsed_str = format_duration_compact(elapsed);
     let in_str = format_tokens_compact(in_tokens);
     let out_str = format_tokens_compact(out_tokens);
-    let half_periods = elapsed.as_millis() / 500;
-    let dot = if half_periods % 2 == 0 { "• " } else { "  " };
+    let frames = crate::ui::spinner::BRAILLE_FRAMES;
+    let frame_idx = (elapsed.as_millis() / 80) as usize % frames.len();
+    let dot = format!("{} ", frames[frame_idx]);
     let raw = if status_text.is_empty() {
         "Running"
     } else {
@@ -153,8 +154,9 @@ pub fn render_thinking_frame_to<W: std::io::Write>(
     let elapsed_str = format_duration_compact(elapsed);
     let in_str = format_tokens_compact(in_tokens);
     let out_str = format_tokens_compact(out_tokens);
-    let half_periods = elapsed.as_millis() / 500;
-    let dot = if half_periods % 2 == 0 { "• " } else { "  " };
+    let frames = crate::ui::spinner::BRAILLE_FRAMES;
+    let frame_idx = (elapsed.as_millis() / 80) as usize % frames.len();
+    let dot = format!("{} ", frames[frame_idx]);
     let raw = if status_text.is_empty() {
         "Running"
     } else {
@@ -770,8 +772,9 @@ pub async fn run_turn_ui(
                 reset_prompt_render_state(prompt);
                 *is_thinking = true;
                 let elapsed = start_time.elapsed();
-                let half_periods = elapsed.as_millis() / 500;
-                let dot = if half_periods % 2 == 0 { "• " } else { "  " };
+                let frames = crate::ui::spinner::BRAILLE_FRAMES;
+                let frame_idx = (elapsed.as_millis() / 80) as usize % frames.len();
+                let dot = format!("{} ", frames[frame_idx]);
                 let verb = active_label.strip_prefix("• ").unwrap_or(&active_label);
                 let status = format!(
                     "\r\x1b[2K{}{} ({}) (↑{} ↓{})",
@@ -863,7 +866,7 @@ pub async fn run_turn_ui(
     };
 
     let mut last_status_secs: Option<u64> = None;
-    let mut last_status_dot_frame: Option<bool> = None;
+    let mut last_status_dot_frame: Option<usize> = None;
 
     loop {
         tokio::select! {
@@ -873,10 +876,11 @@ pub async fn run_turn_ui(
                 }
                 let elapsed = start_time.elapsed();
                 let current_secs = elapsed.as_secs();
-                let half_periods = elapsed.as_millis() / 500;
-                let dot_frame = half_periods % 2 == 0;
+                let frames = crate::ui::spinner::BRAILLE_FRAMES;
+                let frame_idx = (elapsed.as_millis() / 80) as usize % frames.len();
+                let dot_frame = frame_idx;
 
-                // Debounce: only re-render if elapsed second changed or dot frame changed
+                // Debounce: only re-render if elapsed second changed or spinner frame changed
                 if prompt.running_status.is_some()
                     && last_status_secs == Some(current_secs)
                     && last_status_dot_frame == Some(dot_frame)
@@ -886,7 +890,7 @@ pub async fn run_turn_ui(
                 last_status_secs = Some(current_secs);
                 last_status_dot_frame = Some(dot_frame);
 
-                let dot = if dot_frame { "• " } else { "  " };
+                let dot = format!("{} ", frames[frame_idx]);
                 let verb = if is_thinking {
                     match active_tool_label.as_deref() {
                         Some(label) => label.strip_prefix("• ").unwrap_or(label),
