@@ -282,6 +282,7 @@ impl AcpServer {
             "session/list" => self.handle_session_list(params).await,
             "session/close" => self.handle_session_close(params).await,
             "session/cancel" => self.handle_session_cancel(params).await,
+            "session/set_config_option" => self.handle_session_set_config_option(params).await,
 
             // Prompt Dispatching
             "session/prompt" => self.handle_session_prompt(params, out_tx).await,
@@ -345,6 +346,7 @@ impl AcpServer {
             provider: cfg.default_provider.clone(),
             is_default: true,
         }];
+        let config_options = self.build_model_config_options(&active_model);
 
         self.sessions
             .write()
@@ -354,6 +356,7 @@ impl AcpServer {
         let result = NewSessionResult {
             session_id,
             models: Some(models),
+            config_options: Some(config_options),
         };
 
         serde_json::to_value(result).map_err(|e| JsonRpcError::internal_error(e.to_string()))
@@ -380,6 +383,7 @@ impl AcpServer {
                     active_model: guard.active_model.clone(),
                     message_count: guard.messages.len(),
                     title: guard.title.clone(),
+                    config_options: Some(self.build_model_config_options(&guard.active_model)),
                 };
                 return serde_json::to_value(result)
                     .map_err(|e| JsonRpcError::internal_error(e.to_string()));
@@ -398,8 +402,8 @@ impl AcpServer {
             active_model: loaded.active_model.clone(),
             message_count: loaded.messages.len(),
             title: loaded.title.clone(),
+            config_options: Some(self.build_model_config_options(&loaded.active_model)),
         };
-
         self.sessions
             .write()
             .await
@@ -502,32 +506,108 @@ impl AcpServer {
         let cfg = self.config.read().await;
         let models = vec![
             ModelInfo {
-                id: cfg.default_model.clone(),
-                name: cfg.default_model.clone(),
-                provider: cfg.default_provider.clone(),
-                is_default: true,
+                id: "deepseek-ai/DeepSeek-V4-Flash-0731".to_string(),
+                name: "DeepSeek V4 Flash".to_string(),
+                provider: "fusion".to_string(),
+                is_default: cfg.default_model == "deepseek-ai/DeepSeek-V4-Flash-0731",
             },
             ModelInfo {
-                id: "deepseek-chat".to_string(),
-                name: "DeepSeek V3".to_string(),
-                provider: "deepseek".to_string(),
-                is_default: cfg.default_model == "deepseek-chat",
+                id: "MiniMaxAI/MiniMax-M2.7".to_string(),
+                name: "MiniMax M2.7".to_string(),
+                provider: "fusion".to_string(),
+                is_default: cfg.default_model == "MiniMaxAI/MiniMax-M2.7",
             },
             ModelInfo {
-                id: "claude-3-5-sonnet-20241022".to_string(),
-                name: "Claude 3.5 Sonnet".to_string(),
-                provider: "anthropic".to_string(),
-                is_default: cfg.default_model == "claude-3-5-sonnet-20241022",
-            },
-            ModelInfo {
-                id: "gpt-4o".to_string(),
-                name: "GPT-4o".to_string(),
-                provider: "openai".to_string(),
-                is_default: cfg.default_model == "gpt-4o",
+                id: "moonshotai/Kimi-K2.6".to_string(),
+                name: "Kimi K2.6".to_string(),
+                provider: "fusion".to_string(),
+                is_default: cfg.default_model == "moonshotai/Kimi-K2.6",
             },
         ];
 
         Ok(serde_json::json!({ "models": models }))
+    }
+
+    /// Builds standard ACP `configOptions` including model selection for Zed and other editors.
+    pub fn build_model_config_options(&self, active_model: &str) -> Vec<SessionConfigOption> {
+        let mut options = vec![
+            SessionConfigSelectOption {
+                value: "deepseek-ai/DeepSeek-V4-Flash-0731".to_string(),
+                name: "DeepSeek V4 Flash".to_string(),
+                description: Some("Fusion Gateway Flagship (1M context · fast)".to_string()),
+            },
+            SessionConfigSelectOption {
+                value: "MiniMaxAI/MiniMax-M2.7".to_string(),
+                name: "MiniMax M2.7".to_string(),
+                description: Some("Fusion Gateway (200k context)".to_string()),
+            },
+            SessionConfigSelectOption {
+                value: "moonshotai/Kimi-K2.6".to_string(),
+                name: "Kimi K2.6".to_string(),
+                description: Some("Fusion Gateway (262k context)".to_string()),
+            },
+        ];
+
+        if !options.iter().any(|o| o.value == active_model) {
+            options.insert(
+                0,
+                SessionConfigSelectOption {
+                    value: active_model.to_string(),
+                    name: active_model.to_string(),
+                    description: Some("Active Model".to_string()),
+                },
+            );
+        }
+
+        vec![SessionConfigOption {
+            id: "model".to_string(),
+            name: "Model".to_string(),
+            description: Some("AI model used for reasoning and completions".to_string()),
+            category: Some(SessionConfigOptionCategory::Model),
+            kind: SessionConfigKind::Select(SessionConfigSelect {
+                current_value: active_model.to_string(),
+                options,
+            }),
+        }]
+    }
+
+    async fn handle_session_set_config_option(
+        &self,
+        params: Option<serde_json::Value>,
+    ) -> Result<serde_json::Value, JsonRpcError> {
+        let params_val = params.ok_or_else(|| JsonRpcError::invalid_params("Missing params"))?;
+        let session_id = params_val
+            .get("sessionId")
+            .and_then(|v| v.as_str())
+            .ok_or_else(|| JsonRpcError::invalid_params("Missing sessionId"))?;
+        let config_id = params_val
+            .get("configId")
+            .and_then(|v| v.as_str())
+            .ok_or_else(|| JsonRpcError::invalid_params("Missing configId"))?;
+
+        let value_str = match params_val.get("value") {
+            Some(serde_json::Value::String(s)) => s.clone(),
+            Some(serde_json::Value::Object(map)) => map
+                .get("value")
+                .and_then(|v| v.as_str())
+                .unwrap_or_default()
+                .to_string(),
+            _ => return Err(JsonRpcError::invalid_params("Missing or invalid value")),
+        };
+
+        if config_id == "model" {
+            let sessions = self.sessions.read().await;
+            if let Some(session_arc) = sessions.get(session_id) {
+                let mut guard = session_arc.lock().await;
+                guard.set_active_model(&value_str);
+            }
+        }
+
+        let result = SetSessionConfigOptionResult {
+            config_options: self.build_model_config_options(&value_str),
+        };
+
+        serde_json::to_value(result).map_err(|e| JsonRpcError::internal_error(e.to_string()))
     }
 
     async fn handle_session_prompt(
@@ -568,11 +648,17 @@ impl AcpServer {
                 .insert(req.session_id.clone(), cancel_tx);
         }
 
-        let (event_tx, mut event_rx) = unbounded_channel::<AgentEvent>();
+        let (event_tx, event_rx) = unbounded_channel::<AgentEvent>();
 
-        // Build runner
+        let mut session_guard = session_arc.lock().await;
+
+        // Build runner using the session's active model and provider
         let runner = {
-            let cfg = self.config.read().await.clone();
+            let mut cfg = self.config.read().await.clone();
+            cfg.default_model = session_guard.active_model.clone();
+            if let Some(prov) = Config::detect_provider_for_model(&cfg.default_model) {
+                cfg.default_provider = prov.to_string();
+            }
             AgentRunner::new(
                 self.client.clone(),
                 cfg,
@@ -587,7 +673,6 @@ impl AcpServer {
         let stream_bridge = tokio::spawn(bridge.run(event_rx));
 
         // Execute runner with cancellation watch
-        let mut session_guard = session_arc.lock().await;
         let mut stop_reason = StopReason::EndTurn;
 
         tokio::select! {

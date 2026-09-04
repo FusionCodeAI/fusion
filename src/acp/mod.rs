@@ -162,6 +162,74 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn test_session_config_options_model_picker() {
+        let server = test_server();
+        let (out_tx, mut out_rx) = tokio::sync::mpsc::unbounded_channel();
+
+        // Initialize handshake
+        let init_req = json!({
+            "jsonrpc": "2.0",
+            "id": 1,
+            "method": "initialize",
+            "params": {
+                "protocolVersion": 1,
+                "clientCapabilities": {},
+                "clientInfo": { "name": "zed", "version": "0.180.0" }
+            }
+        });
+        server.process_raw_message(&init_req.to_string(), out_tx.clone()).await;
+        let _ = out_rx.recv().await.unwrap();
+
+        // 1. Create session and verify configOptions has category "model"
+        let new_session_req = json!({
+            "jsonrpc": "2.0",
+            "id": 2,
+            "method": "session/new",
+            "params": {}
+        });
+        server.process_raw_message(&new_session_req.to_string(), out_tx.clone()).await;
+        let resp_str = out_rx.recv().await.unwrap();
+        let resp: JsonRpcResponse = serde_json::from_str(&resp_str).unwrap();
+        let result: NewSessionResult = serde_json::from_value(resp.result.unwrap()).unwrap();
+        let session_id = result.session_id;
+
+        let config_options = result.config_options.expect("configOptions must be present");
+        let model_opt = config_options.iter().find(|o| o.id == "model").expect("model option exists");
+        assert_eq!(model_opt.category, Some(SessionConfigOptionCategory::Model));
+        match &model_opt.kind {
+            SessionConfigKind::Select(sel) => {
+                assert_eq!(sel.current_value, "deepseek-ai/DeepSeek-V4-Flash-0731");
+                assert!(sel.options.iter().any(|o| o.value == "deepseek-ai/DeepSeek-V4-Flash-0731"));
+                assert!(sel.options.iter().any(|o| o.value == "MiniMaxAI/MiniMax-M2.7"));
+                assert!(sel.options.iter().any(|o| o.value == "moonshotai/Kimi-K2.6"));
+            }
+        }
+
+        // 2. Client changes model via session/set_config_option
+        let set_req = json!({
+            "jsonrpc": "2.0",
+            "id": 3,
+            "method": "session/set_config_option",
+            "params": {
+                "sessionId": session_id,
+                "configId": "model",
+                "value": "MiniMaxAI/MiniMax-M2.7"
+            }
+        });
+        server.process_raw_message(&set_req.to_string(), out_tx.clone()).await;
+        let set_resp_str = out_rx.recv().await.unwrap();
+        let set_resp: JsonRpcResponse = serde_json::from_str(&set_resp_str).unwrap();
+        let set_res: SetSessionConfigOptionResult = serde_json::from_value(set_resp.result.unwrap()).unwrap();
+
+        let updated_model_opt = set_res.config_options.iter().find(|o| o.id == "model").unwrap();
+        match &updated_model_opt.kind {
+            SessionConfigKind::Select(sel) => {
+                assert_eq!(sel.current_value, "MiniMaxAI/MiniMax-M2.7");
+            }
+        }
+    }
+
+    #[tokio::test]
     async fn test_invalid_json_and_method_not_found() {
         let server = test_server();
         let (out_tx, mut out_rx) = tokio::sync::mpsc::unbounded_channel();

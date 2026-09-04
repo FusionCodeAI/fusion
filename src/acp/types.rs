@@ -374,6 +374,57 @@ pub struct NewSessionRequest {
     pub provider: Option<String>,
 }
 
+/// Semantic category for an ACP session configuration option.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum SessionConfigOptionCategory {
+    Mode,
+    Model,
+    ModelConfig,
+    ThoughtLevel,
+    #[serde(untagged)]
+    Other(String),
+}
+
+/// A possible choice for an ACP session select configuration option.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct SessionConfigSelectOption {
+    pub value: String,
+    pub name: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub description: Option<String>,
+}
+
+/// Select dropdown payload for an ACP configuration option.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct SessionConfigSelect {
+    pub current_value: String,
+    pub options: Vec<SessionConfigSelectOption>,
+}
+
+/// Type-specific configuration option payload.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(tag = "type", rename_all = "snake_case")]
+pub enum SessionConfigKind {
+    Select(SessionConfigSelect),
+}
+
+/// Standard ACP session configuration option (used by Zed/JetBrains to render pickers/controls).
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct SessionConfigOption {
+    pub id: String,
+    pub name: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub description: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub category: Option<SessionConfigOptionCategory>,
+    #[serde(flatten)]
+    pub kind: SessionConfigKind,
+}
+
 /// Result returned when a new session is created.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -381,8 +432,9 @@ pub struct NewSessionResult {
     pub session_id: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub models: Option<Vec<ModelInfo>>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub config_options: Option<Vec<SessionConfigOption>>,
 }
-
 /// Model descriptor advertised to the client.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -410,8 +462,25 @@ pub struct LoadSessionResult {
     pub message_count: usize,
     #[serde(default)]
     pub title: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub config_options: Option<Vec<SessionConfigOption>>,
 }
 
+/// Request parameters for `session/set_config_option`.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SetSessionConfigOptionRequest {
+    pub session_id: String,
+    pub config_id: String,
+    pub value: serde_json::Value,
+}
+
+/// Result returned from `session/set_config_option`.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SetSessionConfigOptionResult {
+    pub config_options: Vec<SessionConfigOption>,
+}
 /// Parameters for listing sessions (`session/list`).
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -572,12 +641,12 @@ pub struct SessionUpdateParams {
 
 /// Detailed update payload streamed during an agent turn.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(tag = "kind", rename_all = "snake_case")]
+#[serde(tag = "sessionUpdate", rename_all = "snake_case")]
 pub enum SessionUpdate {
     /// Incremental assistant text chunk.
     #[serde(rename_all = "camelCase")]
     AgentMessageChunk {
-        content: AgentMessageContent,
+        content: ContentBlock,
         #[serde(default, skip_serializing_if = "Option::is_none")]
         index: Option<u64>,
         #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -588,7 +657,9 @@ pub enum SessionUpdate {
     /// Incremental thinking/reasoning chunk.
     #[serde(rename_all = "camelCase")]
     AgentThoughtChunk {
-        thought: String,
+        content: ContentBlock,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        thought: Option<String>,
         #[serde(default, skip_serializing_if = "Option::is_none")]
         index: Option<u64>,
         #[serde(default, skip_serializing_if = "Option::is_none")]

@@ -1001,6 +1001,7 @@ impl WasmFusionAgent {
                     NewSessionResult {
                         session_id: lock.session.id_str(),
                         models: None,
+                        config_options: None,
                     }
                 };
                 serde_json::to_value(result).map_err(|e| {
@@ -1030,6 +1031,7 @@ impl WasmFusionAgent {
                         active_model: lock.session.active_model.clone(),
                         message_count: lock.session.messages.len(),
                         title: lock.session.title.clone(),
+                        config_options: None,
                     }
                 };
                 serde_json::to_value(result).map_err(|e| {

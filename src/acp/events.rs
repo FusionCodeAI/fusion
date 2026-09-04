@@ -13,7 +13,7 @@ use tokio::sync::broadcast;
 use tokio::sync::mpsc::{UnboundedReceiver, UnboundedSender};
 
 use crate::acp::types::{
-    AgentMessageContent, JsonRpcNotification, SessionUpdate, SessionUpdateParams,
+    ContentBlock, JsonRpcNotification, SessionUpdate, SessionUpdateParams,
 };
 use crate::agent::loop_runner::AgentEvent;
 
@@ -501,13 +501,14 @@ impl AcpSessionEvent {
     pub fn to_session_update(&self) -> SessionUpdate {
         match self {
             Self::TokenChunk(chunk) => SessionUpdate::AgentMessageChunk {
-                content: AgentMessageContent::assistant_text(&chunk.delta),
+                content: ContentBlock::text(&chunk.delta),
                 index: Some(chunk.index),
                 is_first: Some(chunk.is_first),
                 is_last: Some(chunk.is_last),
             },
             Self::ThinkingChunk(thought) => SessionUpdate::AgentThoughtChunk {
-                thought: thought.delta.clone(),
+                content: ContentBlock::text(&thought.delta),
+                thought: Some(thought.delta.clone()),
                 index: Some(thought.index),
                 elapsed_ms: Some(thought.elapsed_ms),
             },
@@ -590,11 +591,19 @@ impl AcpSessionEvent {
     /// Packages this event into an ACP JSON-RPC 2.0 `session/update` notification.
     pub fn to_jsonrpc_notification(&self, session_id: &str) -> JsonRpcNotification {
         let update = self.to_session_update();
-        let params = serde_json::to_value(SessionUpdateParams {
-            session_id: session_id.to_string(),
-            update,
-        })
-        .unwrap_or(serde_json::Value::Null);
+        let mut update_val = serde_json::to_value(&update).unwrap_or(serde_json::Value::Null);
+        // Ensure both "sessionUpdate" and "kind" are populated for maximum client compatibility
+        if let serde_json::Value::Object(map) = &mut update_val {
+            if let Some(tag) = map.get("sessionUpdate").cloned() {
+                map.insert("kind".to_string(), tag);
+            } else if let Some(tag) = map.get("kind").cloned() {
+                map.insert("sessionUpdate".to_string(), tag);
+            }
+        }
+        let params = serde_json::json!({
+            "sessionId": session_id,
+            "update": update_val,
+        });
 
         JsonRpcNotification::new("session/update", params)
     }
@@ -682,7 +691,12 @@ impl AdvisorFeedbackAggregator {
         for line in critique.lines() {
             let trimmed = line.trim();
             if trimmed.starts_with("- ") || trimmed.starts_with("* ") || trimmed.starts_with("+ ") {
-                let text = trimmed[2..].trim();
+                let mut text = trimmed[2..].trim();
+                if text.to_lowercase().starts_with("suggestion:") {
+                    text = text["suggestion:".len()..].trim();
+                } else if text.to_lowercase().starts_with("recommendation:") {
+                    text = text["recommendation:".len()..].trim();
+                }
                 if !text.is_empty() {
                     suggestions.push(text.to_string());
                 }
@@ -1239,8 +1253,7 @@ mod tests {
                 is_first,
                 is_last,
             } => {
-                assert_eq!(content.role, "assistant");
-                assert_eq!(content.content[0].text, Some("Hello".to_string()));
+                assert_eq!(content.text, Some("Hello".to_string()));
                 assert_eq!(index, Some(1));
                 assert_eq!(is_first, Some(true));
                 assert_eq!(is_last, Some(false));
@@ -1254,9 +1267,10 @@ mod tests {
 
         let json_val = serde_json::to_value(&notif).unwrap();
         assert_eq!(json_val["params"]["sessionId"], "sess-123");
+        assert_eq!(json_val["params"]["update"]["sessionUpdate"], "agent_message_chunk");
         assert_eq!(json_val["params"]["update"]["kind"], "agent_message_chunk");
         assert_eq!(
-            json_val["params"]["update"]["content"]["content"][0]["text"],
+            json_val["params"]["update"]["content"]["text"],
             "Hello"
         );
     }
@@ -1269,10 +1283,12 @@ mod tests {
         match update {
             SessionUpdate::AgentThoughtChunk {
                 thought,
+                content,
                 index,
                 elapsed_ms,
             } => {
-                assert_eq!(thought, "Analyzing problem...");
+                assert_eq!(thought.as_deref(), Some("Analyzing problem..."));
+                assert_eq!(content.text.as_deref(), Some("Analyzing problem..."));
                 assert_eq!(index, Some(42));
                 assert_eq!(elapsed_ms, Some(120));
             }
