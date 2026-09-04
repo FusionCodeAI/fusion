@@ -1,11 +1,11 @@
-# @theaungmyatmoe/fusion — SDK
+# @fusioncode/sdk — SDK
 
 > **Official TypeScript & WebAssembly SDK for the Fusion AI Coding Assistant**
 > A pure-Rust agent engine compiled to WebAssembly (or driven over a stdio JSON-RPC
 > process) with an in-memory Virtual File System (VFS), streaming event turns,
 > multi-agent advisors, session checkpoints, and a turnkey xterm.js terminal adapter.
 
-[![npm version](https://img.shields.io/npm/v/@theaungmyatmoe/fusion.svg?style=flat-square)](https://www.npmjs.com/package/@theaungmyatmoe/fusion)
+[![npm version](https://img.shields.io/npm/v/@fusioncode/sdk.svg?style=flat-square)](https://www.npmjs.com/package/@fusioncode/sdk)
 [![License](https://img.shields.io/badge/License-MIT-blue.svg?style=flat-square)](LICENSE)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.6%2B-blue.svg?style=flat-square)](#type-reference)
 [![WebAssembly](https://img.shields.io/badge/Core-Pure%20Rust%20WASM-purple.svg?style=flat-square)](#cross-environment-notes)
@@ -50,13 +50,13 @@
 
 ```bash
 # npm
-npm install @theaungmyatmoe/fusion
+npm install @fusioncode/sdk
 
 # pnpm
-pnpm add @theaungmyatmoe/fusion
+pnpm add @fusioncode/sdk
 
 # bun
-bun add @theaungmyatmoe/fusion
+bun add @fusioncode/sdk
 ```
 
 The package ships ESM only (`"type": "module"`) with TypeScript declarations. Node.js ≥ 18 is required (`engines` field). If you use the in-browser terminal adapter, install [`@xterm/xterm`](https://www.npmjs.com/package/@xterm/xterm) as an optional peer:
@@ -70,10 +70,10 @@ Subpath exports:
 
 | Import path | Contents |
 | :--- | :--- |
-| `@theaungmyatmoe/fusion` | `FusionAgent`, WASM loader, xterm adapter, all types |
-| `@theaungmyatmoe/fusion/wasm` | Low-level WASM loader bridge (`loadFusionWasm`, `initWasm`, …) |
-| `@theaungmyatmoe/fusion/xterm` | `XtermAdapter` and terminal utilities |
-| `@theaungmyatmoe/fusion/types` | Type-only definitions |
+| `@fusioncode/sdk` | `FusionAgent`, WASM loader, xterm adapter, all types |
+| `@fusioncode/sdk/wasm` | Low-level WASM loader bridge (`loadFusionWasm`, `initWasm`, …) |
+| `@fusioncode/sdk/xterm` | `XtermAdapter` and terminal utilities |
+| `@fusioncode/sdk/types` | Type-only definitions |
 
 The Fusion CLI binary itself (needed for the stdio transport) is distributed separately — via [Homebrew](https://fusioncode.app) (`brew install fusion`), `cargo install fusion`, or a GitHub release download.
 
@@ -86,7 +86,7 @@ The Fusion CLI binary itself (needed for the stdio transport) is distributed sep
 `FusionAgent.create()` auto-detects the runtime: **`wasm`** in browsers, **`stdio`** under Node.js. Force the in-memory WASM engine explicitly with `transport: 'wasm'`:
 
 ```typescript
-import { FusionAgent } from '@theaungmyatmoe/fusion';
+import { FusionAgent } from '@fusioncode/sdk';
 
 const agent = await FusionAgent.create({
   transport: 'wasm',
@@ -150,7 +150,7 @@ JSON-RPC 2.0 (Agent Client Protocol) over stdio — initialize handshake,
 `session/new`, streamed `session/update` notifications, and `session/prompt`:
 
 ```typescript
-import { FusionAgent } from '@theaungmyatmoe/fusion';
+import { FusionAgent } from '@fusioncode/sdk';
 
 const agent = await FusionAgent.create({
   transport: 'stdio',          // default under Node.js; explicit here for clarity
@@ -189,7 +189,7 @@ Every turn dispatches a typed, discriminated-union event stream
 | `error` | `{ message, code? }` | An unrecoverable error occurred |
 
 ```typescript
-import type { FusionEvent } from '@theaungmyatmoe/fusion';
+import type { FusionEvent } from '@fusioncode/sdk';
 
 const render = (event: FusionEvent) => {
   if (event.type === 'thinking_delta') {
@@ -225,7 +225,7 @@ unsubscribe();
 into an `AsyncIterable<FusionEvent>` and normalizes everything into typed events:
 
 ```typescript
-import { createWasmEventBridge } from '@theaungmyatmoe/fusion/wasm';
+import { createWasmEventBridge } from '@fusioncode/sdk/wasm';
 
 const bridge = createWasmEventBridge({ signal: controller.signal });
 
@@ -252,7 +252,7 @@ const files = agent.fsList();        // ['config.json', 'package.json', 'README.
 const deleted = agent.fsDelete('config.json'); // true
 
 // Richer access via the standalone bridge (grep / glob / edit / events / bash)
-import { VirtualFileSystem } from '@theaungmyatmoe/fusion/wasm';
+import { VirtualFileSystem } from '@fusioncode/sdk/wasm';
 
 const vfs = new VirtualFileSystem('memory');           // or 'localstorage' in browsers
 vfs.writeFile('src/main.rs', 'fn main() {}\n');
@@ -285,7 +285,7 @@ server.
 
 ```typescript
 import { Terminal } from '@xterm/xterm';
-import { FusionAgent, XtermAdapter } from '@theaungmyatmoe/fusion';
+import { FusionAgent, XtermAdapter } from '@fusioncode/sdk';
 import { FitAddon } from '@xterm/addon-fit';
 import '@xterm/xterm/css/xterm.css';
 
@@ -340,12 +340,12 @@ adapter.dispose();                         // detach + disconnect backend
 
 | Backend | Import | Use case |
 | :--- | :--- | :--- |
-| `WasmAgentBackend` | `@theaungmyatmoe/fusion/xterm` | Drive the adapter from a raw `WasmFusionAgent` instance |
-| `WebSocketAgentBackend` | `@theaungmyatmoe/fusion/xterm` | Connect to a remote Fusion ACP daemon (`ws://127.0.0.1:3000/acp`, auto-reconnect) |
-| `MockAgentBackend` | `@theaungmyatmoe/fusion/xterm` | Zero-config demo / offline UI testing (default when no backend given) |
+| `WasmAgentBackend` | `@fusioncode/sdk/xterm` | Drive the adapter from a raw `WasmFusionAgent` instance |
+| `WebSocketAgentBackend` | `@fusioncode/sdk/xterm` | Connect to a remote Fusion ACP daemon (`ws://127.0.0.1:3000/acp`, auto-reconnect) |
+| `MockAgentBackend` | `@fusioncode/sdk/xterm` | Zero-config demo / offline UI testing (default when no backend given) |
 
 ```typescript
-import { WebSocketAgentBackend } from '@theaungmyatmoe/fusion/xterm';
+import { WebSocketAgentBackend } from '@fusioncode/sdk/xterm';
 
 const adapter = new XtermAdapter({
   terminal: term,
@@ -524,7 +524,7 @@ interface PromptOptions {
 
 ## Type Reference
 
-All types are exported from the root package and `@theaungmyatmoe/fusion/types`.
+All types are exported from the root package and `@fusioncode/sdk/types`.
 
 ### Core
 
@@ -624,7 +624,7 @@ Practical guidance:
 ```tsx
 import React, { useEffect, useRef } from 'react';
 import { Terminal } from '@xterm/xterm';
-import { FusionAgent, XtermAdapter } from '@theaungmyatmoe/fusion';
+import { FusionAgent, XtermAdapter } from '@fusioncode/sdk';
 import '@xterm/xterm/css/xterm.css';
 
 export function FusionTerminalComponent() {
