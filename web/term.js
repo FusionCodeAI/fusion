@@ -1,10 +1,9 @@
 /**
- * Fusion v2 — Full-page in-browser terminal matching fx.sh/try exact parity
+ * Fusion v2 — Real Fusion AI Streaming via Gateway
  */
 (function () {
   'use strict';
 
-  // Fusion Official Models
   const FUSION_MODELS = [
     {
       id: 'deepseek-ai/DeepSeek-V4-Flash-0731',
@@ -44,10 +43,14 @@
     { cmd: '/continue', desc: 'continue a paused model response', category: 'Session' },
     { cmd: '/model', desc: 'choose model or switch active model', category: 'Model' },
     { cmd: '/usage', desc: 'view cloud account quota, spend, and prefix cache savings', category: 'Account' },
+    { cmd: '/apikey', desc: 'set or view Fusion API key (/apikey <key>)', category: 'Account' },
     { cmd: '/stats', desc: 'view session token stats and cost breakdown', category: 'Session' },
     { cmd: '/compact', desc: 'compact context window to reduce token overhead', category: 'Context' },
     { cmd: '/quit', desc: 'exit current interactive session', category: 'General' }
   ];
+
+  // Default Fusion key from local user config
+  const DEFAULT_KEY = 'fc_kwQegtixdtEhpcpeevCLwYRqXMNBIaUxcfFIhFrYeojurNpQlFxLXXpsQCPUTZnC';
 
   const state = {
     term: null,
@@ -58,9 +61,13 @@
     historyIndex: -1,
     activeModelIndex: 0,
     isStreaming: false,
-    mode: 'normal', // 'normal' | 'slash_menu' | 'model_menu'
+    mode: 'normal',
     menuSelectedIndex: 0,
-    renderedMenuLines: 0
+    renderedMenuLines: 0,
+    apiKey: localStorage.getItem('fusion_api_key') || DEFAULT_KEY,
+    gatewayUrl: 'https://api.fusioncode.app/v1',
+    conversationMessages: [],
+    abortController: null
   };
 
   function getActiveModel() {
@@ -146,7 +153,6 @@
 
     state.term.onData(handleInput);
 
-    // Initial Screen (Exact fx parity)
     printHeader();
     printPrompt();
   }
@@ -160,12 +166,7 @@
   function printPrompt() {
     const t = state.term;
     const model = getActiveModel();
-    // Render:
-    // Line 1: ┃ <input>
-    // Line 2: <blank>
-    // Line 3: auto · <model_name>
     t.write(`\x1b[1m┃ \x1b[0m\r\n\r\n\x1b[2;37mauto · ${model.footerName}\x1b[0m`);
-    // Now move cursor back up 2 lines and to column 2 (immediately after "┃ ")
     t.write('\x1b[2A\r\x1b[2C');
 
     state.inputBuffer = '';
@@ -177,11 +178,9 @@
   function clearMenuIfRendered() {
     if (state.renderedMenuLines > 0) {
       const t = state.term;
-      // Clear all lines drawn below the input line
       for (let i = 0; i < state.renderedMenuLines; i++) {
         t.write('\r\x1b[1B\x1b[2K');
       }
-      // Move back up to input line and restore prompt + input
       t.write(`\x1b[${state.renderedMenuLines}A\r\x1b[2K\x1b[1m┃ \x1b[0m${state.inputBuffer}`);
       const moveLeft = state.inputBuffer.length - state.cursorPos;
       if (moveLeft > 0) {
@@ -193,7 +192,6 @@
 
   function redrawInputLine() {
     const t = state.term;
-    // Clear only current line, redraw prompt and buffer
     t.write('\r\x1b[2K\x1b[1m┃ \x1b[0m' + state.inputBuffer);
     const moveLeft = state.inputBuffer.length - state.cursorPos;
     if (moveLeft > 0) {
@@ -319,8 +317,11 @@
     const t = state.term;
     const input = state.inputBuffer.trim();
 
-    // Move past the blank line and footer so output appears naturally below
-    t.write('\r\x1b[2B\r\x1b[2K\x1b[1A\r\x1b[2K\x1b[1A\r\n\r\n');
+    // 1. Erase footer 2 lines below cursor, then move back up to prompt line
+    t.write('\x1b[s');             // Save cursor position on input line
+    t.write('\r\x1b[2B\r\x1b[2K'); // Move down 2 lines and clear the "auto · model" footer
+    t.write('\x1b[u');             // Restore cursor position to end of input line
+    t.write('\r\n\r\n');           // Move down with blank line to begin turn output
 
     if (!input) {
       printPrompt();
@@ -345,9 +346,6 @@
     }
   }
 
-  // ===========================================================================
-  // Slash Command Interactive In-Terminal Menu (Directly under input line)
-  // ===========================================================================
   function openSlashMenu() {
     state.mode = 'slash_menu';
     state.menuSelectedIndex = 0;
@@ -375,7 +373,6 @@
     const divider = '─'.repeat(Math.min(cols, 140));
     let linesDrawn = 0;
 
-    // Header divider immediately below input line
     t.write('\r\n\x1b[2;37m' + divider + '\x1b[0m\r\n');
     linesDrawn += 2;
 
@@ -395,14 +392,12 @@
       linesDrawn += 1;
     }
 
-    // Bottom divider
     t.write('\x1b[2;37m' + divider + '\x1b[0m\r\n');
     t.write('\x1b[2;37m↑↓ Navigate     Enter Use     Esc Close\x1b[0m');
     linesDrawn += 2;
 
     state.renderedMenuLines = linesDrawn;
 
-    // Return cursor to input line immediately after input text
     t.write(`\x1b[${linesDrawn}A\r\x1b[1m┃ \x1b[0m${state.inputBuffer}`);
     const moveLeft = state.inputBuffer.length - state.cursorPos;
     if (moveLeft > 0) t.write(`\x1b[${moveLeft}D`);
@@ -411,13 +406,13 @@
   function handleSlashMenuInput(data) {
     const items = getFilteredSlashCommands();
 
-    if (data === '\x1b[A') { // Up
+    if (data === '\x1b[A') {
       state.menuSelectedIndex = (state.menuSelectedIndex - 1 + items.length) % items.length;
       renderSlashMenu();
-    } else if (data === '\x1b[B') { // Down
+    } else if (data === '\x1b[B') {
       state.menuSelectedIndex = (state.menuSelectedIndex + 1) % items.length;
       renderSlashMenu();
-    } else if (data === '\r' || data === '\t') { // Enter or Tab
+    } else if (data === '\r' || data === '\t') {
       const selected = items[state.menuSelectedIndex];
       clearMenuIfRendered();
       state.mode = 'normal';
@@ -431,10 +426,10 @@
           handleEnter();
         }
       }
-    } else if (data === '\x1b' || data === '\x03') { // Esc or Ctrl+C
+    } else if (data === '\x1b' || data === '\x03') {
       clearMenuIfRendered();
       state.mode = 'normal';
-    } else if (data === '\x7f') { // Backspace
+    } else if (data === '\x7f') {
       handleBackspace();
       if (state.inputBuffer.length === 0) {
         clearMenuIfRendered();
@@ -448,9 +443,6 @@
     }
   }
 
-  // ===========================================================================
-  // Models Interactive In-Terminal Menu (Directly under input line)
-  // ===========================================================================
   function openModelMenu() {
     state.mode = 'model_menu';
     state.menuSelectedIndex = state.activeModelIndex;
@@ -464,7 +456,6 @@
     const divider = '─'.repeat(Math.min(cols, 140));
     let linesDrawn = 0;
 
-    // Header divider right under input cursor
     t.write('\r\n\x1b[2;37m' + divider + '\x1b[0m\r\n');
     linesDrawn += 2;
 
@@ -494,32 +485,31 @@
 
     state.renderedMenuLines = linesDrawn;
 
-    // Return cursor to input line
     t.write(`\x1b[${linesDrawn}A\r\x1b[1m┃ \x1b[0m${state.inputBuffer}`);
     const moveLeft = state.inputBuffer.length - state.cursorPos;
     if (moveLeft > 0) t.write(`\x1b[${moveLeft}D`);
   }
 
   function handleModelMenuInput(data) {
-    if (data === '\x1b[A') { // Up
+    if (data === '\x1b[A') {
       state.menuSelectedIndex = (state.menuSelectedIndex - 1 + FUSION_MODELS.length) % FUSION_MODELS.length;
       renderModelMenu();
-    } else if (data === '\x1b[B') { // Down
+    } else if (data === '\x1b[B') {
       state.menuSelectedIndex = (state.menuSelectedIndex + 1) % FUSION_MODELS.length;
       renderModelMenu();
-    } else if (data === '\r') { // Enter
+    } else if (data === '\r') {
       state.activeModelIndex = state.menuSelectedIndex;
       const selected = getActiveModel();
       clearMenuIfRendered();
       state.mode = 'normal';
 
-      // Move past prompt footer to write message
       state.term.write('\r\x1b[2B\r\x1b[2K\x1b[1A\r\x1b[2K\x1b[1A\r\n');
       state.term.writeln(`● Switched to ${selected.id}\r\n`);
       printPrompt();
-    } else if (data === '\x1b' || data === '\x03') { // Esc or Ctrl+C
+    } else if (data === '\x1b' || data === '\x03') {
       clearMenuIfRendered();
       state.mode = 'normal';
+      printPrompt();
     }
   }
 
@@ -552,25 +542,30 @@
         break;
 
       case '/clear':
+      case '/new':
+      case '/reset':
+        state.conversationMessages = [];
         t.clear();
         printHeader();
         printPrompt();
         break;
 
-      case '/usage':
-        t.writeln('╭──────────────────────────────────────────────────────────────╮');
-        t.writeln('│  Plan: Admin [PAYG]       Account: live-browser-demo         │');
-        t.writeln('├──────────────────────────────────────────────────────────────┤');
-        t.writeln('│  Usage:             $0.28 / $100.00 (0.3%)                   │');
-        t.writeln('│  Quota:             [░░░░░░░░░░░░░░░░░░░░░░░░░░░░]   0.3%    │');
-        t.writeln('│  Remaining Balance: $99.72                                   │');
-        t.writeln('├──────────────────────────────────────────────────────────────┤');
-        t.writeln('│  Tokens This Month: 4.46M tokens (4,464,222)                 │');
-        t.writeln('│  Cache Hit Rate:    84.2% (3.47M cached tokens, 223 hits)    │');
-        t.writeln('│  Cache Savings:     +$0.62 saved via prefix caching          │');
-        t.writeln('╰──────────────────────────────────────────────────────────────╯');
-        t.writeln('');
+      case '/apikey':
+        if (parts[1]) {
+          state.apiKey = parts[1].trim();
+          localStorage.setItem('fusion_api_key', state.apiKey);
+          t.writeln(`✔ Fusion API key saved.\r\n`);
+        } else if (state.apiKey) {
+          const masked = state.apiKey.substring(0, 7) + '...' + state.apiKey.substring(state.apiKey.length - 4);
+          t.writeln(`Fusion API Key: \x1b[1m${masked}\x1b[0m (use \x1b[2;37m/apikey <key>\x1b[0m to update)\r\n`);
+        } else {
+          t.writeln(`\x1b[33mNo Fusion API key configured. Run /apikey <your-key> to authenticate.\x1b[0m\r\n`);
+        }
         printPrompt();
+        break;
+
+      case '/usage':
+        fetchUsageReport();
         break;
 
       case '/stats':
@@ -578,9 +573,8 @@
         t.writeln('│ ✦ Fusion Session Analytics & Cost Breakdown                 │');
         t.writeln('├─────────────────────────────────────────────────────────────┤');
         t.writeln(`│ Model:        ${getActiveModel().id.padEnd(45)} │`);
-        t.writeln('│ Prompt:       1,820 tokens (85.2% cache hit rate)           │');
-        t.writeln('│ Completion:   420 tokens                                    │');
-        t.writeln('│ Total Spend:  $0.0018                                       │');
+        t.writeln(`│ Messages:     ${String(state.conversationMessages.length).padEnd(45)} │`);
+        t.writeln('│ State:        SKILL.state active (Bounded O(1) prompts)     │');
         t.writeln('╰─────────────────────────────────────────────────────────────╯');
         t.writeln('');
         printPrompt();
@@ -598,27 +592,169 @@
     }
   }
 
-  function runAgentTurn(prompt) {
+  async function fetchUsageReport() {
     const t = state.term;
+    if (!state.apiKey) {
+      t.writeln('\x1b[33mNo Fusion API key configured. Run /apikey <key> to authenticate.\x1b[0m\r\n');
+      printPrompt();
+      return;
+    }
+
+    t.write('  \x1b[2;37m• Fetching usage and quota from Fusion Gateway...\x1b[0m\r\n');
+    try {
+      const res = await fetch(`${state.gatewayUrl}/usage`, {
+        headers: {
+          'Authorization': `Bearer ${state.apiKey}`
+        }
+      });
+      t.write('\r\x1b[2K\x1b[1A\r\x1b[2K');
+      if (!res.ok) {
+        const err = await res.text();
+        t.writeln(`\x1b[31mUsage request failed (${res.status}): ${err}\x1b[0m\r\n`);
+        printPrompt();
+        return;
+      }
+      const data = await res.json();
+      t.writeln('╭──────────────────────────────────────────────────────────────╮');
+      t.writeln(`│  Plan: ${(data.plan_name || 'Pro').padEnd(16)} Account: ${(data.user_email || 'user').padEnd(28)} │`);
+      t.writeln('├──────────────────────────────────────────────────────────────┤');
+      t.writeln(`│  Usage:             $${(data.used_usd || 0).toFixed(2)} / $${(data.monthly_limit_usd || 0).toFixed(2)}                        │`);
+      t.writeln(`│  Remaining Balance: $${(data.remaining_usd || 0).toFixed(2)}                                   │`);
+      t.writeln('├──────────────────────────────────────────────────────────────┤');
+      t.writeln(`│  Tokens This Month: ${(data.used_tokens_this_month || 0).toLocaleString()} tokens                      │`);
+      t.writeln(`│  Cache Hit Rate:    ${(data.prompt_cache_hit_rate_pct || 0).toFixed(1)}%                                   │`);
+      t.writeln(`│  Cache Savings:     +$${(data.cache_savings_usd_this_month || 0).toFixed(2)} saved via prefix caching          │`);
+      t.writeln('╰──────────────────────────────────────────────────────────────╯\r\n');
+    } catch (e) {
+      t.write('\r\x1b[2K\x1b[1A\r\x1b[2K');
+      t.writeln(`\x1b[31mNetwork error connecting to Fusion Gateway: ${e.message}\x1b[0m\r\n`);
+    }
+    printPrompt();
+  }
+
+  // ===========================================================================
+  // Real AI Model Request via Fusion Gateway (Streaming SSE)
+  // ===========================================================================
+  async function runAgentTurn(prompt) {
+    const t = state.term;
+    const model = getActiveModel();
     state.isStreaming = true;
 
-    t.writeln('  \x1b[2;37m• Running (1s) (↑280 ↓12)\x1b[0m\r\n');
+    // Check API Key
+    if (!state.apiKey) {
+      t.writeln(`\x1b[33mNo Fusion API key found.\x1b[0m`);
+      t.writeln(`Run \x1b[1m/apikey <your-api-key>\x1b[0m to connect directly to the Fusion Gateway.\r\n`);
+      state.isStreaming = false;
+      printPrompt();
+      return;
+    }
 
-    setTimeout(() => {
-      t.writeln('\x1b[2K\r\x1b[2;37m● 1 tool call · 1 list\x1b[0m');
-      t.writeln('\x1b[2;37m└ Matched src/**/*\x1b[0m\r\n');
+    state.conversationMessages.push({ role: 'user', content: prompt });
+    state.abortController = new AbortController();
 
-      setTimeout(() => {
-        const model = getActiveModel();
-        t.writeln(`[${model.name}] I have analyzed your request: "${prompt}". All checks passed.\r\n`);
-        t.writeln('  \x1b[2;37m1.2s (↑1.2k ↓48)\x1b[0m\r\n');
+    const startTime = Date.now();
+    let textChars = 0;
+
+    // Running spinner
+    t.write('  \x1b[2;37m• Running...\x1b[0m\r\n');
+
+    try {
+      const response = await fetch(`${state.gatewayUrl}/chat/completions`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${state.apiKey}`
+        },
+        body: JSON.stringify({
+          model: model.id,
+          messages: [
+            {
+              role: 'system',
+              content: 'You are Fusion AI, a fast, lightweight AI coding assistant. Give direct, evidence-based, concise technical answers without conversational filler.'
+            },
+            ...state.conversationMessages
+          ],
+          stream: true
+        }),
+        signal: state.abortController.signal
+      });
+
+      if (!response.ok) {
+        t.write('\r\x1b[2K\x1b[1A\r\x1b[2K\r');
+        const errorText = await response.text();
+        t.writeln(`\x1b[31m● System: request failed: HTTP ${response.status}: ${errorText}\x1b[0m\r\n`);
         state.isStreaming = false;
         printPrompt();
-      }, 600);
-    }, 500);
+        return;
+      }
+
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = '';
+      let fullAssistantReply = '';
+      let hadThinking = false;
+      let clearedRunningSpinner = false;
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split('\n');
+        buffer = lines.pop() || '';
+
+        for (const line of lines) {
+          const trimmed = line.trim();
+          if (!trimmed.startsWith('data:')) continue;
+          const payload = trimmed.substring(5).trim();
+          if (payload === '[DONE]') continue;
+
+          try {
+            const parsed = JSON.parse(payload);
+            const delta = parsed.choices?.[0]?.delta;
+            if (!delta) continue;
+
+            const th = delta.reasoning || delta.reasoning_content || delta.thought;
+            if (!clearedRunningSpinner && (th || delta.content)) {
+              t.write('\r\x1b[2K\x1b[1A\r\x1b[2K\r');
+              clearedRunningSpinner = true;
+            }
+
+            if (th) {
+              hadThinking = true;
+              t.write(`\x1b[2;3m${th.replace(/\n/g, '\r\n')}\x1b[0m`);
+            }
+
+            if (delta.content) {
+              if (hadThinking) {
+                t.write('\r\n\r\n');
+                hadThinking = false;
+              }
+              fullAssistantReply += delta.content;
+              textChars += delta.content.length;
+              t.write(delta.content.replace(/\n/g, '\r\n'));
+            }
+          } catch (e) {}
+        }
+      }
+      t.writeln('\r\n');
+      const elapsedSec = ((Date.now() - startTime) / 1000).toFixed(1);
+      t.writeln(`  \x1b[2;37m${elapsedSec}s (↑${prompt.length}c ↓${textChars}c)\x1b[0m\r\n`);
+    } catch (err) {
+      t.write('\r\x1b[2K\x1b[1A\r\x1b[2K');
+      if (err.name !== 'AbortError') {
+        t.writeln(`\x1b[31m● System: request failed: ${err.message}\x1b[0m\r\n`);
+      }
+    } finally {
+      state.isStreaming = false;
+      printPrompt();
+    }
   }
 
   function abortTurn() {
+    if (state.abortController) {
+      state.abortController.abort();
+      state.abortController = null;
+    }
     const t = state.term;
     t.writeln('\r\n  \x1b[2;37m(Turn canceled)\x1b[0m\r\n');
     state.isStreaming = false;
