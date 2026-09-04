@@ -289,6 +289,7 @@ jobs:
           generate_release_notes: true
           draft: false
           prerelease: ${{ needs.tag-check.outputs.prerelease == 'true' }}
+          update_release: true
           body: |
             ## Fusion ${{ needs.tag-check.outputs.tag }}
 
@@ -319,9 +320,6 @@ jobs:
             | Platform / Architecture | Archive | Checksum |
             |-------------------------|---------|----------|
             | **macOS Apple Silicon** (ARM64) | [`fusion-${{ needs.tag-check.outputs.tag }}-aarch64-apple-darwin.tar.gz`](https://github.com/${{ github.repository }}/releases/download/${{ needs.tag-check.outputs.tag }}/fusion-${{ needs.tag-check.outputs.tag }}-aarch64-apple-darwin.tar.gz) | [`.sha256`](https://github.com/${{ github.repository }}/releases/download/${{ needs.tag-check.outputs.tag }}/fusion-${{ needs.tag-check.outputs.tag }}-aarch64-apple-darwin.tar.gz.sha256) |
-            | **macOS Intel** (x86_64) | [`fusion-${{ needs.tag-check.outputs.tag }}-x86_64-apple-darwin.tar.gz`](https://github.com/${{ github.repository }}/releases/download/${{ needs.tag-check.outputs.tag }}/fusion-${{ needs.tag-check.outputs.tag }}-x86_64-apple-darwin.tar.gz) | [`.sha256`](https://github.com/${{ github.repository }}/releases/download/${{ needs.tag-check.outputs.tag }}/fusion-${{ needs.tag-check.outputs.tag }}-x86_64-apple-darwin.tar.gz.sha256) |
-            | **Linux x86_64** (glibc) | [`fusion-${{ needs.tag-check.outputs.tag }}-x86_64-unknown-linux-gnu.tar.gz`](https://github.com/${{ github.repository }}/releases/download/${{ needs.tag-check.outputs.tag }}/fusion-${{ needs.tag-check.outputs.tag }}-x86_64-unknown-linux-gnu.tar.gz) | [`.sha256`](https://github.com/${{ github.repository }}/releases/download/${{ needs.tag-check.outputs.tag }}/fusion-${{ needs.tag-check.outputs.tag }}-x86_64-unknown-linux-gnu.tar.gz.sha256) |
-            | **Linux x86_64** (musl static) | [`fusion-${{ needs.tag-check.outputs.tag }}-x86_64-unknown-linux-musl.tar.gz`](https://github.com/${{ github.repository }}/releases/download/${{ needs.tag-check.outputs.tag }}/fusion-${{ needs.tag-check.outputs.tag }}-x86_64-unknown-linux-musl.tar.gz) | [`.sha256`](https://github.com/${{ github.repository }}/releases/download/${{ needs.tag-check.outputs.tag }}/fusion-${{ needs.tag-check.outputs.tag }}-x86_64-unknown-linux-musl.tar.gz.sha256) |
             | **Linux AArch64** (musl static) | [`fusion-${{ needs.tag-check.outputs.tag }}-aarch64-unknown-linux-musl.tar.gz`](https://github.com/${{ github.repository }}/releases/download/${{ needs.tag-check.outputs.tag }}/fusion-${{ needs.tag-check.outputs.tag }}-aarch64-unknown-linux-musl.tar.gz) | [`.sha256`](https://github.com/${{ github.repository }}/releases/download/${{ needs.tag-check.outputs.tag }}/fusion-${{ needs.tag-check.outputs.tag }}-aarch64-unknown-linux-musl.tar.gz.sha256) |
             | **Android / Termux** (ARM64) | [`fusion-${{ needs.tag-check.outputs.tag }}-aarch64-linux-android.tar.gz`](https://github.com/${{ github.repository }}/releases/download/${{ needs.tag-check.outputs.tag }}/fusion-${{ needs.tag-check.outputs.tag }}-aarch64-linux-android.tar.gz) | [`.sha256`](https://github.com/${{ github.repository }}/releases/download/${{ needs.tag-check.outputs.tag }}/fusion-${{ needs.tag-check.outputs.tag }}-aarch64-linux-android.tar.gz.sha256) |
             | **Windows x64** (MSVC) | [`fusion-${{ needs.tag-check.outputs.tag }}-x86_64-pc-windows-msvc.zip`](https://github.com/${{ github.repository }}/releases/download/${{ needs.tag-check.outputs.tag }}/fusion-${{ needs.tag-check.outputs.tag }}-x86_64-pc-windows-msvc.zip) | [`.sha256`](https://github.com/${{ github.repository }}/releases/download/${{ needs.tag-check.outputs.tag }}/fusion-${{ needs.tag-check.outputs.tag }}-x86_64-pc-windows-msvc.zip.sha256) |
@@ -333,6 +331,9 @@ jobs:
     name: Publish TypeScript SDK (@fusion/sdk)
     needs: [tag-check, release]
     runs-on: ubuntu-latest
+    # Non-blocking: npm publishing depends on the NPM_TOKEN account owning the
+    # package scope; a failure here must not fail the binary release.
+    continue-on-error: true
     steps:
       - uses: actions/checkout@v4
 
