@@ -1,4 +1,4 @@
-/* Clean, minimalist styling matching fx.sh */
+/* Full Page Minimalist Clean Layout matching fx.sh/try exact parity */
 :root {
   --bg: #ffffff;
   --fg: #171717;
@@ -11,7 +11,7 @@
   :root {
     --bg: #000000;
     --fg: #f5f5f5;
-    --muted: #a3a3a3;
+    --muted: #8a8a8a;
     --border: #262626;
   }
 }
@@ -26,125 +26,112 @@ html, body {
   background: var(--bg);
   color: var(--fg);
   font-family: var(--font-mono);
+  width: 100%;
   min-height: 100vh;
-  display: flex;
-  flex-direction: column;
+  margin: 0;
+  padding: 0;
   -webkit-font-smoothing: antialiased;
 }
 
 body {
-  padding: 24px 32px;
+  display: flex;
+  flex-direction: column;
 }
 
 header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  max-width: 820px;
   width: 100%;
-  margin: 0 auto 32px auto;
+  height: 64px;
+  padding: 0 32px;
+  border-bottom: 1px solid transparent;
 }
 
-.brand {
+.brand-section {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 12px;
   text-decoration: none;
   color: inherit;
-  font-weight: 600;
-  font-size: 16px;
 }
 
 .brand-logo {
-  font-size: 18px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--fg);
+}
+
+.brand-title {
+  font-weight: 600;
+  font-size: 16px;
+  letter-spacing: -0.01em;
 }
 
 nav {
   display: flex;
-  gap: 20px;
-  font-size: 13px;
+  align-items: center;
+  gap: 24px;
+  font-size: 14px;
 }
 
 nav a {
   color: var(--muted);
   text-decoration: none;
-  transition: color 0.15s;
+  transition: color 0.15s ease;
 }
 
 nav a:hover, nav a.active {
   color: var(--fg);
 }
 
-.container {
-  max-width: 820px;
+.install-link {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--fg);
+  font-size: 13px;
+  text-decoration: none;
+}
+
+.page-container {
   width: 100%;
-  margin: 0 auto;
+  padding: 16px 32px 32px 32px;
   display: flex;
   flex-direction: column;
-  gap: 16px;
   flex: 1;
 }
 
-.tagline {
+.demo-description {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--muted);
+  margin-bottom: 24px;
+  max-width: 900px;
+}
+
+.demo-info-icon {
   font-size: 13px;
   color: var(--muted);
+  user-select: none;
 }
 
-.install-cmd {
-  font-size: 13px;
-  font-weight: 500;
-  user-select: all;
-}
-
-.meta-line {
-  font-size: 12px;
-  color: var(--muted);
-  margin-bottom: 8px;
-}
-
-/* Minimalist Terminal Card matching fx.sh */
-.terminal-card {
-  border: 1px solid var(--border);
-  border-radius: 12px;
-  overflow: hidden;
-  background: var(--bg);
-  box-shadow: 0 4px 24px rgba(0,0,0,0.04);
+.terminal-full-wrapper {
+  width: 100%;
+  flex: 1;
+  min-height: calc(100vh - 180px);
   display: flex;
   flex-direction: column;
-}
-
-.terminal-header {
-  height: 38px;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 0 16px;
-  border-bottom: 1px solid var(--border);
-  font-size: 12px;
-  color: var(--muted);
-}
-
-.window-dots {
-  display: flex;
-  gap: 6px;
-}
-
-.dot {
-  width: 10px;
-  height: 10px;
-  border-radius: 50%;
-  background: var(--border);
-}
-
-.terminal-body {
-  padding: 16px;
-  min-height: 440px;
-  height: 520px;
 }
 
 #terminal-container {
   width: 100%;
-  height: 100%;
+  flex: 1;
+  min-height: 700px;
 }
 
 .xterm {
@@ -155,51 +142,6 @@ nav a:hover, nav a.active {
   background-color: transparent !important;
 }
 
-/* Slash auto-suggest box */
-.slash-popup {
-  border-top: 1px solid var(--border);
-  padding: 12px 16px;
-  font-size: 12px;
-  display: none;
-  flex-direction: column;
-  gap: 6px;
-  background: var(--bg);
-}
-
-.slash-popup.visible {
-  display: flex;
-}
-
-.slash-header {
-  display: flex;
-  justify-content: space-between;
-  color: var(--muted);
-  margin-bottom: 4px;
-}
-
-.slash-item {
-  display: flex;
-  justify-content: space-between;
-  padding: 4px 8px;
-  border-radius: 4px;
-  color: var(--fg);
-  cursor: pointer;
-}
-
-.slash-item.selected {
-  background: var(--border);
-}
-
-.slash-cmd { font-weight: 500; }
-.slash-desc { color: var(--muted); }
-
-.bottom-info {
-  margin-top: 24px;
-  font-size: 13px;
-  color: var(--muted);
-  line-height: 1.6;
-}
-
-.bottom-info p + p {
-  margin-top: 12px;
+.xterm-screen {
+  padding: 0 !important;
 }

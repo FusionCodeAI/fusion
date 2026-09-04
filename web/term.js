@@ -1,17 +1,52 @@
 /**
- * Fusion v2 — Minimalist Web Terminal matching fx.sh
+ * Fusion v2 — Full-page in-browser terminal matching fx.sh/try exact parity
  */
 (function () {
   'use strict';
 
-  const COMMANDS = [
-    { cmd: '/help', desc: 'show available slash commands' },
-    { cmd: '/usage', desc: 'view cloud account quota and cache savings' },
-    { cmd: '/stats', desc: 'view session token stats and cost' },
-    { cmd: '/clear', desc: 'start a fresh session and clear screen' },
-    { cmd: '/model', desc: 'switch model or view model catalog' },
-    { cmd: '/compact', desc: 'compact context window' },
-    { cmd: '/quit', desc: 'exit current turn' }
+  // Fusion Official Models
+  const FUSION_MODELS = [
+    {
+      id: 'deepseek-ai/DeepSeek-V4-Flash-0731',
+      name: 'DeepSeek V4 Flash',
+      context: '1M context',
+      output: '128K output · Fast',
+      tag: 'Default',
+      shorthand: 'flash',
+      footerName: 'deepseek-v4-flash'
+    },
+    {
+      id: 'MiniMaxAI/MiniMax-M2.7',
+      name: 'MiniMax M2.7',
+      context: '204K context',
+      output: '128K output · Reasoning & Coding',
+      tag: 'Reasoning',
+      shorthand: 'minimax',
+      footerName: 'minimax-m2.7'
+    },
+    {
+      id: 'moonshotai/Kimi-K2.6',
+      name: 'Kimi K2.6',
+      context: '262K context',
+      output: '128K output · Long Context',
+      tag: 'Context',
+      shorthand: 'kimi',
+      footerName: 'kimi-k2.6'
+    }
+  ];
+
+  const SLASH_COMMANDS = [
+    { cmd: '/help', desc: 'show available slash commands', category: 'General' },
+    { cmd: '/clear', desc: 'start a fresh session and keep background processes', category: 'General' },
+    { cmd: '/new', desc: 'start a fresh session', category: 'Session' },
+    { cmd: '/reset', desc: 'reset the current session context', category: 'Session' },
+    { cmd: '/resume', desc: 'resume a saved session', category: 'Session' },
+    { cmd: '/continue', desc: 'continue a paused model response', category: 'Session' },
+    { cmd: '/model', desc: 'choose model or switch active model', category: 'Model' },
+    { cmd: '/usage', desc: 'view cloud account quota, spend, and prefix cache savings', category: 'Account' },
+    { cmd: '/stats', desc: 'view session token stats and cost breakdown', category: 'Session' },
+    { cmd: '/compact', desc: 'compact context window to reduce token overhead', category: 'Context' },
+    { cmd: '/quit', desc: 'exit current interactive session', category: 'General' }
   ];
 
   const state = {
@@ -21,10 +56,16 @@
     cursorPos: 0,
     history: [],
     historyIndex: -1,
-    activeModel: 'deepseek-ai/DeepSeek-V4-Flash-0731',
+    activeModelIndex: 0,
     isStreaming: false,
-    selectedSlashIndex: 0
+    mode: 'normal', // 'normal' | 'slash_menu' | 'model_menu'
+    menuSelectedIndex: 0,
+    renderedMenuLines: 0
   };
+
+  function getActiveModel() {
+    return FUSION_MODELS[state.activeModelIndex] || FUSION_MODELS[0];
+  }
 
   function isDarkMode() {
     return window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
@@ -34,10 +75,10 @@
     if (isDarkMode()) {
       return {
         background: '#000000',
-        foreground: '#f5f5f5',
-        cursor: '#f5f5f5',
+        foreground: '#ededed',
+        cursor: '#ededed',
         cursorAccent: '#000000',
-        selectionBackground: 'rgba(255, 255, 255, 0.25)',
+        selectionBackground: 'rgba(255, 255, 255, 0.22)',
         black: '#000000',
         red: '#ef4444',
         green: '#22c55e',
@@ -45,7 +86,7 @@
         blue: '#3b82f6',
         magenta: '#a855f7',
         cyan: '#06b6d4',
-        white: '#f5f5f5'
+        white: '#ededed'
       };
     } else {
       return {
@@ -53,7 +94,7 @@
         foreground: '#171717',
         cursor: '#171717',
         cursorAccent: '#ffffff',
-        selectionBackground: 'rgba(0, 0, 0, 0.15)',
+        selectionBackground: 'rgba(0, 0, 0, 0.12)',
         black: '#171717',
         red: '#dc2626',
         green: '#16a34a',
@@ -61,7 +102,9 @@
         blue: '#2563eb',
         magenta: '#9333ea',
         cyan: '#0891b2',
-        white: '#ffffff'
+        white: '#737373',
+        brightWhite: '#171717',
+        brightBlack: '#737373'
       };
     }
   }
@@ -74,8 +117,8 @@
       cursorBlink: true,
       cursorStyle: 'bar',
       fontSize: 14,
-      lineHeight: 1.4,
-      fontFamily: '"Geist Mono", "SF Mono", Menlo, Monaco, Consolas, monospace',
+      lineHeight: 1.45,
+      fontFamily: '"Geist Mono", "Geist Mono Fallback", ui-monospace, monospace',
       theme: getTheme(),
       convertEol: true,
       allowTransparency: true
@@ -116,11 +159,46 @@
 
   function printPrompt() {
     const t = state.term;
-    // Exactly 1 vertical bar prompt line, followed by docked status
-    t.write('\x1b[1m┃ \x1b[0m');
+    const model = getActiveModel();
+    // Render:
+    // Line 1: ┃ <input>
+    // Line 2: <blank>
+    // Line 3: auto · <model_name>
+    t.write(`\x1b[1m┃ \x1b[0m\r\n\r\n\x1b[2;37mauto · ${model.footerName}\x1b[0m`);
+    // Now move cursor back up 2 lines and to column 2 (immediately after "┃ ")
+    t.write('\x1b[2A\r\x1b[2C');
+
     state.inputBuffer = '';
     state.cursorPos = 0;
-    hideSlashPopup();
+    state.mode = 'normal';
+    state.renderedMenuLines = 0;
+  }
+
+  function clearMenuIfRendered() {
+    if (state.renderedMenuLines > 0) {
+      const t = state.term;
+      // Clear all lines drawn below the input line
+      for (let i = 0; i < state.renderedMenuLines; i++) {
+        t.write('\r\x1b[1B\x1b[2K');
+      }
+      // Move back up to input line and restore prompt + input
+      t.write(`\x1b[${state.renderedMenuLines}A\r\x1b[2K\x1b[1m┃ \x1b[0m${state.inputBuffer}`);
+      const moveLeft = state.inputBuffer.length - state.cursorPos;
+      if (moveLeft > 0) {
+        t.write(`\x1b[${moveLeft}D`);
+      }
+      state.renderedMenuLines = 0;
+    }
+  }
+
+  function redrawInputLine() {
+    const t = state.term;
+    // Clear only current line, redraw prompt and buffer
+    t.write('\r\x1b[2K\x1b[1m┃ \x1b[0m' + state.inputBuffer);
+    const moveLeft = state.inputBuffer.length - state.cursorPos;
+    if (moveLeft > 0) {
+      t.write(`\x1b[${moveLeft}D`);
+    }
   }
 
   function handleInput(data) {
@@ -128,6 +206,16 @@
       if (data === '\x03') { // Ctrl+C
         abortTurn();
       }
+      return;
+    }
+
+    if (state.mode === 'slash_menu') {
+      handleSlashMenuInput(data);
+      return;
+    }
+
+    if (state.mode === 'model_menu') {
+      handleModelMenuInput(data);
       return;
     }
 
@@ -148,15 +236,23 @@
         printPrompt();
         break;
       case '\t': // Tab
-        handleTab();
+        if (state.inputBuffer.startsWith('/')) {
+          openSlashMenu();
+        }
         break;
       default:
         if (data.startsWith('\x1b[')) {
           handleArrowKey(data);
         } else if (data.length === 1 && data.charCodeAt(0) >= 32) {
           insertChar(data);
+          if (state.inputBuffer === '/') {
+            openSlashMenu();
+          }
         } else if (data.length > 1) {
           insertText(data);
+          if (state.inputBuffer.startsWith('/')) {
+            openSlashMenu();
+          }
         }
         break;
     }
@@ -167,8 +263,7 @@
     const right = state.inputBuffer.slice(state.cursorPos);
     state.inputBuffer = left + ch + right;
     state.cursorPos++;
-    redrawLine();
-    checkSlashPopup();
+    redrawInputLine();
   }
 
   function insertText(text) {
@@ -177,8 +272,7 @@
     const right = state.inputBuffer.slice(state.cursorPos);
     state.inputBuffer = left + clean + right;
     state.cursorPos += clean.length;
-    redrawLine();
-    checkSlashPopup();
+    redrawInputLine();
   }
 
   function handleBackspace() {
@@ -187,37 +281,21 @@
       const right = state.inputBuffer.slice(state.cursorPos);
       state.inputBuffer = left + right;
       state.cursorPos--;
-      redrawLine();
-      checkSlashPopup();
-    }
-  }
-
-  function redrawLine() {
-    state.term.write('\r\x1b[2K\x1b[1m┃ \x1b[0m' + state.inputBuffer);
-    const moveLeft = state.inputBuffer.length - state.cursorPos;
-    if (moveLeft > 0) {
-      state.term.write(`\x1b[${moveLeft}D`);
+      redrawInputLine();
     }
   }
 
   function handleArrowKey(seq) {
-    const popup = document.getElementById('slash-popup');
-    const isPopupVisible = popup && popup.classList.contains('visible');
-
     if (seq === '\x1b[A') { // Up
-      if (isPopupVisible) {
-        moveSlashSelection(-1);
-      } else if (state.history.length > 0) {
+      if (state.history.length > 0) {
         if (state.historyIndex === -1) state.historyIndex = state.history.length - 1;
         else if (state.historyIndex > 0) state.historyIndex--;
         state.inputBuffer = state.history[state.historyIndex] || '';
         state.cursorPos = state.inputBuffer.length;
-        redrawLine();
+        redrawInputLine();
       }
     } else if (seq === '\x1b[B') { // Down
-      if (isPopupVisible) {
-        moveSlashSelection(1);
-      } else if (state.historyIndex !== -1) {
+      if (state.historyIndex !== -1) {
         if (state.historyIndex < state.history.length - 1) {
           state.historyIndex++;
           state.inputBuffer = state.history[state.historyIndex];
@@ -226,7 +304,7 @@
           state.inputBuffer = '';
         }
         state.cursorPos = state.inputBuffer.length;
-        redrawLine();
+        redrawInputLine();
       }
     } else if (seq === '\x1b[D' && state.cursorPos > 0) { // Left
       state.cursorPos--;
@@ -237,33 +315,12 @@
     }
   }
 
-  function handleTab() {
-    const popup = document.getElementById('slash-popup');
-    if (popup && popup.classList.contains('visible')) {
-      const items = getFilteredCommands();
-      if (items[state.selectedSlashIndex]) {
-        state.inputBuffer = items[state.selectedSlashIndex].cmd + ' ';
-        state.cursorPos = state.inputBuffer.length;
-        redrawLine();
-        hideSlashPopup();
-      }
-    }
-  }
-
   function handleEnter() {
-    const popup = document.getElementById('slash-popup');
-    if (popup && popup.classList.contains('visible')) {
-      const items = getFilteredCommands();
-      if (items[state.selectedSlashIndex]) {
-        state.inputBuffer = items[state.selectedSlashIndex].cmd;
-        state.cursorPos = state.inputBuffer.length;
-        redrawLine();
-        hideSlashPopup();
-      }
-    }
-
-    state.term.writeln('');
+    const t = state.term;
     const input = state.inputBuffer.trim();
+
+    // Move past the blank line and footer so output appears naturally below
+    t.write('\r\x1b[2B\r\x1b[2K\x1b[1A\r\x1b[2K\x1b[1A\r\n\r\n');
 
     if (!input) {
       printPrompt();
@@ -272,64 +329,211 @@
 
     state.history.push(input);
     state.historyIndex = -1;
-    hideSlashPopup();
 
-    if (input.startsWith('/')) {
+    if (input === '/model' || input.startsWith('/model ')) {
+      const parts = input.split(' ');
+      if (parts[1]) {
+        selectModelById(parts[1]);
+        printPrompt();
+      } else {
+        openModelMenu();
+      }
+    } else if (input.startsWith('/')) {
       runSlashCommand(input);
     } else {
       runAgentTurn(input);
     }
   }
 
-  function getFilteredCommands() {
-    const query = state.inputBuffer.toLowerCase().trim();
-    return COMMANDS.filter(c => c.cmd.startsWith(query) || c.desc.toLowerCase().includes(query.replace('/', '')));
+  // ===========================================================================
+  // Slash Command Interactive In-Terminal Menu (Directly under input line)
+  // ===========================================================================
+  function openSlashMenu() {
+    state.mode = 'slash_menu';
+    state.menuSelectedIndex = 0;
+    renderSlashMenu();
   }
 
-  function checkSlashPopup() {
-    const popup = document.getElementById('slash-popup');
-    if (!popup) return;
+  function getFilteredSlashCommands() {
+    const q = state.inputBuffer.toLowerCase().trim();
+    return SLASH_COMMANDS.filter(c => c.cmd.startsWith(q) || c.desc.toLowerCase().includes(q.replace('/', '')));
+  }
 
-    if (state.inputBuffer.startsWith('/')) {
-      const items = getFilteredCommands();
-      if (items.length > 0) {
-        state.selectedSlashIndex = Math.min(state.selectedSlashIndex, items.length - 1);
-        renderSlashItems(items);
-        popup.classList.add('visible');
-      } else {
-        hideSlashPopup();
+  function renderSlashMenu() {
+    clearMenuIfRendered();
+    const t = state.term;
+    const items = getFilteredSlashCommands();
+
+    if (items.length === 0) {
+      state.mode = 'normal';
+      return;
+    }
+
+    state.menuSelectedIndex = Math.min(state.menuSelectedIndex, items.length - 1);
+    const visibleCount = Math.min(items.length, 6);
+    const cols = state.term.cols || 120;
+    const divider = '─'.repeat(Math.min(cols, 140));
+    let linesDrawn = 0;
+
+    // Header divider immediately below input line
+    t.write('\r\n\x1b[2;37m' + divider + '\x1b[0m\r\n');
+    linesDrawn += 2;
+
+    const rightCol = Math.max(cols - 10, 80);
+    t.write(`\x1b[2;37mCommands ${items.length} · Type to filter\x1b[0m\x1b[${rightCol}G\x1b[2;37m1–${visibleCount}\x1b[0m\r\n\r\n`);
+    linesDrawn += 2;
+
+    const catCol = Math.max(cols - 12, 80);
+    for (let i = 0; i < visibleCount; i++) {
+      const item = items[i];
+      const isSelected = i === state.menuSelectedIndex;
+      const cmdFmt = isSelected ? `\x1b[1;36m${item.cmd.padEnd(12)}\x1b[0m` : `\x1b[1m${item.cmd.padEnd(12)}\x1b[0m`;
+      const descFmt = `\x1b[2;37m${item.desc}\x1b[0m`;
+      const catFmt = `\x1b[2;37m${item.category}\x1b[0m`;
+
+      t.write(`  ${cmdFmt} ${descFmt}\x1b[${catCol}G${catFmt}\r\n`);
+      linesDrawn += 1;
+    }
+
+    // Bottom divider
+    t.write('\x1b[2;37m' + divider + '\x1b[0m\r\n');
+    t.write('\x1b[2;37m↑↓ Navigate     Enter Use     Esc Close\x1b[0m');
+    linesDrawn += 2;
+
+    state.renderedMenuLines = linesDrawn;
+
+    // Return cursor to input line immediately after input text
+    t.write(`\x1b[${linesDrawn}A\r\x1b[1m┃ \x1b[0m${state.inputBuffer}`);
+    const moveLeft = state.inputBuffer.length - state.cursorPos;
+    if (moveLeft > 0) t.write(`\x1b[${moveLeft}D`);
+  }
+
+  function handleSlashMenuInput(data) {
+    const items = getFilteredSlashCommands();
+
+    if (data === '\x1b[A') { // Up
+      state.menuSelectedIndex = (state.menuSelectedIndex - 1 + items.length) % items.length;
+      renderSlashMenu();
+    } else if (data === '\x1b[B') { // Down
+      state.menuSelectedIndex = (state.menuSelectedIndex + 1) % items.length;
+      renderSlashMenu();
+    } else if (data === '\r' || data === '\t') { // Enter or Tab
+      const selected = items[state.menuSelectedIndex];
+      clearMenuIfRendered();
+      state.mode = 'normal';
+      if (selected) {
+        state.inputBuffer = selected.cmd;
+        state.cursorPos = state.inputBuffer.length;
+        redrawInputLine();
+        if (selected.cmd === '/model') {
+          openModelMenu();
+        } else if (data === '\r') {
+          handleEnter();
+        }
       }
-    } else {
-      hideSlashPopup();
+    } else if (data === '\x1b' || data === '\x03') { // Esc or Ctrl+C
+      clearMenuIfRendered();
+      state.mode = 'normal';
+    } else if (data === '\x7f') { // Backspace
+      handleBackspace();
+      if (state.inputBuffer.length === 0) {
+        clearMenuIfRendered();
+        state.mode = 'normal';
+      } else {
+        renderSlashMenu();
+      }
+    } else if (data.length === 1 && data.charCodeAt(0) >= 32) {
+      insertChar(data);
+      renderSlashMenu();
     }
   }
 
-  function hideSlashPopup() {
-    const popup = document.getElementById('slash-popup');
-    if (popup) popup.classList.remove('visible');
-    state.selectedSlashIndex = 0;
+  // ===========================================================================
+  // Models Interactive In-Terminal Menu (Directly under input line)
+  // ===========================================================================
+  function openModelMenu() {
+    state.mode = 'model_menu';
+    state.menuSelectedIndex = state.activeModelIndex;
+    renderModelMenu();
   }
 
-  function renderSlashItems(items) {
-    const list = document.getElementById('slash-list');
-    const count = document.getElementById('slash-count');
-    if (!list) return;
+  function renderModelMenu() {
+    clearMenuIfRendered();
+    const t = state.term;
+    const cols = state.term.cols || 120;
+    const divider = '─'.repeat(Math.min(cols, 140));
+    let linesDrawn = 0;
 
-    if (count) count.textContent = items.length;
+    // Header divider right under input cursor
+    t.write('\r\n\x1b[2;37m' + divider + '\x1b[0m\r\n');
+    linesDrawn += 2;
 
-    list.innerHTML = items.map((item, idx) => `
-      <div class="slash-item ${idx === state.selectedSlashIndex ? 'selected' : ''}">
-        <span class="slash-cmd">${item.cmd}</span>
-        <span class="slash-desc">${item.desc}</span>
-      </div>
-    `).join('');
+    t.write(`\x1b[2;37mModels ${FUSION_MODELS.length}  [All] Fusion AI\x1b[0m\r\n\r\n`);
+    linesDrawn += 2;
+
+    for (let i = 0; i < FUSION_MODELS.length; i++) {
+      const m = FUSION_MODELS[i];
+      const isSelected = i === state.menuSelectedIndex;
+      const isCurrent = i === state.activeModelIndex;
+
+      const prefix = isSelected ? '\x1b[1;36m❯\x1b[0m ' : '  ';
+      const nameFmt = isSelected
+        ? `\x1b[1;36m${m.id.padEnd(38)}\x1b[0m`
+        : `\x1b[1m${m.id.padEnd(38)}\x1b[0m`;
+      const specFmt = `\x1b[2;37m${m.context.padEnd(14)} · ${m.output.padEnd(28)}\x1b[0m`;
+      const curFmt = isCurrent ? `\x1b[1;32m[Active]\x1b[0m` : '';
+
+      t.write(`${prefix}${nameFmt} ${specFmt} ${curFmt}\r\n`);
+      linesDrawn += 1;
+    }
+
+    t.write('\r\n\x1b[2;37mNote: Fusion Gateway catalog is authenticated with FUSION_API_KEY\x1b[0m\r\n');
+    t.write('\x1b[2;37m' + divider + '\x1b[0m\r\n');
+    t.write('\x1b[2;37m↑↓ Navigate     Enter Use     Esc Close\x1b[0m');
+    linesDrawn += 3;
+
+    state.renderedMenuLines = linesDrawn;
+
+    // Return cursor to input line
+    t.write(`\x1b[${linesDrawn}A\r\x1b[1m┃ \x1b[0m${state.inputBuffer}`);
+    const moveLeft = state.inputBuffer.length - state.cursorPos;
+    if (moveLeft > 0) t.write(`\x1b[${moveLeft}D`);
   }
 
-  function moveSlashSelection(delta) {
-    const items = getFilteredCommands();
-    if (items.length === 0) return;
-    state.selectedSlashIndex = (state.selectedSlashIndex + delta + items.length) % items.length;
-    renderSlashItems(items);
+  function handleModelMenuInput(data) {
+    if (data === '\x1b[A') { // Up
+      state.menuSelectedIndex = (state.menuSelectedIndex - 1 + FUSION_MODELS.length) % FUSION_MODELS.length;
+      renderModelMenu();
+    } else if (data === '\x1b[B') { // Down
+      state.menuSelectedIndex = (state.menuSelectedIndex + 1) % FUSION_MODELS.length;
+      renderModelMenu();
+    } else if (data === '\r') { // Enter
+      state.activeModelIndex = state.menuSelectedIndex;
+      const selected = getActiveModel();
+      clearMenuIfRendered();
+      state.mode = 'normal';
+
+      // Move past prompt footer to write message
+      state.term.write('\r\x1b[2B\r\x1b[2K\x1b[1A\r\x1b[2K\x1b[1A\r\n');
+      state.term.writeln(`● Switched to ${selected.id}\r\n`);
+      printPrompt();
+    } else if (data === '\x1b' || data === '\x03') { // Esc or Ctrl+C
+      clearMenuIfRendered();
+      state.mode = 'normal';
+    }
+  }
+
+  function selectModelById(query) {
+    const q = query.toLowerCase().trim();
+    const idx = FUSION_MODELS.findIndex(m => m.id.toLowerCase().includes(q) || m.shorthand === q || m.name.toLowerCase().includes(q));
+    if (idx >= 0) {
+      state.activeModelIndex = idx;
+      const m = FUSION_MODELS[idx];
+      state.term.writeln(`● Switched to ${m.id}\r\n`);
+    } else {
+      state.term.writeln(`\x1b[31mUnknown model: ${query}\x1b[0m\r\n`);
+      state.term.writeln('\x1b[2;37mAvailable Fusion models: flash (DeepSeek V4 Flash), minimax (MiniMax M2.7), kimi (Kimi K2.6)\x1b[0m\r\n');
+    }
   }
 
   function runSlashCommand(input) {
@@ -340,7 +544,7 @@
     switch (cmd) {
       case '/help':
         t.writeln('\x1b[2;37mCommands:\x1b[0m');
-        COMMANDS.forEach(c => {
+        SLASH_COMMANDS.forEach(c => {
           t.writeln(`  \x1b[1m${c.cmd.padEnd(12)}\x1b[0m \x1b[2;37m${c.desc}\x1b[0m`);
         });
         t.writeln('');
@@ -369,13 +573,21 @@
         printPrompt();
         break;
 
-      case '/model':
-        if (parts[1]) {
-          state.activeModel = parts[1];
-          t.writeln(`Switched model to \x1b[1m${state.activeModel}\x1b[0m\r\n`);
-        } else {
-          t.writeln(`Active model: \x1b[1m${state.activeModel}\x1b[0m (use \x1b[2;37m/model <name>\x1b[0m to switch)\r\n`);
-        }
+      case '/stats':
+        t.writeln('╭─────────────────────────────────────────────────────────────╮');
+        t.writeln('│ ✦ Fusion Session Analytics & Cost Breakdown                 │');
+        t.writeln('├─────────────────────────────────────────────────────────────┤');
+        t.writeln(`│ Model:        ${getActiveModel().id.padEnd(45)} │`);
+        t.writeln('│ Prompt:       1,820 tokens (85.2% cache hit rate)           │');
+        t.writeln('│ Completion:   420 tokens                                    │');
+        t.writeln('│ Total Spend:  $0.0018                                       │');
+        t.writeln('╰─────────────────────────────────────────────────────────────╯');
+        t.writeln('');
+        printPrompt();
+        break;
+
+      case '/compact':
+        t.writeln('✔ Session context compacted via SKILL.state (prompt size remains O(1)).\r\n');
         printPrompt();
         break;
 
@@ -390,7 +602,6 @@
     const t = state.term;
     state.isStreaming = true;
 
-    // Simulate clean agent execution with tool tree
     t.writeln('  \x1b[2;37m• Running (1s) (↑280 ↓12)\x1b[0m\r\n');
 
     setTimeout(() => {
@@ -398,7 +609,8 @@
       t.writeln('\x1b[2;37m└ Matched src/**/*\x1b[0m\r\n');
 
       setTimeout(() => {
-        t.writeln(`I have analyzed your request: "${prompt}". All checks passed.\r\n`);
+        const model = getActiveModel();
+        t.writeln(`[${model.name}] I have analyzed your request: "${prompt}". All checks passed.\r\n`);
         t.writeln('  \x1b[2;37m1.2s (↑1.2k ↓48)\x1b[0m\r\n');
         state.isStreaming = false;
         printPrompt();
