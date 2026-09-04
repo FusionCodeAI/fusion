@@ -34,6 +34,8 @@ pub struct SlashSuggestion {
     pub category: String,
     /// Whether this entry is a skill (vs a built-in command).
     pub is_skill: bool,
+    /// Source label for skills (e.g. "Claude", "Fusion", "Global").
+    pub source: String,
 }
 
 pub struct Prompt {
@@ -139,6 +141,61 @@ impl Prompt {
 
     pub fn set_skill_suggestions(&mut self, suggestions: Vec<SlashSuggestion>) {
         self.skill_suggestions = suggestions;
+    }
+
+    /// Set the active skill (name, source label) picked by the user.
+    pub fn set_active_skill(&mut self, skill: Option<(String, String)>) {
+        self.active_skill = skill;
+    }
+
+    /// Take and clear the active skill; used by the REPL after submit.
+    pub fn take_active_skill(&mut self) -> Option<(String, String)> {
+        self.active_skill.take()
+    }
+
+    /// Current active skill, if any.
+    pub fn active_skill(&self) -> Option<&(String, String)> {
+        self.active_skill.as_ref()
+    }
+
+    /// Filtered skill list for the picker: source tab filter + buffer text query.
+    fn skill_picker_filtered(&self) -> Vec<&SlashSuggestion> {
+        let query: String = self.buffer.iter().collect::<String>().to_lowercase();
+        self.skill_suggestions
+            .iter()
+            .filter(|s| {
+                if !s.is_skill {
+                    return false;
+                }
+                let src_ok = match self.skill_picker_source {
+                    0 => true,
+                    1 => s.source == "Fusion",
+                    2 => s.source == "Claude",
+                    3 => s.source == "Global",
+                    _ => s.source == "Custom" || s.source == "Builtin",
+                };
+                if !src_ok {
+                    return false;
+                }
+                if query.is_empty() {
+                    return true;
+                }
+                let name = s.name.strip_prefix("skill:").unwrap_or(&s.name);
+                name.to_lowercase().contains(&query)
+            })
+            .collect()
+    }
+
+    /// Visible width of the active-skill chip rendered on the input row.
+    fn skill_chip_width(&self) -> usize {
+        if let Some((name, source)) = &self.active_skill {
+            UnicodeWidthStr::width(name.as_str())
+                + 3 // " · "
+                + UnicodeWidthStr::width(source.as_str())
+                + 2 // trailing "  "
+        } else {
+            0
+        }
     }
 
     /// Set active model displayed in the prompt box title.
@@ -502,6 +559,15 @@ impl Prompt {
                         self.render_current()?;
                         return Ok(None);
                     }
+                    if self.skill_picker_active {
+                        self.skill_picker_active = false;
+                        self.skill_picker_selection = 0;
+                        self.skill_picker_source = 0;
+                        self.buffer.clear();
+                        self.cursor_pos = 0;
+                        self.render_current()?;
+                        return Ok(None);
+                    }
                     let text_so_far: String = self.buffer.iter().collect();
                     if text_so_far.starts_with('/') {
                         self.buffer.clear();
@@ -520,6 +586,7 @@ impl Prompt {
                     self.effort_selection = 0;
                     self.pending_model_id.clear();
                     self.model_picker_active = false;
+                    self.skill_picker_active = false;
                     self.clear_frame()?;
                     return Ok(Some(PromptResult::Cancel));
                 }
@@ -641,6 +708,85 @@ impl Prompt {
                             self.buffer.insert(self.cursor_pos, c);
                             self.cursor_pos += 1;
                             self.model_selection = 0;
+                            self.render_current()?;
+                            return Ok(None);
+                        }
+                        _ => return Ok(None),
+                    }
+                }
+
+                // Skill picker dialog mode
+                if self.skill_picker_active {
+                    let filtered = self.skill_picker_filtered();
+                    match key.code {
+                        KeyCode::Down => {
+                            if !filtered.is_empty() {
+                                self.skill_picker_selection =
+                                    (self.skill_picker_selection + 1) % filtered.len();
+                            }
+                            self.render_current()?;
+                            return Ok(None);
+                        }
+                        KeyCode::Up => {
+                            if !filtered.is_empty() {
+                                self.skill_picker_selection = if self.skill_picker_selection == 0 {
+                                    filtered.len() - 1
+                                } else {
+                                    self.skill_picker_selection - 1
+                                };
+                            }
+                            self.render_current()?;
+                            return Ok(None);
+                        }
+                        KeyCode::Tab | KeyCode::BackTab => {
+                            // Tab cycles source filter (fx-style)
+                            self.skill_picker_source = (self.skill_picker_source + 1) % 5;
+                            self.skill_picker_selection = 0;
+                            self.render_current()?;
+                            return Ok(None);
+                        }
+                        KeyCode::Enter => {
+                            if let Some(sel) = filtered.get(
+                                self.skill_picker_selection
+                                    .min(filtered.len().saturating_sub(1)),
+                            ) {
+                                let skill_name =
+                                    sel.name.strip_prefix("skill:").unwrap_or(&sel.name);
+                                // Store active skill; clear picker; user keeps typing
+                                self.active_skill =
+                                    Some((skill_name.to_string(), sel.source.clone()));
+                                self.skill_picker_active = false;
+                                self.skill_picker_selection = 0;
+                                self.skill_picker_source = 0;
+                                self.buffer.clear();
+                                self.cursor_pos = 0;
+                                self.render_current()?;
+                                return Ok(None);
+                            }
+                            return Ok(None);
+                        }
+                        KeyCode::Esc => {
+                            self.skill_picker_active = false;
+                            self.skill_picker_selection = 0;
+                            self.skill_picker_source = 0;
+                            self.buffer.clear();
+                            self.cursor_pos = 0;
+                            self.render_current()?;
+                            return Ok(None);
+                        }
+                        KeyCode::Backspace => {
+                            if self.cursor_pos > 0 {
+                                self.buffer.remove(self.cursor_pos - 1);
+                                self.cursor_pos -= 1;
+                            }
+                            self.skill_picker_selection = 0;
+                            self.render_current()?;
+                            return Ok(None);
+                        }
+                        KeyCode::Char(c) => {
+                            self.buffer.insert(self.cursor_pos, c);
+                            self.cursor_pos += 1;
+                            self.skill_picker_selection = 0;
                             self.render_current()?;
                             return Ok(None);
                         }
@@ -940,6 +1086,16 @@ impl Prompt {
             };
 
             write!(out, "{}", prefix)?;
+            if idx == 0 {
+                // Active skill chip prefix (fx-style): skill name · source
+                if let Some((skill_name, source)) = &self.active_skill {
+                    write!(
+                        out,
+                        "\x1b[1;36m{}\x1b[0m \x1b[2;37m· {}\x1b[0m  ",
+                        skill_name, source
+                    )?;
+                }
+            }
             if idx == 0 && line.is_empty() && lines.len() == 1 && !self.is_running {
                 if let Some(ph) = &self.placeholder {
                     if !ph.is_empty() {
@@ -1009,7 +1165,12 @@ impl Prompt {
                 &self.multiline_symbol
             };
             let prefix_col = visible_width(prefix);
-            let target_x = (prefix_col + target_col) as u16;
+            let chip_w = if target_row == 0 {
+                self.skill_chip_width()
+            } else {
+                0
+            };
+            let target_x = (prefix_col + chip_w + target_col) as u16;
             execute!(out, cursor::MoveToColumn(target_x))?;
 
             *last_rendered_lines = total_lines;
@@ -1105,7 +1266,113 @@ impl Prompt {
                 &self.multiline_symbol
             };
             let prefix_col = visible_width(prefix);
-            let target_x = (prefix_col + target_col) as u16;
+            let chip_w = if target_row == 0 {
+                self.skill_chip_width()
+            } else {
+                0
+            };
+            let target_x = (prefix_col + chip_w + target_col) as u16;
+            execute!(out, cursor::MoveToColumn(target_x))?;
+
+            *last_rendered_lines = total_lines;
+            *last_cursor_row = header_lines + target_row;
+        } else if self.skill_picker_active {
+            // Filter by source tab (0=All, 1=Fusion, 2=Claude, 3=Global, 4=Custom/Builtin)
+            let filtered = self.skill_picker_filtered();
+            let sel = if filtered.is_empty() {
+                0
+            } else {
+                self.skill_picker_selection
+                    .min(filtered.len().saturating_sub(1))
+            };
+            let window_start = if sel >= 8 { sel - 7 } else { 0 };
+            let visible_items: Vec<_> = filtered
+                .iter()
+                .enumerate()
+                .skip(window_start)
+                .take(8)
+                .collect();
+            let visible_count = visible_items.len();
+
+            write!(out, "\x1b[38;5;240m{}\x1b[0m\r\n", divider)?;
+            total_lines += 1;
+
+            // Header: Skills <count> [tabs]
+            let tabs = ["All", "Fusion", "Claude", "Global", "Other"];
+            let mut header = format!("Skills {}", filtered.len());
+            for (i, tab) in tabs.iter().enumerate() {
+                if i == self.skill_picker_source {
+                    header.push_str(&format!(" \x1b[1;37m[{}]\x1b[0m", tab));
+                } else {
+                    header.push_str(&format!(" \x1b[2;37m{}\x1b[0m", tab));
+                }
+            }
+            write!(out, "\x1b[2;37m{}\x1b[0m\r\n", header)?;
+            total_lines += 1;
+
+            write!(out, "\r\n")?;
+            total_lines += 1;
+
+            for (idx, item) in &visible_items {
+                let is_selected = *idx == sel;
+                let col1_w = visible_items
+                    .iter()
+                    .map(|(_, s)| UnicodeWidthStr::width(s.name.as_str()))
+                    .max()
+                    .unwrap_or(20)
+                    .max(20)
+                    .min(term_cols.saturating_sub(30));
+                let col3_w = 12;
+                let col2_w = term_cols.saturating_sub(col1_w + col3_w + 4);
+
+                let col1 = truncate_fit(&item.name, col1_w);
+                let col2 = truncate_fit(&item.description, col2_w);
+                let src = &item.source;
+
+                if is_selected {
+                    write!(
+                        out,
+                        "\x1b[1;37m{:<c1$}\x1b[0m \x1b[37m{:<c2$}\x1b[0m \x1b[2;37m{:>c3$}\x1b[0m\r\n",
+                        col1, col2, src, c1 = col1_w, c2 = col2_w, c3 = col3_w
+                    )?;
+                } else {
+                    write!(
+                        out,
+                        "\x1b[2;37m{:<c1$} {:<c2$} {:>c3$}\x1b[0m\r\n",
+                        col1,
+                        col2,
+                        src,
+                        c1 = col1_w,
+                        c2 = col2_w,
+                        c3 = col3_w
+                    )?;
+                }
+                total_lines += 1;
+            }
+
+            write!(out, "\x1b[38;5;240m{}\x1b[0m\r\n", divider)?;
+            total_lines += 1;
+
+            write!(
+                out,
+                "\x1b[2;37m↑↓ Navigate     Tab Source     Enter Use     Esc Close\x1b[0m"
+            )?;
+            total_lines += 1;
+
+            let lines_up = ((lines.len() - 1 - target_row) + visible_count + 5).min(max_up);
+            execute!(out, cursor::MoveUp(lines_up as u16))?;
+            let prefix = if target_row == 0 {
+                &self.prompt_symbol
+            } else {
+                &self.multiline_symbol
+            };
+            let prefix_col = visible_width(prefix);
+            let chip_w = if target_row == 0 {
+                self.skill_chip_width()
+            } else {
+                0
+            };
+            let target_x = (prefix_col + chip_w + target_col) as u16;
             execute!(out, cursor::MoveToColumn(target_x))?;
 
             *last_rendered_lines = total_lines;
@@ -1212,7 +1479,12 @@ impl Prompt {
                 &self.multiline_symbol
             };
             let prefix_col = visible_width(prefix);
-            let target_x = (prefix_col + target_col) as u16;
+            let chip_w = if target_row == 0 {
+                self.skill_chip_width()
+            } else {
+                0
+            };
+            let target_x = (prefix_col + chip_w + target_col) as u16;
             execute!(out, cursor::MoveToColumn(target_x))?;
 
             *last_rendered_lines = total_lines;
@@ -1258,7 +1530,12 @@ impl Prompt {
                 &self.multiline_symbol
             };
             let prefix_col = visible_width(prefix);
-            let target_x = (prefix_col + target_col) as u16;
+            let chip_w = if target_row == 0 {
+                self.skill_chip_width()
+            } else {
+                0
+            };
+            let target_x = (prefix_col + chip_w + target_col) as u16;
             execute!(out, cursor::MoveToColumn(target_x))?;
 
             *last_rendered_lines = total_lines;
@@ -1343,6 +1620,7 @@ fn slash_matches(typed: &str, skills: &[SlashSuggestion]) -> Vec<SlashSuggestion
             description: d.description.to_string(),
             category: slash_category_label_static(d.category),
             is_skill: false,
+            source: String::new(),
         })
         .collect();
 
@@ -1361,18 +1639,26 @@ fn slash_matches(typed: &str, skills: &[SlashSuggestion]) -> Vec<SlashSuggestion
                 description: s.description.clone(),
                 category: s.category.clone(),
                 is_skill: true,
+                source: s.source.clone(),
             });
         }
     }
 
     // When user specifically types /skill:, show only skills
     if wants_skills && !skill_results.is_empty() {
-        // Put /skills command first, then all matching skills
+        // Put /skill command first (opens the picker on Enter), then all matching skills
         let mut results = Vec::new();
-        for c in &cmd_results {
-            if c.name == "/skills" {
-                results.push(c.clone());
-            }
+        if let Some(d) = crate::ui::slash::COMMAND_PALETTE
+            .iter()
+            .find(|d| d.name == "/skill")
+        {
+            results.push(SlashSuggestion {
+                name: d.name.to_string(),
+                description: d.description.to_string(),
+                category: slash_category_label_static(d.category),
+                is_skill: false,
+                source: String::new(),
+            });
         }
         results.extend(skill_results);
         results.truncate(12);
@@ -1598,19 +1884,21 @@ mod tests {
                 description: "Generate Git commit message".to_string(),
                 category: "Skill".to_string(),
                 is_skill: true,
+                source: "Fusion".to_string(),
             },
             SlashSuggestion {
                 name: "review".to_string(),
                 description: "Code review".to_string(),
                 category: "Skill".to_string(),
                 is_skill: true,
+                source: "Claude".to_string(),
             },
         ];
         let m = slash_matches("/com", &skills);
-        assert!(m.iter().any(|s| s.name == "commit" && s.is_skill));
+        assert!(m.iter().any(|s| s.name == "skill:commit" && s.is_skill));
 
         let m2 = slash_matches("/rev", &skills);
-        assert!(m2.iter().any(|s| s.name == "review" && s.is_skill));
+        assert!(m2.iter().any(|s| s.name == "skill:review" && s.is_skill));
     }
 
     #[test]

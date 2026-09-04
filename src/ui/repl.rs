@@ -88,6 +88,22 @@ pub fn format_model_label(model: &str) -> &str {
     }
 }
 
+/// Map a skill's source to a short display label for the picker tabs.
+pub fn skill_source_label(source: &crate::agent::skills::SkillSource) -> &'static str {
+    match source {
+        crate::agent::skills::SkillSource::Project(p) => {
+            if p.to_string_lossy().contains(".claude") {
+                "Claude"
+            } else {
+                "Fusion"
+            }
+        }
+        crate::agent::skills::SkillSource::Global(_) => "Global",
+        crate::agent::skills::SkillSource::Custom(_) => "Custom",
+        crate::agent::skills::SkillSource::Builtin => "Builtin",
+    }
+}
+
 /// Format real-time activity status (e.g. running, thinking).
 pub fn format_activity_status(
     status_text: &str,
@@ -1030,13 +1046,14 @@ pub async fn run_repl_with_session(
         initial_session.unwrap_or_else(|| Session::new(&runner.config().default_model));
     let skill_suggestions: Vec<SlashSuggestion> = runner
         .skills()
-        .list_enabled()
+        .list()
         .iter()
         .map(|s| SlashSuggestion {
             name: s.name().to_string(),
             description: s.description().to_string(),
             category: "Skill".to_string(),
             is_skill: true,
+            source: skill_source_label(&s.source).to_string(),
         })
         .collect();
     let mut prompt = Prompt::new()
@@ -1132,6 +1149,13 @@ pub async fn run_repl_with_session(
             continue;
         }
 
+        // Enable the skill selected from the skill picker, if any
+        if let Some((skill_name, _)) = prompt.take_active_skill() {
+            if runner.skills_mut().set_enabled(&skill_name, true) {
+                println!("\x1b[2;37m✓ \x1b[1;36m{}\x1b[0m enabled\r\n", skill_name);
+            }
+        }
+
         // Handle slash commands
         if trimmed.starts_with('/') {
             if handle_command(trimmed, &mut runner, &mut session) {
@@ -1142,13 +1166,14 @@ pub async fn run_repl_with_session(
             // Refresh skill suggestions (e.g. after /skills reload/enable/disable)
             let refreshed: Vec<SlashSuggestion> = runner
                 .skills()
-                .list_enabled()
+                .list()
                 .iter()
                 .map(|s| SlashSuggestion {
                     name: s.name().to_string(),
                     description: s.description().to_string(),
                     category: "Skill".to_string(),
                     is_skill: true,
+                    source: skill_source_label(&s.source).to_string(),
                 })
                 .collect();
             prompt.set_skill_suggestions(refreshed);
