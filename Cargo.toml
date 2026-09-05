@@ -27,6 +27,11 @@ unicode-width = "0.2"
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
 ratatui = { version = "0.29", default-features = false, features = ["crossterm"] }
 crossterm = { version = "0.28", features = ["event-stream"] }
+# Archive handling for auto-updates (pure-Rust backend)
+flate2 = { version = "1.0", default-features = false, features = ["rust_backend"] }
+tar = "0.4"
+zip = { version = "2.2", default-features = false, features = ["deflate"] }
+sha2 = "0.10"
 unicode-width = "0.2"
 
 # File system, Search & Diffs

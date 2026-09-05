@@ -3,6 +3,8 @@ pub use fusion::cli::Cli;
 use std::path::PathBuf;
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
+    // Check if an update was staged on a previous run and apply it before launching
+    fusion::agent::updater::startup_update_check();
     let cli = Cli::parse();
 
     if let Some(shell) = cli.generate_completion {
@@ -122,8 +124,11 @@ async fn main() -> anyhow::Result<()> {
         } else {
             None
         };
+        // Kick off background auto-update check (throttled)
+        fusion::agent::updater::spawn_background_update_check(false);
         fusion::ui::run_repl_with_session(runner, initial_session).await?;
     }
+    fusion::agent::updater::shutdown_update_check();
     Ok(())
 }
 

@@ -33,6 +33,7 @@ pub mod throttle;
 pub mod tokens;
 pub mod trace;
 pub mod undo;
+pub mod updater;
 pub use skill_state::{extract_state_patch, ExtractedPatch, SkillState, StateUpdateReport};
 
 pub use advisor::{

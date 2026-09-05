@@ -1014,7 +1014,16 @@ pub async fn run_turn_ui(
                 let in_str = format_tokens_compact(input_tokens);
                 let out_str = format_tokens_compact(output_tokens);
                 let mut out = stdout();
-                let _ = write!(out, "\r\n  \x1b[2;37m{} (↑{} ↓{})\x1b[0m\r\n\r\n", elapsed_str, in_str, out_str);
+                let update_suffix = if let Some(notice) = crate::agent::updater::staged_update_notice() {
+                    format!(" · \x1b[1;32m● {}\x1b[0m", notice)
+                } else {
+                    String::new()
+                };
+                let _ = write!(
+                    out,
+                    "\r\n  \x1b[2;37m{} (↑{} ↓{}){}\x1b[0m\r\n\r\n",
+                    elapsed_str, in_str, out_str, update_suffix
+                );
                 let _ = execute!(out, cursor::MoveToColumn(0));
                 let _ = out.flush();
                 reset_prompt_render_state(prompt);

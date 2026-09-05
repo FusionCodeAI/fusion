@@ -113,6 +113,8 @@ pub enum SlashCommand {
     Recover { args: Vec<String> },
     /// Benchmark configured LLM providers measuring TTFT and tokens/sec: `/benchmark [provider] [options]`
     Benchmark { args: Vec<String> },
+    /// Check or manage background auto-updates: `/update [now|status|check]`
+    Update { args: Vec<String> },
     /// Unrecognized slash command.
     Unknown { name: String, args: Vec<String> },
 }
@@ -536,6 +538,14 @@ pub static COMMAND_PALETTE: &[CommandDescriptor] = &[
         description: "Enable a skill or reload all skills",
         examples: &["/skill cloudflare", "/skill reload"],
     },
+    CommandDescriptor {
+        name: "/update",
+        aliases: &["/upgrade", "/up"],
+        syntax: "/update [now|status|check]",
+        category: CommandCategory::Config,
+        description: "Check for updates or stage and apply the latest release",
+        examples: &["/update", "/update now", "/update status"],
+    },
 ];
 
 /// Returns all static command palette entries.
@@ -677,6 +687,9 @@ impl SlashCommand {
                 let prompt_cmd = parse_prompt_subcommand(args);
                 SlashCommand::Prompt(prompt_cmd)
             }
+            "/update" | "/upgrade" | "/up" => SlashCommand::Update {
+                args: args.to_vec(),
+            },
             _ => SlashCommand::Unknown {
                 name: tokens[0].clone(),
                 args: args.to_vec(),
@@ -1064,6 +1077,10 @@ pub fn execute_slash_command(
             println!("{}", output);
             CommandResult::Continue
         }
+        SlashCommand::Update { args } => {
+            handle_update(args);
+            CommandResult::Continue
+        }
         SlashCommand::Unknown { name, args } => {
             handle_unknown(name, args);
             CommandResult::Continue
@@ -1074,6 +1091,43 @@ pub fn execute_slash_command(
 // ---------------------------------------------------------------------------
 // Command Handlers
 // ---------------------------------------------------------------------------
+
+fn handle_update(args: &[String]) {
+    let subcmd = args.first().map(|s| s.as_str()).unwrap_or("status");
+    let current_v = env!("CARGO_PKG_VERSION");
+    let target = crate::agent::updater::current_target();
+
+    match subcmd {
+        "status" => {
+            let state = crate::agent::updater::load_state();
+            println!("\n\x1b[1;36mFusion Update Status\x1b[0m");
+            println!("  Current version:   v{}", current_v);
+            println!("  Platform target:   {}", target);
+            if let Some(latest) = &state.latest_version {
+                println!("  Latest seen:       {}", latest);
+            }
+            if let Some(notice) = crate::agent::updater::staged_update_notice() {
+                println!("  \x1b[1;32m● {}\x1b[0m", notice);
+            } else if state.status == crate::agent::updater::UpdateStatus::Downloading {
+                println!("  Status:            Downloading update in background...");
+            } else {
+                println!("  Status:            Up to date");
+            }
+            println!("\nUse \x1b[1;36m/update now\x1b[0m to check and stage the latest version immediately.\n");
+        }
+        "now" | "check" => {
+            println!("\nChecking for updates from GitHub (FusionCodeAI/fusion)...");
+            crate::agent::updater::spawn_background_update_check(true);
+            println!("Background update check dispatched. Any newer version will be staged and applied on restart.\n");
+        }
+        _ => {
+            println!(
+                "Unknown update subcommand: '{}'. Available: /update status, /update now",
+                subcmd
+            );
+        }
+    }
+}
 
 fn handle_file(query: Option<&str>) {
     let mut picker = crate::ui::file_picker::FilePicker::new();
@@ -4238,5 +4292,25 @@ mod tests {
         assert!(res_rm.is_some());
         assert!(!crate::agent::tagging::has_tag(&session, "backend"));
         assert!(crate::agent::tagging::has_tag(&session, "rust"));
+    }
+
+    #[test]
+    fn test_parse_update() {
+        assert_eq!(
+            SlashCommand::parse("/update"),
+            Some(SlashCommand::Update { args: Vec::new() })
+        );
+        assert_eq!(
+            SlashCommand::parse("/upgrade now"),
+            Some(SlashCommand::Update {
+                args: vec!["now".to_string()]
+            })
+        );
+        assert_eq!(
+            SlashCommand::parse("/up status"),
+            Some(SlashCommand::Update {
+                args: vec!["status".to_string()]
+            })
+        );
     }
 }
