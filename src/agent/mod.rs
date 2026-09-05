@@ -27,6 +27,7 @@ pub mod session_patch;
 pub mod skill_state;
 pub mod skills;
 pub mod snippets;
+pub mod strace;
 pub mod subagent;
 pub mod tagging;
 pub mod throttle;
@@ -67,10 +68,11 @@ pub use consensus::{
     ConsensusResolution, ConsensusStrategy,
 };
 pub use correction::{
-    clean_path_string, find_fuzzy_file_matches, parse_python_traceback, parse_rust_compiler_errors,
-    parse_ts_compiler_errors, CorrectionAttempt, CorrectionConfig, CorrectionEngine,
-    CorrectionHistory, CorrectionOutcome, CorrectiveAction, ErrorAnalyzer, ErrorCategory,
-    ErrorDiagnosis, PythonTracebackDiagnostic, RustCompilerDiagnostic, TsCompilerDiagnostic,
+    causal_diagnose_turn, clean_path_string, construct_correction_prompt, find_fuzzy_file_matches,
+    parse_python_traceback, parse_rust_compiler_errors, parse_ts_compiler_errors,
+    CorrectionAttempt, CorrectionConfig, CorrectionEngine, CorrectionHistory, CorrectionOutcome,
+    CorrectiveAction, ErrorAnalyzer, ErrorCategory, ErrorDiagnosis, PythonTracebackDiagnostic,
+    RustCompilerDiagnostic, TsCompilerDiagnostic,
 };
 pub use cost::{
     estimate_cost, estimate_session_cost, format_cost_summary, format_usd, format_usd_precise,
@@ -202,6 +204,9 @@ pub use snippets::{
     load_snippet, load_snippet_from, project_snippets_dir, recall_snippet, sanitize_snippet_name,
     save_snippet, save_snippet_to, snippet_file_path, snippets_dir, Snippet, SnippetError,
     SnippetManager,
+};
+pub use strace::{
+    BackwardCausalSlicer, CausalAttribution, ExecutionDependencyGraph, RootCauseAttributor,
 };
 pub use subagent::{
     run_subagent, SpawnBatchSubagentsTool, SpawnSubagentTool, Subagent, SubagentHandle,

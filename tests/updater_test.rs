@@ -1,10 +1,7 @@
 use std::fs;
-use std::path::PathBuf;
 use tempfile::tempdir;
 
-use fusion::agent::updater::{
-    current_target, is_newer_version, verify_sha256, SimpleSemVer, UpdateState, UpdateStatus,
-};
+use fusion::agent::updater::{current_target, is_newer_version, verify_sha256};
 
 #[test]
 fn test_current_target_detection() {

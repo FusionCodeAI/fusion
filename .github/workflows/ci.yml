@@ -92,6 +92,7 @@ jobs:
           cargo test --test wasm_test
           cargo test --test tui_fx_style_test
           cargo test --test updater_test
+          cargo test --test strace_test
           cargo test --bin fusion
   # ── Android / Termux AArch64 Cross-Compile Verification ─────────────────────
   android:

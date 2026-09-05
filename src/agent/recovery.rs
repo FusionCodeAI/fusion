@@ -810,6 +810,14 @@ impl RecoveryManager {
         check_for_crash_at_path(&self.recovery_path).ok().flatten()
     }
 
+    /// Diagnoses root-cause causality across session trajectory using STRACE.
+    pub fn diagnose_failure_causality(
+        &self,
+        session: &Session,
+    ) -> Option<crate::agent::strace::CausalAttribution> {
+        crate::agent::strace::RootCauseAttributor::diagnose_session(session).ok()
+    }
+
     /// Loads the active recovery state from disk if present.
     pub fn load_active_state(&self) -> Result<Option<RecoveryState>, RecoveryError> {
         if !self.recovery_path.exists() {
@@ -4000,5 +4008,33 @@ mod tests {
             decision.remediation,
             RemediationAction::EscalateToUser { .. }
         ));
+    }
+
+    #[test]
+    fn test_recovery_manager_diagnose_failure_causality() {
+        use crate::provider::types::ToolCall;
+
+        let manager = RecoveryManager::default_for_cwd();
+        let mut session = Session::new("claude-3-7-sonnet");
+        session.add_user_message("Check the database config.");
+        session.add_assistant_with_tools(
+            "I will read the config.",
+            vec![ToolCall {
+                id: "call_read_db_conf".to_string(),
+                name: "read".to_string(),
+                arguments: r#"{"path": "config/database.toml"}"#.to_string(),
+            }],
+        );
+        session.add_tool_result(
+            "call_read_db_conf",
+            "Error: file not found: config/database.toml",
+        );
+
+        let attr = manager.diagnose_failure_causality(&session);
+        assert!(attr.is_some());
+        let attribution = attr.unwrap();
+        assert_eq!(attribution.manifestation_node, "ToolResult");
+        assert_eq!(attribution.root_cause_node, "User");
+        assert_eq!(attribution.root_cause_pos, 1);
     }
 }

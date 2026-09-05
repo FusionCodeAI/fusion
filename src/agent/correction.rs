@@ -21,6 +21,8 @@ use serde_json::{json, Value};
 use tokio::sync::RwLock;
 use tracing::{debug, info};
 
+use crate::agent::session::Session;
+use crate::agent::strace::CausalAttribution;
 use crate::tools::types::{ToolContext, ToolRegistry};
 // ---------------------------------------------------------------------------
 // Error Categories & Diagnostics
@@ -495,6 +497,13 @@ pub fn parse_rust_compiler_errors(stderr: &str) -> Vec<RustCompilerDiagnostic> {
                     }
                 } else if next_line.starts_with("help: ") {
                     suggestion = Some(next_line[6..].trim().to_string());
+                } else if next_line.contains('+') && suggestion.is_some() {
+                    if let Some(s) = &mut suggestion {
+                        if let Some(plus_idx) = next_line.find('+') {
+                            s.push(' ');
+                            s.push_str(next_line[plus_idx + 1..].trim());
+                        }
+                    }
                 } else if next_line.starts_with("error[") || next_line.starts_with("error:") {
                     break;
                 }
@@ -754,7 +763,36 @@ impl ErrorAnalyzer {
         let err_lower = error_str.to_lowercase();
         let mut details = HashMap::new();
 
-        // 1. Check for File Not Found
+        // 1. Check for Directory Not Found (e.g. writing to missing folder)
+        if (err_lower.contains("no such file or directory")
+            && (tool_name == "write" || tool_name == "write_file"))
+            || err_lower.contains("parent directory does not exist")
+        {
+            let target_path = extract_path_from_args(args).unwrap_or_default();
+            let parent_dir = Path::new(&target_path)
+                .parent()
+                .map(|p| p.to_string_lossy().to_string())
+                .unwrap_or_default();
+
+            details.insert("target_path".to_string(), target_path.clone());
+            details.insert("parent_dir".to_string(), parent_dir.clone());
+
+            return ErrorDiagnosis {
+                category: ErrorCategory::DirectoryNotFound {
+                    path: target_path,
+                    parent_dir: parent_dir.clone(),
+                },
+                tool_name: tool_name.to_string(),
+                raw_error: error_str.to_string(),
+                root_cause: format!("Parent directory '{parent_dir}' does not exist yet."),
+                confidence: 0.95,
+                is_recoverable: !parent_dir.is_empty(),
+                suggested_action: format!("Create directory '{parent_dir}' before writing file."),
+                details,
+            };
+        }
+
+        // 2. Check for File Not Found
         if err_lower.contains("file not found")
             || err_lower.contains("no such file or directory")
             || err_lower.contains("cannot find the path specified")
@@ -793,35 +831,6 @@ impl ErrorAnalyzer {
                 confidence: 0.95,
                 is_recoverable: is_rec,
                 suggested_action,
-                details,
-            };
-        }
-
-        // 2. Check for Directory Not Found (e.g. writing to missing folder)
-        if (err_lower.contains("no such file or directory")
-            && (tool_name == "write" || tool_name == "write_file"))
-            || err_lower.contains("parent directory does not exist")
-        {
-            let target_path = extract_path_from_args(args).unwrap_or_default();
-            let parent_dir = Path::new(&target_path)
-                .parent()
-                .map(|p| p.to_string_lossy().to_string())
-                .unwrap_or_default();
-
-            details.insert("target_path".to_string(), target_path.clone());
-            details.insert("parent_dir".to_string(), parent_dir.clone());
-
-            return ErrorDiagnosis {
-                category: ErrorCategory::DirectoryNotFound {
-                    path: target_path,
-                    parent_dir: parent_dir.clone(),
-                },
-                tool_name: tool_name.to_string(),
-                raw_error: error_str.to_string(),
-                root_cause: format!("Parent directory '{parent_dir}' does not exist yet."),
-                confidence: 0.95,
-                is_recoverable: !parent_dir.is_empty(),
-                suggested_action: format!("Create directory '{parent_dir}' before writing file."),
                 details,
             };
         }
@@ -1213,6 +1222,49 @@ fn suggest_command_alternatives(cmd: &str) -> Vec<String> {
 // ---------------------------------------------------------------------------
 // Self-Correcting Engine
 // ---------------------------------------------------------------------------
+
+/// Diagnoses session trajectory using STRACE to isolate root-cause attribution for turn failures.
+pub fn causal_diagnose_turn(session: &Session) -> Option<CausalAttribution> {
+    crate::agent::strace::RootCauseAttributor::diagnose_session(session).ok()
+}
+
+/// Constructs a structured correction prompt for repeated turn failures,
+/// incorporating STRACE root-cause causal attribution if available from the session trajectory.
+pub fn construct_correction_prompt(
+    session: &Session,
+    failed_tool: &str,
+    error_message: &str,
+) -> String {
+    let mut prompt = format!("❌ Repeated Failure in `{failed_tool}`: {error_message}\n\n");
+    if let Some(attr) = causal_diagnose_turn(session) {
+        prompt.push_str("🔍 STRACE Root-Cause Attribution:\n");
+        prompt.push_str(&format!(
+            "• Manifestation: `{}` (step {})\n",
+            attr.manifestation_node, attr.manifestation_pos
+        ));
+        prompt.push_str(&format!(
+            "• Root Cause: `{}` (step {})\n",
+            attr.root_cause_node, attr.root_cause_pos
+        ));
+        prompt.push_str(&format!("• Reason: {}\n", attr.reason));
+        prompt.push_str(&format!(
+            "• Recommended Heuristic: {}\n",
+            attr.suggested_heuristic
+        ));
+        if !attr.causal_chain.is_empty() {
+            prompt.push_str(&format!(
+                "• Causal Dependency Chain: {:?}\n",
+                attr.causal_chain
+            ));
+        }
+        prompt.push_str("\nPlease update your execution strategy to avoid repeating this root-cause fault pattern.\n");
+    } else {
+        prompt.push_str(
+            "Please review previous failed attempts and choose an alternative strategy.\n",
+        );
+    }
+    prompt
+}
 
 /// The core self-correcting retry engine.
 #[derive(Debug, Clone)]
@@ -1624,6 +1676,96 @@ impl CorrectionEngine {
         }
 
         out
+    }
+
+    /// Diagnoses session trajectory using STRACE to isolate root-cause attribution for turn failures.
+    pub fn causal_diagnose_turn(&self, session: &Session) -> Option<CausalAttribution> {
+        causal_diagnose_turn(session)
+    }
+
+    /// Formats an error into a structured markdown diagnostic response for the LLM,
+    /// including root-cause attribution from STRACE if available for repeated turn failures.
+    pub fn format_agent_feedback_with_session(
+        &self,
+        tool_name: &str,
+        args: &Value,
+        diagnosis: &ErrorDiagnosis,
+        history: &CorrectionHistory,
+        session: Option<&Session>,
+    ) -> String {
+        let mut out = self.format_agent_feedback(tool_name, args, diagnosis, history);
+        if let Some(session) = session {
+            if let Some(attr) = causal_diagnose_turn(session) {
+                out.push_str("\n🔍 STRACE Root-Cause Attribution:\n");
+                out.push_str(&format!(
+                    "• Manifestation: `{}` (step {})\n",
+                    attr.manifestation_node, attr.manifestation_pos
+                ));
+                out.push_str(&format!(
+                    "• Root Cause: `{}` (step {})\n",
+                    attr.root_cause_node, attr.root_cause_pos
+                ));
+                out.push_str(&format!("• Reason: {}\n", attr.reason));
+                out.push_str(&format!(
+                    "• Recommended Heuristic: {}\n",
+                    attr.suggested_heuristic
+                ));
+                if !attr.causal_chain.is_empty() {
+                    out.push_str(&format!(
+                        "• Causal Dependency Chain: {:?}\n",
+                        attr.causal_chain
+                    ));
+                }
+            }
+        }
+        out
+    }
+
+    /// Constructs a structured correction prompt for repeated turn failures,
+    /// including root-cause attribution from STRACE if available.
+    pub fn construct_correction_prompt(
+        &self,
+        session: &Session,
+        tool_name: &str,
+        args: &Value,
+        diagnosis: &ErrorDiagnosis,
+        history: &CorrectionHistory,
+    ) -> String {
+        self.format_agent_feedback_with_session(tool_name, args, diagnosis, history, Some(session))
+    }
+
+    /// Formulates clear markdown diagnostic guidance to feed back to the LLM agent,
+    /// enriched with root-cause attribution when session trajectory is provided.
+    pub fn formulate_diagnostic_guidance_with_session(
+        &self,
+        diagnosis: &ErrorDiagnosis,
+        tool_name: &str,
+        args: &Value,
+        session: Option<&Session>,
+    ) -> CorrectiveAction {
+        let mut action = self.formulate_diagnostic_guidance(diagnosis, tool_name, args);
+        if let Some(session) = session {
+            if let Some(attr) = causal_diagnose_turn(session) {
+                if let CorrectiveAction::FormatDiagnosticGuidanceForAgent {
+                    ref mut diagnosis_summary,
+                    ref mut actionable_hints,
+                    ..
+                } = action
+                {
+                    diagnosis_summary
+                        .push_str(&format!(" [STRACE Root Cause: {}]", attr.root_cause_node));
+                    actionable_hints.push(format!(
+                        "STRACE Root Cause: {} (step {}) - {}",
+                        attr.root_cause_node, attr.root_cause_pos, attr.reason
+                    ));
+                    actionable_hints.push(format!(
+                        "STRACE Transferable Heuristic: {}",
+                        attr.suggested_heuristic
+                    ));
+                }
+            }
+        }
+        action
     }
 
     /// Executes a tool with the self-correcting retry loop.
@@ -2298,5 +2440,70 @@ ZeroDivisionError: division by zero
         assert!(feedback.contains("File Not Found"));
         assert!(feedback.contains("Automated Recovery History"));
         assert!(feedback.contains("Recommended Next Steps"));
+    }
+
+    #[test]
+    fn test_causal_diagnose_turn_and_correction_prompt() {
+        use crate::provider::types::ToolCall;
+
+        let engine = CorrectionEngine::default();
+        let mut session = Session::new("claude-3-7-sonnet");
+        session.add_user_message("Please refactor the authentication schema.");
+        session.add_assistant_with_tools(
+            "I will inspect the migration file.",
+            vec![ToolCall {
+                id: "call_read_migration_01".to_string(),
+                name: "read".to_string(),
+                arguments: r#"{"path": "migrations/auth.sql"}"#.to_string(),
+            }],
+        );
+        session.add_tool_result(
+            "call_read_migration_01",
+            "Error: file not found: migrations/auth.sql",
+        );
+
+        // Verify causal_diagnose_turn
+        let attr = causal_diagnose_turn(&session);
+        assert!(attr.is_some());
+        let attribution = attr.unwrap();
+        assert_eq!(attribution.manifestation_node, "ToolResult");
+        assert_eq!(attribution.root_cause_node, "User");
+
+        // Verify engine method
+        let engine_attr = engine.causal_diagnose_turn(&session);
+        assert!(engine_attr.is_some());
+
+        // Verify construct_correction_prompt standalone
+        let prompt = construct_correction_prompt(&session, "read", "File not found");
+        assert!(prompt.contains("Repeated Failure in `read`"));
+        assert!(prompt.contains("STRACE Root-Cause Attribution"));
+        assert!(prompt.contains("Manifestation: `ToolResult`"));
+        assert!(prompt.contains("Root Cause: `User`"));
+
+        // Verify construct_correction_prompt on engine
+        let ctx = ToolContext::default();
+        let args = json!({ "path": "migrations/auth.sql" });
+        let diagnosis = engine.diagnose("read", &args, "File not found: migrations/auth.sql", &ctx);
+        let mut history = CorrectionHistory::new();
+        history.record(
+            "read".to_string(),
+            args.clone(),
+            "retry read".to_string(),
+            Err("File not found".to_string()),
+            15,
+        );
+        history.record(
+            "read".to_string(),
+            args.clone(),
+            "second retry read".to_string(),
+            Err("File not found".to_string()),
+            18,
+        );
+
+        let engine_prompt =
+            engine.construct_correction_prompt(&session, "read", &args, &diagnosis, &history);
+        assert!(engine_prompt.contains("STRACE Root-Cause Attribution"));
+        assert!(engine_prompt.contains("Manifestation: `ToolResult`"));
+        assert!(engine_prompt.contains("Root Cause: `User`"));
     }
 }

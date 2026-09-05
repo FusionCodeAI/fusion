@@ -115,6 +115,8 @@ pub enum SlashCommand {
     Benchmark { args: Vec<String> },
     /// Check or manage background auto-updates: `/update [now|status|check]`
     Update { args: Vec<String> },
+    /// Structural trajectory analysis and causal backward slicing on active session: `/strace [report|graph|slice]`
+    Strace { args: Vec<String> },
     /// Unrecognized slash command.
     Unknown { name: String, args: Vec<String> },
 }
@@ -433,6 +435,14 @@ pub static COMMAND_PALETTE: &[CommandDescriptor] = &[
             "/recover discard",
         ],
     },
+    CommandDescriptor {
+        name: "/strace",
+        aliases: &["/diagnose"],
+        syntax: "/strace [report|graph|slice]",
+        category: CommandCategory::Session,
+        description: "Structural trajectory analysis and causal backward slicing on active session",
+        examples: &["/strace", "/diagnose", "/strace graph"],
+    },
     // Model, Advisors & Cost Analytics
     CommandDescriptor {
         name: "/model",
@@ -688,6 +698,9 @@ impl SlashCommand {
                 SlashCommand::Prompt(prompt_cmd)
             }
             "/update" | "/upgrade" | "/up" => SlashCommand::Update {
+                args: args.to_vec(),
+            },
+            "/strace" | "/diagnose" => SlashCommand::Strace {
                 args: args.to_vec(),
             },
             _ => SlashCommand::Unknown {
@@ -1081,6 +1094,10 @@ pub fn execute_slash_command(
             handle_update(args);
             CommandResult::Continue
         }
+        SlashCommand::Strace { args } => {
+            handle_strace(args, runner, session);
+            CommandResult::Continue
+        }
         SlashCommand::Unknown { name, args } => {
             handle_unknown(name, args);
             CommandResult::Continue
@@ -1091,6 +1108,71 @@ pub fn execute_slash_command(
 // ---------------------------------------------------------------------------
 // Command Handlers
 // ---------------------------------------------------------------------------
+fn handle_strace(args: &[String], _runner: &mut AgentRunner, session: &mut Session) {
+    match crate::agent::strace::RootCauseAttributor::diagnose_session(session) {
+        Ok(attr) => {
+            println!("\x1b[1;36mSTRACE: Causal Trajectory Analysis\x1b[0m");
+            println!(
+                "Manifestation Node: {} at Step #{}",
+                attr.manifestation_node, attr.manifestation_pos
+            );
+            println!(
+                "Root Cause Node:    {} at Step #{}",
+                attr.root_cause_node, attr.root_cause_pos
+            );
+            println!("Causal Chain:       {:?}", attr.causal_chain);
+            println!("Pruned Noise Steps: {} steps", attr.pruned_steps_count);
+            println!("Attribution Reason: {}", attr.reason);
+            println!("Suggested Fix:      {}", attr.suggested_heuristic);
+        }
+        Err(e) => {
+            println!(
+                "\x1b[2;37mNo failure trajectory detected in active session: {}\x1b[0m\n",
+                e
+            );
+        }
+    }
+
+    if args.contains(&"graph".to_string()) {
+        let edg = crate::agent::strace::ExecutionDependencyGraph::fusion_default();
+        println!("\x1b[1;36mExecution Dependency Graph (EDG) Priors:\x1b[0m");
+        println!("Components (Nodes):");
+        let mut node_names: Vec<&String> = edg.nodes.keys().collect();
+        node_names.sort();
+        for name in node_names {
+            if let Some(node) = edg.nodes.get(name) {
+                println!(
+                    "  • {:<18} [{:?}] produces: {:?}, consumes: {:?}",
+                    node.name, node.role, node.produces, node.consumes
+                );
+            }
+        }
+        println!("Dependencies (Edges):");
+        for (from, to, kind) in &edg.edges {
+            match kind {
+                crate::agent::strace::DependencyKind::Control {
+                    condition,
+                    rationale,
+                } => {
+                    println!(
+                        "  • {} -> {} [Control: {} ({})]",
+                        from, to, condition, rationale
+                    );
+                }
+                crate::agent::strace::DependencyKind::Data {
+                    artifact,
+                    rationale,
+                } => {
+                    println!(
+                        "  • {} -> {} [Data: {} ({})]",
+                        from, to, artifact, rationale
+                    );
+                }
+            }
+        }
+        println!();
+    }
+}
 
 fn handle_update(args: &[String]) {
     let subcmd = args.first().map(|s| s.as_str()).unwrap_or("status");
@@ -4310,6 +4392,30 @@ mod tests {
             SlashCommand::parse("/up status"),
             Some(SlashCommand::Update {
                 args: vec!["status".to_string()]
+            })
+        );
+    }
+
+    #[test]
+    fn test_parse_strace() {
+        assert_eq!(
+            SlashCommand::parse("/strace"),
+            Some(SlashCommand::Strace { args: Vec::new() })
+        );
+        assert_eq!(
+            SlashCommand::parse("/diagnose"),
+            Some(SlashCommand::Strace { args: Vec::new() })
+        );
+        assert_eq!(
+            SlashCommand::parse("/strace graph"),
+            Some(SlashCommand::Strace {
+                args: vec!["graph".to_string()]
+            })
+        );
+        assert_eq!(
+            SlashCommand::parse("/diagnose slice"),
+            Some(SlashCommand::Strace {
+                args: vec!["slice".to_string()]
             })
         );
     }
