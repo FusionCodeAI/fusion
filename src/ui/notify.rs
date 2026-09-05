@@ -14,7 +14,7 @@
 
 use serde::{Deserialize, Serialize};
 use std::fmt;
-use std::io::{stderr, IsTerminal, Write};
+use std::io::{stderr, stdout, IsTerminal, Write};
 use std::path::Path;
 use std::process::{Command, Stdio};
 use std::time::{Duration, Instant};
@@ -719,6 +719,15 @@ impl Notification {
 
     /// Convenience constructor for agent turn completion.
     pub fn turn_complete(task_name: &str, model: &str, duration_secs: Option<f64>) -> Self {
+        let first_line = task_name.lines().next().unwrap_or("").trim();
+        let title = if first_line.len() > 60 {
+            format!("{}...", &first_line[..57])
+        } else if !first_line.is_empty() {
+            first_line.to_string()
+        } else {
+            "Turn Complete".to_string()
+        };
+
         let body = match duration_secs {
             Some(secs) => format!(
                 "Turn completed via {model} in {}",
@@ -727,7 +736,7 @@ impl Notification {
             None => format!("Turn completed via {model}"),
         };
 
-        Self::new(task_name, body)
+        Self::new(title, body)
             .subtitle(format!("Model: {model}"))
             .priority(NotificationPriority::Success)
             .category("turn_complete")
@@ -1026,23 +1035,20 @@ end run"#;
 
         match protocol {
             TerminalOscProtocol::Osc777 => {
-                // OSC 777;notify;title;body ST / BEL
-                format!("\x1b]777;notify;{clean_title};{clean_body}\x1b\\\x1b]777;notify;{clean_title};{clean_body}\x07")
+                format!("\x1b]777;notify;{clean_title};{clean_body}\x07")
             }
             TerminalOscProtocol::Osc9 => {
-                // OSC 9;title: body BEL
-                format!("\x1b]9;{clean_title}: {clean_body}\x07")
+                // Both OSC 9 with BEL and OSC 777 with BEL for maximum Warp / iTerm / WezTerm compatibility
+                format!("\x1b]9;{clean_title}: {clean_body}\x07\x1b]777;notify;{clean_title};{clean_body}\x07")
             }
             TerminalOscProtocol::Osc99 => {
-                // OSC 99;i=1:d=0;title ST OSC 99;i=1:d=1:p=body;body ST
                 format!(
                     "\x1b]99;i=1:d=0;{clean_title}\x1b\\\x1b]99;i=1:d=1:p=body;{clean_body}\x1b\\"
                 )
             }
             TerminalOscProtocol::All => {
-                // Combined multi-protocol emission for seamless terminal support across Kitty, iTerm2, WezTerm, Ghostty, Alacritty, Foot
                 format!(
-                    "\x1b]777;notify;{clean_title};{clean_body}\x1b\\\x1b]9;{clean_title}: {clean_body}\x07\x1b]99;i=1:d=0;{clean_title}\x1b\\\x1b]99;i=1:d=1:p=body;{clean_body}\x1b\\"
+                    "\x1b]777;notify;{clean_title};{clean_body}\x07\x1b]9;{clean_title}: {clean_body}\x07\x1b]99;i=1:d=0;{clean_title}\x1b\\\x1b]99;i=1:d=1:p=body;{clean_body}\x1b\\"
                 )
             }
         }
@@ -1068,13 +1074,33 @@ end run"#;
             return;
         }
 
+        // Emit terminal OSC immediately to stdout for terminal emulators (Warp, iTerm, WezTerm)
+        if config.terminal_enabled {
+            let tty_ok = !config.tty_only || stdout().is_terminal() || stderr().is_terminal();
+            if tty_ok {
+                let mut out = stdout();
+                let _ = self.send_terminal_osc(&mut out);
+            }
+        }
+
         let notification = self.clone();
         let cfg = config.clone();
 
         let _ = std::thread::Builder::new()
             .name("fusion-notify".to_string())
             .spawn(move || {
-                let _ = notification.send_sync(&cfg);
+                if cfg.desktop_enabled {
+                    let backend = cfg
+                        .backend
+                        .clone()
+                        .unwrap_or_else(NotificationBackend::detect);
+                    let _ = notification.send_desktop(backend);
+                }
+                if cfg.sound || notification.sound {
+                    let mut out = stdout();
+                    let _ = out.write_all(TERMINAL_BELL.as_bytes());
+                    let _ = out.flush();
+                }
             });
     }
 
@@ -1094,10 +1120,10 @@ end run"#;
 
         // 1. Terminal OSC notification
         if config.terminal_enabled {
-            let tty_ok = !config.tty_only || stderr().is_terminal();
+            let tty_ok = !config.tty_only || stdout().is_terminal() || stderr().is_terminal();
             if tty_ok {
-                let mut err = stderr();
-                if self.send_terminal_osc(&mut err).is_ok() {
+                let mut out = stdout();
+                if self.send_terminal_osc(&mut out).is_ok() {
                     outcome.terminal_sent = true;
                 }
             }
@@ -1184,6 +1210,11 @@ end run"#;
             if bin == "notify-send" && is_executable_in_path("kdialog") {
                 let (kdialog_bin, kdialog_args) = self.render_kdialog_command();
                 return execute_process_with_timeout(&kdialog_bin, &kdialog_args, self.timeout_ms);
+            }
+            // Check for Termux fallback if termux-notification is missing
+            if bin == "termux-notification" && is_executable_in_path("termux-toast") {
+                let toast_args = vec!["-s".to_string(), format!("{}: {}", self.title, self.body)];
+                return execute_process_with_timeout("termux-toast", &toast_args, self.timeout_ms);
             }
             return Err(NotificationError::BackendUnavailable(format!(
                 "Executable '{bin}' not found in PATH"

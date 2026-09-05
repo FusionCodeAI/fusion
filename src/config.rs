@@ -921,9 +921,10 @@ impl Config {
         crate::ui::notify::NotificationConfig {
             enabled: self.notify_enabled,
             desktop_enabled: true,
-            terminal_enabled: false,
+            terminal_enabled: true,
             sound: self.sound_enabled,
             min_duration_secs: self.notify_min_duration_secs,
+            tty_only: false,
             ..Default::default()
         }
     }
@@ -1512,7 +1513,7 @@ mod tests {
         let notif_cfg = cfg.notification_config();
         assert!(notif_cfg.enabled);
         assert!(notif_cfg.desktop_enabled);
-        assert!(!notif_cfg.terminal_enabled);
+        assert!(notif_cfg.terminal_enabled);
         assert!(!notif_cfg.sound);
 
         // Roundtrip JSON

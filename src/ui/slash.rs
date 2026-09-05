@@ -117,6 +117,8 @@ pub enum SlashCommand {
     Update { args: Vec<String> },
     /// Structural trajectory analysis and causal backward slicing on active session: `/strace [report|graph|slice]`
     Strace { args: Vec<String> },
+    /// Test or configure notifications: `/notify [test|status|on|off]`
+    Notify { args: Vec<String> },
     /// Unrecognized slash command.
     Unknown { name: String, args: Vec<String> },
 }
@@ -556,6 +558,14 @@ pub static COMMAND_PALETTE: &[CommandDescriptor] = &[
         description: "Check for updates or stage and apply the latest release",
         examples: &["/update", "/update now", "/update status"],
     },
+    CommandDescriptor {
+        name: "/notify",
+        aliases: &["/notification", "/notif"],
+        syntax: "/notify [test|status|on|off]",
+        category: CommandCategory::Config,
+        description: "Test notifications (desktop OS & terminal OSC) or toggle settings",
+        examples: &["/notify test", "/notify status", "/notify off"],
+    },
 ];
 
 /// Returns all static command palette entries.
@@ -701,6 +711,9 @@ impl SlashCommand {
                 args: args.to_vec(),
             },
             "/strace" | "/diagnose" => SlashCommand::Strace {
+                args: args.to_vec(),
+            },
+            "/notify" | "/notification" | "/notif" => SlashCommand::Notify {
                 args: args.to_vec(),
             },
             _ => SlashCommand::Unknown {
@@ -1098,6 +1111,10 @@ pub fn execute_slash_command(
             handle_strace(args, runner, session);
             CommandResult::Continue
         }
+        SlashCommand::Notify { args } => {
+            handle_notify(args, runner);
+            CommandResult::Continue
+        }
         SlashCommand::Unknown { name, args } => {
             handle_unknown(name, args);
             CommandResult::Continue
@@ -1107,6 +1124,78 @@ pub fn execute_slash_command(
 
 // ---------------------------------------------------------------------------
 // Command Handlers
+fn handle_notify(args: &[String], runner: &mut AgentRunner) {
+    let subcmd = args.first().map(|s| s.as_str()).unwrap_or("test");
+    let notif_cfg = runner.config().notification_config();
+
+    match subcmd {
+        "test" => {
+            println!("\n\x1b[1;36mSending Test Notification...\x1b[0m");
+            let notif = crate::ui::notify::Notification::new(
+                "Fusion",
+                "Test notification: turn completion alerts are working properly!",
+            )
+            .subtitle("Notification Test")
+            .priority(crate::ui::notify::NotificationPriority::Success);
+
+            let outcome = notif.send_sync(&notif_cfg);
+            println!(
+                "  • Desktop OS:       {}",
+                if outcome.desktop_sent {
+                    "\x1b[1;32mSent\x1b[0m"
+                } else {
+                    "\x1b[1;33mNot Sent\x1b[0m"
+                }
+            );
+            println!(
+                "  • Terminal OSC:     {}",
+                if outcome.terminal_sent {
+                    "\x1b[1;32mSent (Warp/iTerm/WezTerm compatible)\x1b[0m"
+                } else {
+                    "\x1b[1;33mNot Sent\x1b[0m"
+                }
+            );
+            if let Some(err) = outcome.error {
+                println!("  • Note:             {}", err);
+            }
+            println!("\nIf you are on Warp, macOS, or Termux, you should see an alert banner or toast above.\n");
+        }
+        "status" => {
+            println!("\n\x1b[1;36mNotification Configuration\x1b[0m");
+            println!("  • Enabled:          {}", runner.config().notify_enabled);
+            println!(
+                "  • On Completion:    {}",
+                runner.config().notify_on_completion
+            );
+            println!("  • On Error:         {}", runner.config().notify_on_error);
+            println!("  • Desktop Alerts:   {}", notif_cfg.desktop_enabled);
+            println!("  • Terminal OSC:     {}", notif_cfg.terminal_enabled);
+            println!("  • Sound:            {}", notif_cfg.sound);
+            println!(
+                "  • Backend:          {}",
+                notif_cfg
+                    .backend
+                    .map(|b| b.name().to_string())
+                    .unwrap_or_else(|| crate::ui::notify::NotificationBackend::detect()
+                        .name()
+                        .to_string())
+            );
+            println!("\nUse \x1b[1;36m/notify test\x1b[0m to send a test alert.\n");
+        }
+        "on" => {
+            runner.config_mut().notify_enabled = true;
+            println!("Notifications enabled.");
+        }
+        "off" => {
+            runner.config_mut().notify_enabled = false;
+            println!("Notifications disabled.");
+        }
+        _ => {
+            println!("Usage: /notify [test|status|on|off]");
+        }
+    }
+}
+
 // ---------------------------------------------------------------------------
 fn handle_strace(args: &[String], _runner: &mut AgentRunner, session: &mut Session) {
     match crate::agent::strace::RootCauseAttributor::diagnose_session(session) {
@@ -4416,6 +4505,26 @@ mod tests {
             SlashCommand::parse("/diagnose slice"),
             Some(SlashCommand::Strace {
                 args: vec!["slice".to_string()]
+            })
+        );
+    }
+
+    #[test]
+    fn test_parse_notify() {
+        assert_eq!(
+            SlashCommand::parse("/notify"),
+            Some(SlashCommand::Notify { args: Vec::new() })
+        );
+        assert_eq!(
+            SlashCommand::parse("/notification test"),
+            Some(SlashCommand::Notify {
+                args: vec!["test".to_string()]
+            })
+        );
+        assert_eq!(
+            SlashCommand::parse("/notif status"),
+            Some(SlashCommand::Notify {
+                args: vec!["status".to_string()]
             })
         );
     }
