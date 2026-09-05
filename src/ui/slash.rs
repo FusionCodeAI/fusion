@@ -1261,6 +1261,32 @@ fn handle_strace(args: &[String], _runner: &mut AgentRunner, session: &mut Sessi
         }
         println!();
     }
+    if args.contains(&"steps".to_string()) || args.contains(&"slice".to_string()) {
+        let steps = crate::agent::strace::BackwardCausalSlicer::extract_steps_from_session(session);
+        println!(
+            "\x1b[1;36mActive Trajectory Steps ({} total):\x1b[0m",
+            steps.len()
+        );
+        for step in &steps {
+            let status = match step.outcome {
+                crate::agent::strace::StepOutcome::Success => "\x1b[1;32m✓\x1b[0m",
+                crate::agent::strace::StepOutcome::Failed => "\x1b[1;31m✗\x1b[0m",
+                crate::agent::strace::StepOutcome::Timeout => "\x1b[1;33m⏱\x1b[0m",
+                crate::agent::strace::StepOutcome::Rejected => "\x1b[1;33m⊘\x1b[0m",
+                crate::agent::strace::StepOutcome::LoopDetected => "\x1b[1;35m⟲\x1b[0m",
+            };
+            let state_tag = if step.state_changed {
+                " [state-commit]"
+            } else {
+                ""
+            };
+            println!(
+                "  #{} {} {:<14} ({:?}) - {}{}",
+                step.position, status, step.component, step.role, step.action, state_tag
+            );
+        }
+        println!();
+    }
 }
 
 fn handle_update(args: &[String]) {
