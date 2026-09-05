@@ -7,9 +7,9 @@ name: Release
   workflow_dispatch:
     inputs:
       tag:
-        description: 'Release version tag (e.g. v2.0.0-alpha.1)'
+        description: 'Release version tag (e.g. v2.0.0-alpha.2)'
         required: false
-        default: 'v2.0.0-alpha.1'
+        default: 'v2.0.0-alpha.2'
 concurrency:
   group: release-${{ github.ref }}
   cancel-in-progress: false
@@ -328,7 +328,7 @@ jobs:
 
   # ── TypeScript / WebAssembly SDK NPM Publish ────────────────────────────────
   publish-sdk:
-    name: Publish TypeScript SDK (@fusion/sdk)
+    name: Publish TypeScript SDK (@fusioncode/sdk)
     needs: [tag-check, release]
     runs-on: ubuntu-latest
     # Non-blocking: npm publishing depends on the NPM_TOKEN account owning the
@@ -340,7 +340,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
           registry-url: 'https://registry.npmjs.org'
 
       - name: Build & Publish SDK
@@ -364,7 +364,7 @@ jobs:
           npm run build
 
           if [ -n "${NODE_AUTH_TOKEN:-}" ]; then
-            echo "Publishing @fusion/sdk to npm registry..."
+            echo "Publishing @fusioncode/sdk to npm registry..."
             npm publish --access public --provenance || npm publish --access public
           else
             echo "⚠️ NPM_TOKEN secret not configured; skipping npm publish (dry-run)."

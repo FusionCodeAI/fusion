@@ -2091,9 +2091,6 @@ fn print_model_info(runner: &AgentRunner, session: &Session) {
     println!("\n\x1b[1;34mFusion Gateway Models:\x1b[0m");
     println!("  \x1b[1;33mDeepSeek V4 Flash:\x1b[0m deepseek-ai/DeepSeek-V4-Flash-0731 (shorthands: deepseek, flash, v4, fusion)");
     println!("  \x1b[1;33mMiniMax M2.7:\x1b[0m      MiniMaxAI/MiniMax-M2.7 (shorthands: minimax, minimax-m2.7)");
-    println!(
-        "  \x1b[1;33mKimi K2.6:\x1b[0m         moonshotai/Kimi-K2.6 (shorthands: kimi, kimi-k2.6)"
-    );
     println!("\nUsage: \x1b[1;36m/model <model_name>\x1b[0m to switch.\n");
 }
 

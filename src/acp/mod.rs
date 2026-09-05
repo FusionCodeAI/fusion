@@ -177,7 +177,9 @@ mod tests {
                 "clientInfo": { "name": "zed", "version": "0.180.0" }
             }
         });
-        server.process_raw_message(&init_req.to_string(), out_tx.clone()).await;
+        server
+            .process_raw_message(&init_req.to_string(), out_tx.clone())
+            .await;
         let _ = out_rx.recv().await.unwrap();
 
         // 1. Create session and verify configOptions has category "model"
@@ -187,21 +189,33 @@ mod tests {
             "method": "session/new",
             "params": {}
         });
-        server.process_raw_message(&new_session_req.to_string(), out_tx.clone()).await;
+        server
+            .process_raw_message(&new_session_req.to_string(), out_tx.clone())
+            .await;
         let resp_str = out_rx.recv().await.unwrap();
         let resp: JsonRpcResponse = serde_json::from_str(&resp_str).unwrap();
         let result: NewSessionResult = serde_json::from_value(resp.result.unwrap()).unwrap();
         let session_id = result.session_id;
 
-        let config_options = result.config_options.expect("configOptions must be present");
-        let model_opt = config_options.iter().find(|o| o.id == "model").expect("model option exists");
+        let config_options = result
+            .config_options
+            .expect("configOptions must be present");
+        let model_opt = config_options
+            .iter()
+            .find(|o| o.id == "model")
+            .expect("model option exists");
         assert_eq!(model_opt.category, Some(SessionConfigOptionCategory::Model));
         match &model_opt.kind {
             SessionConfigKind::Select(sel) => {
                 assert_eq!(sel.current_value, "deepseek-ai/DeepSeek-V4-Flash-0731");
-                assert!(sel.options.iter().any(|o| o.value == "deepseek-ai/DeepSeek-V4-Flash-0731"));
-                assert!(sel.options.iter().any(|o| o.value == "MiniMaxAI/MiniMax-M2.7"));
-                assert!(sel.options.iter().any(|o| o.value == "moonshotai/Kimi-K2.6"));
+                assert!(sel
+                    .options
+                    .iter()
+                    .any(|o| o.value == "deepseek-ai/DeepSeek-V4-Flash-0731"));
+                assert!(sel
+                    .options
+                    .iter()
+                    .any(|o| o.value == "MiniMaxAI/MiniMax-M2.7"));
             }
         }
 
@@ -216,12 +230,19 @@ mod tests {
                 "value": "MiniMaxAI/MiniMax-M2.7"
             }
         });
-        server.process_raw_message(&set_req.to_string(), out_tx.clone()).await;
+        server
+            .process_raw_message(&set_req.to_string(), out_tx.clone())
+            .await;
         let set_resp_str = out_rx.recv().await.unwrap();
         let set_resp: JsonRpcResponse = serde_json::from_str(&set_resp_str).unwrap();
-        let set_res: SetSessionConfigOptionResult = serde_json::from_value(set_resp.result.unwrap()).unwrap();
+        let set_res: SetSessionConfigOptionResult =
+            serde_json::from_value(set_resp.result.unwrap()).unwrap();
 
-        let updated_model_opt = set_res.config_options.iter().find(|o| o.id == "model").unwrap();
+        let updated_model_opt = set_res
+            .config_options
+            .iter()
+            .find(|o| o.id == "model")
+            .unwrap();
         match &updated_model_opt.kind {
             SessionConfigKind::Select(sel) => {
                 assert_eq!(sel.current_value, "MiniMaxAI/MiniMax-M2.7");

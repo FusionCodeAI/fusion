@@ -23,15 +23,6 @@
       shorthand: 'minimax',
       footerName: 'minimax-m2.7'
     },
-    {
-      id: 'moonshotai/Kimi-K2.6',
-      name: 'Kimi K2.6',
-      context: '262K context',
-      output: '128K output · Long Context',
-      tag: 'Context',
-      shorthand: 'kimi',
-      footerName: 'kimi-k2.6'
-    }
   ];
 
   const SLASH_COMMANDS = [
@@ -522,7 +513,7 @@
       state.term.writeln(`● Switched to ${m.id}\r\n`);
     } else {
       state.term.writeln(`\x1b[31mUnknown model: ${query}\x1b[0m\r\n`);
-      state.term.writeln('\x1b[2;37mAvailable Fusion models: flash (DeepSeek V4 Flash), minimax (MiniMax M2.7), kimi (Kimi K2.6)\x1b[0m\r\n');
+      state.term.writeln('\x1b[2;37mAvailable Fusion models: flash (DeepSeek V4 Flash), minimax (MiniMax M2.7)\x1b[0m\r\n');
     }
   }
 

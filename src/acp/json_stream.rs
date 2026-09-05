@@ -178,17 +178,17 @@ fn default_source() -> String {
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(untagged)]
 pub enum JsonLogPayload {
-    SessionStart(SessionStartPayload),
     SessionEnd(SessionEndPayload),
+    SessionStart(SessionStartPayload),
     TurnStart(TurnStartPayload),
     TurnEnd(TurnEndPayload),
     TextDelta(TextDeltaPayload),
     ThinkingDelta(ThinkingDeltaPayload),
     ToolStart(ToolStartPayload),
-    ToolProgress(ToolProgressPayload),
     ToolFinish(ToolFinishPayload),
-    AdvisorStart(AdvisorStartPayload),
+    ToolProgress(ToolProgressPayload),
     AdvisorFeedback(AdvisorFeedbackPayload),
+    AdvisorStart(AdvisorStartPayload),
     AdvisorConsensus(AdvisorConsensusPayload),
     SubagentStart(SubagentStartPayload),
     SubagentFinish(SubagentFinishPayload),
@@ -201,7 +201,7 @@ pub enum JsonLogPayload {
 
 /// Payload for `session_start` event.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
-#[serde(rename_all = "camelCase")]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct SessionStartPayload {
     pub session_id: String,
     pub model: Option<String>,
@@ -273,7 +273,7 @@ pub struct ToolStartPayload {
 
 /// Payload for tool execution progress (`tool_progress`).
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
-#[serde(rename_all = "camelCase")]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct ToolProgressPayload {
     pub call_id: String,
     pub tool_name: String,
@@ -300,7 +300,7 @@ pub struct ToolFinishPayload {
 
 /// Payload for advisor start (`advisor_start`).
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
-#[serde(rename_all = "camelCase")]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct AdvisorStartPayload {
     pub advisor: String,
     pub role: String,

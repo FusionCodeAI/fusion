@@ -75,7 +75,6 @@ pub fn format_model_label(model: &str) -> &str {
     match model {
         "deepseek-ai/DeepSeek-V4-Flash-0731" | "flash" | "v4" => "DeepSeek V4 Flash",
         "MiniMaxAI/MiniMax-M2.7" | "minimax" => "MiniMax M2.7",
-        "moonshotai/Kimi-K2.6" | "kimi" => "Kimi K2.6",
         other => {
             if let Some((_, name)) = other.split_once('/') {
                 name
@@ -1223,10 +1222,6 @@ fn model_picker_list(_catalog: &crate::provider::catalog::ModelCatalog) -> Vec<(
         (
             "MiniMaxAI/MiniMax-M2.7".to_string(),
             "MiniMax M2.7 (Reasoning · coding)".to_string(),
-        ),
-        (
-            "moonshotai/Kimi-K2.6".to_string(),
-            "Kimi K2.6 (Reasoning · 200K context)".to_string(),
         ),
     ]
 }

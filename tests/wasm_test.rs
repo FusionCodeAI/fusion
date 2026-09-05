@@ -9,33 +9,26 @@
 //! 4. `wasm_agent_integration_tests`: WebAssembly agent creation, VFS interaction, offline turn streaming, and checkpoint/restore cycles (under `feature = "wasm"`).
 
 use std::collections::HashMap;
-use std::sync::Arc;
 use std::time::Duration;
 
 use serde_json::{json, Value};
 use tokio::sync::mpsc::unbounded_channel;
 
 use fusion::acp::events::{
-    AcpEventBridge, AcpSessionEvent, AdvisorConsensus, AdvisorFeedbackUpdate, AdvisorSeverity,
-    AdvisorStatusState, PlanProgressUpdate, PlanStep, SubagentStatusUpdate, ThinkingStreamChunk,
-    TokenStreamChunk, TokenUsageStats, ToolExecutionState, ToolStatusUpdate,
+    AcpEventBridge, AcpSessionEvent, AdvisorConsensus, TokenStreamChunk, ToolExecutionState,
+    ToolStatusUpdate,
 };
 use fusion::acp::json_stream::{
-    format_ndjson_batch, parse_ndjson_lines, AdvisorFeedbackPayload, AdvisorStartPayload,
-    JsonLogEvent, JsonLogEventKind, JsonLogPayload, JsonLogReader, JsonLogStreamer,
-    SessionStartPayload, TextDeltaPayload, ThinkingDeltaPayload, TokenStatsPayload,
-    ToolFinishPayload, ToolProgressPayload, ToolStartPayload,
+    format_ndjson_batch, parse_ndjson_lines, JsonLogEvent, JsonLogEventKind, JsonLogReader,
 };
 use fusion::acp::server::AcpServer;
 use fusion::acp::types::{
-    error_codes, AgentCapabilities, AgentInfo, AgentMessageContent, AuthMethod,
-    CancelSessionRequest, ClientCapabilities, ClientInfo, ClientSessionCapabilities,
-    CloseSessionRequest, ContentBlock, FsCapabilities, InitializeRequest, InitializeResult,
-    JsonRpcError, JsonRpcNotification, JsonRpcRequest, JsonRpcResponse, ListSessionsRequest,
-    ListSessionsResult, LoadSessionRequest, LoadSessionResult, McpCapabilities, ModelInfo,
-    NewSessionRequest, NewSessionResult, PromptCapabilities, PromptInput, PromptRequest,
-    PromptResponse, RequestId, SessionSummaryItem, SessionUpdate, SessionUpdateParams, StopReason,
-    TokenStatsInfo, PROTOCOL_VERSION,
+    error_codes, AgentCapabilities, AgentInfo, CancelSessionRequest, CloseSessionRequest,
+    ContentBlock, InitializeRequest, InitializeResult, JsonRpcError, JsonRpcNotification,
+    JsonRpcRequest, JsonRpcResponse, ListSessionsRequest, ListSessionsResult, LoadSessionRequest,
+    LoadSessionResult, ModelInfo, NewSessionRequest, NewSessionResult, PromptRequest,
+    PromptResponse, RequestId, SessionSummaryItem, SessionUpdate, StopReason, TokenStatsInfo,
+    PROTOCOL_VERSION,
 };
 use fusion::agent::loop_runner::AgentEvent;
 use fusion::config::Config;
@@ -348,6 +341,7 @@ mod jsonrpc_acp_message_tests {
                 provider: "anthropic".to_string(),
                 is_default: true,
             }]),
+            config_options: None,
         };
         let new_res_val = serde_json::to_value(&new_res).expect("serialize NewSessionResult");
         assert_eq!(new_res_val["sessionId"], "sess_test_12345");
@@ -366,6 +360,7 @@ mod jsonrpc_acp_message_tests {
             active_model: "gpt-4o".to_string(),
             message_count: 42,
             title: Some("Refactor session".to_string()),
+            config_options: None,
         };
         let load_res_val = serde_json::to_value(&load_res).expect("serialize LoadSessionResult");
         assert_eq!(load_res_val["sessionId"], "sess_load_99");
@@ -507,7 +502,7 @@ mod jsonrpc_acp_message_tests {
         let tool_ctx = ToolContext::default();
         let server = AcpServer::new(config, client, tools, tool_ctx);
 
-        let (out_tx, mut out_rx) = unbounded_channel();
+        let (out_tx, _out_rx) = unbounded_channel();
 
         // 1. Handshake: initialize
         let init_val = server
@@ -1155,19 +1150,15 @@ mod event_stream_serialization_tests {
     fn test_session_update_agent_message_and_thought_chunk_serialization() {
         // AgentMessageChunk
         let msg_chunk = SessionUpdate::AgentMessageChunk {
-            content: AgentMessageContent::assistant_text("pub fn compute("),
+            content: ContentBlock::text("pub fn compute("),
             index: Some(1),
             is_first: Some(true),
             is_last: Some(false),
         };
 
         let chunk_val = serde_json::to_value(&msg_chunk).expect("serialize message chunk");
-        assert_eq!(chunk_val["kind"], "agent_message_chunk");
-        assert_eq!(chunk_val["content"]["role"], "assistant");
-        assert_eq!(
-            chunk_val["content"]["content"][0]["text"],
-            "pub fn compute("
-        );
+        assert_eq!(chunk_val["sessionUpdate"], "agent_message_chunk");
+        assert_eq!(chunk_val["content"]["text"], "pub fn compute(");
         assert_eq!(chunk_val["index"], 1);
         assert_eq!(chunk_val["isFirst"], true);
         assert_eq!(chunk_val["isLast"], false);
@@ -1181,7 +1172,7 @@ mod event_stream_serialization_tests {
                 is_first,
                 ..
             } => {
-                assert_eq!(content.role, "assistant");
+                assert_eq!(content.text.as_deref(), Some("pub fn compute("));
                 assert_eq!(index, Some(1));
                 assert_eq!(is_first, Some(true));
             }
@@ -1190,13 +1181,14 @@ mod event_stream_serialization_tests {
 
         // AgentThoughtChunk
         let thought_chunk = SessionUpdate::AgentThoughtChunk {
-            thought: "Determining optimal data structure for AST traversal.".to_string(),
+            content: ContentBlock::text("Determining optimal data structure for AST traversal."),
+            thought: Some("Determining optimal data structure for AST traversal.".to_string()),
             index: Some(2),
             elapsed_ms: Some(120),
         };
 
         let thought_val = serde_json::to_value(&thought_chunk).expect("serialize thought chunk");
-        assert_eq!(thought_val["kind"], "agent_thought_chunk");
+        assert_eq!(thought_val["sessionUpdate"], "agent_thought_chunk");
         assert_eq!(
             thought_val["thought"],
             "Determining optimal data structure for AST traversal."
@@ -1212,7 +1204,7 @@ mod event_stream_serialization_tests {
                 elapsed_ms,
                 ..
             } => {
-                assert!(thought.contains("AST traversal"));
+                assert!(thought.as_deref().unwrap_or("").contains("AST traversal"));
                 assert_eq!(elapsed_ms, Some(120));
             }
             _ => panic!("Expected AgentThoughtChunk variant"),
@@ -1229,7 +1221,7 @@ mod event_stream_serialization_tests {
             status: Some("running".to_string()),
         };
         let call_val = serde_json::to_value(&tool_call).expect("serialize ToolCall");
-        assert_eq!(call_val["kind"], "tool_call");
+        assert_eq!(call_val["sessionUpdate"], "tool_call");
         assert_eq!(call_val["callId"], "call_read_01");
         assert_eq!(call_val["name"], "read");
         assert_eq!(call_val["args"]["path"], "src/main.rs");
@@ -1243,7 +1235,7 @@ mod event_stream_serialization_tests {
             partial_output: Some("Building 42/65 targets...".to_string()),
         };
         let status_val = serde_json::to_value(&tool_status).expect("serialize ToolStatus");
-        assert_eq!(status_val["kind"], "tool_status");
+        assert_eq!(status_val["sessionUpdate"], "tool_status");
         assert_eq!(status_val["progress"].as_f64(), Some(0.65f64));
         assert!((status_val["progress"].as_f64().unwrap() - 0.65f64).abs() < f64::EPSILON);
         assert_eq!(status_val["partialOutput"], "Building 42/65 targets...");
@@ -1258,7 +1250,7 @@ mod event_stream_serialization_tests {
             error: None,
         };
         let res_val = serde_json::to_value(&tool_result_success).expect("serialize ToolCallResult");
-        assert_eq!(res_val["kind"], "tool_call_result");
+        assert_eq!(res_val["sessionUpdate"], "tool_call_result");
         assert_eq!(res_val["success"], true);
         assert_eq!(res_val["durationMs"], 15);
         assert!(res_val.get("error").is_none());
@@ -1285,7 +1277,7 @@ mod event_stream_serialization_tests {
             role: "Vulnerability and sanitization inspection".to_string(),
         };
         let adv_started_val = serde_json::to_value(&adv_started).expect("serialize AdvisorStarted");
-        assert_eq!(adv_started_val["kind"], "advisor_started");
+        assert_eq!(adv_started_val["sessionUpdate"], "advisor_started");
         assert_eq!(adv_started_val["advisor"], "Security");
 
         // AdvisorCritique
@@ -1300,7 +1292,7 @@ mod event_stream_serialization_tests {
             ]),
         };
         let critique_val = serde_json::to_value(&adv_critique).expect("serialize AdvisorCritique");
-        assert_eq!(critique_val["kind"], "advisor_critique");
+        assert_eq!(critique_val["sessionUpdate"], "advisor_critique");
         assert_eq!(critique_val["approved"], false);
         assert_eq!(critique_val["severity"], "warning");
         assert_eq!(
@@ -1317,7 +1309,7 @@ mod event_stream_serialization_tests {
             tokens_per_second: Some(68.5),
         };
         let stats_val = serde_json::to_value(&token_stats).expect("serialize TokenStats");
-        assert_eq!(stats_val["kind"], "token_stats");
+        assert_eq!(stats_val["sessionUpdate"], "token_stats");
         assert_eq!(stats_val["promptTokens"], 1200);
         assert_eq!(stats_val["completionTokens"], 350);
         assert_eq!(stats_val["totalTokens"], 1550);
@@ -1333,7 +1325,7 @@ mod event_stream_serialization_tests {
             ],
         };
         let plan_val = serde_json::to_value(&plan).expect("serialize Plan");
-        assert_eq!(plan_val["kind"], "plan");
+        assert_eq!(plan_val["sessionUpdate"], "plan");
         assert_eq!(plan_val["steps"].as_array().unwrap().len(), 3);
 
         let subagent = SessionUpdate::SubagentUpdate {
@@ -1343,7 +1335,7 @@ mod event_stream_serialization_tests {
             output: None,
         };
         let subagent_val = serde_json::to_value(&subagent).expect("serialize SubagentUpdate");
-        assert_eq!(subagent_val["kind"], "subagent_update");
+        assert_eq!(subagent_val["sessionUpdate"], "subagent_update");
         assert_eq!(subagent_val["name"], "ResearchScout");
     }
 
@@ -1582,7 +1574,7 @@ mod event_stream_serialization_tests {
 
     #[tokio::test]
     async fn test_ndjson_streamer_and_reader_async_roundtrip() {
-        let (tx, rx) = unbounded_channel();
+        let (tx, _rx) = unbounded_channel();
 
         let event = JsonLogEvent::text_delta(
             1,

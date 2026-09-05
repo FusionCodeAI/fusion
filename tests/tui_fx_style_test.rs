@@ -163,8 +163,6 @@ fn test_prompt_model_labels_formatting() {
     assert_eq!(format_model_label("v4"), "DeepSeek V4 Flash");
     assert_eq!(format_model_label("MiniMaxAI/MiniMax-M2.7"), "MiniMax M2.7");
     assert_eq!(format_model_label("minimax"), "MiniMax M2.7");
-    assert_eq!(format_model_label("moonshotai/Kimi-K2.6"), "Kimi K2.6");
-    assert_eq!(format_model_label("kimi"), "Kimi K2.6");
     assert_eq!(format_model_label("openai/gpt-4o"), "gpt-4o");
     assert_eq!(format_model_label(""), "auto");
     assert_eq!(format_model_label("custom-model"), "custom-model");
@@ -358,7 +356,6 @@ fn test_queue_hint_variations() {
     let models = [
         ("deepseek-ai/DeepSeek-V4-Flash-0731", "DeepSeek V4 Flash"),
         ("MiniMaxAI/MiniMax-M2.7", "MiniMax M2.7"),
-        ("moonshotai/Kimi-K2.6", "Kimi K2.6"),
         ("anthropic/claude-3-5-sonnet", "claude-3-5-sonnet"),
     ];
 
@@ -881,10 +878,6 @@ fn test_model_picker_menu_3_column_layout_and_dividers() {
             "DeepSeek V4 Flash".to_string(),
         ),
         (
-            "moonshotai/Kimi-K2.6".to_string(),
-            "Kimi K2.6 Reasoning".to_string(),
-        ),
-        (
             "MiniMaxAI/MiniMax-M2.7".to_string(),
             "MiniMax M2.7".to_string(),
         ),
@@ -925,13 +918,13 @@ fn test_model_picker_menu_3_column_layout_and_dividers() {
 
     // 2. Header
     assert!(
-        plain.contains("Models 5 · Type to filter"),
-        "Model picker header must contain 'Models 5 · Type to filter', got:\n{}",
+        plain.contains("Models 4 · Type to filter"),
+        "Model picker header must contain 'Models 4 · Type to filter', got:\n{}",
         plain
     );
     assert!(
-        plain.contains("1-5"),
-        "Header must show pagination range '1-5'"
+        plain.contains("1-4"),
+        "Header must show pagination range '1-4'"
     );
 
     // 3. 3-column rows (ID, Description/Name, Category Tag)
@@ -941,10 +934,6 @@ fn test_model_picker_menu_3_column_layout_and_dividers() {
     assert!(plain.contains("Fast"));
 
     // Reasoning category
-    assert!(plain.contains("moonshotai/Kimi-K2.6"));
-    assert!(plain.contains("Kimi K2.6 Reasoning"));
-    assert!(plain.contains("Reasoning"));
-
     assert!(plain.contains("MiniMaxAI/MiniMax-M2.7"));
     assert!(plain.contains("MiniMax M2.7"));
 
@@ -968,7 +957,10 @@ fn test_model_picker_menu_filtering_and_selection() {
             "deepseek-ai/DeepSeek-V4-Flash-0731".to_string(),
             "DeepSeek V4 Flash".to_string(),
         ),
-        ("moonshotai/Kimi-K2.6".to_string(), "Kimi K2.6".to_string()),
+        (
+            "anthropic/claude-3-5-sonnet".to_string(),
+            "Claude 3.5 Sonnet".to_string(),
+        ),
         (
             "MiniMaxAI/MiniMax-M2.7".to_string(),
             "MiniMax M2.7".to_string(),
@@ -980,14 +972,14 @@ fn test_model_picker_menu_filtering_and_selection() {
         .with_model_picker_active(true)
         .with_model_selection(0);
 
-    // Filter with "kimi"
-    let filter_text: Vec<char> = "kimi".chars().collect();
+    // Filter with "minimax"
+    let filter_text: Vec<char> = "minimax".chars().collect();
     let mut buf = Vec::new();
     let mut last_lines = 0;
     let mut last_cursor = 0;
 
     prompt
-        .render_to(&mut buf, &filter_text, 4, &mut last_lines, &mut last_cursor)
+        .render_to(&mut buf, &filter_text, 7, &mut last_lines, &mut last_cursor)
         .expect("render_to filtered model picker failed");
 
     let raw = String::from_utf8_lossy(&buf);
@@ -996,13 +988,13 @@ fn test_model_picker_menu_filtering_and_selection() {
     // Header shows 1 match
     assert!(plain.contains("Models 1 · Type to filter"));
     assert!(plain.contains("1-1"));
-    assert!(plain.contains("moonshotai/Kimi-K2.6"));
-    assert!(plain.contains("Kimi K2.6"));
+    assert!(plain.contains("MiniMaxAI/MiniMax-M2.7"));
+    assert!(plain.contains("MiniMax M2.7"));
     assert!(plain.contains("Reasoning"));
 
     // Non-matching models are excluded
     assert!(!plain.contains("DeepSeek V4 Flash"));
-    assert!(!plain.contains("MiniMax M2.7"));
+    assert!(!plain.contains("Claude 3.5 Sonnet"));
 }
 
 // ===========================================================================
@@ -1536,7 +1528,10 @@ fn test_effort_picker_interactive_navigation_and_event_handling() {
             "deepseek-ai/DeepSeek-V4-Flash-0731".to_string(),
             "DeepSeek V4 Flash".to_string(),
         ),
-        ("moonshotai/Kimi-K2.6".to_string(), "Kimi K2.6".to_string()),
+        (
+            "anthropic/claude-3-5-sonnet".to_string(),
+            "Claude 3.5 Sonnet".to_string(),
+        ),
     ];
 
     let mut prompt = Prompt::new()
@@ -1678,7 +1673,7 @@ fn test_effort_picker_cancellation_via_esc_and_ctrl_c() {
 
     // 2. Cancel via Ctrl+C
     let mut prompt_ctrl_c = Prompt::new()
-        .with_pending_model_id("moonshotai/Kimi-K2.6")
+        .with_pending_model_id("MiniMaxAI/MiniMax-M2.7")
         .with_effort_picker_active(true)
         .with_effort_selection(1);
 
@@ -1735,20 +1730,20 @@ fn test_status_line_with_reasoning_effort_variations() {
         plain2
     );
 
-    // 3. Kimi model without effort (None)
+    // 3. MiniMax model without effort (None)
     buf.clear();
     last_lines = 0;
     last_cursor = 0;
     let prompt3 = Prompt::new()
-        .with_model("moonshotai/Kimi-K2.6")
+        .with_model("MiniMaxAI/MiniMax-M2.7")
         .with_selected_effort(None);
     prompt3
         .render_to(&mut buf, &empty_buf, 0, &mut last_lines, &mut last_cursor)
         .unwrap();
     let plain3 = strip_ansi(&String::from_utf8_lossy(&buf));
     assert!(
-        plain3.contains("auto · Kimi K2.6") && !plain3.contains("auto · Kimi K2.6 ·"),
-        "Status line must contain 'auto · Kimi K2.6' without effort suffix, got:\n{}",
+        plain3.contains("auto · MiniMax M2.7") && !plain3.contains("auto · MiniMax M2.7 ·"),
+        "Status line must contain 'auto · MiniMax M2.7' without effort suffix, got:\n{}",
         plain3
     );
 

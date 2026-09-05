@@ -1567,15 +1567,6 @@ pub fn default_models() -> Vec<ModelEntry> {
         )
         .with_speed("Fast")
         .with_description("MiniMax M2.7 frontier coding and reasoning model"),
-        ModelEntry::with_tokens(
-            "moonshotai/Kimi-K2.6",
-            "fusion",
-            204_800,
-            8_192,
-            vec!["Reasoning", "200K context"],
-        )
-        .with_speed("Fast")
-        .with_description("Kimi K2.6 long-context and reasoning model"),
     ]
 }
 
@@ -1689,7 +1680,6 @@ mod tests {
         assert!(models
             .iter()
             .any(|m| m.id == "deepseek-ai/DeepSeek-V4-Flash-0731"));
-        assert!(models.iter().any(|m| m.id == "moonshotai/Kimi-K2.6"));
         for m in &models {
             assert_eq!(m.provider, "fusion");
         }
@@ -1700,7 +1690,7 @@ mod tests {
         let mut picker = ModelPicker::new();
         assert_eq!(picker.active_tab(), ProviderTab::All);
         let all_count = picker.filtered_count();
-        assert!(all_count >= 3);
+        assert!(all_count >= 2);
 
         picker.set_tab(ProviderTab::Fusion);
         assert_eq!(picker.active_tab(), ProviderTab::Fusion);
@@ -1774,13 +1764,12 @@ mod tests {
         picker.select_next();
         assert_eq!(picker.selected_index(), 0);
 
-        // Page navigation (clamped to max index 2)
+        // Page navigation (clamped to max index)
         picker.select_page_down(5);
-        assert_eq!(picker.selected_index(), 2);
+        assert_eq!(picker.selected_index(), picker.filtered_count() - 1);
 
         picker.select_page_up(1);
-        assert_eq!(picker.selected_index(), 1);
-
+        assert_eq!(picker.selected_index(), 0);
         picker.select_last();
         assert_eq!(picker.selected_index(), picker.filtered_count() - 1);
 

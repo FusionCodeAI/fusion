@@ -1435,7 +1435,6 @@ pub fn enrich_model_metadata(model: &mut CatalogModel) {
         || lower.contains("claude-3-7")
         || lower.contains("claude-3.7")
         || lower.contains("minimax")
-        || lower.contains("kimi")
     {
         model.capabilities.reasoning = true;
         add_badge_if_missing(model, "Reasoning");
@@ -1572,11 +1571,6 @@ pub fn static_model_list() -> Vec<CatalogModel> {
             .with_max_output(8_192)
             .with_badges(["Reasoning"])
             .with_description("MiniMax M2.7 frontier coding and reasoning model"),
-        CatalogModel::new("moonshotai/Kimi-K2.6", "Kimi K2.6", "fusion")
-            .with_context(204_800)
-            .with_max_output(8_192)
-            .with_badges(["Reasoning"])
-            .with_description("Kimi K2.6 long-context and reasoning model"),
     ]
 }
 

@@ -12,9 +12,7 @@ use serde::{Deserialize, Serialize};
 use tokio::sync::broadcast;
 use tokio::sync::mpsc::{UnboundedReceiver, UnboundedSender};
 
-use crate::acp::types::{
-    ContentBlock, JsonRpcNotification, SessionUpdate, SessionUpdateParams,
-};
+use crate::acp::types::{ContentBlock, JsonRpcNotification, SessionUpdate, SessionUpdateParams};
 use crate::agent::loop_runner::AgentEvent;
 
 fn now_ms() -> u64 {
@@ -1267,12 +1265,12 @@ mod tests {
 
         let json_val = serde_json::to_value(&notif).unwrap();
         assert_eq!(json_val["params"]["sessionId"], "sess-123");
-        assert_eq!(json_val["params"]["update"]["sessionUpdate"], "agent_message_chunk");
-        assert_eq!(json_val["params"]["update"]["kind"], "agent_message_chunk");
         assert_eq!(
-            json_val["params"]["update"]["content"]["text"],
-            "Hello"
+            json_val["params"]["update"]["sessionUpdate"],
+            "agent_message_chunk"
         );
+        assert_eq!(json_val["params"]["update"]["kind"], "agent_message_chunk");
+        assert_eq!(json_val["params"]["update"]["content"]["text"], "Hello");
     }
 
     #[test]

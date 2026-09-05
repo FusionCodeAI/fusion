@@ -43,8 +43,6 @@ pub const MODEL_SHORTHANDS: &[(&str, &str, &str)] = &[
     ("minimax", "fusion", "MiniMaxAI/MiniMax-M2.7"),
     ("minimax-m2.7", "fusion", "MiniMaxAI/MiniMax-M2.7"),
     ("minimax-m2", "fusion", "MiniMaxAI/MiniMax-M2.7"),
-    ("kimi", "fusion", "moonshotai/Kimi-K2.6"),
-    ("kimi-k2.6", "fusion", "moonshotai/Kimi-K2.6"),
     (
         "deepseek-v4",
         "fusion",
@@ -963,9 +961,6 @@ impl Config {
         if lower.starts_with("minimax") || lower.contains("minimax") {
             return Some("fusion");
         }
-        if lower.starts_with("moonshot") || lower.starts_with("kimi") || lower.contains("kimi") {
-            return Some("fusion");
-        }
         if lower == "deepseek-ai/deepseek-v4-flash-0731" || lower.starts_with("deepseek-ai/") {
             return Some("fusion");
         }
@@ -1387,10 +1382,6 @@ mod tests {
             Some(("fusion", "MiniMaxAI/MiniMax-M2.7"))
         );
         assert_eq!(
-            Config::resolve_model_shorthand("kimi"),
-            Some(("fusion", "moonshotai/Kimi-K2.6"))
-        );
-        assert_eq!(
             Config::resolve_model_shorthand("deepseek-v4"),
             Some(("fusion", "deepseek-ai/DeepSeek-V4-Flash-0731"))
         );
@@ -1447,10 +1438,6 @@ mod tests {
         );
         assert_eq!(
             Config::detect_provider_for_model("MiniMaxAI/MiniMax-M2.7"),
-            Some("fusion")
-        );
-        assert_eq!(
-            Config::detect_provider_for_model("moonshotai/Kimi-K2.6"),
             Some("fusion")
         );
         assert_eq!(
@@ -1525,7 +1512,7 @@ mod tests {
         let notif_cfg = cfg.notification_config();
         assert!(notif_cfg.enabled);
         assert!(notif_cfg.desktop_enabled);
-        assert!(notif_cfg.terminal_enabled);
+        assert!(!notif_cfg.terminal_enabled);
         assert!(!notif_cfg.sound);
 
         // Roundtrip JSON

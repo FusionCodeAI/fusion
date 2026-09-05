@@ -1,6 +1,6 @@
 {
   "name": "@fusioncode/sdk",
-  "version": "2.0.0-alpha.1",
+  "version": "2.0.0-alpha.2",
   "description": "Official TypeScript & WebAssembly SDK for Fusion AI Coding Assistant — pure-Rust engine with in-memory VFS, streaming turns, subagents, and xterm.js integration",
   "type": "module",
   "main": "./dist/index.js",

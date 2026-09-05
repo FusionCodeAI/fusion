@@ -517,12 +517,6 @@ impl AcpServer {
                 provider: "fusion".to_string(),
                 is_default: cfg.default_model == "MiniMaxAI/MiniMax-M2.7",
             },
-            ModelInfo {
-                id: "moonshotai/Kimi-K2.6".to_string(),
-                name: "Kimi K2.6".to_string(),
-                provider: "fusion".to_string(),
-                is_default: cfg.default_model == "moonshotai/Kimi-K2.6",
-            },
         ];
 
         Ok(serde_json::json!({ "models": models }))
@@ -540,11 +534,6 @@ impl AcpServer {
                 value: "MiniMaxAI/MiniMax-M2.7".to_string(),
                 name: "MiniMax M2.7".to_string(),
                 description: Some("Fusion Gateway (200k context)".to_string()),
-            },
-            SessionConfigSelectOption {
-                value: "moonshotai/Kimi-K2.6".to_string(),
-                name: "Kimi K2.6".to_string(),
-                description: Some("Fusion Gateway (262k context)".to_string()),
             },
         ];
 

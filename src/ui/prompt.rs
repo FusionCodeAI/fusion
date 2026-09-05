@@ -1590,7 +1590,7 @@ fn model_category_label(id: &str, name: &str) -> &'static str {
     let lower = format!("{} {}", id, name).to_lowercase();
     if lower.contains("flash") || lower.contains("fast") {
         "Fast"
-    } else if lower.contains("reason") || lower.contains("kimi") || lower.contains("minimax") {
+    } else if lower.contains("reason") || lower.contains("minimax") {
         "Reasoning"
     } else if lower.contains("code") || lower.contains("coding") {
         "Coding"
@@ -1932,7 +1932,6 @@ mod tests {
                 "MiniMaxAI/MiniMax-M2.7".to_string(),
                 "MiniMax M2.7".to_string(),
             ),
-            ("moonshotai/Kimi-K2.6".to_string(), "Kimi K2.6".to_string()),
         ];
         let prompt = Prompt::new()
             .with_models(models)
@@ -1950,11 +1949,11 @@ mod tests {
         let raw = String::from_utf8_lossy(&buf);
         // Header row
         assert!(
-            raw.contains("Models 3 · Type to filter"),
+            raw.contains("Models 2 · Type to filter"),
             "Missing header in:\n{}",
             raw
         );
-        assert!(raw.contains("1-3"), "Missing range indicator in:\n{}", raw);
+        assert!(raw.contains("1-2"), "Missing range indicator in:\n{}", raw);
         // Top and bottom divider color
         assert!(
             raw.contains("\x1b[38;5;240m"),
@@ -2048,10 +2047,6 @@ mod tests {
             "Fast"
         );
         assert_eq!(
-            model_category_label("moonshotai/Kimi-K2.6", "Kimi K2.6"),
-            "Reasoning"
-        );
-        assert_eq!(
             model_category_label("MiniMaxAI/MiniMax-M2.7", "MiniMax M2.7"),
             "Reasoning"
         );
@@ -2129,12 +2124,12 @@ mod tests {
     #[test]
     fn test_render_effort_picker_menu_with_effort_selected() {
         let prompt = Prompt::new()
-            .with_pending_model_id("moonshotai/Kimi-K2.6")
+            .with_pending_model_id("MiniMaxAI/MiniMax-M2.7")
             .with_effort_picker_active(true)
             .with_effort_selection(1); // xhigh
 
         let mut buf = Vec::new();
-        let buffer: Vec<char> = "/model moonshotai/Kimi-K2.6 ".chars().collect();
+        let buffer: Vec<char> = "/model MiniMaxAI/MiniMax-M2.7 ".chars().collect();
         let mut last_lines = 0;
         let mut last_cursor = 0;
 
@@ -2163,7 +2158,7 @@ mod tests {
         );
         // Status line dynamically shows effort
         assert!(
-            raw.contains("auto · Kimi K2.6 · xhigh"),
+            raw.contains("auto · MiniMax M2.7 · xhigh"),
             "Missing dynamic status line in:\n{}",
             raw
         );
