@@ -214,7 +214,7 @@ impl NotificationBackend {
 
         #[cfg(target_os = "macos")]
         {
-            return Self::MacOS;
+            return Self::TerminalOsc;
         }
 
         #[cfg(target_os = "windows")]
@@ -1162,8 +1162,7 @@ end run"#;
                 format!("\x1b]777;notify;{clean_title};{clean_body}\x07")
             }
             TerminalOscProtocol::Osc9 => {
-                // Both OSC 9 with BEL and OSC 777 with BEL for maximum Warp / iTerm / WezTerm compatibility
-                format!("\x1b]9;{clean_title}: {clean_body}\x07\x1b]777;notify;{clean_title};{clean_body}\x07")
+                format!("\x1b]9;{clean_title}: {clean_body}\x07")
             }
             TerminalOscProtocol::Osc99 => {
                 self.render_osc99()
@@ -1172,10 +1171,8 @@ end run"#;
                 TERMINAL_BELL.to_string()
             }
             TerminalOscProtocol::All => {
-                let osc99 = self.render_osc99();
-                format!(
-                    "\x1b]777;notify;{clean_title};{clean_body}\x07\x1b]9;{clean_title}: {clean_body}\x07{osc99}"
-                )
+                let proto = detect_terminal_osc_protocol();
+                self.render_terminal_osc_protocol(proto)
             }
         }
     }
@@ -1233,7 +1230,9 @@ end run"#;
                         .backend
                         .clone()
                         .unwrap_or_else(NotificationBackend::detect);
-                    let _ = notification.send_desktop(backend);
+                    if backend != NotificationBackend::TerminalOsc && backend != NotificationBackend::Disabled {
+                        let _ = notification.send_desktop(backend);
+                    }
                 }
                 if cfg.sound || notification.sound {
                     let mut out = stdout();
@@ -1274,18 +1273,13 @@ end run"#;
                 .backend
                 .clone()
                 .unwrap_or_else(NotificationBackend::detect);
-            match self.send_desktop(backend) {
-                Ok(()) => {
-                    outcome.desktop_sent = true;
-                }
-                Err(e) => {
-                    outcome.error = Some(e.to_string());
-                    // Fallback to terminal OSC if desktop failed and terminal hasn't sent yet
-                    if !outcome.terminal_sent {
-                        let mut err = stderr();
-                        if self.send_terminal_osc(&mut err).is_ok() {
-                            outcome.terminal_sent = true;
-                        }
+            if backend != NotificationBackend::TerminalOsc && backend != NotificationBackend::Disabled {
+                match self.send_desktop(backend) {
+                    Ok(()) => {
+                        outcome.desktop_sent = true;
+                    }
+                    Err(e) => {
+                        outcome.error = Some(e.to_string());
                     }
                 }
             }
@@ -2235,11 +2229,8 @@ mod tests {
         assert!(osc99.contains("d=0;Terminal Title"));
         assert!(osc99.contains("p=body;Terminal Body"));
         let osc_all = notif.render_terminal_osc();
-        assert!(osc_all.contains("777;notify;"));
-        assert!(osc_all.contains("9;"));
-        assert!(osc_all.contains("99;"));
+        assert!(!osc_all.is_empty());
     }
-
     #[test]
     fn test_send_terminal_osc_to_writer() {
         let notif = Notification::new("Test Title", "Test Body");
