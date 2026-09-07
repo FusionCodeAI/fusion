@@ -149,9 +149,15 @@ pub fn format_turn_summary(
     let elapsed_str = format_duration_compact(elapsed);
     let in_str = format_tokens_compact(in_tokens);
     let out_str = format_tokens_compact(out_tokens);
+    let tps_suffix = if elapsed.as_secs_f64() >= 0.1 && out_tokens > 0 {
+        let tps = out_tokens as f64 / elapsed.as_secs_f64();
+        format!(" · {:.1} tok/s", tps)
+    } else {
+        String::new()
+    };
     format!(
-        "\r\n  \x1b[2;37m{} (↑{} ↓{})\x1b[0m\r\n\r\n",
-        elapsed_str, in_str, out_str
+        "\r\n  \x1b[2;37m{}{} (↑{} ↓{})\x1b[0m\r\n\r\n",
+        elapsed_str, tps_suffix, in_str, out_str
     )
 }
 
@@ -808,11 +814,18 @@ pub async fn run_turn_ui(
                 let frame_idx = (elapsed.as_millis() / 80) as usize % frames.len();
                 let dot = format!("{} ", frames[frame_idx]);
                 let verb = active_label.strip_prefix("• ").unwrap_or(&active_label);
+                let tps_suffix = if elapsed.as_secs_f64() >= 0.5 && *output_tokens > 0 {
+                    let tps = *output_tokens as f64 / elapsed.as_secs_f64();
+                    format!(" · {:.1} tok/s", tps)
+                } else {
+                    String::new()
+                };
                 let status = format!(
-                    "\r\x1b[2K{}{} ({}) (↑{} ↓{})",
+                    "\r\x1b[2K{}{} ({}{}) (↑{} ↓{})",
                     dot,
                     verb,
                     format_duration_compact(elapsed),
+                    tps_suffix,
                     format_tokens_compact(*input_tokens),
                     format_tokens_compact(*output_tokens)
                 );
@@ -988,11 +1001,18 @@ pub async fn run_turn_ui(
                         }
                     }
                 };
+                let tps_suffix = if elapsed.as_secs_f64() >= 0.5 && output_tokens > 0 {
+                    let tps = output_tokens as f64 / elapsed.as_secs_f64();
+                    format!(" · {:.1} tok/s", tps)
+                } else {
+                    String::new()
+                };
                 let status = format!(
-                    "\r\x1b[2K{}{} ({}) (↑{} ↓{})",
+                    "\r\x1b[2K{}{} ({}{}) (↑{} ↓{})",
                     dot,
                     verb,
                     format_duration_compact(elapsed),
+                    tps_suffix,
                     format_tokens_compact(input_tokens),
                     format_tokens_compact(output_tokens)
                 );
@@ -1105,6 +1125,12 @@ pub async fn run_turn_ui(
                 let elapsed_str = format_duration_compact(elapsed);
                 let in_str = format_tokens_compact(input_tokens);
                 let out_str = format_tokens_compact(output_tokens);
+                let tps_suffix = if elapsed.as_secs_f64() >= 0.1 && output_tokens > 0 {
+                    let tps = output_tokens as f64 / elapsed.as_secs_f64();
+                    format!(" · {:.1} tok/s", tps)
+                } else {
+                    String::new()
+                };
                 let mut out = stdout();
                 let update_suffix = if let Some(notice) = crate::agent::updater::staged_update_notice() {
                     format!(" · \x1b[1;32m● {}\x1b[0m", notice)
@@ -1113,8 +1139,8 @@ pub async fn run_turn_ui(
                 };
                 let _ = write!(
                     out,
-                    "\r\n  \x1b[2;37m{} (↑{} ↓{}){}\x1b[0m\r\n\r\n",
-                    elapsed_str, in_str, out_str, update_suffix
+                    "\r\n  \x1b[2;37m{}{}{} (↑{} ↓{})\x1b[0m\r\n\r\n",
+                    elapsed_str, tps_suffix, update_suffix, in_str, out_str
                 );
                 let _ = execute!(out, cursor::MoveToColumn(0));
                 let _ = out.flush();
@@ -1545,6 +1571,16 @@ mod tests {
         // Braille spinner frame is present (not a blinking dot)
         let frames = crate::ui::spinner::BRAILLE_FRAMES;
         assert!(frames.iter().any(|f| status.contains(f)));
+    }
+    #[test]
+    fn test_format_turn_summary_with_tps() {
+        let summary = format_turn_summary(Duration::from_secs(2), 20, 100);
+        assert!(summary.contains("2s"));
+        assert!(summary.contains("50.0 tok/s"));
+        assert!(summary.contains("↑20 ↓100"));
+
+        let summary_no_out = format_turn_summary(Duration::from_secs(2), 20, 0);
+        assert!(!summary_no_out.contains("tok/s"));
     }
 
     #[test]
