@@ -713,6 +713,8 @@ pub async fn run_turn_ui(
         + session.estimate_tokens())
     .max(1) as u64;
     let mut output_tokens = 0u64;
+    let mut generation_duration = std::time::Duration::ZERO;
+    let mut stream_segment_start: Option<Instant> = None;
     let mut md = MarkdownRenderer::new().with_indent(2);
 
     let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel();
@@ -740,10 +742,15 @@ pub async fn run_turn_ui(
                                   is_thinking: &mut bool,
                                   output_tokens: &mut u64,
                                   input_tokens: &mut u64,
+                                  generation_duration: &mut std::time::Duration,
+                                  stream_segment_start: &mut Option<Instant>,
                                   md: &mut MarkdownRenderer,
                                   prompt: &mut Prompt| {
         match event {
             AgentEvent::TextDelta(d) => {
+                if stream_segment_start.is_none() {
+                    *stream_segment_start = Some(Instant::now());
+                }
                 clear_prompt_frame(prompt);
                 if *is_thinking {
                     *is_thinking = false;
@@ -767,6 +774,9 @@ pub async fn run_turn_ui(
                 let _ = prompt.render_current();
             }
             AgentEvent::ThinkingDelta(th) => {
+                if stream_segment_start.is_none() {
+                    *stream_segment_start = Some(Instant::now());
+                }
                 if !tool_batch.is_empty() {
                     clear_prompt_frame(prompt);
                     prompt.set_running_status(None);
@@ -793,6 +803,9 @@ pub async fn run_turn_ui(
                 let _ = prompt.render_current();
             }
             AgentEvent::ToolStarted { name, args, .. } => {
+                if let Some(t) = stream_segment_start.take() {
+                    *generation_duration += t.elapsed();
+                }
                 clear_prompt_frame(prompt);
                 if *is_thinking {
                     let mut out = stdout();
@@ -1001,8 +1014,9 @@ pub async fn run_turn_ui(
                         }
                     }
                 };
-                let tps_suffix = if elapsed.as_secs_f64() >= 0.5 && output_tokens > 0 {
-                    let tps = output_tokens as f64 / elapsed.as_secs_f64();
+                let active_gen = generation_duration + stream_segment_start.map(|t| t.elapsed()).unwrap_or_default();
+                let tps_suffix = if active_gen.as_secs_f64() >= 0.2 && output_tokens > 0 {
+                    let tps = output_tokens as f64 / active_gen.as_secs_f64();
                     format!(" · {:.1} tok/s", tps)
                 } else {
                     String::new()
@@ -1105,6 +1119,8 @@ pub async fn run_turn_ui(
                         &mut is_thinking,
                         &mut output_tokens,
                         &mut input_tokens,
+                        &mut generation_duration,
+                        &mut stream_segment_start,
                         &mut md,
                         prompt,
                     );
@@ -1125,8 +1141,11 @@ pub async fn run_turn_ui(
                 let elapsed_str = format_duration_compact(elapsed);
                 let in_str = format_tokens_compact(input_tokens);
                 let out_str = format_tokens_compact(output_tokens);
-                let tps_suffix = if elapsed.as_secs_f64() >= 0.1 && output_tokens > 0 {
-                    let tps = output_tokens as f64 / elapsed.as_secs_f64();
+                if let Some(t) = stream_segment_start.take() {
+                    generation_duration += t.elapsed();
+                }
+                let tps_suffix = if generation_duration.as_secs_f64() >= 0.05 && output_tokens > 0 {
+                    let tps = output_tokens as f64 / generation_duration.as_secs_f64();
                     format!(" · {:.1} tok/s", tps)
                 } else {
                     String::new()
@@ -1155,6 +1174,8 @@ pub async fn run_turn_ui(
                     &mut is_thinking,
                     &mut output_tokens,
                     &mut input_tokens,
+                    &mut generation_duration,
+                    &mut stream_segment_start,
                     &mut md,
                     prompt,
                 );
