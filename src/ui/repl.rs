@@ -1007,7 +1007,6 @@ pub async fn run_turn_ui(
                         if key.kind != KeyEventKind::Release {
                             if (key.code == KeyCode::Esc || (key.modifiers.contains(KeyModifiers::CONTROL) && key.code == KeyCode::Char('c')))
                                 && prompt.is_running()
-                                && prompt.buffer.is_empty()
                             {
                                 clear_prompt_frame(prompt);
                                 prompt.set_running(false);

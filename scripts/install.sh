@@ -5,7 +5,7 @@
 # Usage:
 #   curl -fsSL https://fusioncode.app/install | bash
 #   or:
-#   curl -fsSL https://raw.githubusercontent.com/theaungmyatmoe/fusion/main/scripts/install.sh | sh
+#   curl -fsSL https://raw.githubusercontent.com/FusionCodeAI/fusion/main/scripts/install.sh | sh
 #
 # Supported Operating Systems:
 #   - macOS (Darwin): Apple Silicon (aarch64), Intel (x86_64)
