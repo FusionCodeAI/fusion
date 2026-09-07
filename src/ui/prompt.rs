@@ -713,6 +713,11 @@ impl Prompt {
                         self.render_current()?;
                         return Ok(None);
                     }
+                    if !self.at_file_dismissed && !self.at_file_matches().is_empty() {
+                        self.at_file_dismissed = true;
+                        self.render_current()?;
+                        return Ok(None);
+                    }
                     self.clear_frame()?;
                     return Ok(Some(PromptResult::Cancel));
                 }
@@ -3219,5 +3224,31 @@ mod tests {
         let res = prompt.handle_event(tab_event).expect("handle_event failed");
         assert_eq!(res, None);
         assert_eq!(prompt.buffer_text(), "crates/fusion-shell/src/main.rs");
+    }
+
+    #[test]
+    fn test_handle_event_at_file_esc_dismissal() {
+        let mut prompt = Prompt::new();
+        prompt.set_file_cache(vec!["src/main.rs".to_string()]);
+        prompt.buffer = "@main".chars().collect();
+        prompt.cursor_pos = 5;
+
+        // Esc dismisses the @file dropdown without canceling prompt
+        let esc_event = Event::Key(crossterm::event::KeyEvent::new(
+            KeyCode::Esc,
+            KeyModifiers::NONE,
+        ));
+        let res = prompt.handle_event(esc_event).expect("handle_event failed");
+        assert_eq!(res, None);
+        assert!(prompt.at_file_dismissed);
+        assert_eq!(prompt.buffer_text(), "@main");
+
+        // Second Esc cancels prompt
+        let esc_event2 = Event::Key(crossterm::event::KeyEvent::new(
+            KeyCode::Esc,
+            KeyModifiers::NONE,
+        ));
+        let res2 = prompt.handle_event(esc_event2).expect("handle_event failed");
+        assert_eq!(res2, Some(PromptResult::Cancel));
     }
 }
