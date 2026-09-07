@@ -91,6 +91,20 @@ impl AgentRunner {
         tool_ctx: ToolContext,
     ) -> Self {
         let max_turns = config.max_turns.unwrap_or(100).clamp(10, 500);
+        let mut tools = tools;
+        let client_arc = std::sync::Arc::new(client.clone());
+        let spawn_tool = std::sync::Arc::new(crate::agent::subagent::SpawnSubagentTool::new(
+            client_arc.clone(),
+            config.clone(),
+            tools.clone(),
+        ));
+        let batch_tool = std::sync::Arc::new(crate::agent::subagent::SpawnBatchSubagentsTool::new(
+            client_arc,
+            config.clone(),
+            tools.clone(),
+        ));
+        tools.register(spawn_tool);
+        tools.register(batch_tool);
         Self {
             client,
             config,
