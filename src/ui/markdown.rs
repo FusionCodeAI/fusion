@@ -157,11 +157,12 @@ impl MarkdownRenderer {
         if self.indent > 0 {
             let indent_prefix = " ".repeat(self.indent);
             for line in formatted.split('\n') {
-                if !line.is_empty() {
+                let clean = line.trim_end_matches('\r');
+                if !clean.is_empty() {
                     output.push_str(&indent_prefix);
-                    output.push_str(line);
+                    output.push_str(clean);
                     if self.stream_stdout {
-                        print!("{}{}\r\n", indent_prefix, line);
+                        print!("{}{}\r\n", indent_prefix, clean);
                     }
                 } else if self.stream_stdout {
                     print!("\r\n");
@@ -173,10 +174,11 @@ impl MarkdownRenderer {
             }
         } else {
             for line in formatted.split('\n') {
-                output.push_str(line);
+                let clean = line.trim_end_matches('\r');
+                output.push_str(clean);
                 output.push('\n');
                 if self.stream_stdout {
-                    print!("{}\r\n", line);
+                    print!("{}\r\n", clean);
                 }
             }
             if self.stream_stdout {
@@ -189,10 +191,16 @@ impl MarkdownRenderer {
     fn render_buffered_line(&mut self, line: &str, output: &mut String) {
         let trimmed = line.trim();
         if !self.in_code_block && super::table::is_markdown_table_line(trimmed) {
+            let term_w = super::table::get_terminal_width();
+            let effective_w = term_w.saturating_sub(self.indent + 4).max(30);
+            self.table_streamer = std::mem::take(&mut self.table_streamer).with_terminal_width(effective_w);
             self.table_streamer.feed_line(line);
             return;
         }
         if self.table_streamer.is_buffering() {
+            let term_w = super::table::get_terminal_width();
+            let effective_w = term_w.saturating_sub(self.indent + 4).max(30);
+            self.table_streamer = std::mem::take(&mut self.table_streamer).with_terminal_width(effective_w);
             let table_out = self.table_streamer.flush();
             self.emit(&table_out, output);
         }
@@ -242,6 +250,9 @@ impl MarkdownRenderer {
         }
 
         if self.table_streamer.is_buffering() {
+            let term_w = super::table::get_terminal_width();
+            let effective_w = term_w.saturating_sub(self.indent + 4).max(30);
+            self.table_streamer = std::mem::take(&mut self.table_streamer).with_terminal_width(effective_w);
             let table_out = self.table_streamer.flush();
             self.emit(&table_out, &mut output);
         }

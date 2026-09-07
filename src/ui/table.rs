@@ -833,7 +833,11 @@ impl ColumnAutoSizer {
                                 if let Some(&widest) =
                                     unassigned.iter().max_by_key(|&&c| final_widths[c])
                                 {
-                                    final_widths[widest] += rem;
+                                    let cap = natural_widths[widest].saturating_sub(final_widths[widest]);
+                                    if cap > 0 {
+                                        let added_amt = rem.min(cap);
+                                        final_widths[widest] += added_amt;
+                                    }
                                 }
                                 break;
                             }
