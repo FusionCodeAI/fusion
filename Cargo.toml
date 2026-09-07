@@ -1,14 +1,14 @@
 [workspace]
 members = [
     ".",
-    "crates/pi-diff",
-    "crates/pi-edit",
-    "crates/pi-iso",
-    "crates/pi-walker",
-    "crates/pi-vcs",
-    "crates/pi-shell",
-    "crates/pi-builtins",
-    "crates/pi-ast",
+    "crates/fusion-diff",
+    "crates/fusion-edit",
+    "crates/fusion-iso",
+    "crates/fusion-walker",
+    "crates/fusion-vcs",
+    "crates/fusion-shell",
+    "crates/fusion-builtins",
+    "crates/fusion-ast",
     "crates/vendor/brush-core",
 ]
 resolver = "2"
@@ -34,15 +34,15 @@ brush-core = { path = "crates/vendor/brush-core" }
 # ──────────────────────────────────────────────────────────────────────────────
 # Internal Libraries
 # ──────────────────────────────────────────────────────────────────────────────
-pi-ast = { path = "crates/pi-ast" }
-pi-diff = { path = "crates/pi-diff" }
-pi-edit = { path = "crates/pi-edit" }
-pi-iso = { path = "crates/pi-iso" }
-pi-shell = { path = "crates/pi-shell" }
-pi-walker = { path = "crates/pi-walker" }
-pi-vcs = { path = "crates/pi-vcs" }
+fusion-ast = { path = "crates/fusion-ast" }
+fusion-diff = { path = "crates/fusion-diff" }
+fusion-edit = { path = "crates/fusion-edit" }
+fusion-iso = { path = "crates/fusion-iso" }
+fusion-shell = { path = "crates/fusion-shell" }
+fusion-walker = { path = "crates/fusion-walker" }
+fusion-vcs = { path = "crates/fusion-vcs" }
 brush-core = { path = "crates/vendor/brush-core" }
-pi-builtins = { path = "crates/pi-builtins" }
+fusion-builtins = { path = "crates/fusion-builtins" }
 
 # ──────────────────────────────────────────────────────────────────────────────
 # Async Runtime & Concurrency

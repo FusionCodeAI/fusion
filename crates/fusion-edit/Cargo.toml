@@ -1,0 +1,27 @@
+[package]
+name = "fusion-edit"
+version.workspace = true
+edition.workspace = true
+license = "MIT"
+authors.workspace = true
+repository.workspace = true
+
+[lints]
+workspace = true
+
+[dependencies]
+async-trait.workspace = true
+parking_lot.workspace = true
+fusion-ast.workspace = true
+fusion-diff.workspace = true
+fusion-walker.workspace = true
+regex.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+thiserror.workspace = true
+unicode-normalization = "0.1"
+xxhash-rust.workspace = true
+
+[dev-dependencies]
+tempfile = "3"
+tokio.workspace = true
