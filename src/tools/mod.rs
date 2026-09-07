@@ -1,3 +1,4 @@
+pub mod ask;
 pub mod bash;
 pub mod clipboard;
 pub mod compat;
@@ -34,6 +35,7 @@ pub mod tree;
 pub mod types;
 pub mod watch;
 pub mod web_search;
+pub use ask::AskTool;
 pub use bash::BashTool;
 pub use clipboard::{
     ClipboardBackendKind, ClipboardManager, ClipboardStatus, ClipboardTool, ReadClipboardTool,
@@ -132,6 +134,7 @@ pub fn default_registry() -> ToolRegistry {
     registry.register(Arc::new(JsonSchemaTool::new()));
     registry.register(Arc::new(GitHubTool::new()));
     registry.register(Arc::new(crate::tools::lsp::LspTool::new()));
+    registry.register(Arc::new(AskTool::new()));
     compat::register_compat_tools(&mut registry);
     registry
 }
@@ -209,6 +212,7 @@ mod tests {
         assert!(reg.get("process").is_some());
         assert!(reg.get("bg_process").is_some());
         assert!(reg.get("proc").is_some());
+        assert!(reg.get("ask").is_some());
         assert!(reg.definitions().len() >= 13);
     }
     #[tokio::test]
