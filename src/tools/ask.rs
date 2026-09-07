@@ -189,7 +189,7 @@ pub fn prompt_question_tui(q: &Question) -> anyhow::Result<String> {
     let _ = write!(out, "\r\x1b[2K");
     let _ = out.flush();
 
-    let _guard = crate::ui::prompt::RawModeGuard::enter()?;
+    let _ = crossterm::terminal::enable_raw_mode();
     let _ = execute!(out, cursor::Hide);
 
     let num_opts = q.options.len();

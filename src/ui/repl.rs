@@ -1,6 +1,6 @@
 use crossterm::{
     cursor,
-    event::{Event, EventStream, KeyCode, KeyEventKind},
+    event::{Event, EventStream, KeyCode, KeyEventKind, KeyModifiers},
     execute,
     terminal::{self, ClearType},
 };
@@ -1004,16 +1004,35 @@ pub async fn run_turn_ui(
             Some(event_res) = event_stream.next() => {
                 if let Ok(ev) = event_res {
                     if let Event::Key(key) = ev {
-                        if key.kind != KeyEventKind::Release
-                            && key.code == KeyCode::Up
-                            && prompt.buffer.is_empty()
-                        {
-                            if let Some(last) = queued_prompts.pop_back() {
-                                prompt.buffer = last.chars().collect();
-                                prompt.cursor_pos = prompt.buffer.len();
-                                prompt.set_queued_count(queued_prompts.len());
-                                let _ = prompt.render_current();
-                                continue;
+                        if key.kind != KeyEventKind::Release {
+                            if (key.code == KeyCode::Esc || (key.modifiers.contains(KeyModifiers::CONTROL) && key.code == KeyCode::Char('c')))
+                                && prompt.is_running()
+                                && prompt.buffer.is_empty()
+                            {
+                                clear_prompt_frame(prompt);
+                                prompt.set_running(false);
+                                prompt.set_running_status(None);
+                                prompt.set_queued_count(0);
+                                let mut out = stdout();
+                                if let Some(tool) = &active_tool_label {
+                                    let _ = write!(out, "■ Cancelled {} · What can fusion do differently?\r\n\r\n", tool);
+                                } else {
+                                    let _ = write!(out, "  \x1b[2;37m(Turn canceled)\x1b[0m\r\n\r\n");
+                                }
+                                let _ = execute!(out, cursor::MoveToColumn(0));
+                                let _ = out.flush();
+                                reset_prompt_render_state(prompt);
+                                return Ok((String::new(), queued_prompts));
+                            }
+
+                            if key.code == KeyCode::Up && prompt.buffer.is_empty() {
+                                if let Some(last) = queued_prompts.pop_back() {
+                                    prompt.buffer = last.chars().collect();
+                                    prompt.cursor_pos = prompt.buffer.len();
+                                    prompt.set_queued_count(queued_prompts.len());
+                                    let _ = prompt.render_current();
+                                    continue;
+                                }
                             }
                         }
                     }
