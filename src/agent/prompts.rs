@@ -268,7 +268,11 @@ Core Principles:
 6. Tooling & Ecosystem:
    - Write code that satisfies `cargo clippy -- -D warnings` and `cargo fmt`.
    - Write meaningful doc comments (`///`) with runnable doctests where appropriate.
-   - Prefer pure-Rust dependencies to maintain instant compilation and cross-compilation simplicity (no C/C++ or OpenSSL dependencies unless explicitly requested)."#;
+   - Prefer pure-Rust dependencies to maintain instant compilation and cross-compilation simplicity (no C/C++ or OpenSSL dependencies unless explicitly requested).
+
+7. Semantic Intelligence & Delegation:
+   - Use `lsp` for semantic code intelligence (definitions, references, type hover, rust-analyzer diagnostics, and symbol queries) before making structural edits.
+   - Use `spawn_subagent` and `spawn_subagents_batch` for delegation of complex research, parallel test generation, or multi-crate refactoring to specialized subagents."#;
 
 /// Curated domain-optimized system prompt for TypeScript / JavaScript engineering.
 pub const TYPESCRIPT_SYSTEM_PROMPT: &str = r#"You are Fusion, an expert TypeScript and modern full-stack architect.
@@ -302,7 +306,11 @@ Core Principles:
 
 6. Framework & UI Hygiene:
    - For React/Preact: follow strict hook dependencies, pure functional components, avoid stale closures, and differentiate server vs client components cleanly.
-   - Keep bundle size small and tree-shakeable: prefer named exports over default exports."#;
+   - Keep bundle size small and tree-shakeable: prefer named exports over default exports.
+
+7. Semantic Intelligence & Delegation:
+   - Use `lsp` for semantic code intelligence (symbol definitions, references, type hover, workspace diagnostics) across modules and packages.
+   - Use `spawn_subagent` and `spawn_subagents_batch` for delegation of multi-file refactors, parallel test suites, or exploratory codebase analysis to specialized subagents."#;
 
 /// Curated domain-optimized system prompt for Python engineering.
 pub const PYTHON_SYSTEM_PROMPT: &str = r#"You are Fusion, an expert Python systems and backend engineer.
@@ -337,7 +345,11 @@ Core Principles:
 
 6. Ecosystem & Packaging:
    - Support modern Python virtual environments and package managers (`uv`, `poetry`).
-   - Structure packages with standard `pyproject.toml` configuration and clean module hierarchies."#;
+   - Structure packages with standard `pyproject.toml` configuration and clean module hierarchies.
+
+7. Semantic Intelligence & Delegation:
+   - Use `lsp` for semantic code intelligence (definitions, cross-file references, type hover, pyright/jedi diagnostics).
+   - Use `spawn_subagent` and `spawn_subagents_batch` for delegation of parallel research, background test runs, or modular tasks to specialized subagents."#;
 
 /// Curated domain-optimized system prompt for Go engineering.
 pub const GO_SYSTEM_PROMPT: &str = r#"You are Fusion, an expert Go systems engineer.
@@ -375,7 +387,11 @@ Core Principles:
 6. Testing & Tooling:
    - Write table-driven tests with subtests: `t.Run(tc.name, func(t *testing.T) { ... })`.
    - Code must pass `go vet` and standard `golangci-lint` linters without warnings.
-   - Follow standard project layout (`cmd/`, `internal/`, `pkg/`)."#;
+   - Follow standard project layout (`cmd/`, `internal/`, `pkg/`).
+
+7. Semantic Intelligence & Delegation:
+   - Use `lsp` for semantic code intelligence (gopls definitions, callers, references, type hover, package diagnostics).
+   - Use `spawn_subagent` and `spawn_subagents_batch` for delegation of concurrent investigations, large-scale refactoring, or independent test writing to specialized subagents."#;
 
 /// Curated domain-optimized system prompt for Mobile / Termux environments.
 pub const TERMUX_SYSTEM_PROMPT: &str = r#"You are Fusion, specialized for resource-constrained mobile and Android/Termux environments.
@@ -998,6 +1014,11 @@ mod tests {
         assert!(prompt.contains("tokio"));
         assert!(prompt.contains("SAFETY:"));
         assert!(prompt.contains("clippy"));
+        assert!(prompt.contains("lsp"));
+        assert!(prompt.contains("semantic code intelligence"));
+        assert!(prompt.contains("spawn_subagent"));
+        assert!(prompt.contains("spawn_subagents_batch"));
+        assert!(prompt.contains("delegation"));
     }
 
     #[test]
@@ -1009,6 +1030,11 @@ mod tests {
         assert!(prompt.contains("as const"));
         assert!(prompt.contains("Zod"));
         assert!(prompt.contains("ESM"));
+        assert!(prompt.contains("lsp"));
+        assert!(prompt.contains("semantic code intelligence"));
+        assert!(prompt.contains("spawn_subagent"));
+        assert!(prompt.contains("spawn_subagents_batch"));
+        assert!(prompt.contains("delegation"));
     }
 
     #[test]
@@ -1020,6 +1046,11 @@ mod tests {
         assert!(prompt.contains("dataclass"));
         assert!(prompt.contains("pathlib.Path"));
         assert!(prompt.contains("TaskGroup"));
+        assert!(prompt.contains("lsp"));
+        assert!(prompt.contains("semantic code intelligence"));
+        assert!(prompt.contains("spawn_subagent"));
+        assert!(prompt.contains("spawn_subagents_batch"));
+        assert!(prompt.contains("delegation"));
     }
 
     #[test]
@@ -1031,6 +1062,30 @@ mod tests {
         assert!(prompt.contains("context.Context"));
         assert!(prompt.contains("goroutine"));
         assert!(prompt.contains("sync.Mutex"));
+        assert!(prompt.contains("lsp"));
+        assert!(prompt.contains("semantic code intelligence"));
+        assert!(prompt.contains("spawn_subagent"));
+        assert!(prompt.contains("spawn_subagents_batch"));
+        assert!(prompt.contains("delegation"));
+    }
+
+    #[test]
+    fn test_domain_prompts_lsp_and_delegation() {
+        for (name, prompt) in [
+            ("rust", rust_system_prompt()),
+            ("typescript", typescript_system_prompt()),
+            ("python", python_system_prompt()),
+            ("go", go_system_prompt()),
+        ] {
+            assert!(
+                prompt.contains("`lsp` for semantic code intelligence"),
+                "prompt {name} should mention using lsp for semantic code intelligence"
+            );
+            assert!(
+                prompt.contains("`spawn_subagent` and `spawn_subagents_batch` for delegation"),
+                "prompt {name} should mention using spawn_subagent and spawn_subagents_batch for delegation"
+            );
+        }
     }
 
     #[test]
