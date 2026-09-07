@@ -76,7 +76,7 @@ pub enum SlashCommand {
         title: Option<String>,
         turn: Option<usize>,
     },
-    /// Undo/rewind the last N conversational turns: `/rewind [N]`
+    /// Undo/rewind working tree checkpoints and conversation turns: `/rewind [steps]` or `/undo [steps]`
     Rewind { turns: Option<usize> },
     /// Force context window compaction to reduce token overhead: `/compact`
     Compact,
@@ -368,11 +368,19 @@ pub static COMMAND_PALETTE: &[CommandDescriptor] = &[
     },
     CommandDescriptor {
         name: "/rewind",
-        aliases: &["/undo", "/rw"],
-        syntax: "/rewind [N]",
+        aliases: &["/rw"],
+        syntax: "/rewind [steps]",
         category: CommandCategory::Session,
-        description: "Revert the last N conversation turns (default 1 turn)",
-        examples: &["/rewind", "/rewind 2", "/undo"],
+        description: "Revert working tree checkpoints and conversation turns (default latest turn)",
+        examples: &["/rewind", "/rewind 1", "/rewind 2"],
+    },
+    CommandDescriptor {
+        name: "/undo",
+        aliases: &[],
+        syntax: "/undo [steps]",
+        category: CommandCategory::Session,
+        description: "Revert working tree checkpoints and conversation turns (default latest turn)",
+        examples: &["/undo", "/undo 1", "/undo 2"],
     },
     CommandDescriptor {
         name: "/compact",
@@ -1393,21 +1401,27 @@ Branch the current conversational session into an independent session with paren
             }
             "rewind" | "undo" | "rw" => {
                 let text = r#"
-# Slash Command: `/rewind [N]`
+# Slash Command: `/rewind [steps]` or `/undo [steps]`
 
-Undo and revert the last N conversational turns in the active session.
+Revert working tree checkpoints and conversation turns in the active session.
 
-A turn consists of your user prompt and any subsequent assistant replies or tool calls.
-Prelude system instructions are preserved. Changes are immediately saved to disk.
+When steps are provided (e.g. `/rewind 1`), reverts that many turns immediately and prints restored file diffs.
+When no steps are provided, lists recent checkpoints with turn numbers, timestamps, and files touched, then reverts the latest turn.
+
+### Syntax
+- `/rewind [steps]`
+- `/undo [steps]`
 
 ### Usage
-- `/rewind` or `/undo` - Undo the most recent user turn (N=1).
-- `/rewind <N>` - Undo the last N user turns.
+- `/rewind` or `/undo` - List recent checkpoints, then revert the latest turn.
+- `/rewind <steps>` or `/undo <steps>` - Revert specified number of turns and print restored file diffs.
 
 ### Examples
 - `/rewind`
+- `/rewind 1`
 - `/rewind 2`
 - `/undo`
+- `/undo 1`
 "#;
                 print_markdown(text);
             }
@@ -1916,29 +1930,116 @@ fn handle_fork(title: Option<&str>, turn: Option<usize>, session: &mut Session) 
 }
 
 fn handle_rewind(turns: Option<usize>, runner: &AgentRunner, session: &mut Session) {
-    let count = turns.unwrap_or(1);
-    if count == 0 {
+    if let Some(0) = turns {
         println!(
             "\x1b[1;33m⚠\x1b[0m Specify at least 1 turn to rewind/undo (e.g. \x1b[1;36m/undo 1\x1b[0m).\n"
         );
         return;
     }
 
-    // Revert file mutation checkpoints if any were recorded
+    let count = match turns {
+        Some(steps) => steps,
+        None => {
+            // If no steps are provided, list recent checkpoints with turn numbers, timestamps, and files touched
+            if let Ok(mgr) = runner.checkpoints().lock() {
+                let checkpoints = mgr.list_checkpoints();
+                if checkpoints.is_empty() {
+                    println!("\x1b[2;37mNo checkpoints recorded in this session.\x1b[0m\n");
+                } else {
+                    println!(
+                        "\x1b[1;36mRecent Checkpoints:\x1b[0m ({} total recorded)",
+                        checkpoints.len()
+                    );
+                    for chk in checkpoints.iter().rev().take(5) {
+                        let full_chk = mgr.get_checkpoint(&chk.id);
+                        let turn_str = match full_chk.and_then(|c| c.turn_index) {
+                            Some(t) => format!("Turn #{}", t),
+                            None => {
+                                let total_turns = crate::agent::fork::count_turns(session);
+                                if total_turns > 0 {
+                                    format!("Turn #{}", total_turns)
+                                } else {
+                                    "Turn: -".to_string()
+                                }
+                            }
+                        };
+                        let files_str = if chk.files.is_empty() {
+                            "-".to_string()
+                        } else {
+                            chk.files
+                                .iter()
+                                 .map(|p| p.display().to_string())
+                                .collect::<Vec<_>>()
+                                .join(", ")
+                        };
+                        println!(
+                            "  \x1b[1;33m•\x1b[0m \x1b[1;37m{}\x1b[0m (\x1b[36m{}\x1b[0m) | \x1b[35m{}\x1b[0m | \x1b[2;37m{}\x1b[0m",
+                            chk.id, chk.tool_name, turn_str, chk.created_at
+                        );
+                        println!("    \x1b[2;37mFiles touched:\x1b[0m {}", files_str);
+                    }
+                    println!();
+                }
+            }
+            1 // Revert latest turn
+        }
+    };
+
+    // Revert file mutation checkpoints if any were recorded and print restored file diffs
+    let cwd = &runner.tool_ctx().cwd;
     if let Ok(mut mgr) = runner.checkpoints().lock() {
         if mgr.can_undo() {
-            match mgr.undo_n(count, &runner.tool_ctx().cwd) {
-                Ok(results) => {
-                    for res in &results {
-                        print!("{}", crate::agent::undo::format_undo_report(res));
+            let undo_count = count.min(mgr.undo_count());
+            for _ in 0..undo_count {
+                if let Some(top_chk) = mgr.peek_undo() {
+                    let chk_id = top_chk.id.clone();
+                    let inspection = mgr.inspect_checkpoint(&chk_id, cwd).ok();
+
+                    match mgr.undo(cwd) {
+                        Ok(res) => {
+                            print!("{}", crate::agent::undo::format_undo_report(&res));
+                            if let Some(insp) = inspection {
+                                let has_diffs = insp
+                                    .files
+                                    .iter()
+                                    .any(|f| f.colorized_diff.is_some() || f.unified_diff.is_some());
+                                if has_diffs {
+                                    println!("  \x1b[1;36mRestored File Diffs:\x1b[0m");
+                                    for file_diff in &insp.files {
+                                        let stats_str = format!(
+                                            "+{} -{}",
+                                            file_diff.stats.insertions, file_diff.stats.deletions
+                                        );
+                                        println!(
+                                            "  \x1b[1;33m•\x1b[0m \x1b[1;37m{}\x1b[0m ({}):",
+                                            file_diff.path.display(),
+                                            stats_str
+                                        );
+                                        if let Some(colorized) = &file_diff.colorized_diff {
+                                            print!("{}", colorized);
+                                            if !colorized.ends_with('\n') {
+                                                println!();
+                                            }
+                                        } else if let Some(unified) = &file_diff.unified_diff {
+                                            print!("{}", unified);
+                                            if !unified.ends_with('\n') {
+                                                println!();
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                        Err(e) => {
+                            eprintln!("\x1b[1;31m⚠ Checkpoint undo error:\x1b[0m {}", e);
+                            break;
+                        }
                     }
-                }
-                Err(e) => {
-                    eprintln!("\x1b[1;31m⚠ Checkpoint undo error:\x1b[0m {}", e);
                 }
             }
         }
     }
+
     let before_turns = crate::agent::fork::count_turns(session);
     let before_messages = session.total_messages();
 
@@ -4136,6 +4237,70 @@ mod tests {
         assert_eq!(session.total_messages(), 2);
         assert_eq!(session.messages()[1].content, "First answer");
     }
+    #[test]
+    fn test_execute_undo() {
+        let client = crate::provider::LlmClient::new();
+        let config = Config::default();
+        let tools = crate::tools::ToolRegistry::new();
+        let tool_ctx = crate::tools::ToolContext {
+            cwd: std::path::PathBuf::from("."),
+            env: std::collections::HashMap::new(),
+        };
+        let mut runner = AgentRunner::new(client, config, tools, tool_ctx);
+        let mut session = Session::new("deepseek-chat");
+        session.add_user_message("First question");
+        session.add_assistant_message("First answer");
+        session.add_user_message("Second question");
+        session.add_assistant_message("Second answer");
+        assert_eq!(session.total_messages(), 4);
+
+        let res = handle_slash_command("/undo", &mut runner, &mut session);
+        assert!(res.is_some());
+        assert_eq!(session.total_messages(), 2);
+        assert_eq!(session.messages()[1].content, "First answer");
+    }
+
+    #[test]
+    fn test_execute_rewind_with_checkpoint_and_diffs() {
+        let dir = tempfile::tempdir().unwrap();
+        let file_path = dir.path().join("code.rs");
+        std::fs::write(&file_path, "fn hello() {}\n").unwrap();
+
+        let client = crate::provider::LlmClient::new();
+        let config = Config::default();
+        let tools = crate::tools::ToolRegistry::new();
+        let tool_ctx = crate::tools::ToolContext {
+            cwd: dir.path().to_path_buf(),
+            env: std::collections::HashMap::new(),
+        };
+        let mut runner = AgentRunner::new(client, config, tools, tool_ctx);
+        let mut session = Session::new("deepseek-chat");
+        session.add_user_message("Add world function");
+        session.add_assistant_message("I updated code.rs");
+
+        {
+            let chk_mgr = runner.checkpoints();
+            let mut mgr = chk_mgr.lock().unwrap();
+            let mut chk = crate::agent::undo::Checkpoint::new("chk_test_1", "edit", "Edit code.rs");
+            chk.turn_index = Some(1);
+            let snap = crate::agent::undo::FileSnapshot::from_states(
+                file_path.clone(),
+                "code.rs".to_string(),
+                crate::agent::undo::FileState::from_str("fn hello() {}\n"),
+                Some(crate::agent::undo::FileState::from_str("fn hello() {}\nfn world() {}\n")),
+            );
+            chk.add_snapshot(snap);
+            mgr.push_checkpoint(chk);
+        }
+
+        std::fs::write(&file_path, "fn hello() {}\nfn world() {}\n").unwrap();
+
+        let res = handle_slash_command("/rewind 1", &mut runner, &mut session);
+        assert!(res.is_some());
+        let restored_content = std::fs::read_to_string(&file_path).unwrap();
+        assert_eq!(restored_content, "fn hello() {}\n");
+        assert_eq!(session.total_messages(), 0);
+    }
 
     #[test]
     fn test_execute_compact() {
@@ -4230,6 +4395,7 @@ mod tests {
         assert!(all.contains("Fusion Command Palette"));
         assert!(all.contains("/fork"));
         assert!(all.contains("/rewind"));
+        assert!(all.contains("/undo"));
         assert!(all.contains("/compact"));
         assert!(all.contains("/stats"));
         assert!(all.contains("/usage"));
