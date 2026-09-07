@@ -319,6 +319,9 @@ fusion-edit = { workspace = true }
 fusion-iso = { workspace = true }
 fusion-walker = { workspace = true }
 fusion-vcs = { workspace = true }
+fusion-ast = { workspace = true }
+fusion-shell = { workspace = true }
+fusion-builtins = { workspace = true }
 
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
 ratatui = { version = "0.29", default-features = false, features = ["crossterm"] }
@@ -372,6 +375,9 @@ web-sys = { version = "0.3", features = ["console", "Window", "Document", "Heade
 [dev-dependencies]
 criterion = { version = "0.5", features = ["async_tokio"] }
 tempfile = "3"
+flume = { workspace = true }
+bytes = { workspace = true }
+brush-core = { workspace = true }
 
 [[bench]]
 name = "bench"
