@@ -129,7 +129,7 @@ jobs:
           echo "CARGO_TARGET_AARCH64_LINUX_ANDROID_AR=${TOOLCHAIN}/llvm-ar" >> "$GITHUB_ENV"
 
       - name: Verify Android build
-        run: cargo build --target aarch64-linux-android --verbose
+        run: cargo build --target aarch64-linux-android -p fusion --verbose
   # ── WebAssembly & TypeScript SDK Verification ──────────────────────────────
   wasm-sdk:
     name: WASM & TypeScript SDK Check

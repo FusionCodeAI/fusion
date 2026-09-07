@@ -11,6 +11,7 @@ members = [
     "crates/fusion-ast",
     "crates/vendor/brush-core",
 ]
+default-members = ["."]
 resolver = "2"
 
 [workspace.package]

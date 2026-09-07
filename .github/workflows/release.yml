@@ -166,13 +166,13 @@ jobs:
         if: "!matrix.use_cross"
         shell: bash
         run: |
-          cargo build --release --target ${{ matrix.target }}
+          cargo build --release --target ${{ matrix.target }} -p fusion
 
       - name: Build Binary (Cross)
         if: matrix.use_cross
         shell: bash
         run: |
-          cross build --release --target ${{ matrix.target }}
+          cross build --release --target ${{ matrix.target }} -p fusion
 
       # ── Symbol Stripping ───────────────────────────────────────────────────
       - name: Strip Debug Symbols (Unix)
