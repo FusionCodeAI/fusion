@@ -1166,9 +1166,11 @@ pub fn execute_slash_command(
             let cwd = runner.tool_ctx().cwd.clone();
             let args_clone = args.clone();
             if let Ok(handle) = tokio::runtime::Handle::try_current() {
-                handle.block_on(async move {
-                    let output = crate::ui::slash_mcp::handle_mcp_command(&args_clone, &cwd).await;
-                    println!("{}", output);
+                tokio::task::block_in_place(move || {
+                    handle.block_on(async move {
+                        let output = crate::ui::slash_mcp::handle_mcp_command(&args_clone, &cwd).await;
+                        println!("{}", output);
+                    });
                 });
             }
             CommandResult::Continue
