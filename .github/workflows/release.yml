@@ -7,9 +7,9 @@ name: Release
   workflow_dispatch:
     inputs:
       tag:
-        description: 'Release version tag (e.g. v2.0.0-alpha.2)'
+        description: 'Release version tag (e.g. v2.0.0-alpha.3)'
         required: false
-        default: 'v2.0.0-alpha.2'
+        default: 'v2.0.0-alpha.3'
 concurrency:
   group: release-${{ github.ref }}
   cancel-in-progress: false
