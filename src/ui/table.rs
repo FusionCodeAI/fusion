@@ -991,7 +991,10 @@ impl Table {
 
         // First table line: Header row
         let first_line = lines_iter.next()?;
-        table.headers = parse_markdown_table_row(first_line);
+        table.headers = parse_markdown_table_row(first_line)
+            .into_iter()
+            .map(|c| crate::ui::markdown::render_inline(c.trim()))
+            .collect();
         if table.headers.is_empty() {
             return None;
         }
@@ -1002,17 +1005,26 @@ impl Table {
                 table.alignments = parse_delimiter_row(second_line);
             } else {
                 // Not a delimiter: treat as second row
-                table.rows.push(parse_markdown_table_row(second_line));
+                table.rows.push(
+                    parse_markdown_table_row(second_line)
+                        .into_iter()
+                        .map(|c| crate::ui::markdown::render_inline(c.trim()))
+                        .collect(),
+                );
             }
         }
 
         // Subsequent lines: Data rows
         for line in lines_iter {
             if !is_markdown_delimiter_line(line) {
-                table.rows.push(parse_markdown_table_row(line));
+                table.rows.push(
+                    parse_markdown_table_row(line)
+                        .into_iter()
+                        .map(|c| crate::ui::markdown::render_inline(c.trim()))
+                        .collect(),
+                );
             }
         }
-
         Some(table)
     }
 

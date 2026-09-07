@@ -154,36 +154,79 @@ impl MarkdownRenderer {
     /// Emit a fully rendered line: into the output buffer and, when streaming,
     /// straight to stdout with an inline flush.
     fn emit(&mut self, formatted: &str, output: &mut String) {
-        if self.indent > 0 {
-            let indent_prefix = " ".repeat(self.indent);
-            for line in formatted.split('\n') {
-                let clean = line.trim_end_matches('\r');
-                if !clean.is_empty() {
-                    output.push_str(&indent_prefix);
-                    output.push_str(clean);
-                    if self.stream_stdout {
-                        print!("{}{}\r\n", indent_prefix, clean);
-                    }
-                } else if self.stream_stdout {
+        let term_width = super::table::get_terminal_width().max(40);
+        let indent_prefix = if self.indent > 0 {
+            " ".repeat(self.indent)
+        } else {
+            String::new()
+        };
+        let effective_width = term_width.saturating_sub(self.indent).max(20);
+
+        for line in formatted.split('\n') {
+            let clean = line.trim_end_matches('\r');
+            if clean.is_empty() {
+                output.push('\n');
+                if self.stream_stdout {
                     print!("\r\n");
                 }
-                output.push('\n');
+                continue;
             }
-            if self.stream_stdout {
-                let _ = stdout().flush();
-            }
-        } else {
-            for line in formatted.split('\n') {
-                let clean = line.trim_end_matches('\r');
+
+            // Tables, horizontal dividers, and code blocks shouldn't be re-wrapped
+            let is_special = clean.contains('│')
+                || clean.contains('─')
+                || clean.contains('┌')
+                || clean.contains('├')
+                || clean.contains('└')
+                || self.in_code_block;
+
+            if is_special {
+                output.push_str(&indent_prefix);
                 output.push_str(clean);
                 output.push('\n');
                 if self.stream_stdout {
-                    print!("{}\r\n", clean);
+                    print!("{}{}\r\n", indent_prefix, clean);
+                }
+            } else {
+                // Determine hanging indent for lists
+                let clean_stripped = super::table::strip_ansi(clean);
+                let trimmed_stripped = clean_stripped.trim_start();
+                let leading_spaces = clean_stripped.len() - trimmed_stripped.len();
+
+                let hanging_extra = if trimmed_stripped.starts_with("• ") {
+                    2 + leading_spaces
+                } else if let Some(dot_idx) = trimmed_stripped.find(". ") {
+                    if dot_idx < 4 && trimmed_stripped[..dot_idx].chars().all(|c| c.is_ascii_digit()) {
+                        dot_idx + 2 + leading_spaces
+                    } else {
+                        leading_spaces
+                    }
+                } else if trimmed_stripped.starts_with("[ ] ") || trimmed_stripped.starts_with("[✓] ") {
+                    4 + leading_spaces
+                } else {
+                    leading_spaces
+                };
+
+                let wrapped_lines = super::table::wrap_ansi(clean, effective_width);
+                let hanging_prefix = format!("{}{}", indent_prefix, " ".repeat(hanging_extra));
+
+                for (idx, w_line) in wrapped_lines.iter().enumerate() {
+                    let prefix = if idx == 0 {
+                        &indent_prefix
+                    } else {
+                        &hanging_prefix
+                    };
+                    output.push_str(prefix);
+                    output.push_str(w_line);
+                    output.push('\n');
+                    if self.stream_stdout {
+                        print!("{}{}\r\n", prefix, w_line);
+                    }
                 }
             }
-            if self.stream_stdout {
-                let _ = stdout().flush();
-            }
+        }
+        if self.stream_stdout {
+            let _ = stdout().flush();
         }
     }
 
@@ -412,22 +455,22 @@ pub fn render_line(line: &str, in_code_block: &mut bool, code_lang: &mut String)
 
     // Headers H1 through H6
     if let Some(rest) = trimmed.strip_prefix("# ") {
-        return format!("\x1b[1;36m# {}\x1b[0m", render_inline(rest.trim()));
+        return format!("\x1b[1;4;36m{}\x1b[0m", render_inline(rest.trim()));
     }
     if let Some(rest) = trimmed.strip_prefix("## ") {
-        return format!("\x1b[1;34m## {}\x1b[0m", render_inline(rest.trim()));
+        return format!("\x1b[1;34m{}\x1b[0m", render_inline(rest.trim()));
     }
     if let Some(rest) = trimmed.strip_prefix("### ") {
-        return format!("\x1b[1;35m### {}\x1b[0m", render_inline(rest.trim()));
+        return format!("\x1b[1;35m{}\x1b[0m", render_inline(rest.trim()));
     }
     if let Some(rest) = trimmed.strip_prefix("#### ") {
-        return format!("\x1b[1;33m#### {}\x1b[0m", render_inline(rest.trim()));
+        return format!("\x1b[1;33m{}\x1b[0m", render_inline(rest.trim()));
     }
     if let Some(rest) = trimmed.strip_prefix("##### ") {
-        return format!("\x1b[1;32m##### {}\x1b[0m", render_inline(rest.trim()));
+        return format!("\x1b[1;32m{}\x1b[0m", render_inline(rest.trim()));
     }
     if let Some(rest) = trimmed.strip_prefix("###### ") {
-        return format!("\x1b[1;90m###### {}\x1b[0m", render_inline(rest.trim()));
+        return format!("\x1b[1;90m{}\x1b[0m", render_inline(rest.trim()));
     }
 
     // Blockquotes: > quote or >> nested quote
@@ -586,9 +629,9 @@ pub fn render_inline(text: &str) -> String {
             }
             if j < len {
                 let code_content: String = chars[i + 1..j].iter().collect();
-                result.push_str("\x1b[33m`");
+                result.push_str("\x1b[38;5;178m");
                 result.push_str(&code_content);
-                result.push_str("`\x1b[0m");
+                result.push_str("\x1b[0m");
                 i = j + 1;
                 continue;
             }
@@ -1265,22 +1308,22 @@ mod tests {
     #[test]
     fn test_headers() {
         let h1 = render_line("# Title", &mut false, &mut String::new());
-        assert!(h1.contains("\x1b[1;36m# Title\x1b[0m"));
+        assert!(h1.contains("\x1b[1;4;36mTitle\x1b[0m"));
 
         let h2 = render_line("## Subtitle", &mut false, &mut String::new());
-        assert!(h2.contains("\x1b[1;34m## Subtitle\x1b[0m"));
+        assert!(h2.contains("\x1b[1;34mSubtitle\x1b[0m"));
 
         let h3 = render_line("### Section", &mut false, &mut String::new());
-        assert!(h3.contains("\x1b[1;35m### Section\x1b[0m"));
+        assert!(h3.contains("\x1b[1;35mSection\x1b[0m"));
 
         let h4 = render_line("#### Subsection", &mut false, &mut String::new());
-        assert!(h4.contains("\x1b[1;33m#### Subsection\x1b[0m"));
+        assert!(h4.contains("\x1b[1;33mSubsection\x1b[0m"));
 
         let h5 = render_line("##### Minor", &mut false, &mut String::new());
-        assert!(h5.contains("\x1b[1;32m##### Minor\x1b[0m"));
+        assert!(h5.contains("\x1b[1;32mMinor\x1b[0m"));
 
         let h6 = render_line("###### Detail", &mut false, &mut String::new());
-        assert!(h6.contains("\x1b[1;90m###### Detail\x1b[0m"));
+        assert!(h6.contains("\x1b[1;90mDetail\x1b[0m"));
     }
 
     #[test]
@@ -1309,7 +1352,7 @@ mod tests {
     fn test_inline_formatting() {
         let inline = render_inline("This is **bold** and `code` and *italic* and ~~strike~~ test.");
         assert!(inline.contains("\x1b[1mbold\x1b[22m"));
-        assert!(inline.contains("\x1b[33m`code`\x1b[0m"));
+        assert!(inline.contains("\x1b[38;5;178mcode\x1b[0m"));
         assert!(inline.contains("\x1b[3mitalic\x1b[23m"));
         assert!(inline.contains("\x1b[9mstrike\x1b[29m"));
     }
@@ -1376,7 +1419,7 @@ mod tests {
     fn test_streaming_renderer() {
         let mut renderer = MarkdownRenderer::buffered();
         let chunk1 = renderer.push("# Hello\n\nThis is **streaming");
-        assert!(chunk1.contains("# Hello"));
+        assert!(chunk1.contains("Hello"));
 
         let chunk2 = renderer.push("** markdown.\n```rust\nfn main() {}\n```\n");
         assert!(chunk2.contains("streaming"));
@@ -1402,7 +1445,7 @@ mod tests {
     fn test_render_markdown_full_document() {
         let doc = "# Main Heading\n\nSome introductory text with **bold**.\n\n- Point A\n- Point B\n\n```sh\necho \"Hello\"\n```\n";
         let rendered = render_markdown(doc);
-        assert!(rendered.contains("# Main Heading"));
+        assert!(rendered.contains("Main Heading"));
         assert!(rendered.contains("bold"));
         assert!(rendered.contains("•"));
         assert!(rendered.contains("Point A"));
