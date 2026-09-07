@@ -180,7 +180,7 @@ pub fn execute_interactive_tui(questions: &[Question]) -> anyhow::Result<String>
 pub fn prompt_question_tui(q: &Question) -> anyhow::Result<String> {
     use crossterm::{
         cursor,
-        event::{self, Event, KeyCode, KeyEventKind},
+        event::{self, Event, KeyCode, KeyEventKind, KeyModifiers},
         execute,
     };
     use std::io::{stdout, Write};
@@ -205,7 +205,8 @@ pub fn prompt_question_tui(q: &Question) -> anyhow::Result<String> {
 
     let mut last_rendered_lines: usize = 0;
     let term_width = crate::ui::table::get_terminal_width().max(40);
-    let box_width = term_width.saturating_sub(4).min(86);
+    let menu_width = term_width.saturating_sub(4).min(84);
+    let divider = "─".repeat(menu_width);
 
     loop {
         // 1. Clear previous rendered lines
@@ -217,27 +218,15 @@ pub fn prompt_question_tui(q: &Question) -> anyhow::Result<String> {
             let _ = out.flush();
         }
 
-        // 2. Render frame
+        // 2. Render frame in slash command dropdown style
         let mut lines = Vec::new();
 
-        // Top Border with question
-        let q_clean = q.question.replace('\n', " ");
-        let q_max_len = box_width.saturating_sub(10);
-        let q_disp = if q_clean.len() > q_max_len {
-            format!("{}...", &q_clean[..q_max_len.saturating_sub(3)])
-        } else {
-            q_clean
-        };
-        let dashes_needed = box_width.saturating_sub(q_disp.len() + 6);
-        lines.push(format!(
-            "\x1b[1;36m┌─ ❓ {}\x1b[0m \x1b[38;5;240m{}\x1b[1;36m┐\x1b[0m",
-            q_disp,
-            "─".repeat(dashes_needed)
-        ));
-        lines.push(format!(
-            "\x1b[1;36m│\x1b[0m{}\x1b[1;36m│\x1b[0m",
-            " ".repeat(box_width.saturating_sub(2))
-        ));
+        // Top divider
+        lines.push(format!("\x1b[38;5;240m{}\x1b[0m", divider));
+
+        // Question header
+        lines.push(format!("\x1b[1;36m? \x1b[1;37m{}\x1b[0m", q.question.trim()));
+        lines.push(String::new());
 
         // Options
         for (idx, opt) in q.options.iter().enumerate() {
@@ -247,88 +236,66 @@ pub fn prompt_question_tui(q: &Question) -> anyhow::Result<String> {
 
             let marker = if q.multi {
                 let check_mark = if checked[idx] { "✓" } else { " " };
-                if is_curr {
-                    format!("\x1b[1;36m❯ [{}]\x1b[0m", check_mark)
-                } else {
-                    format!("  [{}]", check_mark)
-                }
+                format!("[{}]", check_mark)
             } else {
                 if is_curr {
-                    "\x1b[1;36m❯ (•)\x1b[0m".to_string()
+                    "(•)".to_string()
                 } else {
-                    "    ( )".to_string()
+                    "( )".to_string()
                 }
             };
 
-            let label_style = if is_curr {
-                "\x1b[1;37m"
-            } else {
-                "\x1b[37m"
-            };
-
-            let row_text = format!(" {} {}{}{}", marker, label_style, opt.label, rec_chip);
-            let vis_len = crate::ui::table::visible_width(&row_text);
-            let pad_len = box_width.saturating_sub(vis_len + 2);
-            lines.push(format!(
-                "\x1b[1;36m│\x1b[0m{}{}\x1b[1;36m│\x1b[0m",
-                row_text,
-                " ".repeat(pad_len)
-            ));
-
-            // Description
-            if let Some(desc) = &opt.description {
-                let d_clean = desc.replace('\n', " ");
-                let d_max = box_width.saturating_sub(12);
-                let d_disp = if d_clean.len() > d_max {
-                    format!("{}...", &d_clean[..d_max.saturating_sub(3)])
-                } else {
-                    d_clean
-                };
-                let desc_row = format!("        \x1b[2;37m{}\x1b[0m", d_disp);
-                let desc_vis = crate::ui::table::visible_width(&desc_row);
-                let d_pad = box_width.saturating_sub(desc_vis + 2);
+            if is_curr {
                 lines.push(format!(
-                    "\x1b[1;36m│\x1b[0m{}{}\x1b[1;36m│\x1b[0m",
-                    desc_row,
-                    " ".repeat(d_pad)
+                    "\x1b[1;36m┃\x1b[0m \x1b[1;37m{} {}\x1b[0m{}",
+                    marker, opt.label, rec_chip
                 ));
+            } else {
+                lines.push(format!(
+                    "  \x1b[37m{} {}\x1b[0m{}",
+                    marker, opt.label, rec_chip
+                ));
+            }
+
+            // Description indented below
+            if let Some(desc) = &opt.description {
+                let d_clean = desc.trim();
+                if !d_clean.is_empty() {
+                    lines.push(format!("    \x1b[2;37m{}\x1b[0m", d_clean));
+                }
             }
         }
 
-        lines.push(format!(
-            "\x1b[1;36m│\x1b[0m{}\x1b[1;36m│\x1b[0m",
-            " ".repeat(box_width.saturating_sub(2))
-        ));
+        // Bottom divider
+        lines.push(format!("\x1b[38;5;240m{}\x1b[0m", divider));
 
-        // Footer hints
+        // Footer key hints
         let hint_text = if q.multi {
-            "  ↑↓ Navigate  Space Toggle  Enter Submit  Esc Default"
+            "↑↓ Navigate · Space Toggle · Enter Select · Esc Default · Ctrl+C Cancel"
         } else {
-            "  ↑↓ Navigate  Enter Select  Esc Default"
+            "↑↓ Navigate · Enter Select · Esc Default · Ctrl+C Cancel"
         };
-        let hint_vis = crate::ui::table::visible_width(hint_text);
-        let hint_pad = box_width.saturating_sub(hint_vis + 2);
-        lines.push(format!(
-            "\x1b[1;36m│\x1b[0m\x1b[2;37m{}\x1b[0m{}\x1b[1;36m│\x1b[0m",
-            hint_text,
-            " ".repeat(hint_pad)
-        ));
-
-        // Bottom Border
-        lines.push(format!(
-            "\x1b[1;36m└{}\x1b[0m",
-            "─".repeat(box_width.saturating_sub(1))
-        ));
+        lines.push(format!("\x1b[2;37m{}\x1b[0m", hint_text));
 
         last_rendered_lines = lines.len();
         for l in &lines {
-            let _ = write!(out, "\r{}\x1b[0m\r\n", l);
+            let _ = write!(out, "\r\x1b[2K{}\r\n", l);
         }
         let _ = out.flush();
 
         // 3. Read key
         if let Event::Key(key) = event::read()? {
             if key.kind == KeyEventKind::Press {
+                if key.modifiers.contains(KeyModifiers::CONTROL) && key.code == KeyCode::Char('c') {
+                    for _ in 0..last_rendered_lines {
+                        let _ = execute!(out, cursor::MoveToPreviousLine(1), cursor::MoveToColumn(0));
+                        let _ = write!(out, "\x1b[2K");
+                    }
+                    let _ = execute!(out, cursor::Show);
+                    let _ = crossterm::terminal::enable_raw_mode();
+                    anyhow::bail!("Question prompt cancelled by user (Ctrl+C)");
+                }
+
                 match key.code {
                     KeyCode::Up | KeyCode::Char('k') => {
                         selected_idx = selected_idx.saturating_sub(1);
@@ -389,6 +356,9 @@ pub fn prompt_question_tui(q: &Question) -> anyhow::Result<String> {
         result_str
     );
     let _ = out.flush();
+
+    // 6. Ensure raw mode stays enabled for outer repl.rs so Esc immediately cancels the turn
+    let _ = crossterm::terminal::enable_raw_mode();
 
     Ok(result_str)
 }
