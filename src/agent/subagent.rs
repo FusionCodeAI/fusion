@@ -1,8 +1,10 @@
 use std::collections::HashMap;
 use std::fmt;
+use std::path::{Path, PathBuf};
 use std::str::FromStr;
 use std::sync::Arc;
 
+use fusion_iso::{ChangeKind, Diff, IsolationBackend};
 use async_trait::async_trait;
 use chrono::Utc;
 use futures::future::join_all;
@@ -258,6 +260,8 @@ pub struct SubagentResult {
     pub output: String,
     pub turns: usize,
     pub success: bool,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub patch: Option<String>,
 }
 
 /// Task specification for spawning a subagent.
@@ -272,6 +276,7 @@ pub struct SubagentTask {
     pub max_turns: usize,
     pub model: Option<String>,
     pub temperature: Option<f32>,
+    pub isolated: bool,
 }
 
 impl fmt::Debug for SubagentTask {
@@ -286,15 +291,16 @@ impl fmt::Debug for SubagentTask {
             .field("max_turns", &self.max_turns)
             .field("model", &self.model)
             .field("temperature", &self.temperature)
+            .field("isolated", &self.isolated)
             .finish()
     }
 }
 
 impl SubagentTask {
-    /// Creates a new subagent task specification.
     pub fn new(role: SubagentRole, task: impl Into<String>) -> Self {
         let task_str = task.into();
         let role_name = role.default_name().to_string();
+        let isolated = matches!(role, SubagentRole::Coder);
         Self {
             id: uuid::Uuid::new_v4().to_string()[..8].to_string(),
             name: role_name,
@@ -305,6 +311,7 @@ impl SubagentTask {
             max_turns: 20,
             model: None,
             temperature: None,
+            isolated,
         }
     }
 
@@ -382,6 +389,11 @@ impl SubagentTask {
 
     pub fn with_temperature(mut self, temperature: f32) -> Self {
         self.temperature = Some(temperature);
+        self
+    }
+
+    pub fn with_isolated(mut self, isolated: bool) -> Self {
+        self.isolated = isolated;
         self
     }
 }
@@ -607,7 +619,7 @@ impl SubagentManager {
         let task_role = role.clone();
         let custom_model = task.model.clone();
         let custom_temperature = task.temperature;
-
+        let isolated = task.isolated;
         let join_handle = tokio::spawn(async move {
             let _permit = semaphore.acquire().await.ok();
 
@@ -649,6 +661,7 @@ impl SubagentManager {
                 max_turns,
                 custom_model.as_deref(),
                 custom_temperature,
+                isolated,
                 &client,
                 &config,
                 &progress_tx,
@@ -755,6 +768,179 @@ impl SubagentManager {
     }
 }
 
+/// Manages an isolated workspace lifecycle powered by `fusion_iso`.
+pub struct WorkspaceIsolation {
+    pub lower: PathBuf,
+    pub merged: PathBuf,
+    backend: &'static dyn IsolationBackend,
+    cleaned_up: bool,
+}
+
+impl fmt::Debug for WorkspaceIsolation {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("WorkspaceIsolation")
+            .field("lower", &self.lower)
+            .field("merged", &self.merged)
+            .field("backend", &self.backend.kind())
+            .field("cleaned_up", &self.cleaned_up)
+            .finish()
+    }
+}
+
+impl WorkspaceIsolation {
+    /// Creates an isolated workspace mirroring `lower` at a temporary location.
+    pub fn create(lower: &Path, id: &str) -> anyhow::Result<Self> {
+        let lower = std::fs::canonicalize(lower).unwrap_or_else(|_| lower.to_path_buf());
+        let merged = std::env::temp_dir().join(format!("fusion-iso-{}", id));
+
+        let resolution = fusion_iso::resolve(None);
+        let mut chosen_backend = None;
+        let mut last_err = None;
+
+        for kind in resolution.candidates {
+            let backend = fusion_iso::backend(kind);
+            if merged.exists() {
+                let _ = std::fs::remove_dir_all(&merged);
+            }
+            match backend.start(&lower, &merged) {
+                Ok(()) => {
+                    chosen_backend = Some(backend);
+                    break;
+                }
+                Err(e) => {
+                    let _ = backend.stop(&merged);
+                    if merged.exists() {
+                        let _ = std::fs::remove_dir_all(&merged);
+                    }
+                    last_err = Some(e);
+                }
+            }
+        }
+
+        let backend = chosen_backend.ok_or_else(|| {
+            anyhow::anyhow!(
+                "Failed to initialize workspace isolation backend: {:?}",
+                last_err
+            )
+        })?;
+
+        Ok(Self {
+            lower,
+            merged,
+            backend,
+            cleaned_up: false,
+        })
+    }
+
+    /// Returns the raw diff from the underlying isolation backend.
+    pub async fn diff(&self) -> anyhow::Result<Diff> {
+        self.backend
+            .diff(&self.lower, &self.merged)
+            .await
+            .map_err(|e| anyhow::anyhow!("Diff failed: {e}"))
+    }
+
+    /// Captures file mutations that actually differ between `merged` and `lower`.
+    pub async fn capture_changes(&self) -> anyhow::Result<Diff> {
+        let raw_diff = self.diff().await?;
+        let mut subagent_changes = Vec::new();
+
+        for file in raw_diff.files {
+            if file.path.components().any(|c| c.as_os_str() == ".git") {
+                continue;
+            }
+
+            let src_path = self.merged.join(&file.path);
+            let dest_path = self.lower.join(&file.path);
+
+            match file.op {
+                ChangeKind::Added => {
+                    if src_path.exists() {
+                        if dest_path.exists() {
+                            if let (Ok(c1), Ok(c2)) = (tokio::fs::read(&src_path).await, tokio::fs::read(&dest_path).await) {
+                                if c1 == c2 {
+                                    continue;
+                                }
+                            }
+                        }
+                        subagent_changes.push(file);
+                    }
+                }
+                ChangeKind::Modified => {
+                    if src_path.exists() && dest_path.exists() {
+                        if let (Ok(c1), Ok(c2)) = (tokio::fs::read(&src_path).await, tokio::fs::read(&dest_path).await) {
+                            if c1 == c2 {
+                                continue;
+                            }
+                        }
+                    }
+                    subagent_changes.push(file);
+                }
+                ChangeKind::Removed => {
+                    if dest_path.exists() && !src_path.exists() {
+                        subagent_changes.push(file);
+                    }
+                }
+            }
+        }
+
+        Ok(Diff { files: subagent_changes })
+    }
+
+    /// Merges the captured file mutations from `merged` back into `lower`.
+    pub async fn merge(&self, diff: &Diff) -> anyhow::Result<()> {
+        for file in &diff.files {
+            if file.path.components().any(|c| c.as_os_str() == ".git") {
+                continue;
+            }
+
+            let src_path = self.merged.join(&file.path);
+            let dest_path = self.lower.join(&file.path);
+
+            match file.op {
+                ChangeKind::Added | ChangeKind::Modified => {
+                    if let Some(parent) = dest_path.parent() {
+                        tokio::fs::create_dir_all(parent).await?;
+                    }
+                    if src_path.is_symlink() {
+                        let target = tokio::fs::read_link(&src_path).await?;
+                        if dest_path.exists() || dest_path.is_symlink() {
+                            let _ = tokio::fs::remove_file(&dest_path).await;
+                        }
+                        #[cfg(unix)]
+                        tokio::fs::symlink(target, &dest_path).await?;
+                    } else if src_path.exists() {
+                        tokio::fs::copy(&src_path, &dest_path).await?;
+                    }
+                }
+                ChangeKind::Removed => {
+                    if dest_path.exists() || dest_path.is_symlink() {
+                        let _ = tokio::fs::remove_file(&dest_path).await;
+                    }
+                }
+            }
+        }
+        Ok(())
+    }
+
+    /// Cleans up and tears down the isolated workspace.
+    pub fn cleanup(&mut self) {
+        if !self.cleaned_up {
+            self.cleaned_up = true;
+            let _ = self.backend.stop(&self.merged);
+            if self.merged.exists() {
+                let _ = std::fs::remove_dir_all(&self.merged);
+            }
+        }
+    }
+}
+
+impl Drop for WorkspaceIsolation {
+    fn drop(&mut self) {
+        self.cleanup();
+    }
+}
+
 /// Core execution loop for a subagent.
 async fn execute_subagent_loop(
     id: &str,
@@ -766,6 +952,7 @@ async fn execute_subagent_loop(
     max_turns: usize,
     model: Option<&str>,
     temperature: Option<f32>,
+    isolated: bool,
     client: &LlmClient,
     config: &Config,
     progress_tx: &mpsc::UnboundedSender<SubagentProgress>,
@@ -778,7 +965,40 @@ async fn execute_subagent_loop(
     session.add_system_message(system_prompt);
     session.add_user_message(task);
 
-    let tool_ctx = ToolContext::default();
+    let workspace_iso = if isolated {
+        let current_dir = std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."));
+        match WorkspaceIsolation::create(&current_dir, id) {
+            Ok(iso) => {
+                tracing::info!(
+                    "Created isolated workspace for subagent '{}' ({}) at {}",
+                    name,
+                    id,
+                    iso.merged.display()
+                );
+                Some(iso)
+            }
+            Err(e) => {
+                tracing::warn!(
+                    "Failed to create isolated workspace for subagent '{}' ({}): {}. Falling back to non-isolated execution.",
+                    name,
+                    id,
+                    e
+                );
+                None
+            }
+        }
+    } else {
+        None
+    };
+
+    let tool_ctx = if let Some(iso) = &workspace_iso {
+        ToolContext {
+            cwd: iso.merged.clone(),
+            env: std::env::vars().collect(),
+        }
+    } else {
+        ToolContext::default()
+    };
     let mut turns = 0;
 
     let target_model = model.unwrap_or(&config.default_model);
@@ -808,6 +1028,9 @@ async fn execute_subagent_loop(
 
     while turns < max_turns {
         if *cancel_rx.borrow() {
+            if let Some(mut iso) = workspace_iso {
+                iso.cleanup();
+            }
             let cancel_event = SubagentProgress::Cancelled { id: id.to_string() };
             emit_progress(cancel_event);
 
@@ -826,6 +1049,7 @@ async fn execute_subagent_loop(
                 output: "Subagent cancelled.".to_string(),
                 turns,
                 success: false,
+                patch: None,
             });
         }
 
@@ -871,6 +1095,9 @@ async fn execute_subagent_loop(
         let (content, reasoning, tool_calls) = match completion_res {
             Ok(res) => res,
             Err(e) => {
+                if let Some(mut iso) = workspace_iso {
+                    iso.cleanup();
+                }
                 let err_msg = format!("LLM completion failed: {}", e);
                 let failed_event = SubagentProgress::Failed {
                     id: id.to_string(),
@@ -906,6 +1133,41 @@ async fn execute_subagent_loop(
         if tool_calls.is_empty() {
             session.add_assistant_message(&content);
 
+            let patch = if let Some(mut iso) = workspace_iso {
+                let diff_res = iso.capture_changes().await;
+                let captured_patch = match diff_res {
+                    Ok(diff) => {
+                        let text = diff.unified_text();
+                        if !diff.is_empty() {
+                            if let Err(e) = iso.merge(&diff).await {
+                                tracing::error!(
+                                    "Failed to merge isolated changes for subagent '{}' ({}): {}",
+                                    name, id, e
+                                );
+                            } else {
+                                tracing::info!(
+                                    "Merged {} changed files from isolated workspace for subagent '{}' ({})",
+                                    diff.files.len(), name, id
+                                );
+                            }
+                        }
+                        iso.cleanup();
+                        if text.is_empty() { None } else { Some(text) }
+                    }
+                    Err(e) => {
+                        tracing::warn!(
+                            "Failed to capture diff for isolated workspace '{}' ({}): {}",
+                            name, id, e
+                        );
+                        iso.cleanup();
+                        None
+                    }
+                };
+                captured_patch
+            } else {
+                None
+            };
+
             let completed_event = SubagentProgress::Completed {
                 id: id.to_string(),
                 output: content.clone(),
@@ -931,6 +1193,7 @@ async fn execute_subagent_loop(
                 output: content,
                 turns,
                 success: true,
+                patch,
             });
         }
 
@@ -991,6 +1254,9 @@ async fn execute_subagent_loop(
         }
     }
 
+    if let Some(mut iso) = workspace_iso {
+        iso.cleanup();
+    }
     let err_msg = format!(
         "Subagent '{}' ({}) exceeded maximum turns ({})",
         name, id, max_turns
@@ -1181,6 +1447,10 @@ impl Tool for SpawnSubagentTool {
                 "task": {
                     "type": "string",
                     "description": "The detailed instructions/task for the subagent to execute"
+                },
+                "isolated": {
+                    "type": "boolean",
+                    "description": "Whether to run the subagent in an isolated copy-on-write workspace"
                 }
             },
             "required": ["role", "task"]
@@ -1202,7 +1472,10 @@ impl Tool for SpawnSubagentTool {
             .ok_or_else(|| anyhow::anyhow!("Missing required 'task' argument"))?;
 
         let role = SubagentRole::from_str(role_str).unwrap_or(SubagentRole::General);
-        let task = SubagentTask::new(role, task_str).with_name(name_str);
+        let mut task = SubagentTask::new(role, task_str).with_name(name_str);
+        if let Some(iso) = args.get("isolated").and_then(|v| v.as_bool()) {
+            task = task.with_isolated(iso);
+        }
         let handle = self.manager.spawn(task);
         let res = handle.wait().await?;
         if res.success {
@@ -1277,6 +1550,10 @@ impl Tool for SpawnBatchSubagentsTool {
                             "task": {
                                 "type": "string",
                                 "description": "The task instructions"
+                            },
+                            "isolated": {
+                                "type": "boolean",
+                                "description": "Whether to run in an isolated workspace"
                             }
                         },
                         "required": ["role", "task"]
@@ -1308,7 +1585,11 @@ impl Tool for SpawnBatchSubagentsTool {
                 continue;
             }
             let role = SubagentRole::from_str(role_str).unwrap_or(SubagentRole::General);
-            subagent_tasks.push(SubagentTask::new(role, task_str).with_name(name_str));
+            let mut subagent_task = SubagentTask::new(role, task_str).with_name(name_str);
+            if let Some(iso) = item.get("isolated").and_then(|v| v.as_bool()) {
+                subagent_task = subagent_task.with_isolated(iso);
+            }
+            subagent_tasks.push(subagent_task);
         }
 
         if subagent_tasks.is_empty() {
@@ -1434,14 +1715,29 @@ mod tests {
         assert_eq!(task.model.as_deref(), Some("claude-3-7-sonnet"));
         assert_eq!(task.temperature, Some(0.2));
         assert_eq!(task.task, "Find authentication references");
+        assert!(!task.isolated);
 
         let coder_task = SubagentTask::coder("Fix bug in tokenizer");
         assert_eq!(coder_task.role, SubagentRole::Coder);
         assert_eq!(coder_task.name, "Coder");
+        assert!(coder_task.isolated);
+
+        let non_isolated_coder = coder_task.with_isolated(false);
+        assert!(!non_isolated_coder.isolated);
 
         let tester_task = SubagentTask::tester("Run cargo test");
         assert_eq!(tester_task.role, SubagentRole::Tester);
         assert_eq!(tester_task.name, "Tester");
+        assert!(!tester_task.isolated);
+
+        let isolated_tester = tester_task.with_isolated(true);
+        assert!(isolated_tester.isolated);
+
+        let general_task = SubagentTask::general("General task");
+        assert!(!general_task.isolated);
+
+        let reviewer_task = SubagentTask::reviewer("Review code");
+        assert!(!reviewer_task.isolated);
     }
 
     #[test]
@@ -1510,11 +1806,14 @@ mod tests {
         assert!(params.get("properties").is_some());
         assert!(params["properties"].get("role").is_some());
         assert!(params["properties"].get("task").is_some());
+        assert!(params["properties"].get("isolated").is_some());
 
         let batch_tool = SpawnBatchSubagentsTool::new(client, config, tools);
         assert_eq!(batch_tool.name(), "spawn_subagents_batch");
         let batch_params = batch_tool.parameters();
         assert!(batch_params["properties"].get("tasks").is_some());
+        let task_item_props = &batch_params["properties"]["tasks"]["items"]["properties"];
+        assert!(task_item_props.get("isolated").is_some());
     }
 
     #[tokio::test]
@@ -1569,5 +1868,93 @@ mod tests {
             panic!("Expected SubagentProgressEvent");
         }
         handle.cancel();
+    }
+    #[tokio::test]
+    async fn test_workspace_isolation_lifecycle() {
+        let test_id = format!("test-life-{}", uuid::Uuid::new_v4().to_string()[..8].to_string());
+        let temp_dir = std::env::temp_dir().join(&test_id);
+        let _ = std::fs::remove_dir_all(&temp_dir);
+        std::fs::create_dir_all(&temp_dir).expect("Failed to create test temp dir");
+
+        let hello_path = temp_dir.join("hello.txt");
+        std::fs::write(&hello_path, "Hello Initial").expect("Failed to write initial file");
+
+        let mut iso = WorkspaceIsolation::create(&temp_dir, &test_id)
+            .expect("Failed to create WorkspaceIsolation");
+
+        assert!(iso.merged.exists());
+        assert_eq!(
+            std::fs::read_to_string(iso.merged.join("hello.txt")).unwrap(),
+            "Hello Initial"
+        );
+
+        // Modify an existing file and create a new file in isolated workspace
+        std::fs::write(iso.merged.join("hello.txt"), "Hello Modified in Isolated Workspace")
+            .expect("Failed to write modified file");
+        std::fs::write(iso.merged.join("created.txt"), "Newly Created File")
+            .expect("Failed to write newly created file");
+
+        // Verify the original directory is completely untouched!
+        assert_eq!(
+            std::fs::read_to_string(&hello_path).unwrap(),
+            "Hello Initial"
+        );
+        assert!(!temp_dir.join("created.txt").exists());
+
+        // Capture changes
+        let changes = iso.capture_changes().await.expect("Failed to capture changes");
+        assert!(!changes.is_empty());
+
+        // Merge changes back into lower
+        iso.merge(&changes).await.expect("Failed to merge changes");
+
+        // Verify lower now has the merged files
+        assert_eq!(
+            std::fs::read_to_string(&hello_path).unwrap(),
+            "Hello Modified in Isolated Workspace"
+        );
+        assert_eq!(
+            std::fs::read_to_string(temp_dir.join("created.txt")).unwrap(),
+            "Newly Created File"
+        );
+
+        // Cleanup
+        iso.cleanup();
+        assert!(!iso.merged.exists());
+
+        let _ = std::fs::remove_dir_all(&temp_dir);
+    }
+
+    #[tokio::test]
+    async fn test_workspace_isolation_cancelled_no_merge() {
+        let test_id = format!("test-cancel-{}", uuid::Uuid::new_v4().to_string()[..8].to_string());
+        let temp_dir = std::env::temp_dir().join(&test_id);
+        let _ = std::fs::remove_dir_all(&temp_dir);
+        std::fs::create_dir_all(&temp_dir).expect("Failed to create test temp dir");
+
+        let data_path = temp_dir.join("data.txt");
+        std::fs::write(&data_path, "Original Data").expect("Failed to write original data");
+
+        let mut iso = WorkspaceIsolation::create(&temp_dir, &test_id)
+            .expect("Failed to create WorkspaceIsolation");
+
+        // Mutate in isolated workspace
+        std::fs::write(iso.merged.join("data.txt"), "Mutated Data in Isolation")
+            .expect("Failed to write mutated data");
+        std::fs::write(iso.merged.join("bad.txt"), "Unwanted file")
+            .expect("Failed to write unwanted file");
+
+        // Simulate cancellation / failure: cleanup without merge
+        iso.cleanup();
+
+        // Verify original directory is completely untouched
+        assert_eq!(
+            std::fs::read_to_string(&data_path).unwrap(),
+            "Original Data"
+        );
+        assert!(!temp_dir.join("bad.txt").exists());
+        assert!(!iso.merged.exists());
+
+        let _ = std::fs::remove_dir_all(&temp_dir);
     }
 }
