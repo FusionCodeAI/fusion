@@ -719,7 +719,7 @@ pub async fn run_turn_ui(
     let mut queued_prompts: VecDeque<String> = VecDeque::new();
     let mut active_tool_label: Option<String> = None;
 
-    let mut is_thinking = true;
+    let mut is_thinking = false;
     let mut tool_batch: Vec<ToolCallItem> = Vec::new();
     let mut ticker = tokio::time::interval(std::time::Duration::from_millis(300));
 
@@ -743,7 +743,7 @@ pub async fn run_turn_ui(
                     *is_thinking = false;
                     *active_tool_label = None;
                     let mut out = stdout();
-                    let _ = write!(out, "\r\x1b[2K");
+                    let _ = write!(out, "\x1b[0m\r\n\x1b[2;37m───\x1b[0m\r\n\r\n\r\x1b[2K");
                     let _ = out.flush();
                 }
                 if !tool_batch.is_empty() {
@@ -772,10 +772,28 @@ pub async fn run_turn_ui(
                     reset_prompt_render_state(prompt);
                     let _ = prompt.render_current();
                 }
+                clear_prompt_frame(prompt);
+                if !*is_thinking {
+                    let mut out = stdout();
+                    let _ = write!(out, "\r\x1b[2;3m💭 ");
+                    let _ = out.flush();
+                    *is_thinking = true;
+                }
+                let mut out = stdout();
+                let _ = write!(out, "\x1b[2;3m{}\x1b[0m", th);
+                let _ = out.flush();
                 *output_tokens += crate::agent::tokens::estimate_text_tokens(&th) as u64;
+                reset_prompt_render_state(prompt);
+                let _ = prompt.render_current();
             }
             AgentEvent::ToolStarted { name, args, .. } => {
                 clear_prompt_frame(prompt);
+                if *is_thinking {
+                    let mut out = stdout();
+                    let _ = write!(out, "\x1b[0m\r\n\x1b[2;37m───\x1b[0m\r\n\r\n");
+                    let _ = out.flush();
+                    *is_thinking = false;
+                }
                 let mut out = stdout();
                 let _ = write!(out, "\r\x1b[2K");
                 let _ = out.flush();
@@ -785,7 +803,6 @@ pub async fn run_turn_ui(
                 tool_batch.push(ToolCallItem::new(name, completed_label, category));
                 md.finish();
                 reset_prompt_render_state(prompt);
-                *is_thinking = true;
                 let elapsed = start_time.elapsed();
                 let frames = crate::ui::spinner::BRAILLE_FRAMES;
                 let frame_idx = (elapsed.as_millis() / 80) as usize % frames.len();
@@ -823,7 +840,7 @@ pub async fn run_turn_ui(
                     }
                 }
                 prompt.set_running_status(None);
-                *is_thinking = true;
+                *is_thinking = false;
                 reset_prompt_render_state(prompt);
                 let _ = prompt.render_current();
             }
@@ -906,13 +923,15 @@ pub async fn run_turn_ui(
                 last_status_dot_frame = Some(dot_frame);
 
                 let dot = format!("{} ", frames[frame_idx]);
-                let verb = if is_thinking {
-                    match active_tool_label.as_deref() {
-                        Some(label) => label.strip_prefix("• ").unwrap_or(label),
-                        None => "Running",
+                let verb = match active_tool_label.as_deref() {
+                    Some(label) => label.strip_prefix("• ").unwrap_or(label),
+                    None => {
+                        if is_thinking || output_tokens == 0 {
+                            "Running"
+                        } else {
+                            "Streaming"
+                        }
                     }
-                } else {
-                    "Streaming"
                 };
                 let status = format!(
                     "\r\x1b[2K{}{} ({}) (↑{} ↓{})",

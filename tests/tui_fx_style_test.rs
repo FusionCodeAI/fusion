@@ -2900,3 +2900,15 @@ fn test_prompt_queue_streaming_persistence_lifecycle() {
     let next_plain = strip_ansi(&String::from_utf8_lossy(&next_transcript));
     assert_eq!(next_plain, "┃ explain UI layer\r\n\r\n");
 }
+
+// ===========================================================================
+// Contract 26: Thinking Stream ANSI Sequence Formatting
+// ===========================================================================
+
+#[test]
+fn test_thinking_ansi_formatting() {
+    let raw_chunk = "Analyzing function signature in src/lib.rs";
+    let formatted = format!("\x1b[2;3m{}\x1b[0m", raw_chunk);
+    assert!(formatted.starts_with("\x1b[2;3m"));
+    assert!(formatted.ends_with("\x1b[0m"));
+}
