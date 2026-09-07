@@ -205,11 +205,12 @@ pub fn prompt_question_tui(q: &Question) -> anyhow::Result<String> {
 
     let mut last_rendered_lines: usize = 0;
     let term_width = crate::ui::table::get_terminal_width().max(40);
-    let menu_width = term_width.saturating_sub(4).min(84);
+    let menu_width = term_width.saturating_sub(4).min(90);
     let divider = "─".repeat(menu_width);
+    let content_width = menu_width.saturating_sub(6).max(20);
 
     loop {
-        // 1. Clear previous rendered lines
+        // 1. Clear previous rendered lines (exact 1:1 row clearing)
         if last_rendered_lines > 0 {
             for _ in 0..last_rendered_lines {
                 let _ = execute!(out, cursor::MoveToPreviousLine(1), cursor::MoveToColumn(0));
@@ -224,8 +225,15 @@ pub fn prompt_question_tui(q: &Question) -> anyhow::Result<String> {
         // Top divider
         lines.push(format!("\x1b[38;5;240m{}\x1b[0m", divider));
 
-        // Question header
-        lines.push(format!("\x1b[1;36m? \x1b[1;37m{}\x1b[0m", q.question.trim()));
+        // Question header (wrapped to content_width so it never overflows terminal)
+        let q_wrapped = crate::ui::table::wrap_ansi(q.question.trim(), content_width);
+        for (q_idx, q_line) in q_wrapped.iter().enumerate() {
+            if q_idx == 0 {
+                lines.push(format!("\x1b[1;36m? \x1b[1;37m{}\x1b[0m", q_line));
+            } else {
+                lines.push(format!("  \x1b[1;37m{}\x1b[0m", q_line));
+            }
+        }
         lines.push(String::new());
 
         // Options
@@ -257,11 +265,14 @@ pub fn prompt_question_tui(q: &Question) -> anyhow::Result<String> {
                 ));
             }
 
-            // Description indented below
+            // Description wrapped cleanly to content_width
             if let Some(desc) = &opt.description {
                 let d_clean = desc.trim();
                 if !d_clean.is_empty() {
-                    lines.push(format!("    \x1b[2;37m{}\x1b[0m", d_clean));
+                    let wrapped_desc = crate::ui::table::wrap_ansi(d_clean, content_width);
+                    for dl in wrapped_desc {
+                        lines.push(format!("    \x1b[2;37m{}\x1b[0m", dl));
+                    }
                 }
             }
         }
@@ -271,9 +282,9 @@ pub fn prompt_question_tui(q: &Question) -> anyhow::Result<String> {
 
         // Footer key hints
         let hint_text = if q.multi {
-            "↑↓ Navigate · Space Toggle · Enter Select · Esc Default · Ctrl+C Cancel"
+            "↑↓ Navigate · Space Toggle · Enter Select · Esc Cancel"
         } else {
-            "↑↓ Navigate · Enter Select · Esc Default · Ctrl+C Cancel"
+            "↑↓ Navigate · Enter Select · Esc Cancel"
         };
         lines.push(format!("\x1b[2;37m{}\x1b[0m", hint_text));
 
@@ -286,14 +297,17 @@ pub fn prompt_question_tui(q: &Question) -> anyhow::Result<String> {
         // 3. Read key
         if let Event::Key(key) = event::read()? {
             if key.kind == KeyEventKind::Press {
-                if key.modifiers.contains(KeyModifiers::CONTROL) && key.code == KeyCode::Char('c') {
+                // Esc or Ctrl+C immediately cancels the prompt and aborts turn
+                if key.code == KeyCode::Esc || (key.modifiers.contains(KeyModifiers::CONTROL) && key.code == KeyCode::Char('c')) {
                     for _ in 0..last_rendered_lines {
                         let _ = execute!(out, cursor::MoveToPreviousLine(1), cursor::MoveToColumn(0));
                         let _ = write!(out, "\x1b[2K");
                     }
                     let _ = execute!(out, cursor::Show);
                     let _ = crossterm::terminal::enable_raw_mode();
-                    anyhow::bail!("Question prompt cancelled by user (Ctrl+C)");
+                    let _ = write!(out, "\r\x1b[2K  \x1b[2;37m(Turn canceled)\x1b[0m\r\n\r\n");
+                    let _ = out.flush();
+                    anyhow::bail!("Turn canceled by user (Esc)");
                 }
 
                 match key.code {
@@ -309,15 +323,6 @@ pub fn prompt_question_tui(q: &Question) -> anyhow::Result<String> {
                         checked[selected_idx] = !checked[selected_idx];
                     }
                     KeyCode::Enter => {
-                        break;
-                    }
-                    KeyCode::Esc => {
-                        let def_idx = q.recommended.unwrap_or(0).min(num_opts.saturating_sub(1));
-                        selected_idx = def_idx;
-                        if q.multi {
-                            checked = vec![false; num_opts];
-                            checked[def_idx] = true;
-                        }
                         break;
                     }
                     _ => {}
