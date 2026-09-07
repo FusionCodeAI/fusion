@@ -119,6 +119,12 @@ pub enum SlashCommand {
     Strace { args: Vec<String> },
     /// Test or configure notifications: `/notify [test|status|on|off]`
     Notify { args: Vec<String> },
+    /// Inspect or manage Model Context Protocol servers: `/mcp [list|status|reload]`
+    Mcp { args: Vec<String> },
+    /// Decompose a high-level goal into a multi-phase execution DAG: `/goal <objective>`
+    Goal { prompt: String },
+    /// View, execute, or cancel the active phased execution plan: `/plan [status|stages|cancel]`
+    Plan { args: Vec<String> },
     /// Unrecognized slash command.
     Unknown { name: String, args: Vec<String> },
 }
@@ -574,6 +580,30 @@ pub static COMMAND_PALETTE: &[CommandDescriptor] = &[
         description: "Test notifications (desktop OS & terminal OSC) or toggle settings",
         examples: &["/notify test", "/notify status", "/notify off"],
     },
+    CommandDescriptor {
+        name: "/mcp",
+        aliases: &[],
+        syntax: "/mcp [list|status|reload]",
+        category: CommandCategory::Config,
+        description: "Inspect configured Model Context Protocol servers and connected tools",
+        examples: &["/mcp", "/mcp status", "/mcp reload"],
+    },
+    CommandDescriptor {
+        name: "/goal",
+        aliases: &[],
+        syntax: "/goal <objective description>",
+        category: CommandCategory::Session,
+        description: "Decompose a high-level task into a validated multi-phase execution DAG",
+        examples: &["/goal Add full user authentication with tests"],
+    },
+    CommandDescriptor {
+        name: "/plan",
+        aliases: &[],
+        syntax: "/plan [status|stages|cancel]",
+        category: CommandCategory::Session,
+        description: "View or manage the active phased execution plan",
+        examples: &["/plan", "/plan status", "/plan stages"],
+    },
 ];
 
 /// Returns all static command palette entries.
@@ -722,6 +752,15 @@ impl SlashCommand {
                 args: args.to_vec(),
             },
             "/notify" | "/notification" | "/notif" => SlashCommand::Notify {
+                args: args.to_vec(),
+            },
+            "/mcp" => SlashCommand::Mcp {
+                args: args.to_vec(),
+            },
+            "/goal" => SlashCommand::Goal {
+                prompt: args.join(" "),
+            },
+            "/plan" => SlashCommand::Plan {
                 args: args.to_vec(),
             },
             _ => SlashCommand::Unknown {
@@ -1121,6 +1160,27 @@ pub fn execute_slash_command(
         }
         SlashCommand::Notify { args } => {
             handle_notify(args, runner);
+            CommandResult::Continue
+        }
+        SlashCommand::Mcp { args } => {
+            let cwd = runner.tool_ctx().cwd.clone();
+            let args_clone = args.clone();
+            if let Ok(handle) = tokio::runtime::Handle::try_current() {
+                handle.block_on(async move {
+                    let output = crate::ui::slash_mcp::handle_mcp_command(&args_clone, &cwd).await;
+                    println!("{}", output);
+                });
+            }
+            CommandResult::Continue
+        }
+        SlashCommand::Goal { prompt } => {
+            let (preview, _dag) = crate::ui::slash_plan::handle_goal_command(prompt);
+            println!("{}", preview);
+            CommandResult::Continue
+        }
+        SlashCommand::Plan { args } => {
+            let output = crate::ui::slash_plan::handle_plan_command(args, None);
+            println!("{}", output);
             CommandResult::Continue
         }
         SlashCommand::Unknown { name, args } => {

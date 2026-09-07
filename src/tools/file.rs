@@ -417,6 +417,8 @@ impl ReadFileTool {
     }
 }
 
+pub type FileReadTool = ReadFileTool;
+
 #[async_trait]
 impl Tool for ReadFileTool {
     fn name(&self) -> &str {
@@ -463,7 +465,13 @@ impl Tool for ReadFileTool {
             anyhow::bail!("Missing file path in: '{path_str}'");
         }
 
-        let full_path = resolve_path(&clean_path, &ctx.cwd);
+        let full_path = if let Some(resolved) =
+            crate::tools::uri_router::resolve_internal_uri(&clean_path, Some(&ctx.cwd))
+        {
+            resolved
+        } else {
+            resolve_path(&clean_path, &ctx.cwd)
+        };
 
         if !full_path.exists() {
             anyhow::bail!("File not found: '{}'", full_path.display());
@@ -697,6 +705,8 @@ impl WriteFileTool {
         Self
     }
 }
+
+pub type FileWriteTool = WriteFileTool;
 
 #[async_trait]
 impl Tool for WriteFileTool {

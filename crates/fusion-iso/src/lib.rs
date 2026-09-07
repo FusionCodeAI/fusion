@@ -38,8 +38,10 @@ mod projfs;
 mod rcopy;
 mod windows_block_clone;
 mod zfs;
+mod worktree;
 
 pub use diff::{ChangeKind, Diff, FileChange};
+pub use worktree::WorktreeManager;
 
 /// Stable identifier for which backend a build was compiled with.
 ///

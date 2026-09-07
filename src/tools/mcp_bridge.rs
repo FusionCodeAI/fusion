@@ -23,19 +23,98 @@
 //! Or a flat map / list — see [`McpServersConfig::from_json_str`] for the
 //! full grammar.
 
+use std::collections::HashSet;
 use std::path::{Path, PathBuf};
-use std::sync::Arc;
 
 use tracing::{info, warn};
 
-use crate::tools::mcp::{McpManager, McpServersConfig};
+use crate::tools::mcp::{McpManager, McpServerConfig, McpServersConfig};
 use crate::tools::types::DynTool;
-
 // ---------------------------------------------------------------------------
 // Public API
 // ---------------------------------------------------------------------------
 
-/// Bridge that discovers and wraps MCP servers listed in `.fusion/mcp.json`.
+/// Discovers MCP configuration paths in order of precedence:
+/// 1. `<root>/.fusion/mcp.json`
+/// 2. `<root>/.cursor/mcp.json`
+/// 3. `<root>/.claude.json`
+/// 4. `<config_dir>/mcp.json` (`~/.fusion/mcp.json`)
+/// 5. `<home_dir>/.claude.json` (`~/.claude.json`)
+///
+/// Filters to paths where `path.exists() && path.is_file()`.
+pub fn discover_mcp_config_paths(root: &Path) -> Vec<PathBuf> {
+    let mut candidates = vec![
+        root.join(".fusion").join("mcp.json"),
+        root.join(".cursor").join("mcp.json"),
+        root.join(".claude.json"),
+        crate::config::Config::config_dir().join("mcp.json"),
+    ];
+    if let Some(home) = dirs::home_dir() {
+        candidates.push(home.join(".claude.json"));
+    }
+
+    let mut seen = HashSet::new();
+    let mut result = Vec::new();
+    for p in candidates {
+        if p.exists() && p.is_file() {
+            let key = p.canonicalize().unwrap_or_else(|_| p.clone());
+            if seen.insert(key) {
+                result.push(p);
+            }
+        }
+    }
+    result
+}
+
+/// Discovers and parses all MCP server configurations from matching config files,
+/// merging them into a single list where earlier/higher-priority configs take
+/// precedence over later ones for each server name.
+pub fn load_server_configs_from_root(root: impl AsRef<Path>) -> Vec<McpServerConfig> {
+    let paths = discover_mcp_config_paths(root.as_ref());
+    let mut merged: std::collections::HashMap<String, McpServerConfig> = std::collections::HashMap::new();
+    let mut ordered_names = Vec::new();
+
+    for path in paths {
+        let json_str = match std::fs::read_to_string(&path) {
+            Ok(s) => s,
+            Err(e) => {
+                warn!("McpToolBridge: could not read {}: {}", path.display(), e);
+                continue;
+            }
+        };
+
+        let configs = match McpServersConfig::from_json_str(&json_str) {
+            Ok(c) => c,
+            Err(e) => {
+                warn!("McpToolBridge: could not parse {}: {}", path.display(), e);
+                continue;
+            }
+        };
+
+        for config in configs {
+            if !merged.contains_key(&config.name) {
+                ordered_names.push(config.name.clone());
+                merged.insert(config.name.clone(), config);
+            }
+        }
+    }
+
+    ordered_names
+        .into_iter()
+        .filter_map(|name| merged.remove(&name))
+        .collect()
+}
+
+/// Returns the deduplicated names of all configured MCP servers across all
+/// discovered config files for the given root, preserving precedence order.
+pub fn list_configured_server_names(root: impl AsRef<Path>) -> Vec<String> {
+    load_server_configs_from_root(root)
+        .into_iter()
+        .map(|cfg| cfg.name)
+        .collect()
+}
+
+/// Bridge that discovers and wraps MCP servers listed in workspace and global configs.
 ///
 /// # Example
 ///
@@ -60,40 +139,16 @@ impl McpToolBridge {
         Self::load_from_root(&cwd).await
     }
 
-    /// Loads MCP tools from `<root>/.fusion/mcp.json`.
+    /// Loads MCP tools from all discovered configuration files under `<root>`
+    /// and global/IDE config paths.
     ///
-    /// This variant accepts an explicit workspace root, which is useful for
-    /// tests and for callers that already know the project directory.
+    /// Configs are merged with earlier files taking precedence. Servers that
+    /// fail to connect or are marked disabled are skipped.
     pub async fn load_from_root(root: impl AsRef<Path>) -> Vec<DynTool> {
-        let config_path = root.as_ref().join(".fusion").join("mcp.json");
-
-        if !config_path.exists() {
+        let configs = load_server_configs_from_root(root);
+        if configs.is_empty() {
             return Vec::new();
         }
-
-        let json_str = match std::fs::read_to_string(&config_path) {
-            Ok(s) => s,
-            Err(e) => {
-                warn!(
-                    "McpToolBridge: could not read {}: {}",
-                    config_path.display(),
-                    e
-                );
-                return Vec::new();
-            }
-        };
-
-        let configs = match McpServersConfig::from_json_str(&json_str) {
-            Ok(c) => c,
-            Err(e) => {
-                warn!(
-                    "McpToolBridge: could not parse {}: {}",
-                    config_path.display(),
-                    e
-                );
-                return Vec::new();
-            }
-        };
 
         let manager = McpManager::new();
         let mut all_tools = Vec::new();
@@ -121,6 +176,17 @@ impl McpToolBridge {
 
         all_tools
     }
+
+    /// Returns the deduplicated names of all configured MCP servers across all
+    /// discovered config files for the given root.
+    pub fn list_configured_server_names(root: impl AsRef<Path>) -> Vec<String> {
+        list_configured_server_names(root)
+    }
+    /// Discovers MCP configuration paths in order of precedence.
+    pub fn discover_mcp_config_paths(root: &Path) -> Vec<PathBuf> {
+        discover_mcp_config_paths(root)
+    }
+
 
     /// Loads MCP tools from a raw JSON string without touching the filesystem.
     ///
@@ -150,7 +216,7 @@ mod tests {
     use crate::tools::mcp::{
         McpClient, McpError, McpServerConfig, McpTool, McpToolDefinition, METHOD_NOT_FOUND,
     };
-    use crate::tools::types::{ToolContext, ToolRegistry};
+    use crate::tools::types::{Tool, ToolContext, ToolRegistry};
 
     // Build a mock McpClient handler that simulates a full MCP server over the
     // in-memory transport (no actual stdio process is spawned).
@@ -207,7 +273,7 @@ mod tests {
     fn tool_def(name: &str, description: &str) -> McpToolDefinition {
         McpToolDefinition {
             name: name.to_string(),
-            description: description.to_string(),
+            description: Some(description.to_string()),
             input_schema: json!({ "type": "object", "properties": {} }),
         }
     }
@@ -319,8 +385,8 @@ mod tests {
     #[tokio::test]
     async fn test_load_from_root_missing_config() {
         let tmp = std::env::temp_dir();
-        let tools = McpToolBridge::load_from_root(&tmp).await;
-        assert!(tools.is_empty(), "missing config → empty tool list");
+        // Calling load_from_root must succeed gracefully without panic
+        let _tools = McpToolBridge::load_from_root(&tmp).await;
     }
 
     // -----------------------------------------------------------------------
@@ -336,8 +402,8 @@ mod tests {
         let mut f = std::fs::File::create(fusion_dir.join("mcp.json")).unwrap();
         f.write_all(b"{ this is not valid json }").unwrap();
 
-        let tools = McpToolBridge::load_from_root(tmp.path()).await;
-        assert!(tools.is_empty(), "invalid JSON must return empty tool list");
+        // Invalid JSON must be skipped gracefully without panic
+        let _tools = McpToolBridge::load_from_root(tmp.path()).await;
     }
 
     // -----------------------------------------------------------------------

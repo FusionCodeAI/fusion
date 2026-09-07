@@ -1,4 +1,5 @@
 pub mod ask;
+pub mod ast_edit;
 pub mod bash;
 pub mod clipboard;
 pub mod compat;
@@ -21,6 +22,7 @@ pub mod hex;
 pub mod json_schema;
 pub mod lsp;
 pub mod mcp;
+pub mod mcp_bridge;
 pub mod mock_server;
 pub mod patch;
 pub mod ports;
@@ -33,8 +35,10 @@ pub mod syntax;
 pub mod system;
 pub mod tree;
 pub mod types;
+pub mod uri_router;
 pub mod watch;
 pub mod web_search;
+pub use ast_edit::AstEditTool;
 pub use ask::AskTool;
 pub use bash::BashTool;
 pub use clipboard::{
@@ -51,7 +55,7 @@ pub use env_cleaner::{
     EnvSanitizer, SanitizationPolicy, SanitizationReason, SanitizationReport, SanitizationResult,
 };
 pub use fetch::{FetchFormat, FetchOptions, FetchResult, HttpFetchTool};
-pub use file::{ReadFileTool, WriteFileTool};
+pub use file::{FileReadTool, FileWriteTool, ReadFileTool, WriteFileTool};
 pub use git::{GitDiffTool, GitStatusTool};
 pub use git_branch::{
     format_branch_list, list_branches, parse_upstream_tracking, validate_branch_name, BranchInfo,
@@ -89,6 +93,8 @@ pub use syntax::*;
 pub use system::*;
 pub use tree::*;
 pub use types::*;
+pub use uri_router::resolve_internal_uri;
+pub use mcp_bridge::McpToolBridge;
 pub use watch::{
     global_watcher_manager, ChangeKind, FileChange, FileRecord, FileSnapshot, WatchConfig,
     WatchTool, WatcherInfo, WatcherManager, WorkspaceWatcher,
@@ -135,6 +141,7 @@ pub fn default_registry() -> ToolRegistry {
     registry.register(Arc::new(GitHubTool::new()));
     registry.register(Arc::new(crate::tools::lsp::LspTool::new()));
     registry.register(Arc::new(AskTool::new()));
+    registry.register(Arc::new(AstEditTool::new()));
     compat::register_compat_tools(&mut registry);
     registry
 }
