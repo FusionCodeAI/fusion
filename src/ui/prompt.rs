@@ -4,6 +4,7 @@ use crossterm::{
     execute,
     terminal::{self, ClearType},
 };
+use std::borrow::Cow;
 use std::io::{stdout, Write};
 use unicode_width::UnicodeWidthStr;
 
@@ -36,6 +37,15 @@ pub struct SlashSuggestion {
     pub is_skill: bool,
     /// Source label for skills (e.g. "Claude", "Fusion", "Global").
     pub source: String,
+}
+
+/// Position and query extracted from an `@file` trigger in the buffer.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct AtFileTrigger {
+    /// Index in `buffer` where `@` starts.
+    pub at_index: usize,
+    /// The query typed after `@` up to the cursor.
+    pub query: String,
 }
 
 pub struct Prompt {
@@ -79,6 +89,14 @@ pub struct Prompt {
     pub skill_picker_source: usize,
     /// Currently active skill: (name, source_label).
     pub active_skill: Option<(String, String)>,
+    /// Cached workspace files for @file autocomplete.
+    pub(crate) file_cache: Vec<String>,
+    /// Cache timestamp for file list invalidation.
+    pub(crate) file_cache_time: Option<std::time::Instant>,
+    /// Highlighted index inside the @file autocomplete dialog.
+    pub at_file_selection: usize,
+    /// Whether the @file autocomplete dropdown was dismissed via Esc.
+    pub at_file_dismissed: bool,
 }
 impl Default for Prompt {
     fn default() -> Self {
@@ -120,6 +138,10 @@ impl Prompt {
             skill_picker_selection: 0,
             skill_picker_source: 0,
             active_skill: None,
+            file_cache: Vec::new(),
+            file_cache_time: None,
+            at_file_selection: 0,
+            at_file_dismissed: false,
         }
     }
 
@@ -325,6 +347,120 @@ impl Prompt {
         self.slash_selection
     }
 
+    /// Set the selected index for the @file autocomplete dialog.
+    pub fn with_at_file_selection(mut self, sel: usize) -> Self {
+        self.at_file_selection = sel;
+        self
+    }
+
+    /// Set the selected index for the @file autocomplete dialog.
+    pub fn set_at_file_selection(&mut self, sel: usize) {
+        self.at_file_selection = sel;
+    }
+
+    /// Get the selected index for the @file autocomplete dialog.
+    pub fn at_file_selection(&self) -> usize {
+        self.at_file_selection
+    }
+
+    /// Set a custom file cache (e.g. for testing).
+    pub fn set_file_cache(&mut self, files: Vec<String>) {
+        self.file_cache = files;
+        self.file_cache_time = Some(std::time::Instant::now() + std::time::Duration::from_secs(3600));
+    }
+
+    /// Read the currently cached files, if any.
+    pub fn file_cache(&self) -> Option<&[String]> {
+        if self.file_cache.is_empty() {
+            None
+        } else {
+            Some(&self.file_cache)
+        }
+    }
+
+    /// Builder method to pre-populate file cache.
+    pub fn with_file_cache(mut self, files: Vec<String>) -> Self {
+        self.set_file_cache(files);
+        self
+    }
+
+    /// Return the current prompt buffer as a String.
+    pub fn buffer_text(&self) -> String {
+        self.buffer.iter().collect()
+    }
+
+    /// Scan workspace files using `fusion_walker`.
+    pub fn scan_workspace_files() -> Vec<String> {
+        let cwd = std::env::current_dir().unwrap_or_else(|_| std::path::PathBuf::from("."));
+        if let Ok(entries) = fusion_walker::WalkRequest::new(&cwd)
+            .hidden(false)
+            .gitignore(true)
+            .skip_git(true)
+            .skip_node_modules(true)
+            .cache(true)
+            .collect_files()
+        {
+            let mut paths: Vec<String> = entries.into_iter().map(|e| e.path).collect();
+            paths.sort();
+            paths
+        } else {
+            Vec::new()
+        }
+    }
+
+    /// Extract active @file trigger at the current cursor position in buffer.
+    pub fn at_file_trigger(&self) -> Option<AtFileTrigger> {
+        extract_at_trigger(&self.buffer, self.cursor_pos)
+    }
+
+    /// Get matching files for the active @file trigger.
+    pub fn at_file_matches(&mut self) -> Vec<String> {
+        let trigger = match self.at_file_trigger() {
+            Some(t) => t,
+            None => return Vec::new(),
+        };
+        if self.file_cache.is_empty()
+            || self.file_cache_time.map_or(true, |t| t.elapsed() > std::time::Duration::from_secs(5))
+        {
+            self.file_cache = Self::scan_workspace_files();
+            self.file_cache_time = Some(std::time::Instant::now());
+        }
+        fuzzy_match_files(&trigger.query, &self.file_cache)
+    }
+
+    /// Replace active @query with given path.
+    pub fn apply_at_file_completion(&mut self, path: &str) -> bool {
+        let trigger = match self.at_file_trigger() {
+            Some(t) => t,
+            None => return false,
+        };
+        let at_idx = trigger.at_index;
+        // Find end of token: scan forward while characters are valid query chars
+        let mut end = at_idx + 1;
+        while end < self.buffer.len() && is_query_char(self.buffer[end]) {
+            end += 1;
+        }
+        // Replace buffer[at_idx..end] with path
+        let path_chars: Vec<char> = path.chars().collect();
+        let path_len = path_chars.len();
+        self.buffer.splice(at_idx..end, path_chars);
+        self.cursor_pos = at_idx + path_len;
+        self.at_file_selection = 0;
+        self.at_file_dismissed = false;
+        true
+    }
+
+    /// Complete with the currently selected matching file.
+    pub fn select_at_file_completion(&mut self) -> bool {
+        let matches = self.at_file_matches();
+        if matches.is_empty() {
+            return false;
+        }
+        let sel = self.at_file_selection.min(matches.len().saturating_sub(1));
+        let path = matches[sel].clone();
+        self.apply_at_file_completion(&path)
+    }
+
     /// Available models for the model picker dialog.
     pub fn models(&self) -> &[(String, String)] {
         &self.models
@@ -436,6 +572,8 @@ impl Prompt {
         self.queued_count = 0;
         self.is_running = false;
         self.cancel_pressed = false;
+        self.at_file_selection = 0;
+        self.at_file_dismissed = false;
         if self.key_handler.profile() == KeybindingProfile::Vi {
             self.key_handler.set_vi_mode(ViMode::Insert);
         }
@@ -868,6 +1006,42 @@ impl Prompt {
                     }
                 }
 
+                // @file autocomplete dialog navigation and insertion
+                if !self.at_file_dismissed && !first_line.starts_with('/') {
+                    let at_matches = self.at_file_matches();
+                    if !at_matches.is_empty() {
+                        match key.code {
+                            KeyCode::Down => {
+                                self.at_file_selection =
+                                    (self.at_file_selection + 1) % at_matches.len();
+                                self.render_current()?;
+                                return Ok(None);
+                            }
+                            KeyCode::BackTab | KeyCode::Up => {
+                                self.at_file_selection = if self.at_file_selection == 0 {
+                                    at_matches.len() - 1
+                                } else {
+                                    self.at_file_selection - 1
+                                };
+                                self.render_current()?;
+                                return Ok(None);
+                            }
+                            KeyCode::Tab | KeyCode::Enter => {
+                                if self.select_at_file_completion() {
+                                    self.render_current()?;
+                                    return Ok(None);
+                                }
+                            }
+                            KeyCode::Esc => {
+                                self.at_file_dismissed = true;
+                                self.render_current()?;
+                                return Ok(None);
+                            }
+                            _ => {}
+                        }
+                    }
+                }
+
                 // Standard input editing
                 let mut state = PromptState::new(
                     &mut self.buffer,
@@ -879,6 +1053,7 @@ impl Prompt {
 
                 match self.key_handler.handle_key(key, &mut state) {
                     KeyResult::Continue => {
+                        self.at_file_dismissed = false;
                         self.render_current()?;
                         Ok(None)
                     }
@@ -1022,6 +1197,27 @@ impl Prompt {
             && first_line.starts_with('/')
         {
             slash_matches(first_line, &self.skill_suggestions)
+        } else {
+            Vec::new()
+        };
+
+        // Check for @file suggestions
+        let at_file_matches = if !self.model_picker_active
+            && !self.effort_picker_active
+            && !self.skill_picker_active
+            && !self.at_file_dismissed
+            && slash_suggestions.is_empty()
+        {
+            if let Some(trigger) = extract_at_trigger(buffer, cursor_pos) {
+                let files: Cow<[String]> = if self.file_cache.is_empty() {
+                    Cow::Owned(Self::scan_workspace_files())
+                } else {
+                    Cow::Borrowed(&self.file_cache)
+                };
+                fuzzy_match_files(&trigger.query, &files)
+            } else {
+                Vec::new()
+            }
         } else {
             Vec::new()
         };
@@ -1489,6 +1685,87 @@ impl Prompt {
 
             *last_rendered_lines = total_lines;
             *last_cursor_row = header_lines + target_row;
+        } else if !at_file_matches.is_empty() {
+            let sel = self
+                .at_file_selection
+                .min(at_file_matches.len().saturating_sub(1));
+            let window_start = if sel >= 6 { sel - 5 } else { 0 };
+            let visible_items: Vec<_> = at_file_matches
+                .iter()
+                .enumerate()
+                .skip(window_start)
+                .take(6)
+                .collect();
+            let visible_count = visible_items.len();
+            let window_end = window_start + visible_count;
+
+            write!(out, "\x1b[38;5;240m{}\x1b[0m\r\n", divider)?;
+            total_lines += 1;
+
+            let left = format!("Files {} · Type to filter", at_file_matches.len());
+            let right = format!("{}-{}", window_start + 1, window_end);
+            let gap = term_cols.saturating_sub(left.len() + right.len());
+            write!(
+                out,
+                "\x1b[2;37m{}{}{}\x1b[0m\r\n",
+                left,
+                " ".repeat(gap),
+                right
+            )?;
+            total_lines += 1;
+
+            write!(out, "\r\n")?;
+            total_lines += 1;
+
+            let max_path_w = term_cols.saturating_sub(6);
+
+            for (idx, path) in visible_items {
+                let is_selected = idx == sel;
+                let display_path = truncate_fit(path, max_path_w);
+
+                if is_selected {
+                    write!(
+                        out,
+                        "\x1b[1;37m📄 {}\x1b[0m\r\n",
+                        display_path
+                    )?;
+                } else {
+                    write!(
+                        out,
+                        "\x1b[2;37m📄 {}\x1b[0m\r\n",
+                        display_path
+                    )?;
+                }
+                total_lines += 1;
+            }
+
+            write!(out, "\x1b[38;5;240m{}\x1b[0m\r\n", divider)?;
+            total_lines += 1;
+
+            write!(
+                out,
+                "\x1b[2;37m↑↓ Navigate     Tab/Enter Insert     Esc Close\x1b[0m"
+            )?;
+            total_lines += 1;
+
+            let lines_up = ((lines.len() - 1 - target_row) + visible_count + 5).min(max_up);
+            execute!(out, cursor::MoveUp(lines_up as u16))?;
+            let prefix = if target_row == 0 {
+                &self.prompt_symbol
+            } else {
+                &self.multiline_symbol
+            };
+            let prefix_col = visible_width(prefix);
+            let chip_w = if target_row == 0 {
+                self.skill_chip_width()
+            } else {
+                0
+            };
+            let target_x = (prefix_col + chip_w + target_col) as u16;
+            execute!(out, cursor::MoveToColumn(target_x))?;
+
+            *last_rendered_lines = total_lines;
+            *last_cursor_row = header_lines + target_row;
         } else {
             // 3. Blank line between input and status
             write!(out, "\r\n")?;
@@ -1564,6 +1841,106 @@ impl Prompt {
     pub fn render_submitted_prompt(text: &str) {
         let _ = Self::render_submitted_prompt_to(&mut stdout(), text);
     }
+}
+
+/// Check if a character can be part of an `@file` path query.
+pub fn is_query_char(c: char) -> bool {
+    c.is_alphanumeric() || c == '_' || c == '-' || c == '.' || c == '/' || c == '\\'
+}
+
+/// Check if character preceding `@` is valid (start of word/token).
+pub fn is_valid_at_prefix(prev: char) -> bool {
+    !prev.is_alphanumeric() && prev != '_'
+}
+
+/// Extract `@` trigger and query from buffer at cursor position.
+pub fn extract_at_trigger(buffer: &[char], cursor_pos: usize) -> Option<AtFileTrigger> {
+    if cursor_pos == 0 || buffer.is_empty() {
+        return None;
+    }
+    let effective_cursor = cursor_pos.min(buffer.len());
+    let slice = &buffer[..effective_cursor];
+
+    let mut at_idx = None;
+    for (i, &c) in slice.iter().enumerate().rev() {
+        if c == '@' {
+            at_idx = Some(i);
+            break;
+        } else if !is_query_char(c) {
+            return None;
+        }
+    }
+
+    let at_idx = at_idx?;
+
+    if at_idx > 0 {
+        let prev = buffer[at_idx - 1];
+        if !is_valid_at_prefix(prev) {
+            return None;
+        }
+    }
+
+    let query: String = slice[at_idx + 1..].iter().collect();
+    Some(AtFileTrigger {
+        at_index: at_idx,
+        query,
+    })
+}
+
+/// Fuzzy match and rank workspace file paths against a query.
+pub fn fuzzy_match_files(query: &str, files: &[String]) -> Vec<String> {
+    let q = query.trim().to_lowercase();
+    if q.is_empty() {
+        return files.iter().take(50).cloned().collect();
+    }
+
+    let mut scored: Vec<(i64, &String)> = Vec::new();
+
+    for file in files {
+        let path_lower = file.to_lowercase();
+        let file_name = file.rsplit(['/', '\\']).next().unwrap_or(file);
+        let file_name_lower = file_name.to_lowercase();
+
+        let mut score: Option<i64> = None;
+
+        if file_name_lower == q {
+            score = Some(10_000 - file.len() as i64);
+        } else if file_name_lower.starts_with(&q) {
+            score = Some(8_000 - file.len() as i64);
+        } else if path_lower.starts_with(&q) {
+            score = Some(7_000 - file.len() as i64);
+        } else if file_name_lower.contains(&q) {
+            score = Some(5_000 - file.len() as i64);
+        } else if path_lower.contains(&q) {
+            score = Some(3_000 - file.len() as i64);
+        } else {
+            // Check fuzzy subsequence match
+            let mut q_chars = q.chars().peekable();
+            let mut boundary_matches = 0;
+            let mut prev_char = '/';
+            for c in path_lower.chars() {
+                if let Some(&qc) = q_chars.peek() {
+                    if c == qc {
+                        q_chars.next();
+                        if prev_char == '/' || prev_char == '_' || prev_char == '-' || prev_char == '.' {
+                            boundary_matches += 1;
+                        }
+                    }
+                }
+                prev_char = c;
+            }
+            if q_chars.peek().is_none() {
+                score = Some(1_000 + (boundary_matches * 50) - file.len() as i64);
+            }
+        }
+
+        if let Some(s) = score {
+            scored.push((s, file));
+        }
+    }
+
+    scored.sort_by(|a, b| b.0.cmp(&a.0).then_with(|| a.1.cmp(b.1)));
+    scored.into_iter().take(50).map(|(_, f)| f.clone()).collect()
 }
 fn truncate_fit(s: &str, max_len: usize) -> String {
     if max_len == 0 {
@@ -2700,5 +3077,147 @@ mod tests {
             "Cursor must be moved up 3 lines to active input line in:\n{}",
             raw
         );
+    }
+
+    #[test]
+    fn test_extract_at_trigger() {
+        // Simple @ at start of buffer
+        let buf: Vec<char> = "@".chars().collect();
+        assert_eq!(
+            extract_at_trigger(&buf, 1),
+            Some(AtFileTrigger {
+                at_index: 0,
+                query: String::new()
+            })
+        );
+
+        // Simple @word at start of buffer
+        let buf: Vec<char> = "@main".chars().collect();
+        assert_eq!(
+            extract_at_trigger(&buf, 5),
+            Some(AtFileTrigger {
+                at_index: 0,
+                query: "main".to_string()
+            })
+        );
+
+        // Word preceded by space
+        let buf: Vec<char> = "hello @main".chars().collect();
+        assert_eq!(
+            extract_at_trigger(&buf, 11),
+            Some(AtFileTrigger {
+                at_index: 6,
+                query: "main".to_string()
+            })
+        );
+
+        // Word with path characters
+        let buf: Vec<char> = "see @src/ui/prompt.rs".chars().collect();
+        assert_eq!(
+            extract_at_trigger(&buf, 21),
+            Some(AtFileTrigger {
+                at_index: 4,
+                query: "src/ui/prompt.rs".to_string()
+            })
+        );
+
+        // Trailing space after word should not trigger
+        let buf: Vec<char> = "@main ".chars().collect();
+        assert_eq!(extract_at_trigger(&buf, 6), None);
+
+        // Email / identifier should not trigger
+        let buf: Vec<char> = "user@example.com".chars().collect();
+        assert_eq!(extract_at_trigger(&buf, 16), None);
+
+        // Cursor at 0
+        let buf: Vec<char> = "@main".chars().collect();
+        assert_eq!(extract_at_trigger(&buf, 0), None);
+    }
+
+    #[test]
+    fn test_fuzzy_match_files() {
+        let files = vec![
+            "src/main.rs".to_string(),
+            "crates/fusion-shell/src/main.rs".to_string(),
+            "src/ui/prompt.rs".to_string(),
+            "src/auth/login.rs".to_string(),
+            "Cargo.toml".to_string(),
+        ];
+
+        // Empty query returns all files
+        let all = fuzzy_match_files("", &files);
+        assert_eq!(all.len(), 5);
+
+        // Exact / prefix match on filename ranks highest
+        let matches = fuzzy_match_files("main", &files);
+        assert_eq!(matches[0], "src/main.rs");
+        assert_eq!(matches[1], "crates/fusion-shell/src/main.rs");
+
+        // Subsequence match
+        let prompt_matches = fuzzy_match_files("prompt", &files);
+        assert_eq!(prompt_matches.len(), 1);
+        assert_eq!(prompt_matches[0], "src/ui/prompt.rs");
+
+        let auth_matches = fuzzy_match_files("auth", &files);
+        assert_eq!(auth_matches.len(), 1);
+        assert_eq!(auth_matches[0], "src/auth/login.rs");
+    }
+
+    #[test]
+    fn test_apply_at_file_completion() {
+        let mut prompt = Prompt::new();
+        prompt.buffer = "look at @main and test".chars().collect();
+        prompt.cursor_pos = 13; // after @main
+
+        assert!(prompt.apply_at_file_completion("src/main.rs"));
+        assert_eq!(prompt.buffer_text(), "look at src/main.rs and test");
+        assert_eq!(prompt.cursor_pos, 8 + 11); // 8 is start of path, 11 is len
+    }
+
+    #[test]
+    fn test_render_at_file_dropdown() {
+        let mut prompt = Prompt::new();
+        prompt.set_file_cache(vec!["src/main.rs".to_string(), "src/ui/prompt.rs".to_string()]);
+        let buffer: Vec<char> = "@main".chars().collect();
+        let mut buf = Vec::new();
+        let mut last_lines = 0;
+        let mut last_cursor = 0;
+
+        prompt
+            .render_to(&mut buf, &buffer, 5, &mut last_lines, &mut last_cursor)
+            .expect("render_to failed");
+
+        let rendered = String::from_utf8_lossy(&buf);
+        assert!(rendered.contains("📄 src/main.rs"), "Dropdown must contain document icon and path: {}", rendered);
+        assert!(rendered.contains("Tab/Enter Insert"), "Dropdown must contain keybinding hint: {}", rendered);
+    }
+
+    #[test]
+    fn test_handle_event_at_file_navigation_and_insertion() {
+        let mut prompt = Prompt::new();
+        prompt.set_file_cache(vec![
+            "src/main.rs".to_string(),
+            "crates/fusion-shell/src/main.rs".to_string(),
+        ]);
+        prompt.buffer = "@main".chars().collect();
+        prompt.cursor_pos = 5;
+
+        // Down arrow changes selection
+        let down_event = Event::Key(crossterm::event::KeyEvent::new(
+            KeyCode::Down,
+            KeyModifiers::NONE,
+        ));
+        let res = prompt.handle_event(down_event).expect("handle_event failed");
+        assert_eq!(res, None);
+        assert_eq!(prompt.at_file_selection(), 1);
+
+        // Tab key inserts selected file
+        let tab_event = Event::Key(crossterm::event::KeyEvent::new(
+            KeyCode::Tab,
+            KeyModifiers::NONE,
+        ));
+        let res = prompt.handle_event(tab_event).expect("handle_event failed");
+        assert_eq!(res, None);
+        assert_eq!(prompt.buffer_text(), "crates/fusion-shell/src/main.rs");
     }
 }
