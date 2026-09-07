@@ -437,6 +437,9 @@ impl SubagentHandle {
     }
 }
 
+/// Default maximum concurrent subagents allowed to run concurrently.
+pub const DEFAULT_MAX_CONCURRENT_SUBAGENTS: usize = 16;
+
 /// Central orchestrator managing concurrency, spawning, communication channels,
 /// and lifecycle tracking for specialized subagents.
 #[derive(Clone)]
@@ -456,7 +459,9 @@ impl SubagentManager {
     /// Creates a new `SubagentManager`.
     pub fn new(client: Arc<LlmClient>, config: Config, tools: ToolRegistry) -> Self {
         let (global_event_tx, _) = broadcast::channel(256);
-        let max_concurrent = 8;
+        let max_concurrent = config
+            .max_concurrent_subagents
+            .unwrap_or(DEFAULT_MAX_CONCURRENT_SUBAGENTS);
         let mgr = Self {
             client,
             config,
@@ -468,10 +473,12 @@ impl SubagentManager {
             global_event_tx: global_event_tx.clone(),
             metrics: Arc::new(crate::agent::metrics::SubagentMetricsCollector::new()),
         };
-        crate::agent::metrics::SubagentMetricsCollector::spawn_event_listener(
-            mgr.metrics.clone(),
-            global_event_tx.subscribe(),
-        );
+        if tokio::runtime::Handle::try_current().is_ok() {
+            crate::agent::metrics::SubagentMetricsCollector::spawn_event_listener(
+                mgr.metrics.clone(),
+                global_event_tx.subscribe(),
+            );
+        }
         mgr
     }
 
@@ -480,6 +487,11 @@ impl SubagentManager {
         self.max_concurrent = max;
         self.semaphore = Arc::new(Semaphore::new(max));
         self
+    }
+
+    /// Returns the maximum number of subagents allowed to run concurrently.
+    pub fn max_concurrent(&self) -> usize {
+        self.max_concurrent
     }
 
     /// Subscribes to the broadcast channel of all subagent progress events.
@@ -1379,8 +1391,8 @@ mod tests {
         assert_eq!(ev.id(), "test-scout-1");
     }
 
-    #[test]
-    fn test_spawn_subagent_tool_schema() {
+    #[tokio::test]
+    async fn test_spawn_subagent_tool_schema() {
         let client = Arc::new(LlmClient::new());
         let config = Config::default();
         let tools = ToolRegistry::new();
@@ -1396,5 +1408,24 @@ mod tests {
         assert_eq!(batch_tool.name(), "spawn_subagents_batch");
         let batch_params = batch_tool.parameters();
         assert!(batch_params["properties"].get("tasks").is_some());
+    }
+
+    #[tokio::test]
+    async fn test_subagent_manager_concurrency_defaults_and_config() {
+        let client = Arc::new(LlmClient::new());
+        let tools = ToolRegistry::new();
+
+        // 1. Default config uses DEFAULT_MAX_CONCURRENT_SUBAGENTS (16)
+        let config = Config::default();
+        let manager = SubagentManager::new(client.clone(), config, tools.clone());
+        assert_eq!(manager.max_concurrent(), DEFAULT_MAX_CONCURRENT_SUBAGENTS);
+        assert_eq!(manager.semaphore.available_permits(), 16);
+
+        // 2. Custom config override
+        let mut custom_config = Config::default();
+        custom_config.max_concurrent_subagents = Some(24);
+        let manager2 = SubagentManager::new(client, custom_config, tools);
+        assert_eq!(manager2.max_concurrent(), 24);
+        assert_eq!(manager2.semaphore.available_permits(), 24);
     }
 }

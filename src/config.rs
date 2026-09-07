@@ -258,6 +258,9 @@ pub struct Config {
     )]
     pub max_turns: Option<usize>,
 
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub max_concurrent_subagents: Option<usize>,
+
     // Provider API keys & custom base URLs
     #[serde(
         default,
@@ -443,6 +446,7 @@ impl Default for Config {
             default_temperature: Some(0.2),
             max_tokens: Some(8192),
             max_turns: Some(100),
+            max_concurrent_subagents: None,
 
             openai_api_key: None,
             openai_base_url: None,
@@ -1662,5 +1666,19 @@ advisors_enabled = false
         assert!(cfg.validate().is_err());
         cfg.max_turns = Some(501);
         assert!(cfg.validate().is_err());
+    }
+
+    #[test]
+    fn test_config_max_concurrent_subagents() {
+        let cfg = Config::default();
+        assert_eq!(cfg.max_concurrent_subagents, None);
+
+        let json = r#"{
+            "provider": "deepseek",
+            "model": "deepseek-chat",
+            "max_concurrent_subagents": 32
+        }"#;
+        let parsed: Config = serde_json::from_str(json).unwrap();
+        assert_eq!(parsed.max_concurrent_subagents, Some(32));
     }
 }
