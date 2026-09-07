@@ -18,6 +18,7 @@ pub mod grep_filter;
 pub mod guardrails;
 pub mod hex;
 pub mod json_schema;
+pub mod lsp;
 pub mod mcp;
 pub mod mock_server;
 pub mod patch;
