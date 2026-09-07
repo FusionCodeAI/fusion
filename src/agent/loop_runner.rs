@@ -52,6 +52,13 @@ pub enum AgentEvent {
         success: bool,
         output: String,
     },
+    /// Live progress event emitted by a worker subagent.
+    SubagentProgressEvent {
+        id: String,
+        name: String,
+        role: crate::agent::subagent::SubagentRole,
+        progress: crate::agent::subagent::SubagentProgress,
+    },
     /// Informational status update.
     Status(String),
     /// Turn completed.

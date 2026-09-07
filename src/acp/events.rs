@@ -1105,6 +1105,7 @@ impl AcpEventBridge {
                     timestamp_ms: now_ms(),
                 }));
             }
+            AgentEvent::SubagentProgressEvent { .. } => {}
             AgentEvent::Status(message) => {
                 events.push(AcpSessionEvent::Status {
                     message,

@@ -453,6 +453,7 @@ pub struct SubagentManager {
     cancels: Arc<RwLock<HashMap<String, watch::Sender<bool>>>>,
     global_event_tx: broadcast::Sender<SubagentProgress>,
     metrics: Arc<crate::agent::metrics::SubagentMetricsCollector>,
+    event_tx: Option<tokio::sync::mpsc::UnboundedSender<crate::agent::loop_runner::AgentEvent>>,
 }
 
 impl SubagentManager {
@@ -472,6 +473,7 @@ impl SubagentManager {
             cancels: Arc::new(RwLock::new(HashMap::new())),
             global_event_tx: global_event_tx.clone(),
             metrics: Arc::new(crate::agent::metrics::SubagentMetricsCollector::new()),
+            event_tx: None,
         };
         if tokio::runtime::Handle::try_current().is_ok() {
             crate::agent::metrics::SubagentMetricsCollector::spawn_event_listener(
@@ -497,6 +499,58 @@ impl SubagentManager {
     /// Subscribes to the broadcast channel of all subagent progress events.
     pub fn subscribe(&self) -> broadcast::Receiver<SubagentProgress> {
         self.global_event_tx.subscribe()
+    }
+
+    /// Sets the channel sender to forward live progress events as `AgentEvent::SubagentProgressEvent`.
+    pub fn with_event_sender(
+        mut self,
+        tx: tokio::sync::mpsc::UnboundedSender<crate::agent::loop_runner::AgentEvent>,
+    ) -> Self {
+        self.event_tx = Some(tx);
+        self
+    }
+
+    /// Sets or clears the optional channel sender for progress events.
+    pub fn with_opt_event_sender(
+        mut self,
+        tx: Option<tokio::sync::mpsc::UnboundedSender<crate::agent::loop_runner::AgentEvent>>,
+    ) -> Self {
+        self.event_tx = tx;
+        self
+    }
+
+    /// Mutates the event sender on this manager instance.
+    pub fn set_event_sender(
+        &mut self,
+        tx: Option<tokio::sync::mpsc::UnboundedSender<crate::agent::loop_runner::AgentEvent>>,
+    ) {
+        self.event_tx = tx;
+    }
+
+    /// Bridges progress events to the given channel.
+    pub fn bridge_progress_to(
+        &mut self,
+        tx: Option<tokio::sync::mpsc::UnboundedSender<crate::agent::loop_runner::AgentEvent>>,
+    ) {
+        self.event_tx = tx;
+    }
+
+    /// Returns a reference to the active event sender, if any.
+    pub fn event_sender(
+        &self,
+    ) -> Option<&tokio::sync::mpsc::UnboundedSender<crate::agent::loop_runner::AgentEvent>> {
+        self.event_tx.as_ref()
+    }
+
+    /// Spawns an isolated subagent task and bridges its progress events to the provided channel.
+    pub fn spawn_with_channel(
+        &self,
+        task: SubagentTask,
+        event_tx: tokio::sync::mpsc::UnboundedSender<crate::agent::loop_runner::AgentEvent>,
+    ) -> SubagentHandle {
+        let mut mgr = self.clone();
+        mgr.event_tx = Some(event_tx);
+        mgr.spawn(task)
     }
 
     /// Spawns an isolated subagent task in the background.
@@ -547,7 +601,7 @@ impl SubagentManager {
         let active_agents = self.active_agents.clone();
         let cancels = self.cancels.clone();
         let global_tx = self.global_event_tx.clone();
-
+        let loop_event_tx = self.event_tx.clone();
         let task_id = id.clone();
         let task_name = name.clone();
         let task_role = role.clone();
@@ -565,8 +619,15 @@ impl SubagentManager {
                 task: task_text.clone(),
             };
             let _ = progress_tx.send(start_event.clone());
-            let _ = global_tx.send(start_event);
-
+            let _ = global_tx.send(start_event.clone());
+            if let Some(tx) = &loop_event_tx {
+                let _ = tx.send(crate::agent::loop_runner::AgentEvent::SubagentProgressEvent {
+                    id: task_id.clone(),
+                    name: task_name.clone(),
+                    role: task_role.clone(),
+                    progress: start_event,
+                });
+            }
             // Update status to Running
             {
                 let mut guard = active_agents.write().await;
@@ -592,6 +653,7 @@ impl SubagentManager {
                 &config,
                 &progress_tx,
                 &global_tx,
+                loop_event_tx.as_ref(),
                 cancel_rx,
                 active_agents.clone(),
             )
@@ -708,6 +770,7 @@ async fn execute_subagent_loop(
     config: &Config,
     progress_tx: &mpsc::UnboundedSender<SubagentProgress>,
     global_tx: &broadcast::Sender<SubagentProgress>,
+    loop_event_tx: Option<&mpsc::UnboundedSender<crate::agent::loop_runner::AgentEvent>>,
     cancel_rx: watch::Receiver<bool>,
     active_agents: Arc<RwLock<HashMap<String, SubagentInfo>>>,
 ) -> anyhow::Result<SubagentResult> {
@@ -721,11 +784,32 @@ async fn execute_subagent_loop(
     let target_model = model.unwrap_or(&config.default_model);
     let target_temp = temperature.or(config.default_temperature);
 
+    let emit_progress = |event: SubagentProgress| {
+        let _ = progress_tx.send(event.clone());
+        let _ = global_tx.send(event.clone());
+        if let Some(tx) = loop_event_tx {
+            if matches!(
+                event,
+                SubagentProgress::Started { .. }
+                    | SubagentProgress::ToolStarted { .. }
+                    | SubagentProgress::ToolCompleted { .. }
+                    | SubagentProgress::Completed { .. }
+                    | SubagentProgress::Failed { .. }
+            ) {
+                let _ = tx.send(crate::agent::loop_runner::AgentEvent::SubagentProgressEvent {
+                    id: id.to_string(),
+                    name: name.to_string(),
+                    role: role.clone(),
+                    progress: event,
+                });
+            }
+        }
+    };
+
     while turns < max_turns {
         if *cancel_rx.borrow() {
             let cancel_event = SubagentProgress::Cancelled { id: id.to_string() };
-            let _ = progress_tx.send(cancel_event.clone());
-            let _ = global_tx.send(cancel_event);
+            emit_progress(cancel_event);
 
             let mut guard = active_agents.write().await;
             if let Some(info) = guard.get_mut(id) {
@@ -753,8 +837,7 @@ async fn execute_subagent_loop(
             turn: turns,
             max_turns,
         };
-        let _ = progress_tx.send(turn_event.clone());
-        let _ = global_tx.send(turn_event);
+        emit_progress(turn_event);
 
         // Update active status
         {
@@ -793,8 +876,7 @@ async fn execute_subagent_loop(
                     id: id.to_string(),
                     error: err_msg.clone(),
                 };
-                let _ = progress_tx.send(failed_event.clone());
-                let _ = global_tx.send(failed_event);
+                emit_progress(failed_event);
 
                 let mut guard = active_agents.write().await;
                 if let Some(info) = guard.get_mut(id) {
@@ -816,8 +898,7 @@ async fn execute_subagent_loop(
                     id: id.to_string(),
                     delta: r,
                 };
-                let _ = progress_tx.send(thinking_event.clone());
-                let _ = global_tx.send(thinking_event);
+                emit_progress(thinking_event);
             }
         }
 
@@ -830,8 +911,7 @@ async fn execute_subagent_loop(
                 output: content.clone(),
                 turns_taken: turns,
             };
-            let _ = progress_tx.send(completed_event.clone());
-            let _ = global_tx.send(completed_event);
+            emit_progress(completed_event);
 
             let mut guard = active_agents.write().await;
             if let Some(info) = guard.get_mut(id) {
@@ -889,8 +969,7 @@ async fn execute_subagent_loop(
                 tool: tc.name.clone(),
                 args: parsed_args.clone(),
             };
-            let _ = progress_tx.send(tool_started_event.clone());
-            let _ = global_tx.send(tool_started_event);
+            emit_progress(tool_started_event);
 
             // Execute tool
             let exec_res = tools.execute(&tc.name, parsed_args, &tool_ctx).await;
@@ -906,8 +985,7 @@ async fn execute_subagent_loop(
                 output: result_str.clone(),
                 success,
             };
-            let _ = progress_tx.send(tool_completed_event.clone());
-            let _ = global_tx.send(tool_completed_event);
+            emit_progress(tool_completed_event);
 
             session.add_tool_result(&tc.id, result_str);
         }
@@ -921,8 +999,7 @@ async fn execute_subagent_loop(
         id: id.to_string(),
         error: err_msg.clone(),
     };
-    let _ = progress_tx.send(failed_event.clone());
-    let _ = global_tx.send(failed_event);
+    emit_progress(failed_event);
 
     let mut guard = active_agents.write().await;
     if let Some(info) = guard.get_mut(id) {
@@ -1061,6 +1138,21 @@ impl SpawnSubagentTool {
     pub fn from_manager(manager: SubagentManager) -> Self {
         Self { manager }
     }
+
+    pub fn with_event_sender(
+        mut self,
+        tx: tokio::sync::mpsc::UnboundedSender<crate::agent::loop_runner::AgentEvent>,
+    ) -> Self {
+        self.manager = self.manager.with_event_sender(tx);
+        self
+    }
+
+    pub fn set_event_sender(
+        &mut self,
+        tx: Option<tokio::sync::mpsc::UnboundedSender<crate::agent::loop_runner::AgentEvent>>,
+    ) {
+        self.manager.set_event_sender(tx);
+    }
 }
 
 #[async_trait]
@@ -1135,6 +1227,21 @@ impl SpawnBatchSubagentsTool {
 
     pub fn from_manager(manager: SubagentManager) -> Self {
         Self { manager }
+    }
+
+    pub fn with_event_sender(
+        mut self,
+        tx: tokio::sync::mpsc::UnboundedSender<crate::agent::loop_runner::AgentEvent>,
+    ) -> Self {
+        self.manager = self.manager.with_event_sender(tx);
+        self
+    }
+
+    pub fn set_event_sender(
+        &mut self,
+        tx: Option<tokio::sync::mpsc::UnboundedSender<crate::agent::loop_runner::AgentEvent>>,
+    ) {
+        self.manager.set_event_sender(tx);
     }
 }
 
@@ -1427,5 +1534,40 @@ mod tests {
         let manager2 = SubagentManager::new(client, custom_config, tools);
         assert_eq!(manager2.max_concurrent(), 24);
         assert_eq!(manager2.semaphore.available_permits(), 24);
+    }
+
+    #[tokio::test]
+    async fn test_subagent_progress_event_bridging() {
+        let client = Arc::new(LlmClient::new());
+        let config = Config::default();
+        let tools = create_full_test_registry();
+
+        let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel();
+        let manager = SubagentManager::new(client, config, tools)
+            .with_max_concurrent(4)
+            .with_event_sender(tx);
+
+        let task = SubagentTask::scout("Inspect workspace")
+            .with_id("test-bridge-1")
+            .with_name("BridgeScout");
+
+        let handle = manager.spawn(task);
+        let event = rx.recv().await;
+        assert!(event.is_some());
+        if let Some(crate::agent::loop_runner::AgentEvent::SubagentProgressEvent {
+            id,
+            name,
+            role,
+            progress,
+        }) = event
+        {
+            assert_eq!(id, "test-bridge-1");
+            assert_eq!(name, "BridgeScout");
+            assert_eq!(role, SubagentRole::Scout);
+            assert!(matches!(progress, SubagentProgress::Started { .. }));
+        } else {
+            panic!("Expected SubagentProgressEvent");
+        }
+        handle.cancel();
     }
 }

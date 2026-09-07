@@ -893,6 +893,61 @@ pub async fn run_turn_ui(
                 md.finish();
                 reset_prompt_render_state(prompt);
             }
+            AgentEvent::SubagentProgressEvent {
+                name,
+                role: _,
+                progress,
+                ..
+            } => match progress {
+                crate::agent::subagent::SubagentProgress::Started {
+                    role: s_role,
+                    name: s_name,
+                    task,
+                    ..
+                } => {
+                    clear_prompt_frame(prompt);
+                    let mut out = stdout();
+                    let _ = write!(
+                        out,
+                        "\r\x1b[2K\r\n\x1b[1;36m┌─ 🤖 {} ({})\x1b[0m: \x1b[2;37m{}\x1b[0m\r\n",
+                        s_role, s_name, task
+                    );
+                    let _ = out.flush();
+                }
+                crate::agent::subagent::SubagentProgress::ToolStarted { tool, .. } => {
+                    clear_prompt_frame(prompt);
+                    let mut out = stdout();
+                    let _ = write!(out, "\r\x1b[2K\x1b[1;36m│\x1b[0m  \x1b[33m⠋ {}\x1b[0m\r\n", tool);
+                    let _ = out.flush();
+                }
+                crate::agent::subagent::SubagentProgress::ToolCompleted { tool, .. } => {
+                    clear_prompt_frame(prompt);
+                    let mut out = stdout();
+                    let _ = write!(out, "\r\x1b[2K\x1b[1;36m│\x1b[0m  \x1b[32m✓ {}\x1b[0m\r\n", tool);
+                    let _ = out.flush();
+                }
+                crate::agent::subagent::SubagentProgress::Completed { turns_taken, .. } => {
+                    clear_prompt_frame(prompt);
+                    let mut out = stdout();
+                    let _ = write!(
+                        out,
+                        "\r\x1b[2K\x1b[1;36m└─\x1b[0m \x1b[32m✓ {} finished in {} turns\x1b[0m\r\n\r\n",
+                        name, turns_taken
+                    );
+                    let _ = out.flush();
+                }
+                crate::agent::subagent::SubagentProgress::Failed { error, .. } => {
+                    clear_prompt_frame(prompt);
+                    let mut out = stdout();
+                    let _ = write!(
+                        out,
+                        "\r\x1b[2K\x1b[1;36m└─\x1b[0m \x1b[31m❌ {} failed: {}\x1b[0m\r\n\r\n",
+                        name, error
+                    );
+                    let _ = out.flush();
+                }
+                _ => {}
+            },
             _ => {}
         }
     };

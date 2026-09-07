@@ -939,6 +939,9 @@ impl JsonLogEvent {
                 success,
                 output,
             } => Self::subagent_finish(seq, sid, name, *success, output, 0),
+            AgentEvent::SubagentProgressEvent { name, progress, .. } => {
+                Self::status(seq, sid, "info", &format!("{}: {:?}", name, progress))
+            }
             AgentEvent::Status(msg) => Self::status(seq, sid, "info", msg),
             AgentEvent::Finished { usage } => {
                 let (pt, ct, tt) = if let Some(u) = usage {
