@@ -125,6 +125,10 @@ fusion
 > Explain the concurrency architecture in src/agent/loop_runner.rs
 ```
 
+> **Interactive Highlights**:
+> - **Live `@file` Autocomplete**: Type `@` (e.g. `@main`, `@auth`) to trigger instant, fuzzy file path autocompletion directly in the prompt bar.
+> - **Working Tree Rewind**: Use `/rewind` or `/undo` to inspect checkpoints and roll back file modifications and conversation turns with a single command.
+
 ### 3. Non-Interactive / Scripting Mode
 
 ```bash
@@ -208,6 +212,49 @@ For complex, multi-stage engineering tasks, Fusion features an autonomous multi-
   ```
 - **Non-Intrusive Inline View**: Powered by Ratatui and Crossterm, Fusion's inline rendering engine never captures or clobbers your alternate screen buffer (`insert_before`). All commands, compiler diagnostics, agent thoughts, and execution trees remain permanently preserved, searchable, and copyable in your standard terminal scrollback buffer.
 
+## Frontier Agent Capabilities
+
+Fusion introduces four high-leverage frontier capabilities engineered for interactive agent steering, token-efficient codebase comprehension, and zero-risk refactoring:
+
+### 1. Interactive Architectural Decision-Making (`ask` Tool)
+
+Rather than guessing during ambiguous architectural decisions, choosing between alternative libraries, or performing high-risk operations, autonomous agents invoke the interactive `ask` tool:
+
+- **Structured Inquiries**: Agents present structured questions with contextual options, detailed tradeoff descriptions, multi-select support, and suggested `(Recommended)` chips.
+- **Interactive TUI Prompt**: In interactive terminal sessions, choices render as an inline interactive selector, allowing developers to review tradeoffs and make informed decisions in real time.
+- **Headless & Non-Interactive Fallback**: When operating in headless scripts, CI pipelines, or non-interactive environments, the tool automatically resolves to the recommended or default choice without stalling.
+- **Decision Audit Trail**: The selected option (`Selected option: <label>`) is immediately recorded in the agent's turn context, ensuring subsequent code generation adheres strictly to your design decisions.
+
+### 2. Structural Outline Reader with Line Selectors (`read` Tool)
+
+Large files often exhaust LLM context windows or introduce unwanted noise. Fusion's enhanced file reader provides surgical, token-conserving inspection with inline path selectors:
+
+- **Line Range Slicing (`:start-end`)**: Read targeted slices directly via path syntax (e.g. `src/server.rs:45-90`), returning numbered lines for the specified range.
+- **Offset Reading (`:start`)**: Start reading from a specific line number to the end of the file (e.g. `src/lib.rs:120`).
+- **Verbatim Raw Output (`:raw`)**: Bypass line-number formatting headers to stream exact file bytes (e.g. `config.toml:raw`).
+- **Structural AST Outline (`:defs`)**: Powered by Tree-sitter and `fusion_ast`, elides function and struct bodies (`...`) to return a concise, high-level declaration outline with line numbers.
+- **Automatic Elision on Oversized Files**: Files exceeding 500 lines read without an explicit range automatically produce a declaration outline with an elision notice (`Summary: N lines elided; re-issue with line range selector (e.g. :50-100)`), protecting context windows from accidental blowup.
+
+### 3. Live `@file` Fuzzy Autocompletion in Prompt Bar
+
+Referencing files in natural language is effortless with instantaneous fuzzy path completion directly in the inline REPL:
+
+- **Trigger on `@`**: Typing `@` followed by any path fragment (e.g. `@main`, `@auth`, `@handler`) queries the workspace file index in real time.
+- **Floating Dropdown UI**: A sleek, non-intrusive popup renders above the prompt bar showing matching file paths with clean file indicators (`📄 `) and highlighted match characters.
+- **Seamless Navigation**: Cycle candidates with `Up` / `Down` arrows and press `Tab` or `Enter` to expand the full relative file path into the prompt buffer.
+- **Powered by `fusion_walker`**: Employs gitignore-aware multi-threaded directory walking with in-memory caching for zero-latency suggestions even in massive monorepos.
+
+### 4. Working Tree Checkpoint Restoration (`/rewind` & `/undo`)
+
+Experiment fearlessly with complex autonomous edits knowing every turn can be undone with a single command:
+
+- **Automatic Turn Checkpoints**: Fusion's execution engine captures snapshots of working tree diffs and conversation state before each turn.
+- **One-Click Restoration**:
+  - `/rewind [steps]` or `/undo [steps]`: Instantly reverts workspace files and conversation context by N turns (defaults to 1 turn).
+  - Inspect checkpoints: Running `/rewind` or `/undo` displays recent checkpoints with turn numbers, relative timestamps, and modified files before reverting.
+- **Verified File Restoration**: Restores modified and newly created files to their exact pre-turn state while displaying an inline summary of restored file diffs.
+- **Resilient Refactoring**: Revert misguided agent refactors, failed multi-file migrations, or experimental changes cleanly without manually running complex git reset commands.
+
 ## Configuration
 
 Fusion stores its configuration in `~/.config/fusion/config.json` (or `%APPDATA%\fusion\config.json` on Windows). Inspect with `/config`:
@@ -231,13 +278,13 @@ Detailed guides have been moved to `docs/`:
 | Guide | Description |
 | :--- | :--- |
 | [Vision](docs/vision.md) | Philosophy and comparison with heavyweight alternatives |
-| [Features](docs/features.md) | Inline UI, scrollback streaming, providers, resilience, tokens, benchmarking |
+| [Features](docs/features.md) | Inline UI, @file autocomplete, scrollback streaming, providers, checkpoint restore |
 | [Agents](docs/agents.md) | Multi-agent mesh, subagent delegation & advisory committee |
 | [ACP](docs/acp.md) | Agent Client Protocol for Zed/Neovim/JetBrains |
 | [WASM & SDK](docs/wasm-sdk.md) | Browser playground & TypeScript SDK |
-| [Tools](docs/tools.md) | Sandboxed tool registry & native LSP capabilities |
+| [Tools](docs/tools.md) | Sandboxed tool registry, interactive ask tool, selectors & native LSP capabilities |
 | [Architecture](docs/architecture.md) | System design, Pure Rust manifesto, source layout |
-| [Commands](docs/commands.md) | CLI commands (login) and slash command reference |
+| [Commands](docs/commands.md) | CLI commands (login), /rewind checkpoint restore, and slash command reference |
 | [Configuration](docs/configuration.md) | Config file, presets, env vars, keybindings |
 | [Development](docs/development.md) | Build, CI/CD, Termux, contributing, roadmap |
 
