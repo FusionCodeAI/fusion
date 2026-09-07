@@ -78,7 +78,25 @@ Experience Fusion immediately in your browser with zero installation via WebAsse
 
 ## Quickstart
 
-### 1. Configure Provider API Keys
+### 1. Authenticate & Configure Providers
+
+**Direct CLI Login (Recommended):**
+
+Authenticate directly with Fusion Code AI from your terminal:
+
+```bash
+fusion login
+```
+
+This initiates browser authorization and saves your credentials to `~/.config/fusion/config.json`. You can also supply an API key directly on the command line:
+
+```bash
+fusion login --key <YOUR_API_KEY>
+```
+
+*(Inside an active interactive REPL, `/login` is also available.)*
+
+**Or via Environment Variables:**
 
 Set any of the supported provider environment variables:
 
@@ -91,7 +109,7 @@ export XAI_API_KEY="xai-..."
 export OPENROUTER_API_KEY="sk-or-..."
 ```
 
-> **Fusion API**: The project's own OpenAI-compatible provider at `http://api.fusioncode.app/v1`. Set `FUSION_API_KEY` and run `fusion -p fusion`.
+> **Fusion API**: The project's own OpenAI-compatible provider at `http://api.fusioncode.app/v1`. Set `FUSION_API_KEY` or run `fusion login`, then launch with `fusion -p fusion`.
 
 ### 2. Launch Interactive Inline REPL
 
@@ -146,6 +164,50 @@ fusion --acp
 
 Point Zed, Neovim, or JetBrains at Fusion over the Agent Client Protocol — see [docs/acp.md](docs/acp.md).
 
+## Native Language Server Protocol (LSP)
+
+Fusion features a native, zero-dependency pure-Rust Language Server Protocol (LSP) client operating over asynchronous stdio JSON-RPC (`fusion::tools::lsp`). Rather than relying solely on naive text matching or heuristic regexes, the built-in `lsp` tool equips agents with compiler-grade semantic code intelligence across dozens of programming languages.
+
+### Capabilities & Supported Actions
+
+- **Zero-Config Auto-Discovery**: Ships with embedded configurations for standard language servers (`rust-analyzer`, `vtsls`, `typescript-language-server`, `pyright`, `basedpyright`, `pylsp`, `gopls`, `clangd`, `zls`, `biome`, `deno`, `sourcekit-lsp`, `metals`, `hls`, `ocamllsp`, and more). Fusion automatically detects project root markers (e.g. `Cargo.toml`, `package.json`, `tsconfig.json`, `go.mod`, `pyproject.toml`) and spawns the appropriate server on demand.
+- **Deep Semantic Intelligence**:
+  - **`definition`**: Jump directly to exact symbol definitions across local crates, packages, and dependency sources.
+  - **`references`**: Find all incoming usages, call sites, and symbol references across the entire workspace.
+  - **`type_definition`**: Locate underlying type declarations for variables, parameters, and expressions.
+  - **`diagnostics`**: Query live compiler and linter diagnostics, errors, and warnings for a specific file or the entire workspace (`file: "*"`).
+  - **`symbols`**: Extract hierarchical outlines of functions, structs, enums, traits, methods, and constants.
+- **Resilient Fallback**: When an external language server binary is unavailable in the environment, Fusion transparently falls back to local Tree-sitter AST queries and symbol indexing without interrupting the agent's turn.
+
+## Subagent Delegation & Live Scrollback Streaming
+
+For complex, multi-stage engineering tasks, Fusion features an autonomous multi-agent mesh with parallel delegation and real-time visual streaming designed to keep your terminal history clean, informative, and fully interactive.
+
+### Autonomous Subagent Delegation
+
+- **Parallel Worker Mesh**: The primary coordinator dynamically fans out independent tasks using `spawn_subagent` and `spawn_subagents_batch`, scaling up to 16–32 concurrent workers.
+- **Specialized Roles**:
+  - **`Scout`**: Fast, read-only exploration specialist that uses `grep`, `glob`, `read`, and `lsp` to index files and map architecture without mutation risk.
+  - **`Coder`**: Surgical implementation specialist for applying targeted code edits, refactors, and file creation.
+  - **`Tester`**: Verification specialist for executing targeted test suites via sandboxed commands, capturing output, and isolating regressions.
+  - **`Reviewer`**: In-depth audit specialist for reviewing diffs, security vulnerabilities, and design patterns.
+  - **`General` / `Custom`**: Adaptable workers tailored dynamically for user-defined pipelines and prompts.
+- **Isolated Workspaces**: Subagents execute with isolated workspace environments (powered by `fusion-iso`), eliminating race conditions and file mutation conflicts during concurrent edits.
+
+### Live Terminal Scrollback Streaming
+
+- **Muted Italic Reasoning Stream**: Model reasoning chunks (`AgentEvent::ThinkingDelta` from DeepSeek-R1, Claude 3.7 Sonnet Thinking, etc.) stream live to stdout in dimmed italic ANSI text (`\x1b[2;3m`). Once reasoning concludes, it is cleanly committed into your terminal's native scrollback history separated by a subtle divider line (`───`), leaving the active prompt ready for action.
+- **Real-Time Subagent Execution Trees**: Background subagent lifecycles and tool invocations stream live into your terminal scrollback as hierarchical trees:
+  ```text
+  ┌─ 🤖 Scout (ArchitectureMapper): Map crate dependencies and interfaces
+  │  ⠋ grep
+  │  ✓ grep
+  │  ⠋ read
+  │  ✓ read
+  └─ ✓ ArchitectureMapper finished in 3 turns
+  ```
+- **Non-Intrusive Inline View**: Powered by Ratatui and Crossterm, Fusion's inline rendering engine never captures or clobbers your alternate screen buffer (`insert_before`). All commands, compiler diagnostics, agent thoughts, and execution trees remain permanently preserved, searchable, and copyable in your standard terminal scrollback buffer.
+
 ## Configuration
 
 Fusion stores its configuration in `~/.config/fusion/config.json` (or `%APPDATA%\fusion\config.json` on Windows). Inspect with `/config`:
@@ -169,13 +231,13 @@ Detailed guides have been moved to `docs/`:
 | Guide | Description |
 | :--- | :--- |
 | [Vision](docs/vision.md) | Philosophy and comparison with heavyweight alternatives |
-| [Features](docs/features.md) | Inline UI, providers, resilience, tokens, sessions, benchmarking |
-| [Agents](docs/agents.md) | Multi-agent mesh & advisory committee |
+| [Features](docs/features.md) | Inline UI, scrollback streaming, providers, resilience, tokens, benchmarking |
+| [Agents](docs/agents.md) | Multi-agent mesh, subagent delegation & advisory committee |
 | [ACP](docs/acp.md) | Agent Client Protocol for Zed/Neovim/JetBrains |
 | [WASM & SDK](docs/wasm-sdk.md) | Browser playground & TypeScript SDK |
-| [Tools](docs/tools.md) | Sandboxed tool registry |
+| [Tools](docs/tools.md) | Sandboxed tool registry & native LSP capabilities |
 | [Architecture](docs/architecture.md) | System design, Pure Rust manifesto, source layout |
-| [Commands](docs/commands.md) | Slash command reference |
+| [Commands](docs/commands.md) | CLI commands (login) and slash command reference |
 | [Configuration](docs/configuration.md) | Config file, presets, env vars, keybindings |
 | [Development](docs/development.md) | Build, CI/CD, Termux, contributing, roadmap |
 
