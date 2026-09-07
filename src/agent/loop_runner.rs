@@ -14,6 +14,7 @@ use crate::config::Config;
 use crate::provider::types::{Message, StreamChunk, ToolCall};
 use crate::provider::LlmClient;
 use crate::tools::types::{ToolContext, ToolRegistry};
+use crate::ui::notify::{Notification, NotificationTrigger};
 
 /// High-level events emitted during an agent execution turn.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -264,6 +265,34 @@ impl AgentRunner {
         prompts::general_system_prompt()
     }
 
+    /// Triggers a notification for turn completion with explicit type `completion`.
+    pub fn trigger_turn_completion_notification(
+        &self,
+        task_name: &str,
+        model: &str,
+        duration: Option<Duration>,
+    ) {
+        if !self.config.notify_enabled || !self.config.notify_on_completion {
+            return;
+        }
+        let notif_cfg = self.config.notification_config();
+        let duration_secs = duration.map(|d| d.as_secs_f64());
+        Notification::turn_complete(task_name, model, duration_secs)
+            .trigger(NotificationTrigger::Completion)
+            .send_with_config(&notif_cfg);
+    }
+
+    /// Triggers a notification for turn error / failure with explicit type `error`.
+    pub fn trigger_turn_error_notification(&self, title: &str, error_message: &str) {
+        if !self.config.notify_enabled || !self.config.notify_on_error {
+            return;
+        }
+        let notif_cfg = self.config.notification_config();
+        Notification::error(title, error_message)
+            .trigger(NotificationTrigger::Error)
+            .send_with_config(&notif_cfg);
+    }
+
     /// Runs a single turn synchronously/CLI-style, printing tokens directly to stdout.
     pub async fn run_turn(
         &self,
@@ -340,6 +369,8 @@ impl AgentRunner {
         user_input: &str,
         event_tx: UnboundedSender<AgentEvent>,
     ) -> anyhow::Result<String> {
+        let turn_start = Instant::now();
+
         // Auto-save recovery state immediately before starting conversation turn
         let _ = self.recovery.on_turn_start(session, user_input, 1);
 
@@ -459,6 +490,7 @@ impl AgentRunner {
                     let err_msg = format!("{}", e);
                     let _ = self.recovery.on_turn_error(&err_msg);
                     let _ = event_tx.send(AgentEvent::Error(err_msg.clone()));
+                    self.trigger_turn_error_notification("Turn Error", &err_msg);
                     anyhow::bail!(err_msg);
                 }
             };
@@ -502,6 +534,7 @@ impl AgentRunner {
                     StreamChunk::Error(err) => {
                         let _ = self.recovery.on_turn_error(&err);
                         let _ = event_tx.send(AgentEvent::Error(err.clone()));
+                        self.trigger_turn_error_notification("Turn Error", &err);
                         anyhow::bail!("LLM stream error: {}", err);
                     }
                 }
@@ -571,6 +604,11 @@ impl AgentRunner {
                 let _ = event_tx.send(AgentEvent::Finished { usage: None });
                 let _ = session.save();
                 let _ = self.recovery.on_turn_completed(session);
+                self.trigger_turn_completion_notification(
+                    user_input,
+                    session.active_model(),
+                    Some(turn_start.elapsed()),
+                );
                 return Ok(final_content);
             }
 
@@ -782,6 +820,11 @@ impl AgentRunner {
         session.add_assistant_message(&resume_msg);
         let _ = session.save();
         let _ = self.recovery.on_turn_completed(session);
+        self.trigger_turn_completion_notification(
+            user_input,
+            session.active_model(),
+            Some(turn_start.elapsed()),
+        );
 
         Ok(resume_msg)
     }
@@ -929,5 +972,59 @@ mod tests {
 
         let runner = AgentRunner::new(client, config, tools, ctx);
         assert_eq!(runner.max_turns(), 150);
+    }
+
+    #[test]
+    fn test_turn_completion_notification_trigger() {
+        let client = LlmClient::new();
+        let config = Config::default();
+        let tools = ToolRegistry::new();
+        let ctx = ToolContext::default();
+        let runner = AgentRunner::new(client, config, tools, ctx);
+
+        let notif = Notification::turn_complete("Write quicksort in Rust", "gpt-4o", Some(1.5))
+            .trigger(NotificationTrigger::Completion);
+        assert_eq!(notif.get_trigger(), Some(NotificationTrigger::Completion));
+        assert_eq!(notif.trigger.map(|t| t.as_str()), Some("completion"));
+
+        // Test runner helper executes cleanly without panic
+        runner.trigger_turn_completion_notification(
+            "Write quicksort in Rust",
+            "gpt-4o",
+            Some(Duration::from_millis(1500)),
+        );
+    }
+
+    #[test]
+    fn test_turn_error_notification_trigger() {
+        let client = LlmClient::new();
+        let config = Config::default();
+        let tools = ToolRegistry::new();
+        let ctx = ToolContext::default();
+        let runner = AgentRunner::new(client, config, tools, ctx);
+
+        let notif = Notification::error("Turn Error", "Rate limit exceeded (429)")
+            .trigger(NotificationTrigger::Error);
+        assert_eq!(notif.get_trigger(), Some(NotificationTrigger::Error));
+        assert_eq!(notif.trigger.map(|t| t.as_str()), Some("error"));
+
+        // Test runner helper executes cleanly without panic
+        runner.trigger_turn_error_notification("Turn Error", "Rate limit exceeded (429)");
+    }
+
+    #[test]
+    fn test_notification_suppression_when_disabled() {
+        let client = LlmClient::new();
+        let mut config = Config::default();
+        config.notify_enabled = false;
+        config.notify_on_completion = false;
+        config.notify_on_error = false;
+        let tools = ToolRegistry::new();
+        let ctx = ToolContext::default();
+        let runner = AgentRunner::new(client, config, tools, ctx);
+
+        // Should return early and not send anything
+        runner.trigger_turn_completion_notification("Test task", "claude-3-5-sonnet", None);
+        runner.trigger_turn_error_notification("Turn Error", "Connection failed");
     }
 }
