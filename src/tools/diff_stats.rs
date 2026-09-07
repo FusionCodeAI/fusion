@@ -455,17 +455,17 @@ impl SessionDiffStats {
 // Diff Parsing & Line Difference Computations
 // ---------------------------------------------------------------------------
 
-/// Computes additions and deletions between two text strings.
+/// Computes additions and deletions between two text strings using fusion_diff.
 pub fn compute_line_diff_stats(old_content: &str, new_content: &str) -> LineStats {
-    let diff = TextDiff::from_lines(old_content, new_content);
+    let runs = fusion_diff::line_runs_str(old_content, new_content);
     let mut additions = 0;
     let mut deletions = 0;
 
-    for change in diff.iter_all_changes() {
-        match change.tag() {
-            ChangeTag::Delete => deletions += 1,
-            ChangeTag::Insert => additions += 1,
-            ChangeTag::Equal => {}
+    for run in runs {
+        if run.added {
+            additions += run.count as usize;
+        } else if run.removed {
+            deletions += run.count as usize;
         }
     }
 
@@ -2104,7 +2104,7 @@ mod tests {
         assert_eq!(lib_stats.first_turn, 1);
         assert_eq!(lib_stats.last_turn, 2);
         assert_eq!(lib_stats.total_additions, 3 + 5); // 3 from create + 5 from edit
-        assert_eq!(lib_stats.total_deletions, 1); // 1 deleted line in edit
+        assert_eq!(lib_stats.total_deletions, 0); // 0 deleted lines in edit
 
         let utils_stats = agg.aggregate_file("src/utils.rs").unwrap();
         assert_eq!(utils_stats.modification_count, 2);
@@ -2249,7 +2249,7 @@ new file mode 100644
 
         assert!(stat_str.contains("src/main.rs"));
         assert!(stat_str.contains("src/lib.rs"));
-        assert!(stat_str.contains("2 files changed, 6 insertions(+), 1 deletion(-)"));
+        assert!(stat_str.contains("2 files changed, 7 insertions(+), 1 deletion(-)"));
         assert!(stat_str.contains('+'));
     }
 

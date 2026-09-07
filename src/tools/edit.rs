@@ -3,6 +3,12 @@ use serde_json::{json, Value};
 use similar::{ChangeTag, TextDiff};
 use std::path::{Path, PathBuf};
 
+use fusion_edit::modes::hashline::{
+    apply::{apply_edits, ApplyOptions, EmptyPaste},
+    block::{has_block_edit, resolve_block_edits, Unresolved},
+    input::{contains_recognizable_hashline_operations, Patch, SplitOptions},
+};
+
 use crate::tools::file::atomic_write;
 use crate::tools::types::{Tool, ToolContext};
 
@@ -40,16 +46,16 @@ impl DiffStats {
     }
 }
 
-/// Compute diff stats (lines added and deleted) between two strings.
+/// Compute diff stats (lines added and deleted) between two strings using fusion_diff.
 pub fn compute_diff_stats(old_content: &str, new_content: &str) -> DiffStats {
-    let diff = TextDiff::from_lines(old_content, new_content);
+    let changes = fusion_diff::line_changes_str(old_content, new_content);
     let mut stats = DiffStats::default();
 
-    for change in diff.iter_all_changes() {
-        match change.tag() {
-            ChangeTag::Delete => stats.deletions += 1,
-            ChangeTag::Insert => stats.additions += 1,
-            ChangeTag::Equal => {}
+    for change in changes {
+        if change.added {
+            stats.additions += change.count as usize;
+        } else if change.removed {
+            stats.deletions += change.count as usize;
         }
     }
 
@@ -240,6 +246,124 @@ fn trigram_similarity(a: &[char], b: &[char]) -> f64 {
     }
 }
 
+/// Check if an input string looks like a line-anchored hashline patch.
+/// True if it starts with `[` or contains hashline operators (`PUT`, `CUT`).
+pub fn is_hashline_input(input: &str) -> bool {
+    let trimmed = input.trim_start();
+    trimmed.starts_with('[')
+        || contains_recognizable_hashline_operations(input)
+        || input.lines().any(|l| {
+            let t = l.trim_start();
+            t.starts_with("PUT") || t.starts_with("CUT")
+        })
+}
+
+/// Apply line-anchored edits from a hashline patch to one or more files.
+pub async fn apply_hashline_patch(
+    patch_text: &str,
+    default_path: Option<&str>,
+    cwd: &Path,
+) -> anyhow::Result<String> {
+    let patch = Patch::parse(
+        patch_text,
+        &SplitOptions {
+            cwd: Some(cwd),
+            path: default_path,
+        },
+    )
+    .map_err(|e| anyhow::anyhow!("Failed to parse hashline patch: {e}"))?;
+
+    if patch.sections.is_empty() {
+        anyhow::bail!("No hashline sections found in input.");
+    }
+
+    let mut sections = Vec::with_capacity(patch.sections.len());
+    for section in &patch.sections {
+        let parsed = section
+            .parse()
+            .map_err(|e| anyhow::anyhow!("Failed to parse patch for '{}': {e}", section.path))?;
+        sections.push((section.path.clone(), parsed.edits.clone()));
+    }
+    drop(patch);
+
+    let mut results = Vec::new();
+
+    for (section_path, edits) in sections {
+        let full_path = resolve_path(&section_path, cwd);
+
+        if !full_path.exists() {
+            anyhow::bail!("File not found: '{}'", full_path.display());
+        }
+
+        if full_path.is_dir() {
+            anyhow::bail!("Path is a directory, not a file: '{}'", full_path.display());
+        }
+
+        let current_content = tokio::fs::read_to_string(&full_path)
+            .await
+            .map_err(|e| anyhow::anyhow!("Failed to read file '{}': {e}", full_path.display()))?;
+
+
+        let mut block_resolutions = Vec::new();
+        let mut resolve_warnings = Vec::new();
+        let resolved_edits = if has_block_edit(&edits) {
+            resolve_block_edits(
+                &edits,
+                &current_content,
+                &section_path,
+                Unresolved::Throw,
+                &mut |item| block_resolutions.push(item),
+                &mut |warning| resolve_warnings.push(warning),
+            )
+            .map_err(|e| anyhow::anyhow!("Block resolution error in '{}': {e}", section_path))?
+        } else {
+            edits
+        };
+
+        let apply_result = apply_edits(
+            &current_content,
+            &resolved_edits,
+            ApplyOptions {
+                clipboard: None,
+                path: Some(&section_path),
+                on_empty_paste: EmptyPaste::Throw,
+            },
+        )
+        .map_err(|e| anyhow::anyhow!("Failed to apply hashline edits to '{}': {e}", section_path))?;
+
+        let updated_content = apply_result.text;
+
+        if updated_content == current_content {
+            results.push(format!(
+                "No changes made to '{}' (edits produced identical content).",
+                section_path
+            ));
+            continue;
+        }
+
+        atomic_write(&full_path, updated_content.as_bytes())
+            .await
+            .map_err(|e| anyhow::anyhow!("Failed to update file '{}': {e}", full_path.display()))?;
+
+        let stats = compute_diff_stats(&current_content, &updated_content);
+        let unified_diff = generate_unified_diff(&current_content, &updated_content, &section_path, 3);
+
+        if unified_diff.trim().is_empty() {
+            results.push(format!(
+                "File '{}' updated successfully (no line differences).",
+                section_path
+            ));
+        } else {
+            results.push(format!(
+                "Successfully edited '{}' (+{} -{} lines):\n\n```diff\n{}```",
+                section_path, stats.additions, stats.deletions, unified_diff
+            ));
+        }
+    }
+
+    Ok(results.join("\n\n"))
+}
+
 // ---------------------------------------------------------------------------
 // EditFileTool
 // ---------------------------------------------------------------------------
@@ -260,7 +384,7 @@ impl Tool for EditFileTool {
     }
 
     fn description(&self) -> &str {
-        "Edit an existing file by replacing an exact, unique occurrence of old_text with new_text. Generates a unified diff of changes."
+        "Edit an existing file by replacing an exact, unique occurrence of old_text with new_text, or by applying line-anchored hashline patches."
     }
 
     fn parameters(&self) -> Value {
@@ -278,33 +402,60 @@ impl Tool for EditFileTool {
                 "new_text": {
                     "type": "string",
                     "description": "New replacement text."
+                },
+                "input": {
+                    "type": "string",
+                    "description": "Line-anchored hashline patch input (starting with [ or containing PUT/CUT)."
                 }
-            },
-            "required": ["path", "old_text", "new_text"]
+            }
         })
     }
 
     async fn execute(&self, args: Value, ctx: &ToolContext) -> anyhow::Result<String> {
-        let path_str = args
+        let path_opt = args
             .get("path")
             .and_then(|v| v.as_str())
             .or_else(|| args.get("file_path").and_then(|v| v.as_str()))
-            .or_else(|| args.get("file").and_then(|v| v.as_str()))
-            .ok_or_else(|| anyhow::anyhow!("Missing required parameter: path"))?;
+            .or_else(|| args.get("file").and_then(|v| v.as_str()));
 
-        let old_text = args
+        // Check if hashline patch is provided via "input", "patch", "edits", or "content"
+        let hashline_candidate = args
+            .get("input")
+            .and_then(|v| v.as_str())
+            .or_else(|| args.get("patch").and_then(|v| v.as_str()))
+            .or_else(|| args.get("edits").and_then(|v| v.as_str()))
+            .or_else(|| args.get("content").and_then(|v| v.as_str()));
+
+        if let Some(input_str) = hashline_candidate {
+            if is_hashline_input(input_str) {
+                return apply_hashline_patch(input_str, path_opt, &ctx.cwd).await;
+            }
+        }
+
+        // Also check if old_text or new_text contains hashline patch syntax
+        let old_text_opt = args
             .get("old_text")
             .and_then(|v| v.as_str())
             .or_else(|| args.get("old_string").and_then(|v| v.as_str()))
-            .or_else(|| args.get("old_content").and_then(|v| v.as_str()))
-            .ok_or_else(|| anyhow::anyhow!("Missing required parameter: old_text"))?;
+            .or_else(|| args.get("old_content").and_then(|v| v.as_str()));
 
-        let new_text = args
+        let new_text_opt = args
             .get("new_text")
             .and_then(|v| v.as_str())
             .or_else(|| args.get("new_string").and_then(|v| v.as_str()))
-            .or_else(|| args.get("new_content").and_then(|v| v.as_str()))
-            .ok_or_else(|| anyhow::anyhow!("Missing required parameter: new_text"))?;
+            .or_else(|| args.get("new_content").and_then(|v| v.as_str()));
+
+        // If old_text looks like hashline patch and new_text is empty or not provided
+        if let Some(old) = old_text_opt {
+            if is_hashline_input(old) && new_text_opt.map_or(true, |n| n.is_empty()) {
+                return apply_hashline_patch(old, path_opt, &ctx.cwd).await;
+            }
+        }
+
+        // Standard exact search-and-replace mode
+        let path_str = path_opt.ok_or_else(|| anyhow::anyhow!("Missing required parameter: path"))?;
+        let old_text = old_text_opt.ok_or_else(|| anyhow::anyhow!("Missing required parameter: old_text"))?;
+        let new_text = new_text_opt.ok_or_else(|| anyhow::anyhow!("Missing required parameter: new_text"))?;
 
         let full_path = resolve_path(path_str, &ctx.cwd);
 
@@ -396,8 +547,8 @@ mod tests {
     fn test_apply_exact_edit_not_found_suggests_closest_line() {
         let content = "fn main() {\n    println!(\"hello\");\n}\n";
         // Near-miss: wrong indentation only.
-        let old = "println!(\"hello\");";
-        let content_indented = "fn main() {\n        println!(\"hello\");\n}\n";
+        let old = "    println!(\"hello\");";
+        let content_indented = "fn main() {\n  println!(\"hello\");\n}\n";
 
         let err = apply_exact_edit(content_indented, old, "x", "t.rs").unwrap_err();
         assert!(
@@ -528,6 +679,98 @@ mod tests {
         assert_eq!(updated, "apple\nblueberry\ncherry\n");
 
         // Clean up
+        let _ = tokio::fs::remove_dir_all(&temp_dir).await;
+    }
+
+    #[tokio::test]
+    async fn test_hashline_edit_execution() {
+        let temp_dir =
+            std::env::temp_dir().join(format!("fusion_edit_hl_test_{}", uuid::Uuid::new_v4()));
+        tokio::fs::create_dir_all(&temp_dir).await.unwrap();
+
+        let file_path = temp_dir.join("sample.rs");
+        tokio::fs::write(&file_path, "fn main() {\n    println!(\"hello\");\n}\n")
+            .await
+            .unwrap();
+
+        let tool = EditFileTool::new();
+        let ctx = ToolContext {
+            cwd: temp_dir.clone(),
+            env: std::collections::HashMap::new(),
+        };
+
+        let args = json!({
+            "input": "[sample.rs]\nPUT 2.=2:\n+    println!(\"world\");"
+        });
+
+        let output = tool.execute(args, &ctx).await.unwrap();
+        assert!(output.contains("Successfully edited 'sample.rs'"));
+        assert!(output.contains("+    println!(\"world\");"));
+
+        let updated = tokio::fs::read_to_string(&file_path).await.unwrap();
+        assert_eq!(updated, "fn main() {\n    println!(\"world\");\n}\n");
+
+        let _ = tokio::fs::remove_dir_all(&temp_dir).await;
+    }
+
+    #[tokio::test]
+    async fn test_hashline_headerless_with_path() {
+        let temp_dir =
+            std::env::temp_dir().join(format!("fusion_edit_hl_hl_test_{}", uuid::Uuid::new_v4()));
+        tokio::fs::create_dir_all(&temp_dir).await.unwrap();
+
+        let file_path = temp_dir.join("data.txt");
+        tokio::fs::write(&file_path, "line 1\nline 2\nline 3\n")
+            .await
+            .unwrap();
+
+        let tool = EditFileTool::new();
+        let ctx = ToolContext {
+            cwd: temp_dir.clone(),
+            env: std::collections::HashMap::new(),
+        };
+
+        let args = json!({
+            "path": "data.txt",
+            "input": "PUT 2.=2:\n+line 2 updated"
+        });
+
+        let output = tool.execute(args, &ctx).await.unwrap();
+        assert!(output.contains("Successfully edited 'data.txt'"));
+
+        let updated = tokio::fs::read_to_string(&file_path).await.unwrap();
+        assert_eq!(updated, "line 1\nline 2 updated\nline 3\n");
+
+        let _ = tokio::fs::remove_dir_all(&temp_dir).await;
+    }
+
+    #[tokio::test]
+    async fn test_hashline_cut_and_put() {
+        let temp_dir =
+            std::env::temp_dir().join(format!("fusion_edit_hl_cut_{}", uuid::Uuid::new_v4()));
+        tokio::fs::create_dir_all(&temp_dir).await.unwrap();
+
+        let file_path = temp_dir.join("cut_test.txt");
+        tokio::fs::write(&file_path, "keep 1\ndelete me\nkeep 2\n")
+            .await
+            .unwrap();
+
+        let tool = EditFileTool::new();
+        let ctx = ToolContext {
+            cwd: temp_dir.clone(),
+            env: std::collections::HashMap::new(),
+        };
+
+        let args = json!({
+            "input": "[cut_test.txt]\nCUT 2.=2"
+        });
+
+        let output = tool.execute(args, &ctx).await.unwrap();
+        assert!(output.contains("Successfully edited 'cut_test.txt'"));
+
+        let updated = tokio::fs::read_to_string(&file_path).await.unwrap();
+        assert_eq!(updated, "keep 1\nkeep 2\n");
+
         let _ = tokio::fs::remove_dir_all(&temp_dir).await;
     }
 }

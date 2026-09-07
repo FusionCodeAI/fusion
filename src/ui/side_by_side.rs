@@ -520,123 +520,217 @@ impl SideBySideDocument {
         context_radius: usize,
         compute_word_diff: bool,
     ) -> Self {
-        let diff = TextDiff::from_lines(old_content, new_content);
+        let old_tokens = fusion_diff::line_tokens_str(old_content);
+        let new_tokens = fusion_diff::line_tokens_str(new_content);
+        let runs = fusion_diff::line_runs_str(old_content, new_content);
+
         let mut hunks = Vec::new();
         let mut stats = DiffStats::default();
 
         let path_str = file_path.map(|s| s.to_string());
 
-        for group in diff.grouped_ops(context_radius) {
-            if group.is_empty() {
-                continue;
-            }
+        // Tokenized line change representation
+        enum LineChange<'a> {
+            Equal { old_no: usize, new_no: usize, text: &'a str },
+            Delete { old_no: usize, text: &'a str },
+            Insert { new_no: usize, text: &'a str },
+        }
 
-            let mut old_start = 0;
-            let mut old_count = 0;
-            let mut new_start = 0;
-            let mut new_count = 0;
-            let mut is_first = true;
+        let mut all_changes: Vec<LineChange> = Vec::new();
+        let mut old_idx = 0;
+        let mut new_idx = 0;
 
-            // Collect operations for this hunk
-            for op in &group {
-                if is_first {
-                    old_start = op.old_range().start + 1;
-                    new_start = op.new_range().start + 1;
-                    is_first = false;
+        for run in &runs {
+            let count = run.count as usize;
+            if run.removed {
+                for i in 0..count {
+                    let text = old_tokens
+                        .get(old_idx + i)
+                        .copied()
+                        .unwrap_or("")
+                        .trim_end_matches(['\r', '\n']);
+                    all_changes.push(LineChange::Delete {
+                        old_no: old_idx + i + 1,
+                        text,
+                    });
                 }
-                old_count += op.old_range().len();
-                new_count += op.new_range().len();
+                old_idx += count;
+            } else if run.added {
+                for i in 0..count {
+                    let text = new_tokens
+                        .get(new_idx + i)
+                        .copied()
+                        .unwrap_or("")
+                        .trim_end_matches(['\r', '\n']);
+                    all_changes.push(LineChange::Insert {
+                        new_no: new_idx + i + 1,
+                        text,
+                    });
+                }
+                new_idx += count;
+            } else {
+                for i in 0..count {
+                    let text = old_tokens
+                        .get(old_idx + i)
+                        .copied()
+                        .unwrap_or("")
+                        .trim_end_matches(['\r', '\n']);
+                    all_changes.push(LineChange::Equal {
+                        old_no: old_idx + i + 1,
+                        new_no: new_idx + i + 1,
+                        text,
+                    });
+                }
+                old_idx += count;
+                new_idx += count;
             }
+        }
 
-            // Build synchronized rows for this hunk
-            let mut rows = Vec::new();
+        // Identify indices of non-equal changes
+        let change_indices: Vec<usize> = all_changes
+            .iter()
+            .enumerate()
+            .filter_map(|(idx, ch)| match ch {
+                LineChange::Equal { .. } => None,
+                _ => Some(idx),
+            })
+            .collect();
 
-            for op in &group {
-                match op {
-                    similar::DiffOp::Equal { .. } => {
-                        for change in diff.iter_changes(op) {
-                            let old_no = change.old_index().unwrap_or(0) + 1;
-                            let new_no = change.new_index().unwrap_or(0) + 1;
-                            let text = change.value().trim_end_matches(['\r', '\n']);
-                            rows.push(SideBySideRow::context(old_no, new_no, text));
-                            stats.unchanged += 1;
-                        }
-                    }
-                    similar::DiffOp::Delete { .. } => {
-                        for change in diff.iter_changes(op) {
-                            let old_no = change.old_index().unwrap_or(0) + 1;
-                            let text = change.value().trim_end_matches(['\r', '\n']);
-                            rows.push(SideBySideRow::deletion(old_no, text));
+        if !change_indices.is_empty() {
+            // Group clusters of changes separated by <= 2 * context_radius context lines
+            let mut clusters: Vec<(usize, usize)> = Vec::new();
+            let mut cluster_start = change_indices[0];
+            let mut cluster_end = change_indices[0];
+
+            for &idx in &change_indices[1..] {
+                if idx - cluster_end <= 2 * context_radius + 1 {
+                    cluster_end = idx;
+                } else {
+                    clusters.push((cluster_start, cluster_end));
+                    cluster_start = idx;
+                    cluster_end = idx;
+                }
+            }
+            clusters.push((cluster_start, cluster_end));
+
+            // Flush helper for aligning pending deletions and insertions
+            let flush_pending = |deletes: &mut Vec<(usize, &str)>,
+                                 inserts: &mut Vec<(usize, &str)>,
+                                 rows: &mut Vec<SideBySideRow>,
+                                 stats: &mut DiffStats| {
+                let max_len = deletes.len().max(inserts.len());
+                for i in 0..max_len {
+                    match (deletes.get(i), inserts.get(i)) {
+                        (Some(&(old_no, del_text)), Some(&(new_no, ins_text))) => {
+                            let mut row = SideBySideRow::modified(old_no, del_text, new_no, ins_text);
+                            if compute_word_diff {
+                                let (del_ranges, ins_ranges) =
+                                     compute_intra_line_highlights(del_text, ins_text);
+                                row.left.highlights = del_ranges;
+                                row.right.highlights = ins_ranges;
+                            }
+                            rows.push(row);
+                            stats.modifications += 1;
                             stats.deletions += 1;
-                        }
-                    }
-                    similar::DiffOp::Insert { .. } => {
-                        for change in diff.iter_changes(op) {
-                            let new_no = change.new_index().unwrap_or(0) + 1;
-                            let text = change.value().trim_end_matches(['\r', '\n']);
-                            rows.push(SideBySideRow::addition(new_no, text));
                             stats.additions += 1;
                         }
+                        (Some(&(old_no, del_text)), None) => {
+                            rows.push(SideBySideRow::deletion(old_no, del_text));
+                            stats.deletions += 1;
+                        }
+                        (None, Some(&(new_no, ins_text))) => {
+                            rows.push(SideBySideRow::addition(new_no, ins_text));
+                            stats.additions += 1;
+                        }
+                        (None, None) => {}
                     }
-                    similar::DiffOp::Replace { .. } => {
-                        let deletes: Vec<_> = diff
-                            .iter_changes(op)
-                            .filter(|c| c.tag() == ChangeTag::Delete)
-                            .collect();
-                        let inserts: Vec<_> = diff
-                            .iter_changes(op)
-                            .filter(|c| c.tag() == ChangeTag::Insert)
-                            .collect();
+                }
+                deletes.clear();
+                inserts.clear();
+            };
 
-                        let max_len = deletes.len().max(inserts.len());
+            for (c_start, c_end) in clusters {
+                let hunk_start = c_start.saturating_sub(context_radius);
+                let hunk_end = (c_end + context_radius + 1).min(all_changes.len());
 
-                        for i in 0..max_len {
-                            let del_opt = deletes.get(i);
-                            let ins_opt = inserts.get(i);
+                let mut rows = Vec::new();
+                let mut pending_deletes: Vec<(usize, &str)> = Vec::new();
+                let mut pending_inserts: Vec<(usize, &str)> = Vec::new();
 
-                            match (del_opt, ins_opt) {
-                                (Some(del), Some(ins)) => {
-                                    let old_no = del.old_index().unwrap_or(0) + 1;
-                                    let new_no = ins.new_index().unwrap_or(0) + 1;
-                                    let del_text = del.value().trim_end_matches(['\r', '\n']);
-                                    let ins_text = ins.value().trim_end_matches(['\r', '\n']);
+                let mut old_start = 0;
+                let mut old_count = 0;
+                let mut new_start = 0;
+                let mut new_count = 0;
+                let mut first_old = true;
+                let mut first_new = true;
 
-                                    let mut row =
-                                        SideBySideRow::modified(old_no, del_text, new_no, ins_text);
-
-                                    if compute_word_diff {
-                                        let (del_ranges, ins_ranges) =
-                                            compute_intra_line_highlights(del_text, ins_text);
-                                        row.left.highlights = del_ranges;
-                                        row.right.highlights = ins_ranges;
-                                    }
-
-                                    rows.push(row);
-                                    stats.modifications += 1;
-                                    stats.deletions += 1;
-                                    stats.additions += 1;
-                                }
-                                (Some(del), None) => {
-                                    let old_no = del.old_index().unwrap_or(0) + 1;
-                                    let del_text = del.value().trim_end_matches(['\r', '\n']);
-                                    rows.push(SideBySideRow::deletion(old_no, del_text));
-                                    stats.deletions += 1;
-                                }
-                                (None, Some(ins)) => {
-                                    let new_no = ins.new_index().unwrap_or(0) + 1;
-                                    let ins_text = ins.value().trim_end_matches(['\r', '\n']);
-                                    rows.push(SideBySideRow::addition(new_no, ins_text));
-                                    stats.additions += 1;
-                                }
-                                (None, None) => {}
+                for ch in &all_changes[hunk_start..hunk_end] {
+                    match ch {
+                        LineChange::Equal { old_no, new_no, text } => {
+                            if first_old {
+                                old_start = *old_no;
+                                first_old = false;
                             }
+                            if first_new {
+                                new_start = *new_no;
+                                first_new = false;
+                            }
+                            old_count += 1;
+                            new_count += 1;
+
+                            flush_pending(
+                                &mut pending_deletes,
+                                &mut pending_inserts,
+                                &mut rows,
+                                &mut stats,
+                            );
+
+                            rows.push(SideBySideRow::context(*old_no, *new_no, *text));
+                            stats.unchanged += 1;
+                        }
+                        LineChange::Delete { old_no, text } => {
+                            if first_old {
+                                old_start = *old_no;
+                                first_old = false;
+                            }
+                            old_count += 1;
+                            pending_deletes.push((*old_no, *text));
+                        }
+                        LineChange::Insert { new_no, text } => {
+                            if first_new {
+                                new_start = *new_no;
+                                first_new = false;
+                            }
+                            new_count += 1;
+                            pending_inserts.push((*new_no, *text));
                         }
                     }
                 }
-            }
 
-            let hunk = SideBySideHunk::new(old_start, old_count, new_start, new_count, "", rows);
-            hunks.push(hunk);
+                flush_pending(
+                    &mut pending_deletes,
+                    &mut pending_inserts,
+                    &mut rows,
+                    &mut stats,
+                );
+
+                if old_start == 0 {
+                    old_start = 1;
+                }
+                if new_start == 0 {
+                    new_start = 1;
+                }
+
+                let hunk = SideBySideHunk::new(
+                    old_start,
+                    old_count,
+                    new_start,
+                    new_count,
+                    "",
+                    rows,
+                );
+                hunks.push(hunk);
+            }
         }
 
         stats.hunks_count = hunks.len();
@@ -775,38 +869,37 @@ pub fn compute_intra_line_highlights(
         return (Vec::new(), Vec::new());
     }
 
-    let word_diff = TextDiff::from_words(old_line, new_line);
+    let old_u16: Vec<u16> = old_line.encode_utf16().collect();
+    let new_u16: Vec<u16> = new_line.encode_utf16().collect();
+    let changes = fusion_diff::diff_words_u16(&old_u16, &new_u16);
+
     let mut old_ranges = Vec::new();
     let mut new_ranges = Vec::new();
 
     let mut old_offset = 0;
     let mut new_offset = 0;
 
-    for change in word_diff.iter_all_changes() {
-        let val = change.value();
-        let len = val.len();
+    for change in changes {
+        let text = String::from_utf16_lossy(&change.value);
+        let len = text.len();
 
-        match change.tag() {
-            ChangeTag::Equal => {
-                old_offset += len;
-                new_offset += len;
+        if change.removed {
+            let start = old_offset;
+            let end = old_offset + len;
+            old_offset += len;
+            if start < end {
+                old_ranges.push(HighlightRange { start, end });
             }
-            ChangeTag::Delete => {
-                let start = old_offset;
-                let end = old_offset + len;
-                old_offset += len;
-                if start < end {
-                    old_ranges.push(HighlightRange { start, end });
-                }
+        } else if change.added {
+            let start = new_offset;
+            let end = new_offset + len;
+            new_offset += len;
+            if start < end {
+                new_ranges.push(HighlightRange { start, end });
             }
-            ChangeTag::Insert => {
-                let start = new_offset;
-                let end = new_offset + len;
-                new_offset += len;
-                if start < end {
-                    new_ranges.push(HighlightRange { start, end });
-                }
-            }
+        } else {
+            old_offset += len;
+            new_offset += len;
         }
     }
 
