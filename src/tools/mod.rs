@@ -66,6 +66,7 @@ pub use grep_filter::{
 pub use guardrails::*;
 pub use hex::*;
 pub use json_schema::*;
+pub use lsp::LspTool;
 pub use mcp::*;
 pub use mock_server::*;
 pub use patch::PatchTool;
@@ -130,6 +131,7 @@ pub fn default_registry() -> ToolRegistry {
     registry.register(Arc::new(DiffStatsTool::new()));
     registry.register(Arc::new(JsonSchemaTool::new()));
     registry.register(Arc::new(GitHubTool::new()));
+    registry.register(Arc::new(crate::tools::lsp::LspTool::new()));
     compat::register_compat_tools(&mut registry);
     registry
 }
