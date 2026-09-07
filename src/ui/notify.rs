@@ -2378,6 +2378,9 @@ mod tests {
 
     #[test]
     fn test_format_multiplexer_terminal_sequence() {
+        let orig_tmux = std::env::var("TMUX").ok();
+        let orig_zellij = std::env::var("ZELLIJ").ok();
+
         let payload = "\x1b]9;Test Title: Test Body\x07";
         // When TMUX and ZELLIJ are not set, sequence is unchanged
         std::env::remove_var("TMUX");
@@ -2400,9 +2403,19 @@ mod tests {
         // Plain Bell is never wrapped
         std::env::set_var("TMUX", "/tmp/tmux-1000/default,1234,0");
         assert_eq!(format_multiplexer_terminal_sequence(TERMINAL_BELL), TERMINAL_BELL);
-        std::env::remove_var("TMUX");
-    }
 
+        // Restore env
+        if let Some(val) = orig_tmux {
+            std::env::set_var("TMUX", val);
+        } else {
+            std::env::remove_var("TMUX");
+        }
+        if let Some(val) = orig_zellij {
+            std::env::set_var("ZELLIJ", val);
+        } else {
+            std::env::remove_var("ZELLIJ");
+        }
+    }
     #[test]
     fn test_notification_triggers_and_constructors() {
         assert_eq!(NotificationTrigger::Completion.as_str(), "completion");

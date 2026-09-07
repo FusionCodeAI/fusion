@@ -1,10 +1,14 @@
 //! Targeted integration tests for terminal notification protocols, tmux DCS passthrough,
 //! Zellij BEL signaling, rich OSC 99 Kitty desktop notification protocol, and explicit event triggers.
 
+use std::sync::Mutex;
+
+static ENV_LOCK: Mutex<()> = Mutex::new(());
+
 use fusion::ui::notify::{
     format_multiplexer_terminal_sequence, format_osc99_notification, format_osc99_with_trigger,
     is_inside_tmux, is_inside_zellij, wrap_tmux_passthrough, Notification, NotificationPriority,
-    NotificationTrigger, NotificationUrgency, TerminalOscProtocol, TERMINAL_BELL,
+    NotificationTrigger, NotificationUrgency, TERMINAL_BELL,
 };
 
 #[test]
@@ -26,6 +30,7 @@ fn test_tmux_passthrough_envelope_wrapping() {
 
 #[test]
 fn test_multiplexer_detection_flags() {
+    let _guard = ENV_LOCK.lock().unwrap();
     // Save original env
     let orig_tmux = std::env::var("TMUX").ok();
     let orig_zellij = std::env::var("ZELLIJ").ok();
@@ -60,6 +65,7 @@ fn test_multiplexer_detection_flags() {
 #[test]
 fn test_multiplexer_sequence_formatting() {
     let orig_tmux = std::env::var("TMUX").ok();
+    let _guard = ENV_LOCK.lock().unwrap();
     let orig_zellij = std::env::var("ZELLIJ").ok();
 
     let osc_seq = "\x1b]99;i=1:d=0;Session\x1b\\\x1b]99;i=1:p=body;Complete\x1b\\";
@@ -171,6 +177,7 @@ fn test_explicit_triggers_completion_error_ask() {
 
 #[test]
 fn test_send_terminal_osc_writer_with_multiplexer() {
+    let _guard = ENV_LOCK.lock().unwrap();
     let orig_tmux = std::env::var("TMUX").ok();
     let orig_zellij = std::env::var("ZELLIJ").ok();
 
