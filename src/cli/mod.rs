@@ -2,6 +2,16 @@ pub mod completion;
 
 use clap::Parser;
 use std::path::PathBuf;
+#[derive(clap::Subcommand, Debug, Clone, PartialEq, Eq)]
+pub enum Commands {
+    /// Log in to Fusion Code AI via browser authorization
+    Login {
+        /// Optional direct API key
+        #[arg(long)]
+        key: Option<String>,
+    },
+}
+
 
 /// Command line interface arguments for fusion
 #[derive(Parser, Debug, Clone)]
@@ -11,6 +21,9 @@ use std::path::PathBuf;
     about = "Fast, lightweight AI coding assistant with subagents and advisors"
 )]
 pub struct Cli {
+    #[command(subcommand)]
+    pub command: Option<Commands>,
+
     /// Optional one-off prompt to run non-interactively or slash command
     #[arg(value_name = "PROMPT")]
     pub prompt: Option<String>,
@@ -69,5 +82,20 @@ mod tests {
     fn test_cli_max_turns_flag() {
         let cli = Cli::try_parse_from(["fusion", "--max-turns", "75"]).unwrap();
         assert_eq!(cli.max_turns, Some(75));
+    }
+
+    #[test]
+    fn test_cli_login_subcommand() {
+        let cli = Cli::try_parse_from(["fusion", "login"]).unwrap();
+        assert_eq!(cli.command, Some(Commands::Login { key: None }));
+
+        let cli_with_key =
+            Cli::try_parse_from(["fusion", "login", "--key", "sk-fusion-123"]).unwrap();
+        assert_eq!(
+            cli_with_key.command,
+            Some(Commands::Login {
+                key: Some("sk-fusion-123".to_string())
+            })
+        );
     }
 }

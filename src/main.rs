@@ -1,5 +1,5 @@
 use clap::{CommandFactory, Parser};
-pub use fusion::cli::Cli;
+pub use fusion::cli::{Cli, Commands};
 use std::path::PathBuf;
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
@@ -63,6 +63,25 @@ async fn main() -> anyhow::Result<()> {
 
     let client = fusion::provider::LlmClient::new();
     let mut runner = fusion::agent::AgentRunner::new(client, config, tools, tool_ctx);
+    if let Some(Commands::Login { key }) = cli.command {
+        if let Some(api_key) = key {
+            runner.config_mut().fusion_api_key = Some(api_key);
+            if let Err(e) = runner.config().save() {
+                eprintln!("\x1b[1;31mWarning:\x1b[0m Failed to save config: {}", e);
+            } else {
+                println!("\x1b[1;32m✓\x1b[0m Fusion API key saved successfully!");
+                println!(
+                    "\x1b[2;37mFusion API key saved to {}\x1b[0m",
+                    fusion::config::Config::config_path().display()
+                );
+            }
+            return Ok(());
+        } else {
+            fusion::ui::slash::handle_login(&mut runner);
+            return Ok(());
+        }
+    }
+
 
     if cli.acp {
         // Agent Client Protocol (ACP) stdio adapter mode for editors & IDEs
@@ -221,5 +240,19 @@ mod tests {
             config.max_turns = Some(turns.clamp(10, 500));
         }
         assert_eq!(config.max_turns, Some(150));
+    }
+
+    #[test]
+    fn test_cli_login_subcommand() {
+        let cli = Cli::try_parse_from(["fusion", "login"]).unwrap();
+        assert_eq!(cli.command, Some(Commands::Login { key: None }));
+
+        let cli_key = Cli::try_parse_from(["fusion", "login", "--key", "my-api-key"]).unwrap();
+        assert_eq!(
+            cli_key.command,
+            Some(Commands::Login {
+                key: Some("my-api-key".to_string())
+            })
+        );
     }
 }

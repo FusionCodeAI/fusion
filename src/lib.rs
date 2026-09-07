@@ -73,7 +73,7 @@ pub mod wasm;
 
 pub use acp::AcpServer;
 pub use agent::{AgentEvent, AgentRunner, Session};
-pub use cli::Cli;
+pub use cli::{Cli, Commands};
 pub use config::{Config, ConfigPreset};
 pub use provider::LlmClient;
 pub use tools::{
@@ -89,7 +89,7 @@ pub use tools::{
 pub mod prelude {
     pub use crate::acp::AcpServer;
     pub use crate::agent::{AgentEvent, AgentRunner, Session};
-    pub use crate::cli::Cli;
+    pub use crate::cli::{Cli, Commands};
     pub use crate::config::{Config, ConfigPreset};
     pub use crate::provider::types::{Message, Role, StreamChunk, ToolCall, ToolDefinition};
     pub use crate::provider::LlmClient;

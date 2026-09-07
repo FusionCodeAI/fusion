@@ -2371,7 +2371,7 @@ fn handle_provider(name: Option<&str>, runner: &mut AgentRunner) {
 /// 2. Open https://fusioncode.app/cli-auth?tokenId=... in the browser
 /// 3. Poll GET /v1/api/cli/token/:tokenId/poll until authorized
 /// 4. Store the returned API key in config
-fn handle_login(runner: &mut AgentRunner) {
+pub fn handle_login(runner: &mut AgentRunner) {
     use std::time::{Duration, Instant};
 
     const INIT_URL: &str = "https://api.fusioncode.app/v1/api/cli/token/init";
