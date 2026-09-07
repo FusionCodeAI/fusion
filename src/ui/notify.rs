@@ -29,8 +29,37 @@ pub const DEFAULT_TIMEOUT_MS: u32 = 5000;
 pub const TERMINAL_BELL: &str = "\x07";
 
 // ---------------------------------------------------------------------------
-// Notification Priority & Urgency
+// Notification Priority, Urgency & Triggers
 // ---------------------------------------------------------------------------
+
+/// Explicit event triggers for notifications matching OMP terminal notification triggers.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum NotificationTrigger {
+    /// Agent finished turn normally.
+    Completion,
+    /// Agent stopped with an unrecoverable error.
+    Error,
+    /// Agent waiting for user input / decision.
+    Ask,
+}
+
+impl NotificationTrigger {
+    /// Returns the string identifier for this trigger (e.g. "completion", "error", "ask").
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            Self::Completion => "completion",
+            Self::Error => "error",
+            Self::Ask => "ask",
+        }
+    }
+}
+
+impl fmt::Display for NotificationTrigger {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.as_str())
+    }
+}
 
 /// Priority level for notifications (Info, Success, Warning, Error).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, Default)]
@@ -273,12 +302,14 @@ impl fmt::Display for NotificationBackend {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, Default)]
 #[serde(rename_all = "snake_case")]
 pub enum TerminalOscProtocol {
-    /// OSC 777 (`\x1b]777;notify;{title};{body}\x1b\\`) - supported by Kitty, Foot, WezTerm, Ghostty.
+    /// OSC 777 (`\x1b]777;notify;{title};{body}\x07`) - supported by Kitty, Foot, WezTerm, Ghostty.
     Osc777,
     /// OSC 9 (`\x1b]9;{title}: {body}\x07`) - supported by iTerm2, ConEmu, Windows Terminal.
     Osc9,
     /// OSC 99 (`\x1b]99;i=1:d=0;{title}\x1b\\...`) - Kitty desktop notification protocol.
     Osc99,
+    /// Terminal Bell (`\x07`) - minimalist audible or visual bell for multiplexers and VTE terminals.
+    Bell,
     /// Emits combined multi-protocol escape sequences for maximum terminal emulator compatibility.
     #[default]
     All,
@@ -573,6 +604,9 @@ pub struct Notification {
     /// Optional structured priority level (Info, Success, Warning, Error).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub priority: Option<NotificationPriority>,
+    /// Explicit event trigger (completion, error, ask).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub trigger: Option<NotificationTrigger>,
     /// Originating application name.
     #[serde(default = "default_app_name")]
     pub app_name: String,
@@ -600,6 +634,7 @@ impl Notification {
             sound: false,
             urgency: NotificationUrgency::Normal,
             priority: None,
+            trigger: None,
             app_name: DEFAULT_APP_NAME.to_string(),
             icon: None,
             timeout_ms: Some(DEFAULT_TIMEOUT_MS),
@@ -646,8 +681,25 @@ impl Notification {
             .subtitle("Error")
             .sound(true)
             .category("error")
+            .trigger(NotificationTrigger::Error)
     }
 
+    /// Convenience constructor for completion notifications (agent finished turn normally).
+    pub fn completion(title: impl Into<String>, body: impl Into<String>) -> Self {
+        Self::with_priority(title, body, NotificationPriority::Success)
+            .subtitle("Completed")
+            .category("completion")
+            .trigger(NotificationTrigger::Completion)
+    }
+
+    /// Convenience constructor for ask notifications (agent waiting for user input / decision).
+    pub fn ask(title: impl Into<String>, prompt: impl Into<String>) -> Self {
+        Self::with_priority(title, prompt, NotificationPriority::Warning)
+            .subtitle("Input Required")
+            .sound(true)
+            .category("ask")
+            .trigger(NotificationTrigger::Ask)
+    }
     /// Convenience constructor for general task completion notifications.
     pub fn task_complete(task_name: &str, duration_secs: Option<f64>) -> Self {
         let body = match duration_secs {
@@ -659,6 +711,7 @@ impl Notification {
             .subtitle("Fusion Task")
             .priority(NotificationPriority::Success)
             .category("task_complete")
+            .trigger(NotificationTrigger::Completion)
             .set_duration(duration_secs)
     }
 
@@ -673,6 +726,7 @@ impl Notification {
             .subtitle("Long-running Task")
             .priority(NotificationPriority::Success)
             .category("long_task_complete")
+            .trigger(NotificationTrigger::Completion)
             .duration_secs(duration_secs)
     }
 
@@ -695,6 +749,7 @@ impl Notification {
             .priority(NotificationPriority::Success)
             .category("subagent_complete")
             .icon("dialog-ok")
+            .trigger(NotificationTrigger::Completion)
             .set_duration(duration_secs)
     }
 
@@ -714,6 +769,7 @@ impl Notification {
             .sound(true)
             .category("subagent_failed")
             .icon("dialog-error")
+            .trigger(NotificationTrigger::Error)
             .set_duration(duration_secs)
     }
 
@@ -740,6 +796,7 @@ impl Notification {
             .subtitle(format!("Model: {model}"))
             .priority(NotificationPriority::Success)
             .category("turn_complete")
+            .trigger(NotificationTrigger::Completion)
             .set_duration(duration_secs)
     }
 
@@ -751,6 +808,17 @@ impl Notification {
         self.priority = Some(priority);
         self
     }
+    /// Sets the explicit notification event trigger.
+    pub fn trigger(mut self, trigger: NotificationTrigger) -> Self {
+        self.trigger = Some(trigger);
+        self
+    }
+
+    /// Returns the explicit notification event trigger if set.
+    pub fn get_trigger(&self) -> Option<NotificationTrigger> {
+        self.trigger
+    }
+
 
     /// Returns the active notification priority level.
     pub fn get_priority(&self) -> NotificationPriority {
@@ -1028,6 +1096,62 @@ end run"#;
         detect_terminal_osc_protocol()
     }
 
+    /// Renders rich Kitty OSC 99 desktop notification escape sequence with title and body parameters.
+    pub fn render_osc99(&self) -> String {
+        let id = self
+            .category
+            .as_deref()
+            .unwrap_or("1");
+
+        let mut meta = vec![
+            format!("i={id}"),
+            format!("f={}", base64_encode(self.app_name.as_bytes())),
+        ];
+
+        meta.push("a=focus".to_string());
+
+        let urgency_num = match self.urgency {
+            NotificationUrgency::Low => "0",
+            NotificationUrgency::Normal => "1",
+            NotificationUrgency::Critical => "2",
+        };
+        meta.push(format!("u={urgency_num}"));
+
+        if let Some(trigger) = self.trigger {
+            meta.push(format!("t={}", base64_encode(trigger.as_str().as_bytes())));
+        } else if let Some(cat) = &self.category {
+            meta.push(format!("t={}", base64_encode(cat.as_bytes())));
+        }
+
+        if let Some(icon) = &self.icon {
+            meta.push(format!("n={}", base64_encode(icon.as_bytes())));
+        }
+
+        if self.sound {
+            meta.push(format!("s={}", base64_encode(b"default")));
+        }
+
+        if let Some(timeout) = self.timeout_ms {
+            meta.push(format!("w={timeout}"));
+        }
+
+        if !self.body.is_empty() {
+            // First chunk: title with d=0 (more chunks follow)
+            let mut title_meta = meta;
+            title_meta.push("d=0".to_string());
+            let title_chunk = osc99_chunk(&title_meta, &self.title);
+
+            // Second chunk: body with p=body
+            let body_meta = vec![format!("i={id}"), "p=body".to_string()];
+            let body_chunk = osc99_chunk(&body_meta, &self.body);
+
+            format!("{title_chunk}{body_chunk}")
+        } else {
+            // Single chunk: title only
+            osc99_chunk(&meta, &self.title)
+        }
+    }
+
     /// Renders inline terminal notification escape sequences for a specific protocol.
     pub fn render_terminal_osc_protocol(&self, protocol: TerminalOscProtocol) -> String {
         let clean_title = sanitize_terminal_text(&self.title);
@@ -1042,16 +1166,31 @@ end run"#;
                 format!("\x1b]9;{clean_title}: {clean_body}\x07\x1b]777;notify;{clean_title};{clean_body}\x07")
             }
             TerminalOscProtocol::Osc99 => {
-                format!(
-                    "\x1b]99;i=1:d=0;{clean_title}\x1b\\\x1b]99;i=1:d=1:p=body;{clean_body}\x1b\\"
-                )
+                self.render_osc99()
+            }
+            TerminalOscProtocol::Bell => {
+                TERMINAL_BELL.to_string()
             }
             TerminalOscProtocol::All => {
+                let osc99 = self.render_osc99();
                 format!(
-                    "\x1b]777;notify;{clean_title};{clean_body}\x07\x1b]9;{clean_title}: {clean_body}\x07\x1b]99;i=1:d=0;{clean_title}\x1b\\\x1b]99;i=1:d=1:p=body;{clean_body}\x1b\\"
+                    "\x1b]777;notify;{clean_title};{clean_body}\x07\x1b]9;{clean_title}: {clean_body}\x07{osc99}"
                 )
             }
         }
+    }
+
+    /// Renders inline terminal notification escape sequences with multiplexer wrapping (tmux / Zellij).
+    pub fn render_terminal_osc_with_multiplexer(&self) -> String {
+        format_multiplexer_terminal_sequence(&self.render_terminal_osc())
+    }
+
+    /// Renders inline terminal notification escape sequences for a specific protocol with multiplexer wrapping.
+    pub fn render_terminal_osc_protocol_with_multiplexer(
+        &self,
+        protocol: TerminalOscProtocol,
+    ) -> String {
+        format_multiplexer_terminal_sequence(&self.render_terminal_osc_protocol(protocol))
     }
 
     // -----------------------------------------------------------------------
@@ -1162,11 +1301,12 @@ end run"#;
         outcome
     }
 
-    /// Sends terminal OSC escape sequences to the provided writer.
+    /// Sends terminal OSC escape sequences to the provided writer, applying tmux DCS passthrough or Zellij BEL wrapping if inside a multiplexer.
     pub fn send_terminal_osc<W: Write>(&self, writer: &mut W) -> std::io::Result<bool> {
         let protocol = detect_terminal_osc_protocol();
         let osc_seq = self.render_terminal_osc_protocol(protocol);
-        writer.write_all(osc_seq.as_bytes())?;
+        let final_seq = format_multiplexer_terminal_sequence(&osc_seq);
+        writer.write_all(final_seq.as_bytes())?;
         writer.flush()?;
         Ok(true)
     }
@@ -1368,6 +1508,51 @@ pub fn is_wsl() -> bool {
     false
 }
 
+/// Checks whether the current process is running inside a tmux session.
+/// Reads `TMUX` from the environment on each invocation.
+pub fn is_inside_tmux() -> bool {
+    match std::env::var("TMUX") {
+        Ok(val) => !val.is_empty(),
+        Err(_) => false,
+    }
+}
+
+/// Checks whether the current process is running inside a Zellij session.
+/// Reads `ZELLIJ` from the environment on each invocation.
+pub fn is_inside_zellij() -> bool {
+    match std::env::var("ZELLIJ") {
+        Ok(val) => !val.is_empty(),
+        Err(_) => false,
+    }
+}
+
+/// Wraps a terminal escape sequence in tmux's DCS passthrough envelope with doubled ESCs.
+///
+/// tmux requires nested control sequences to be passed through DCS (`\x1bPtmux;\x1b<OSC>\x1b\\`),
+/// with any inner `\x1b` (ESC) characters doubled (`\x1b\x1b`).
+pub fn wrap_tmux_passthrough(payload: &str) -> String {
+    format!("\x1bPtmux;{}\x1b\\", payload.replace('\x1b', "\x1b\x1b"))
+}
+
+/// Formats a terminal escape sequence for the active multiplexer environment.
+///
+/// - If inside tmux (`is_inside_tmux()`), wraps the sequence in DCS passthrough (`wrap_tmux_passthrough`)
+///   followed by `\x07` (BEL) so notifications escape tmux and trigger `monitor-bell` / `monitor-activity`.
+/// - If inside Zellij (`is_inside_zellij()`), appends `\x07` (BEL) after the OSC sequence.
+/// - If the sequence is already a bare `BEL` (`\x07`), returns it unchanged.
+pub fn format_multiplexer_terminal_sequence(payload: &str) -> String {
+    if payload == TERMINAL_BELL {
+        return payload.to_string();
+    }
+    if is_inside_tmux() {
+        format!("{}\x07", wrap_tmux_passthrough(payload))
+    } else if is_inside_zellij() {
+        format!("{payload}\x07")
+    } else {
+        payload.to_string()
+    }
+}
+
 /// Pure-Rust PATH lookup to check if an executable exists and is runnable.
 pub fn is_executable_in_path(cmd: &str) -> bool {
     if let Ok(path_var) = std::env::var("PATH") {
@@ -1439,6 +1624,51 @@ pub fn sanitize_terminal_text(s: &str) -> String {
     s.chars()
         .filter(|c| !c.is_control() || *c == ' ' || *c == '\t')
         .collect()
+}
+
+/// Minimal RFC 4648 base64 encoder without extra external dependencies.
+pub fn base64_encode(input: &[u8]) -> String {
+    const TABLE: &[u8; 64] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+    let mut out = String::with_capacity((input.len() + 2) / 3 * 4);
+    for chunk in input.chunks(3) {
+        let b0 = chunk[0];
+        let b1 = chunk.get(1).copied().unwrap_or(0);
+        let b2 = chunk.get(2).copied().unwrap_or(0);
+
+        out.push(TABLE[(b0 >> 2) as usize] as char);
+        out.push(TABLE[(((b0 & 0x03) << 4) | (b1 >> 4)) as usize] as char);
+        if chunk.len() > 1 {
+            out.push(TABLE[(((b1 & 0x0f) << 2) | (b2 >> 6)) as usize] as char);
+        } else {
+            out.push('=');
+        }
+        if chunk.len() > 2 {
+            out.push(TABLE[(b2 & 0x3f) as usize] as char);
+        } else {
+            out.push('=');
+        }
+    }
+    out
+}
+
+/// Checks if a string contains C0/C1 control characters that are unsafe inside an OSC payload.
+pub fn is_osc99_unsafe(s: &str) -> bool {
+    s.chars().any(|c| (c as u32) <= 0x1f || ((c as u32) >= 0x7f && (c as u32) <= 0x9f))
+}
+
+/// Emits an OSC 99 chunk, using base64 encoding (`e=1`) if payload contains unsafe control characters.
+pub fn osc99_chunk(meta: &[String], payload: &str) -> String {
+    let mut chunk_meta = meta.to_vec();
+    if is_osc99_unsafe(payload) {
+        chunk_meta.push("e=1".to_string());
+        format!(
+            "\x1b]99;{};{}\x1b\\",
+            chunk_meta.join(":"),
+            base64_encode(payload.as_bytes())
+        )
+    } else {
+        format!("\x1b]99;{};{}\x1b\\", chunk_meta.join(":"), payload)
+    }
 }
 
 /// Formats duration in seconds into a clean human-readable representation.
@@ -1584,6 +1814,58 @@ pub fn notify_error(config: &crate::config::Config, title: &str, error_message: 
     let notif_cfg = config.notification_config();
     Notification::error(title, error_message).send_with_config(&notif_cfg);
     true
+}
+
+/// Dispatches a non-blocking completion notification (agent finished turn normally).
+pub fn notify_completion(title: impl AsRef<str>, body: impl AsRef<str>) {
+    Notification::completion(title.as_ref(), body.as_ref()).send();
+}
+
+/// Dispatches a non-blocking ask notification (agent waiting for user input / decision).
+pub fn notify_ask(title: impl AsRef<str>, prompt: impl AsRef<str>) {
+    Notification::ask(title.as_ref(), prompt.as_ref()).send();
+}
+
+/// Convenience helper for completion notifications integrating application `Config`.
+pub fn notify_completion_with_config(
+    config: &crate::config::Config,
+    title: &str,
+    body: &str,
+) -> bool {
+    if !config.notify_enabled || !config.notify_on_completion {
+        return false;
+    }
+    let notif_cfg = config.notification_config();
+    Notification::completion(title, body).send_with_config(&notif_cfg);
+    true
+}
+
+/// Convenience helper for ask notifications integrating application `Config`.
+pub fn notify_ask_with_config(
+    config: &crate::config::Config,
+    title: &str,
+    prompt: &str,
+) -> bool {
+    if !config.notify_enabled {
+        return false;
+    }
+    let notif_cfg = config.notification_config();
+    Notification::ask(title, prompt).send_with_config(&notif_cfg);
+    true
+}
+
+/// Formats a rich Kitty OSC 99 desktop notification with title and body parameters.
+pub fn format_osc99_notification(title: &str, body: &str) -> String {
+    Notification::new(title, body).render_osc99()
+}
+
+/// Formats a rich Kitty OSC 99 desktop notification with title, body, and explicit trigger.
+pub fn format_osc99_with_trigger(
+    title: &str,
+    body: &str,
+    trigger: NotificationTrigger,
+) -> String {
+    Notification::new(title, body).trigger(trigger).render_osc99()
 }
 
 /// Emits an inline terminal OSC notification directly to standard error.
@@ -1949,9 +2231,9 @@ mod tests {
         assert!(osc9.contains("9;Terminal Title: Terminal Body"));
 
         let osc99 = notif.render_terminal_osc_protocol(TerminalOscProtocol::Osc99);
-        assert!(osc99.contains("99;i=1:d=0;Terminal Title"));
-        assert!(osc99.contains("99;i=1:d=1:p=body;Terminal Body"));
-
+        assert!(osc99.contains("99;i=1"));
+        assert!(osc99.contains("d=0;Terminal Title"));
+        assert!(osc99.contains("p=body;Terminal Body"));
         let osc_all = notif.render_terminal_osc();
         assert!(osc_all.contains("777;notify;"));
         assert!(osc_all.contains("9;"));
@@ -2085,5 +2367,99 @@ mod tests {
         assert!(NotificationBackend::Auto.is_available());
         assert!(NotificationBackend::TerminalOsc.is_available());
         assert!(!NotificationBackend::Disabled.is_available());
+    }
+
+    #[test]
+    fn test_wrap_tmux_passthrough() {
+        let payload = "\x1b]99;;Hello\x1b\\";
+        let wrapped = wrap_tmux_passthrough(payload);
+        assert_eq!(wrapped, "\x1bPtmux;\x1b\x1b]99;;Hello\x1b\x1b\\\x1b\\");
+    }
+
+    #[test]
+    fn test_format_multiplexer_terminal_sequence() {
+        let payload = "\x1b]9;Test Title: Test Body\x07";
+        // When TMUX and ZELLIJ are not set, sequence is unchanged
+        std::env::remove_var("TMUX");
+        std::env::remove_var("ZELLIJ");
+        assert_eq!(format_multiplexer_terminal_sequence(payload), payload);
+
+        // When TMUX is set, wraps in DCS passthrough followed by BEL
+        std::env::set_var("TMUX", "/tmp/tmux-1000/default,1234,0");
+        let tmux_formatted = format_multiplexer_terminal_sequence(payload);
+        assert!(tmux_formatted.starts_with("\x1bPtmux;\x1b\x1b]9;"));
+        assert!(tmux_formatted.ends_with("\x1b\\\x07"));
+        std::env::remove_var("TMUX");
+
+        // When ZELLIJ is set, appends BEL
+        std::env::set_var("ZELLIJ", "1");
+        let zellij_formatted = format_multiplexer_terminal_sequence(payload);
+        assert_eq!(zellij_formatted, format!("{payload}\x07"));
+        std::env::remove_var("ZELLIJ");
+
+        // Plain Bell is never wrapped
+        std::env::set_var("TMUX", "/tmp/tmux-1000/default,1234,0");
+        assert_eq!(format_multiplexer_terminal_sequence(TERMINAL_BELL), TERMINAL_BELL);
+        std::env::remove_var("TMUX");
+    }
+
+    #[test]
+    fn test_notification_triggers_and_constructors() {
+        assert_eq!(NotificationTrigger::Completion.as_str(), "completion");
+        assert_eq!(NotificationTrigger::Error.as_str(), "error");
+        assert_eq!(NotificationTrigger::Ask.as_str(), "ask");
+
+        let comp = Notification::completion("Done", "Task completed");
+        assert_eq!(comp.get_trigger(), Some(NotificationTrigger::Completion));
+        assert_eq!(comp.get_priority(), NotificationPriority::Success);
+
+        let err = Notification::error("Failed", "Network timeout");
+        assert_eq!(err.get_trigger(), Some(NotificationTrigger::Error));
+        assert_eq!(err.get_priority(), NotificationPriority::Error);
+        assert!(err.sound);
+
+        let ask = Notification::ask("Question", "Allow bash command execution?");
+        assert_eq!(ask.get_trigger(), Some(NotificationTrigger::Ask));
+        assert_eq!(ask.get_priority(), NotificationPriority::Warning);
+        assert!(ask.sound);
+    }
+
+    #[test]
+    fn test_rich_osc99_notification_protocol() {
+        let notif = Notification::new("Session", "Complete")
+            .category("complete-1")
+            .app_name("Oh My Pi")
+            .trigger(NotificationTrigger::Completion)
+            .priority(NotificationPriority::Success)
+            .timeout_ms(5000);
+
+        let osc = notif.render_osc99();
+        assert!(osc.contains("99;i=complete-1:f="));
+        assert!(osc.contains("a=focus"));
+        assert!(osc.contains("u=1"));
+        assert!(osc.contains("t=")); // base64 encoded trigger
+        assert!(osc.contains("w=5000"));
+        assert!(osc.contains("d=0;Session\x1b\\"));
+        assert!(osc.contains("i=complete-1:p=body;Complete\x1b\\"));
+
+        // Test base64 encoding of unsafe control characters in payload
+        let unsafe_notif = Notification::new("Line 1\nLine 2", "")
+            .category("unsafe");
+        let unsafe_osc = unsafe_notif.render_osc99();
+        assert!(unsafe_osc.contains("e=1"));
+        assert!(unsafe_osc.contains("TGluZSAxCkxpbmUgMg=="));
+    }
+
+    #[test]
+    fn test_trigger_serde_roundtrip() {
+        for trigger in &[
+            NotificationTrigger::Completion,
+            NotificationTrigger::Error,
+            NotificationTrigger::Ask,
+        ] {
+            let json = serde_json::to_string(trigger).unwrap();
+            let parsed: NotificationTrigger = serde_json::from_str(&json).unwrap();
+            assert_eq!(*trigger, parsed);
+        }
     }
 }

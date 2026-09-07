@@ -1147,18 +1147,31 @@ fn handle_notify(args: &[String], runner: &mut AgentRunner) {
                     "\x1b[1;33mNot Sent\x1b[0m"
                 }
             );
+            let term_desc = if crate::ui::notify::is_inside_tmux() {
+                "Sent (tmux DCS passthrough + BEL)"
+            } else if crate::ui::notify::is_inside_zellij() {
+                "Sent (Zellij + BEL suffix)"
+            } else {
+                "Sent (Warp/iTerm/WezTerm/Kitty compatible)"
+            };
             println!(
                 "  • Terminal OSC:     {}",
                 if outcome.terminal_sent {
-                    "\x1b[1;32mSent (Warp/iTerm/WezTerm compatible)\x1b[0m"
+                    format!("\x1b[1;32m{term_desc}\x1b[0m")
                 } else {
-                    "\x1b[1;33mNot Sent\x1b[0m"
+                    "\x1b[1;33mNot Sent\x1b[0m".to_string()
                 }
             );
             if let Some(err) = outcome.error {
                 println!("  • Note:             {}", err);
             }
-            println!("\nIf you are on Warp, macOS, or Termux, you should see an alert banner or toast above.\n");
+            if crate::ui::notify::is_inside_tmux() {
+                println!("\nRunning inside tmux: notifications are wrapped in DCS passthrough; monitor-bell / monitor-activity will flag the pane.\n");
+            } else if crate::ui::notify::is_inside_zellij() {
+                println!("\nRunning inside Zellij: notifications append BEL to trigger session tab activity.\n");
+            } else {
+                println!("\nIf you are on Warp, macOS, or Termux, you should see an alert banner or toast above.\n");
+            }
         }
         "status" => {
             println!("\n\x1b[1;36mNotification Configuration\x1b[0m");
@@ -1171,6 +1184,14 @@ fn handle_notify(args: &[String], runner: &mut AgentRunner) {
             println!("  • Desktop Alerts:   {}", notif_cfg.desktop_enabled);
             println!("  • Terminal OSC:     {}", notif_cfg.terminal_enabled);
             println!("  • Sound:            {}", notif_cfg.sound);
+            let multiplexer = if crate::ui::notify::is_inside_tmux() {
+                "tmux (DCS passthrough + BEL enabled)"
+            } else if crate::ui::notify::is_inside_zellij() {
+                "Zellij (BEL suffix enabled)"
+            } else {
+                "none (direct terminal)"
+            };
+            println!("  • Multiplexer:      {multiplexer}");
             println!(
                 "  • Backend:          {}",
                 notif_cfg

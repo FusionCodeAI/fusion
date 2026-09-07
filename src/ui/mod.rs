@@ -136,10 +136,13 @@ pub use multicursor::{
     Selection, SortOptions, TextRange, WordWrapEngine, WrapOptions, WrappedLine,
 };
 pub use notify::{
-    emit_terminal_notification, emit_terminal_osc_to, format_duration_secs, notify, notify_err,
-    notify_error, notify_task, notify_task_complete, notify_turn_complete, Notification,
+    emit_terminal_notification, emit_terminal_osc_to, format_duration_secs,
+    format_multiplexer_terminal_sequence, format_osc99_notification, format_osc99_with_trigger,
+    is_inside_tmux, is_inside_zellij, notify, notify_ask, notify_ask_with_config,
+    notify_completion, notify_completion_with_config, notify_err, notify_error, notify_task,
+    notify_task_complete, notify_turn_complete, wrap_tmux_passthrough, Notification,
     NotificationBackend, NotificationConfig, NotificationError, NotificationOutcome,
-    NotificationUrgency, TerminalOscProtocol,
+    NotificationPriority, NotificationTrigger, NotificationUrgency, TerminalOscProtocol,
 };
 pub use print_css::{
     generate_page_css, generate_pdf_css, generate_print_css, generate_print_css_rules,
