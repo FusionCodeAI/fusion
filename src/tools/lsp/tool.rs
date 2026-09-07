@@ -501,7 +501,7 @@ fn is_binary_on_path(command: &str) -> bool {
 }
 
 /// Formats a list of LSP Locations or LocationLinks.
-fn format_locations(locations: &[Value], cwd: &Path) -> String {
+pub fn format_locations(locations: &[Value], cwd: &Path) -> String {
     if locations.is_empty() {
         return "No locations found.".to_string();
     }
@@ -559,7 +559,7 @@ fn format_locations(locations: &[Value], cwd: &Path) -> String {
 }
 
 /// Formats LSP symbols hierarchically.
-fn format_lsp_symbols(val: &Value) -> String {
+pub fn format_lsp_symbols(val: &Value) -> String {
     let mut out = String::new();
     if let Some(arr) = val.as_array() {
         format_symbols_recursive(arr, 0, &mut out);
@@ -630,7 +630,7 @@ fn lsp_symbol_kind_name(kind: u64) -> &'static str {
 }
 
 /// Formats diagnostics returned by LSP server.
-fn format_lsp_diagnostics(val: &Value, path_display: &str) -> String {
+pub fn format_lsp_diagnostics(val: &Value, path_display: &str) -> String {
     let items = val
         .get("items")
         .and_then(|v| v.as_array())
@@ -682,7 +682,7 @@ fn format_lsp_diagnostics(val: &Value, path_display: &str) -> String {
 }
 
 /// Parses an LSP definition or typeDefinition response into a Vec of Value locations.
-fn parse_locations_response(res: Value) -> Vec<Value> {
+pub fn parse_locations_response(res: Value) -> Vec<Value> {
     if res.is_null() {
         Vec::new()
     } else if let Some(arr) = res.as_array() {
@@ -695,7 +695,7 @@ fn parse_locations_response(res: Value) -> Vec<Value> {
 }
 
 /// Converts a `file://` URI to a local `PathBuf`.
-fn uri_to_path_buf(uri: &str) -> Option<PathBuf> {
+pub fn uri_to_path_buf(uri: &str) -> Option<PathBuf> {
     if let Some(stripped) = uri.strip_prefix("file://") {
         #[cfg(windows)]
         {
@@ -716,7 +716,7 @@ fn uri_to_path_buf(uri: &str) -> Option<PathBuf> {
 }
 
 /// Extracts symbol identifier from source file at specified line and character position.
-fn extract_symbol_from_file(path: &Path, line_1: u64, char_1: u64) -> Option<String> {
+pub fn extract_symbol_from_file(path: &Path, line_1: u64, char_1: u64) -> Option<String> {
     if !path.is_file() {
         return None;
     }
@@ -728,7 +728,7 @@ fn extract_symbol_from_file(path: &Path, line_1: u64, char_1: u64) -> Option<Str
 }
 
 /// Extracts an identifier token around `char_idx` in `line_str`.
-fn extract_identifier_at_pos(line_str: &str, char_idx: usize) -> Option<String> {
+pub fn extract_identifier_at_pos(line_str: &str, char_idx: usize) -> Option<String> {
     if line_str.trim().is_empty() {
         return None;
     }
