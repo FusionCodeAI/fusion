@@ -1,6 +1,6 @@
 use async_trait::async_trait;
+use fusion_walker::WalkRequest;
 use globset::GlobBuilder;
-use ignore::WalkBuilder;
 use serde_json::{json, Value};
 
 use crate::tools::file::resolve_path;
@@ -118,57 +118,31 @@ impl Tool for GlobTool {
 
         let matched =
             tokio::task::spawn_blocking(move || -> anyhow::Result<(Vec<String>, usize)> {
-                let mut builder = WalkBuilder::new(&target_path);
-                builder
-                    .hidden(!hidden)
-                    // Honor .gitignore even outside a git repository (e.g. extracted
-                    // archives, CI workspaces) — matches the behavior of ripgrep's
-                    // default file-type filtering in editors.
-                    .require_git(false)
-                    .git_ignore(true)
-                    .git_global(true)
-                    .git_exclude(true)
-                    .parents(true);
+                let mut request = WalkRequest::new(&target_path)
+                    .hidden(hidden)
+                    .gitignore(true)
+                    .skip_git(true)
+                    .emit_root(false);
 
                 if let Some(max_depth) = depth {
-                    builder.max_depth(Some(max_depth));
+                    request = request.depth(1, max_depth);
+                } else {
+                    request = request.depth(1, usize::MAX);
                 }
+
+                let outcome = request
+                    .collect()
+                    .map_err(|e| anyhow::anyhow!("Glob walk error: {e}"))?;
 
                 let mut results = Vec::new();
                 let mut total_count = 0;
                 let max_results = 500;
 
-                for result in builder.build() {
-                    let entry = match result {
-                        Ok(entry) => entry,
-                        Err(e) => {
-                            tracing::debug!("Glob walk error: {e}");
-                            continue;
-                        }
-                    };
+                for entry in outcome.entries {
+                    let path = entry.absolute_path(&target_path);
 
-                    // Skip the search root itself
-                    if entry.depth() == 0 {
-                        continue;
-                    }
-
-                    let path = entry.path();
-
-                    // Never descend into .git internals, even when hidden files are
-                    // included — the ignore crate only auto-filters .git when the
-                    // walk is inside a real repository.
-                    if path
-                        .strip_prefix(&target_path)
-                        .unwrap_or(path)
-                        .components()
-                        .any(|c| c.as_os_str() == ".git")
-                    {
-                        tracing::debug!("Glob walk skipping .git path: {}", path.display());
-                        continue;
-                    }
-
-                    let rel_path = path.strip_prefix(&cwd).unwrap_or(path);
-                    let rel_target = path.strip_prefix(&target_path).unwrap_or(path);
+                    let rel_path = path.strip_prefix(&cwd).unwrap_or(&path);
+                    let rel_target = path.strip_prefix(&target_path).unwrap_or(&path);
                     let file_name = path.file_name().unwrap_or_default();
 
                     // Normalize paths for consistent cross-platform matching (replace '\' with '/')
@@ -191,9 +165,7 @@ impl Tool for GlobTool {
                         total_count += 1;
                         if results.len() < max_results {
                             let mut s = rel_path_str.clone();
-                            if entry.file_type().map(|ft| ft.is_dir()).unwrap_or(false)
-                                && !s.ends_with('/')
-                            {
+                            if entry.is_dir() && !s.ends_with('/') {
                                 s.push('/');
                             }
                             results.push(s);
@@ -219,7 +191,7 @@ impl Tool for GlobTool {
 
         if total_count > results.len() {
             results.push(format!(
-                "\n... [{} additional files truncated]",
+                "... [{} additional files truncated]",
                 total_count - results.len()
             ));
         }

@@ -1,4 +1,5 @@
 use async_trait::async_trait;
+use fusion_walker::WalkRequest;
 use serde_json::{json, Value};
 use std::path::{Path, PathBuf};
 use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
@@ -12,6 +13,16 @@ pub fn resolve_path(path_str: &str, cwd: &Path) -> PathBuf {
     } else {
         cwd.join(p)
     }
+}
+
+/// Create a high-throughput, parallel multi-threaded directory walk request
+/// rooted at `path`, respecting `.gitignore` and skipping `.git` repositories.
+pub fn walk_dir(path: impl Into<PathBuf>, hidden: bool) -> WalkRequest {
+    WalkRequest::new(path)
+        .hidden(hidden)
+        .gitignore(true)
+        .skip_git(true)
+        .emit_root(false)
 }
 
 // ---------------------------------------------------------------------------
@@ -230,7 +241,6 @@ impl Tool for ReadFileTool {
         let mut total_lines = 0usize;
         let start_idx = window.offset.saturating_sub(1);
         let max_take = window.limit.unwrap_or(DEFAULT_READ_LIMIT);
-        let mut binary = false;
         let mut empty = true;
 
         loop {
@@ -244,7 +254,7 @@ impl Tool for ReadFileTool {
             empty = false;
 
             if total_lines < BINARY_SNIFF_BYTES && buf.contains(&0) {
-                binary = true;
+                anyhow::bail!("Cannot read binary file '{}'", full_path.display());
             }
 
             total_lines += 1;
@@ -275,9 +285,6 @@ impl Tool for ReadFileTool {
             }
         }
 
-        if binary {
-            anyhow::bail!("Cannot read binary file '{}'", full_path.display());
-        }
 
         if empty {
             return Ok("(empty file)".to_string());
@@ -767,6 +774,27 @@ mod tests {
             DEFAULT_READ_LIMIT + 1,
             DEFAULT_READ_LIMIT + 1
         )));
+
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[tokio::test]
+    async fn test_walk_dir_helper() {
+        let dir = temp_test_dir();
+        std::fs::write(dir.join("visible.txt"), "hello").unwrap();
+        std::fs::write(dir.join(".hidden.txt"), "secret").unwrap();
+        let sub = dir.join("sub");
+        std::fs::create_dir_all(&sub).unwrap();
+        std::fs::write(sub.join("nested.txt"), "world").unwrap();
+        std::fs::write(dir.join(".gitignore"), "sub/\n").unwrap();
+
+        let request = walk_dir(&dir, false);
+        let outcome = request.collect().expect("walk should succeed");
+        let paths: Vec<_> = outcome.entries.into_iter().map(|e| e.path).collect();
+
+        assert!(paths.contains(&"visible.txt".to_string()));
+        assert!(!paths.contains(&".hidden.txt".to_string()));
+        assert!(!paths.contains(&"sub/nested.txt".to_string()));
 
         let _ = std::fs::remove_dir_all(&dir);
     }
