@@ -16,7 +16,7 @@ pub use fusion_builtins::ProcessStatus;
 
 use crate::cancel::CancelToken;
 
-#[cfg(target_os = "linux")]
+#[cfg(any(target_os = "linux", target_os = "android"))]
 mod platform {
 	use std::{
 		collections::HashSet,
