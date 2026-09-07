@@ -153,6 +153,246 @@ impl AskTool {
     }
 }
 
+/// Executes all questions interactively via inline Crossterm/Ratatui picker.
+pub fn execute_interactive_tui(questions: &[Question]) -> anyhow::Result<String> {
+    if questions.is_empty() {
+        anyhow::bail!("No questions provided to ask tool.");
+    }
+
+    let mut results = Vec::new();
+    for q in questions {
+        let choice = prompt_question_tui(q)?;
+        results.push((q.id.as_str(), choice));
+    }
+
+    if results.len() == 1 {
+        Ok(format!("Selected option: {}", results[0].1))
+    } else {
+        let lines: Vec<String> = results
+            .iter()
+            .map(|(id, choice)| format!("{}: Selected option: {}", id, choice))
+            .collect();
+        Ok(lines.join("\n"))
+    }
+}
+
+/// Renders an interactive TUI selection popup for a single question.
+pub fn prompt_question_tui(q: &Question) -> anyhow::Result<String> {
+    use crossterm::{
+        cursor,
+        event::{self, Event, KeyCode, KeyEventKind},
+        execute,
+    };
+    use std::io::{stdout, Write};
+
+    let mut out = stdout();
+    let _ = write!(out, "\r\x1b[2K");
+    let _ = out.flush();
+
+    let _guard = crate::ui::prompt::RawModeGuard::enter()?;
+    let _ = execute!(out, cursor::Hide);
+
+    let num_opts = q.options.len();
+    let mut selected_idx = q.recommended.unwrap_or(0).min(num_opts.saturating_sub(1));
+    let mut checked: Vec<bool> = vec![false; num_opts];
+    if q.multi {
+        if let Some(r) = q.recommended {
+            if r < num_opts {
+                checked[r] = true;
+            }
+        }
+    }
+
+    let mut last_rendered_lines: usize = 0;
+    let term_width = crate::ui::table::get_terminal_width().max(40);
+    let box_width = term_width.saturating_sub(4).min(86);
+
+    loop {
+        // 1. Clear previous rendered lines
+        if last_rendered_lines > 0 {
+            for _ in 0..last_rendered_lines {
+                let _ = execute!(out, cursor::MoveToPreviousLine(1), cursor::MoveToColumn(0));
+                let _ = write!(out, "\x1b[2K");
+            }
+            let _ = out.flush();
+        }
+
+        // 2. Render frame
+        let mut lines = Vec::new();
+
+        // Top Border with question
+        let q_clean = q.question.replace('\n', " ");
+        let q_max_len = box_width.saturating_sub(10);
+        let q_disp = if q_clean.len() > q_max_len {
+            format!("{}...", &q_clean[..q_max_len.saturating_sub(3)])
+        } else {
+            q_clean
+        };
+        let dashes_needed = box_width.saturating_sub(q_disp.len() + 6);
+        lines.push(format!(
+            "\x1b[1;36m┌─ ❓ {}\x1b[0m \x1b[38;5;240m{}\x1b[1;36m┐\x1b[0m",
+            q_disp,
+            "─".repeat(dashes_needed)
+        ));
+        lines.push(format!(
+            "\x1b[1;36m│\x1b[0m{}\x1b[1;36m│\x1b[0m",
+            " ".repeat(box_width.saturating_sub(2))
+        ));
+
+        // Options
+        for (idx, opt) in q.options.iter().enumerate() {
+            let is_curr = idx == selected_idx;
+            let is_rec = q.recommended == Some(idx);
+            let rec_chip = if is_rec { " \x1b[1;32m(Recommended)\x1b[0m" } else { "" };
+
+            let marker = if q.multi {
+                let check_mark = if checked[idx] { "✓" } else { " " };
+                if is_curr {
+                    format!("\x1b[1;36m❯ [{}]\x1b[0m", check_mark)
+                } else {
+                    format!("  [{}]", check_mark)
+                }
+            } else {
+                if is_curr {
+                    "\x1b[1;36m❯ (•)\x1b[0m".to_string()
+                } else {
+                    "    ( )".to_string()
+                }
+            };
+
+            let label_style = if is_curr {
+                "\x1b[1;37m"
+            } else {
+                "\x1b[37m"
+            };
+
+            let row_text = format!(" {} {}{}{}", marker, label_style, opt.label, rec_chip);
+            let vis_len = crate::ui::table::visible_width(&row_text);
+            let pad_len = box_width.saturating_sub(vis_len + 2);
+            lines.push(format!(
+                "\x1b[1;36m│\x1b[0m{}{}\x1b[1;36m│\x1b[0m",
+                row_text,
+                " ".repeat(pad_len)
+            ));
+
+            // Description
+            if let Some(desc) = &opt.description {
+                let d_clean = desc.replace('\n', " ");
+                let d_max = box_width.saturating_sub(12);
+                let d_disp = if d_clean.len() > d_max {
+                    format!("{}...", &d_clean[..d_max.saturating_sub(3)])
+                } else {
+                    d_clean
+                };
+                let desc_row = format!("        \x1b[2;37m{}\x1b[0m", d_disp);
+                let desc_vis = crate::ui::table::visible_width(&desc_row);
+                let d_pad = box_width.saturating_sub(desc_vis + 2);
+                lines.push(format!(
+                    "\x1b[1;36m│\x1b[0m{}{}\x1b[1;36m│\x1b[0m",
+                    desc_row,
+                    " ".repeat(d_pad)
+                ));
+            }
+        }
+
+        lines.push(format!(
+            "\x1b[1;36m│\x1b[0m{}\x1b[1;36m│\x1b[0m",
+            " ".repeat(box_width.saturating_sub(2))
+        ));
+
+        // Footer hints
+        let hint_text = if q.multi {
+            "  ↑↓ Navigate  Space Toggle  Enter Submit  Esc Default"
+        } else {
+            "  ↑↓ Navigate  Enter Select  Esc Default"
+        };
+        let hint_vis = crate::ui::table::visible_width(hint_text);
+        let hint_pad = box_width.saturating_sub(hint_vis + 2);
+        lines.push(format!(
+            "\x1b[1;36m│\x1b[0m\x1b[2;37m{}\x1b[0m{}\x1b[1;36m│\x1b[0m",
+            hint_text,
+            " ".repeat(hint_pad)
+        ));
+
+        // Bottom Border
+        lines.push(format!(
+            "\x1b[1;36m└{}\x1b[0m",
+            "─".repeat(box_width.saturating_sub(1))
+        ));
+
+        last_rendered_lines = lines.len();
+        for l in &lines {
+            let _ = write!(out, "\r{}\x1b[0m\r\n", l);
+        }
+        let _ = out.flush();
+
+        // 3. Read key
+        if let Event::Key(key) = event::read()? {
+            if key.kind == KeyEventKind::Press {
+                match key.code {
+                    KeyCode::Up | KeyCode::Char('k') => {
+                        selected_idx = selected_idx.saturating_sub(1);
+                    }
+                    KeyCode::Down | KeyCode::Char('j') => {
+                        if selected_idx + 1 < num_opts {
+                            selected_idx += 1;
+                        }
+                    }
+                    KeyCode::Char(' ') if q.multi => {
+                        checked[selected_idx] = !checked[selected_idx];
+                    }
+                    KeyCode::Enter => {
+                        break;
+                    }
+                    KeyCode::Esc => {
+                        let def_idx = q.recommended.unwrap_or(0).min(num_opts.saturating_sub(1));
+                        selected_idx = def_idx;
+                        if q.multi {
+                            checked = vec![false; num_opts];
+                            checked[def_idx] = true;
+                        }
+                        break;
+                    }
+                    _ => {}
+                }
+            }
+        }
+    }
+
+    // 4. Cleanup interactive frame
+    for _ in 0..last_rendered_lines {
+        let _ = execute!(out, cursor::MoveToPreviousLine(1), cursor::MoveToColumn(0));
+        let _ = write!(out, "\x1b[2K");
+    }
+    let _ = execute!(out, cursor::Show);
+
+    // 5. Build chosen answer & print clean confirmation
+    let result_str = if q.multi {
+        let mut chosen: Vec<String> = Vec::new();
+        for (i, &chk) in checked.iter().enumerate() {
+            if chk {
+                chosen.push(q.options[i].label.clone());
+            }
+        }
+        if chosen.is_empty() {
+            q.options[selected_idx].label.clone()
+        } else {
+            chosen.join(", ")
+        }
+    } else {
+        q.options[selected_idx].label.clone()
+    };
+
+    let _ = write!(
+        out,
+        "\r\x1b[2K\x1b[1;32m✓ Selected:\x1b[0m \x1b[1;37m{}\x1b[0m\r\n\r\n",
+        result_str
+    );
+    let _ = out.flush();
+
+    Ok(result_str)
+}
+
 /// Checks whether the current process is running in an interactive terminal.
 pub fn is_interactive_terminal() -> bool {
     if std::env::var("CI").is_ok() {
@@ -419,12 +659,18 @@ impl Tool for AskTool {
         if questions.is_empty() {
             anyhow::bail!("No questions provided to ask tool.");
         }
-
         if self.is_interactive() {
-            let stdin = std::io::stdin();
-            let mut reader = stdin.lock();
-            let mut stdout = std::io::stdout();
-            self.execute_interactive_with_io(&questions, &mut reader, &mut stdout)
+            #[cfg(not(test))]
+            {
+                execute_interactive_tui(&questions)
+            }
+            #[cfg(test)]
+            {
+                let stdin = std::io::stdin();
+                let mut reader = stdin.lock();
+                let mut stdout = std::io::stdout();
+                self.execute_interactive_with_io(&questions, &mut reader, &mut stdout)
+            }
         } else {
             self.execute_headless(&questions)
         }
