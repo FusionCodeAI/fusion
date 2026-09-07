@@ -1,5 +1,7 @@
 use async_trait::async_trait;
 use fusion_walker::WalkRequest;
+use fusion_ast::summary::{summarize_code, SummaryOptions};
+use fusion_ast::SupportLang;
 use serde_json::{json, Value};
 use std::path::{Path, PathBuf};
 use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
@@ -101,7 +103,7 @@ pub fn format_read_output(
     }
 
     let end = start_line.saturating_sub(1) + selected.len();
-    if end < total_lines {
+    if window.line_numbers && end < total_lines {
         let remaining = total_lines - end;
         output.push_str(&format!(
             "\n... [{} more lines in file (total: {})]\n",
@@ -164,6 +166,246 @@ async fn write_tmp_and_rename(tmp_path: &Path, dest: &Path, contents: &[u8]) -> 
 
 // ---------------------------------------------------------------------------
 // ReadFileTool
+/// Parsed inline selector components from a path string (e.g. `src/main.rs:10-40:raw`).
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
+pub struct PathSelector {
+    /// 1-based inclusive slice range: (start, optional end)
+    pub range: Option<(usize, Option<usize>)>,
+    /// Skip line number headers and return verbatim content
+    pub raw: bool,
+    /// Use fusion_ast to elide function and struct bodies (...)
+    pub defs: bool,
+    /// Whether any explicit selector (:range, :raw, :defs) was present in path
+    pub has_explicit_selector: bool,
+}
+
+/// Parse inline selectors from a path string, returning the clean path without
+/// selectors and the parsed [`PathSelector`].
+pub fn parse_path_selector(path_str: &str) -> (String, PathSelector) {
+    let mut current_path = path_str;
+    let mut selector = PathSelector::default();
+
+    loop {
+        let Some(last_colon_idx) = current_path.rfind(':') else {
+            break;
+        };
+
+        // Don't treat Windows drive letters (e.g. C:\ or C:/) as a selector
+        if last_colon_idx == 1 {
+            let first_char = current_path.chars().next().unwrap_or('\0');
+            if first_char.is_ascii_alphabetic() {
+                break;
+            }
+        }
+
+        let suffix = &current_path[last_colon_idx + 1..];
+
+        if suffix == "raw" {
+            selector.raw = true;
+            selector.has_explicit_selector = true;
+            current_path = &current_path[..last_colon_idx];
+        } else if suffix == "defs" {
+            selector.defs = true;
+            selector.has_explicit_selector = true;
+            current_path = &current_path[..last_colon_idx];
+        } else if let Some((start, end)) = parse_range_selector(suffix) {
+            selector.range = Some((start, end));
+            selector.has_explicit_selector = true;
+            current_path = &current_path[..last_colon_idx];
+        } else {
+            break;
+        }
+    }
+
+    (current_path.to_string(), selector)
+}
+
+fn parse_range_selector(suffix: &str) -> Option<(usize, Option<usize>)> {
+    if suffix.is_empty() {
+        return None;
+    }
+
+    if let Some((start_s, end_s)) = suffix.split_once('-') {
+        let start = start_s.parse::<usize>().ok()?.max(1);
+        if end_s.is_empty() {
+            Some((start, None))
+        } else {
+            let end = end_s.parse::<usize>().ok()?.max(1);
+            if end < start {
+                return None;
+            }
+            Some((start, Some(end)))
+        }
+    } else {
+        let start = suffix.parse::<usize>().ok()?.max(1);
+        Some((start, None))
+    }
+}
+
+fn render_defs_outline(content: &str, path: &Path, line_numbers: bool) -> anyhow::Result<String> {
+    use std::fmt::Write as _;
+
+    let content_lines: Vec<&str> = content.lines().collect();
+    let options = SummaryOptions {
+        code: content.to_string(),
+        lang: None,
+        path: Some(path.to_string_lossy().to_string()),
+        min_body_lines: Some(2),
+        min_comment_lines: None,
+        unfold_until_lines: None,
+        unfold_limit_lines: None,
+    };
+
+    let summary_opt = summarize_code(options).ok();
+    let mut output = String::new();
+    if let Some(summary) = summary_opt {
+        if summary.parsed {
+            for segment in &summary.segments {
+                if segment.kind == "kept" {
+                    for line_num in segment.start_line..=segment.end_line {
+                        let line = content_lines
+                            .get((line_num - 1) as usize)
+                            .copied()
+                            .unwrap_or("");
+                        if line_numbers {
+                            let _ = write!(output, "{:6} | {}\n", line_num, line);
+                        } else {
+                            output.push_str(line);
+                            output.push('\n');
+                        }
+                    }
+                } else if segment.kind == "elided" {
+                    if line_numbers {
+                        let _ = write!(output, "{:>6} | ...\n", "...");
+                    } else {
+                        output.push_str("...\n");
+                    }
+                }
+            }
+        } else {
+            for (idx, line) in content_lines.iter().enumerate() {
+                let line_num = idx + 1;
+                if line_numbers {
+                    let _ = write!(output, "{:6} | {}\n", line_num, line);
+                } else {
+                    output.push_str(line);
+                    output.push('\n');
+                }
+            }
+        }
+    } else {
+        for (idx, line) in content_lines.iter().enumerate() {
+            let line_num = idx + 1;
+            if line_numbers {
+                let _ = write!(output, "{:6} | {}\n", line_num, line);
+            } else {
+                output.push_str(line);
+                output.push('\n');
+            }
+        }
+    }
+
+    Ok(output)
+}
+
+fn render_oversized_summary(
+    content: &str,
+    path: &Path,
+    line_numbers: bool,
+) -> anyhow::Result<String> {
+    use std::fmt::Write as _;
+
+    let content_lines: Vec<&str> = content.lines().collect();
+    let total_lines = content_lines.len();
+
+    let options = SummaryOptions {
+        code: content.to_string(),
+        lang: None,
+        path: Some(path.to_string_lossy().to_string()),
+        min_body_lines: Some(2),
+        min_comment_lines: None,
+        unfold_until_lines: None,
+        unfold_limit_lines: None,
+    };
+
+    let summary_opt = summarize_code(options).ok();
+    let mut output = String::new();
+    let mut elided_lines_count = 0usize;
+
+    if let Some(summary) = summary_opt {
+        if summary.parsed && summary.elided {
+        for segment in &summary.segments {
+            if segment.kind == "kept" {
+                for line_num in segment.start_line..=segment.end_line {
+                    let line = content_lines
+                        .get((line_num - 1) as usize)
+                        .copied()
+                        .unwrap_or("");
+                    if line_numbers {
+                        let _ = write!(output, "{:6} | {}\n", line_num, line);
+                    } else {
+                        output.push_str(line);
+                        output.push('\n');
+                    }
+                }
+            } else if segment.kind == "elided" {
+                let span = (segment.end_line.saturating_sub(segment.start_line) + 1) as usize;
+                elided_lines_count += span;
+                if line_numbers {
+                    let _ = write!(output, "{:>6} | ...\n", "...");
+                } else {
+                    output.push_str("...\n");
+                }
+            }
+        }
+        }
+    }
+
+    if elided_lines_count == 0 {
+        output.clear();
+        let head_count = 50.min(total_lines);
+        let tail_count = 50.min(total_lines.saturating_sub(head_count));
+        let elided_span = total_lines.saturating_sub(head_count + tail_count);
+        elided_lines_count = elided_span;
+
+        for line_num in 1..=head_count {
+            let line = content_lines.get(line_num - 1).copied().unwrap_or("");
+            if line_numbers {
+                let _ = write!(output, "{:6} | {}\n", line_num, line);
+            } else {
+                output.push_str(line);
+                output.push('\n');
+            }
+        }
+
+        if elided_span > 0 {
+            if line_numbers {
+                let _ = write!(output, "{:>6} | ...\n", "...");
+            } else {
+                output.push_str("...\n");
+            }
+        }
+
+        let tail_start = total_lines.saturating_sub(tail_count) + 1;
+        for line_num in tail_start..=total_lines {
+            let line = content_lines.get(line_num - 1).copied().unwrap_or("");
+            if line_numbers {
+                let _ = write!(output, "{:6} | {}\n", line_num, line);
+            } else {
+                output.push_str(line);
+                output.push('\n');
+            }
+        }
+    }
+
+    output.push_str(&format!(
+        "\nSummary: {} lines elided; re-issue with line range selector (e.g. :50-100)\n",
+        elided_lines_count
+    ));
+
+    Ok(output)
+}
+
 // ---------------------------------------------------------------------------
 
 #[derive(Default, Debug, Clone)]
@@ -190,8 +432,7 @@ impl Tool for ReadFileTool {
             "type": "object",
             "properties": {
                 "path": {
-                    "type": "string",
-                    "description": "Path to the file to read (relative to workspace or absolute)."
+                    "description": "Path to the file to read (relative to workspace or absolute). Supports inline selectors: ':start-end' (e.g. ':10-40'), ':start' (e.g. ':50'), ':raw', and ':defs'."
                 },
                 "offset": {
                     "type": "integer",
@@ -217,7 +458,12 @@ impl Tool for ReadFileTool {
             .or_else(|| args.get("file_path").and_then(|v| v.as_str()))
             .ok_or_else(|| anyhow::anyhow!("Missing required parameter: path"))?;
 
-        let full_path = resolve_path(path_str, &ctx.cwd);
+        let (clean_path, selector) = parse_path_selector(path_str);
+        if clean_path.is_empty() {
+            anyhow::bail!("Missing file path in: '{path_str}'");
+        }
+
+        let full_path = resolve_path(&clean_path, &ctx.cwd);
 
         if !full_path.exists() {
             anyhow::bail!("File not found: '{}'", full_path.display());
@@ -227,10 +473,73 @@ impl Tool for ReadFileTool {
             anyhow::bail!("Path is a directory, not a file: '{}'", full_path.display());
         }
 
-        let window = parse_read_window(&args);
+        let mut window = parse_read_window(&args);
 
-        // Streaming read: decode the file line-by-line instead of buffering
-        // the whole file into memory, and keep only the requested window.
+        if let Some((start, end_opt)) = selector.range {
+            window.offset = start;
+            if let Some(end) = end_opt {
+                window.limit = Some(end.saturating_sub(start) + 1);
+            }
+        }
+
+        if selector.raw {
+            window.line_numbers = false;
+        }
+
+        let line_numbers = window.line_numbers;
+
+        // If :defs was explicitly requested, return AST outline
+        if selector.defs {
+            let bytes = tokio::fs::read(&full_path).await.map_err(|e| {
+                anyhow::anyhow!("Failed to read file '{}': {e}", full_path.display())
+            })?;
+            if bytes.is_empty() {
+                return Ok("(empty file)".to_string());
+            }
+            let sniff_len = bytes.len().min(BINARY_SNIFF_BYTES);
+            if bytes[..sniff_len].contains(&0) {
+                anyhow::bail!("Cannot read binary file '{}'", full_path.display());
+            }
+            let content = String::from_utf8(bytes).map_err(|_| {
+                anyhow::anyhow!("File '{}' is not valid UTF-8", full_path.display())
+            })?;
+            return render_defs_outline(&content, &full_path, line_numbers);
+        }
+
+        // Automatic outline/summary for oversized files read without explicit selector or limit
+        let no_explicit_selector_or_limit = !selector.has_explicit_selector
+            && args.get("limit").is_none()
+            && args
+                .get("offset")
+                .map(|v| v.as_u64() == Some(1))
+                .unwrap_or(true);
+
+        if no_explicit_selector_or_limit && SupportLang::from_path(&full_path).is_some() {
+            let bytes = tokio::fs::read(&full_path).await.map_err(|e| {
+                anyhow::anyhow!("Failed to read file '{}': {e}", full_path.display())
+            })?;
+            if bytes.is_empty() {
+                return Ok("(empty file)".to_string());
+            }
+            let sniff_len = bytes.len().min(BINARY_SNIFF_BYTES);
+            if bytes[..sniff_len].contains(&0) {
+                anyhow::bail!("Cannot read binary file '{}'", full_path.display());
+            }
+            let content = String::from_utf8(bytes).map_err(|_| {
+                anyhow::anyhow!("File '{}' is not valid UTF-8", full_path.display())
+            })?;
+
+            let total_lines = content.lines().count();
+            if total_lines > 500 {
+                return render_oversized_summary(&content, &full_path, line_numbers);
+            }
+
+            let lines: Vec<String> = content.lines().map(|s| s.to_string()).collect();
+            let output = format_read_output(&window, &lines, 1, total_lines);
+            return Ok(output);
+        }
+
+        // Standard windowed/streaming read
         let file = tokio::fs::File::open(&full_path)
             .await
             .map_err(|e| anyhow::anyhow!("Failed to read file '{}': {e}", full_path.display()))?;
@@ -285,7 +594,6 @@ impl Tool for ReadFileTool {
             }
         }
 
-
         if empty {
             return Ok("(empty file)".to_string());
         }
@@ -308,7 +616,10 @@ impl Tool for ReadFileTool {
         // When we broke out early (window full + one lookahead line), the
         // counted total is a lower bound; rewrite the footer so remaining
         // counts are never understated.
-        if selected.len() >= max_take && total_lines == start_idx + max_take + 1 {
+        if window.line_numbers
+            && selected.len() >= max_take
+            && total_lines == start_idx + max_take + 1
+        {
             let more_marker = "\n... [";
             if let Some(pos) = output.rfind(more_marker) {
                 output.truncate(pos);
@@ -795,6 +1106,134 @@ mod tests {
         assert!(paths.contains(&"visible.txt".to_string()));
         assert!(!paths.contains(&".hidden.txt".to_string()));
         assert!(!paths.contains(&"sub/nested.txt".to_string()));
+
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+    #[test]
+    fn test_parse_path_selector_variants() {
+        let (path, sel) = parse_path_selector("src/main.rs:10-40");
+        assert_eq!(path, "src/main.rs");
+        assert_eq!(sel.range, Some((10, Some(40))));
+        assert!(!sel.raw);
+        assert!(!sel.defs);
+        assert!(sel.has_explicit_selector);
+
+        let (path, sel) = parse_path_selector("src/main.rs:50");
+        assert_eq!(path, "src/main.rs");
+        assert_eq!(sel.range, Some((50, None)));
+        assert!(!sel.raw);
+        assert!(sel.has_explicit_selector);
+
+        let (path, sel) = parse_path_selector("src/main.rs:raw");
+        assert_eq!(path, "src/main.rs");
+        assert!(sel.raw);
+        assert!(sel.has_explicit_selector);
+
+        let (path, sel) = parse_path_selector("src/main.rs:defs");
+        assert_eq!(path, "src/main.rs");
+        assert!(sel.defs);
+        assert!(sel.has_explicit_selector);
+
+        let (path, sel) = parse_path_selector("src/main.rs:10-40:raw");
+        assert_eq!(path, "src/main.rs");
+        assert_eq!(sel.range, Some((10, Some(40))));
+        assert!(sel.raw);
+        assert!(sel.has_explicit_selector);
+
+        let (path, sel) = parse_path_selector("src/main.rs");
+        assert_eq!(path, "src/main.rs");
+        assert!(!sel.has_explicit_selector);
+        assert_eq!(sel.range, None);
+    }
+
+    #[tokio::test]
+    async fn test_read_tool_line_selectors() {
+        let dir = temp_test_dir();
+        let ctx = ToolContext {
+            cwd: dir.clone(),
+            env: std::collections::HashMap::new(),
+        };
+        let read_tool = ReadFileTool::new();
+        let file_path = dir.join("test_lines.txt");
+        let content = (1..=10).map(|i| format!("Line {i}\n")).collect::<String>();
+        std::fs::write(&file_path, content).unwrap();
+
+        // 1. :2-4 slicing
+        let res = read_tool
+            .execute(json!({ "path": "test_lines.txt:2-4" }), &ctx)
+            .await
+            .unwrap();
+        assert!(res.contains("     2 | Line 2"));
+        assert!(res.contains("     4 | Line 4"));
+        assert!(!res.contains("Line 1"));
+        assert!(!res.contains("Line 5"));
+
+        // 2. :8 offset
+        let res = read_tool
+            .execute(json!({ "path": "test_lines.txt:8" }), &ctx)
+            .await
+            .unwrap();
+        assert!(res.contains("     8 | Line 8"));
+        assert!(res.contains("    10 | Line 10"));
+        assert!(!res.contains("Line 7"));
+
+        // 3. :raw
+        let res = read_tool
+            .execute(json!({ "path": "test_lines.txt:raw" }), &ctx)
+            .await
+            .unwrap();
+        assert_eq!(res, (1..=10).map(|i| format!("Line {i}\n")).collect::<String>());
+
+        // 4. :2-4:raw
+        let res = read_tool
+            .execute(json!({ "path": "test_lines.txt:2-4:raw" }), &ctx)
+            .await
+            .unwrap();
+        assert_eq!(res, "Line 2\nLine 3\nLine 4\n");
+
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[tokio::test]
+    async fn test_read_tool_defs_and_oversized_summary() {
+        let dir = temp_test_dir();
+        let ctx = ToolContext {
+            cwd: dir.clone(),
+            env: std::collections::HashMap::new(),
+        };
+        let read_tool = ReadFileTool::new();
+
+        // 1. Test :defs on Rust code
+        let code_path = dir.join("lib.rs");
+        let code = "pub fn add(a: i32, b: i32) -> i32 {\n    let sum = a + b;\n    sum\n}\n\npub struct Item {\n    pub id: u32,\n}\n";
+        std::fs::write(&code_path, code).unwrap();
+
+        let res = read_tool
+            .execute(json!({ "path": "lib.rs:defs" }), &ctx)
+            .await
+            .unwrap();
+        assert!(res.contains("pub fn add"));
+        assert!(res.contains("pub struct Item"));
+        assert!(res.contains("..."));
+
+        // 2. Test >500 lines automatic outline summary
+        let big_code_path = dir.join("big_code.rs");
+        let mut big_code = String::new();
+        for i in 0..110 {
+            big_code.push_str(&format!(
+                "pub fn func_{i}() -> usize {{\n    let a = {i};\n    let b = a + 1;\n    b\n}}\n\n"
+            ));
+        }
+        assert!(big_code.lines().count() > 500);
+        std::fs::write(&big_code_path, &big_code).unwrap();
+
+        let res = read_tool
+            .execute(json!({ "path": "big_code.rs" }), &ctx)
+            .await
+            .unwrap();
+        assert!(res.contains("Summary:"));
+        assert!(res.contains("lines elided; re-issue with line range selector"));
+        assert!(res.contains("..."));
 
         let _ = std::fs::remove_dir_all(&dir);
     }
