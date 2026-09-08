@@ -39,6 +39,12 @@ pub mod tokens;
 pub mod trace;
 pub mod undo;
 pub mod updater;
+pub mod mesh_network;
+pub mod tdd_loop;
+pub mod todo_state;
+pub use mesh_network::{MeshMessage, MeshNode, PeerId, PeerStatus};
+pub use tdd_loop::{TddEngine, TddIteration, TddPhase, TestFailure};
+pub use todo_state::{TodoItem, TodoPhase, TodoState, TodoStatus};
 pub use skill_state::{extract_state_patch, ExtractedPatch, SkillState, StateUpdateReport};
 
 pub use advisor::{

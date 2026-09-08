@@ -8,6 +8,7 @@ pub mod context_view;
 pub mod context_warning;
 pub mod diff_view;
 pub mod doc_render;
+pub mod editor;
 pub mod file_picker;
 pub mod inline;
 pub mod keymap_config;
@@ -22,9 +23,11 @@ pub mod print_css;
 pub mod progress_tree;
 pub mod prompt;
 pub mod prompt_match;
+pub mod prompt_picker;
 pub mod quick;
 pub mod rate_limit_banner;
 pub mod repl;
+pub mod review;
 pub mod side_by_side;
 pub mod diff_viewer;
 pub mod slash;
@@ -42,6 +45,9 @@ pub mod theme;
 pub mod title;
 pub mod usage_card;
 pub mod voice;
+pub use editor::{edit_text_interactive, EditorBuffer as TuiEditorBuffer, EditorWidget};
+pub use prompt_picker::{pick_prompt_interactive, PromptPickerWidget, PromptTemplate};
+pub use review::{run_diff_review_interactive, DiffHunkReviewState, ReviewHunk, ReviewSession, ReviewWidget};
 // Re-exports for convenient top-level access
 pub use agent_tree::{
     render_tree_ansi, render_tree_diagram, render_tree_plain, AgentTree, AgentTreeAction,

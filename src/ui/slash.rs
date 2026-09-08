@@ -128,6 +128,12 @@ pub enum SlashCommand {
     Subagents { args: Vec<String> },
     /// View side-by-side git working tree diffs: `/diff [path]`
     Diff { path: Option<String> },
+    /// View, manage, or add items to the phased todo task tracker: `/todo [view|add|done|clear]`
+    Todo { args: Vec<String> },
+    /// Launch the interactive in-TUI text editor or open target file: `/editor [file]`
+    Editor { path: Option<String> },
+    /// Interactive hunk-by-hunk git diff reviewer: `/review [path]`
+    Review { path: Option<String> },
     /// Unrecognized slash command.
     Unknown { name: String, args: Vec<String> },
 }
@@ -789,6 +795,17 @@ impl SlashCommand {
                 let path = args.first().cloned();
                 SlashCommand::Diff { path }
             },
+            "/todo" | "/tasks" | "/checklist" => SlashCommand::Todo {
+                args: args.to_vec(),
+            },
+            "/editor" | "/edit" => {
+                let path = args.first().cloned();
+                SlashCommand::Editor { path }
+            },
+            "/review" => {
+                let path = args.first().cloned();
+                SlashCommand::Review { path }
+            },
             _ => SlashCommand::Unknown {
                 name: tokens[0].clone(),
                 args: args.to_vec(),
@@ -1219,6 +1236,18 @@ pub fn execute_slash_command(
             handle_diff(path.as_deref(), runner);
             CommandResult::Continue
         }
+        SlashCommand::Todo { args } => {
+            handle_todo(&args);
+            CommandResult::Continue
+        }
+        SlashCommand::Editor { path } => {
+            handle_editor(path.as_deref());
+            CommandResult::Continue
+        }
+        SlashCommand::Review { path } => {
+            handle_review(path.as_deref(), runner);
+            CommandResult::Continue
+        }
         SlashCommand::Unknown { name, args } => {
             handle_unknown(name, args);
             CommandResult::Continue
@@ -1281,6 +1310,141 @@ fn handle_diff(_path: Option<&str>, runner: &mut AgentRunner) {
         }
         Err(e) => {
             println!("\x1b[1;31m✗ Failed to compute git diff:\x1b[0m {}", e);
+        }
+    }
+}
+
+fn handle_todo(args: &[String]) {
+    if let Ok(handle) = tokio::runtime::Handle::try_current() {
+        tokio::task::block_in_place(|| {
+            handle.block_on(async {
+                run_todo_subcommand(args).await;
+            })
+        });
+    } else if let Ok(rt) = tokio::runtime::Builder::new_current_thread().enable_all().build() {
+        rt.block_on(async {
+            run_todo_subcommand(args).await;
+        });
+    }
+}
+
+async fn run_todo_subcommand(args: &[String]) {
+    let op = args.first().map(|s| s.as_str()).unwrap_or("view");
+    match op {
+        "view" | "list" | "show" => {
+            let state = crate::tools::todo::GLOBAL_TODO_STATE.read().await;
+            println!("\n{}\n", state.view());
+        }
+        "clear" | "rm" => {
+            let mut state = crate::tools::todo::GLOBAL_TODO_STATE.write().await;
+            state.clear();
+            println!("\x1b[1;32m✓\x1b[0m Cleared all tasks.\n");
+        }
+        "done" => {
+            let target = args[1..].join(" ");
+            if target.is_empty() {
+                println!("\x1b[1;31mError:\x1b[0m Usage: /todo done <task name or #id>\n");
+                return;
+            }
+            let mut state = crate::tools::todo::GLOBAL_TODO_STATE.write().await;
+            if state.done(&target) {
+                println!("\x1b[1;32m✓\x1b[0m Marked task as completed.\n");
+            } else {
+                println!("\x1b[1;31mError:\x1b[0m Task not found: {}\n", target);
+            }
+        }
+        "add" => {
+            let task = args[1..].join(" ");
+            if task.is_empty() {
+                println!("\x1b[1;31mError:\x1b[0m Usage: /todo add <task description>\n");
+                return;
+            }
+            let mut state = crate::tools::todo::GLOBAL_TODO_STATE.write().await;
+            state.append("Tasks", vec![task]);
+            println!("\x1b[1;32m✓\x1b[0m Added task to checklist.\n");
+        }
+        _ => {
+            let task = args.join(" ");
+            let mut state = crate::tools::todo::GLOBAL_TODO_STATE.write().await;
+            state.append("Tasks", vec![task]);
+            println!("\x1b[1;32m✓\x1b[0m Added task to checklist.\n");
+        }
+    }
+}
+
+fn handle_editor(path: Option<&str>) {
+    let target_path = path.map(std::path::PathBuf::from);
+    let initial_text = if let Some(p) = &target_path {
+        if p.exists() {
+            std::fs::read_to_string(p).unwrap_or_default()
+        } else {
+            String::new()
+        }
+    } else {
+        String::new()
+    };
+
+    match crate::ui::edit_text_interactive(&initial_text, target_path.as_deref()) {
+        Ok(Some(saved_text)) => {
+            if let Some(p) = &target_path {
+                if let Err(e) = std::fs::write(p, &saved_text) {
+                    eprintln!("\x1b[1;31mError saving to {}:\x1b[0m {e}\n", p.display());
+                } else {
+                    println!("\x1b[1;32m✓\x1b[0m Saved {} lines to {}\n", saved_text.lines().count(), p.display());
+                }
+            } else {
+                println!("\x1b[1;32m✓\x1b[0m Editor closed with {} characters.\n", saved_text.len());
+            }
+        }
+        Ok(None) => {
+            println!("\x1b[2;37mEditor closed without saving.\x1b[0m\n");
+        }
+        Err(e) => {
+            eprintln!("\x1b[1;31mEditor error:\x1b[0m {e}\n");
+        }
+    }
+}
+
+fn handle_review(_path: Option<&str>, runner: &mut AgentRunner) {
+    let diff_result = crate::ui::diff_viewer::git_working_tree_diff(&runner.tool_ctx().cwd);
+    let diff_text = match diff_result {
+        Ok(t) => t,
+        Err(e) => {
+            println!("\x1b[1;31m✗ Failed to compute git diff:\x1b[0m {}", e);
+            return;
+        }
+    };
+
+    if diff_text.trim().is_empty() {
+        println!("\x1b[1;32m✓\x1b[0m Working tree is clean — no diffs to review.\n");
+        return;
+    }
+
+    match crate::ui::run_diff_review_interactive(&diff_text) {
+        Ok(session) => {
+            let (total, accepted, rejected) = session.summary();
+            println!(
+                "\x1b[1;32m✓\x1b[0m Review complete: \x1b[1;32m{} accepted\x1b[0m, \x1b[1;31m{} rejected\x1b[0m of {} hunks.\n",
+                accepted, rejected, total
+            );
+        }
+        Err(e) => {
+            eprintln!("\x1b[1;31mReview error:\x1b[0m {e}\n");
+        }
+    }
+}
+
+fn handle_prompts() {
+    match crate::ui::pick_prompt_interactive() {
+        Ok(Some(template)) => {
+            println!("\x1b[1;32m✓ Selected Prompt Template:\x1b[0m \x1b[1;37m{}\x1b[0m ({})\n", template.name, template.category);
+            println!("{}\n", template.template);
+        }
+        Ok(None) => {
+            println!("\x1b[2;37mPrompt selection cancelled.\x1b[0m\n");
+        }
+        Err(e) => {
+            eprintln!("\x1b[1;31mPrompt picker error:\x1b[0m {e}\n");
         }
     }
 }

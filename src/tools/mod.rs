@@ -8,6 +8,10 @@ pub mod diff_stats;
 pub mod docgen;
 pub mod edit;
 pub mod env_cleaner;
+pub mod browser;
+pub mod mcp_discovery;
+pub mod todo;
+pub mod vector_search;
 pub mod fetch;
 pub mod file;
 pub mod git;
@@ -38,6 +42,10 @@ pub mod types;
 pub mod uri_router;
 pub mod watch;
 pub mod web_search;
+pub use browser::BrowserTool;
+pub use mcp_discovery::McpDiscoveryTool;
+pub use todo::TodoTool;
+pub use vector_search::VectorSearchTool;
 pub use ast_edit::AstEditTool;
 pub use ask::AskTool;
 pub use bash::BashTool;
@@ -142,6 +150,10 @@ pub fn default_registry() -> ToolRegistry {
     registry.register(Arc::new(crate::tools::lsp::LspTool::new()));
     registry.register(Arc::new(AskTool::new()));
     registry.register(Arc::new(AstEditTool::new()));
+    registry.register(Arc::new(TodoTool::new()));
+    registry.register(Arc::new(BrowserTool::new()));
+    registry.register(Arc::new(VectorSearchTool::new()));
+    registry.register(Arc::new(McpDiscoveryTool::new()));
     compat::register_compat_tools(&mut registry);
     registry
 }
@@ -220,7 +232,11 @@ mod tests {
         assert!(reg.get("bg_process").is_some());
         assert!(reg.get("proc").is_some());
         assert!(reg.get("ask").is_some());
-        assert!(reg.definitions().len() >= 13);
+        assert!(reg.get("todo").is_some());
+        assert!(reg.get("browser").is_some());
+        assert!(reg.get("vector_search").is_some());
+        assert!(reg.get("mcp_discovery").is_some());
+        assert!(reg.definitions().len() >= 17);
     }
     #[tokio::test]
     async fn test_file_tools_roundtrip() {
