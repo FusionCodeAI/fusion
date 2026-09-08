@@ -719,7 +719,7 @@ impl OpenRouterClient {
             let mut prompt_tokens = None;
             let mut completion_tokens = None;
             let mut done_sent = false;
-
+            let mut reasoning_dedup = crate::provider::types::CumulativeDeduplicator::new();
             while let Some(event_res) = stream.next().await {
                 match event_res {
                     Ok(event) => {
@@ -783,10 +783,11 @@ impl OpenRouterClient {
                                             .or_else(|| delta.get("thinking"))
                                             .and_then(|v| v.as_str())
                                         {
-                                            if !reasoning.is_empty() {
+                                            let delta_chunk = reasoning_dedup.feed(reasoning);
+                                            if !delta_chunk.is_empty() {
                                                 let _ = tx
                                                     .send(StreamChunk::ThinkingDelta(
-                                                        reasoning.to_string(),
+                                                        delta_chunk.to_string(),
                                                     ))
                                                     .await;
                                             }

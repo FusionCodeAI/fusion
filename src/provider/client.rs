@@ -367,7 +367,7 @@ impl LlmClient {
             let mut prompt_tokens = None;
             let mut completion_tokens = None;
             let mut done_sent = false;
-
+            let mut reasoning_dedup = crate::provider::types::CumulativeDeduplicator::new();
             while let Some(event_res) = stream.next().await {
                 match event_res {
                     Ok(event) => {
@@ -414,16 +414,17 @@ impl LlmClient {
                                         .map(|s| s.to_string());
 
                                     if let Some(delta) = choice.get("delta") {
-                                        // DeepSeek R1 / Reasoning models
+                                        // DeepSeek R1 / Reasoning models / MiniMax cumulative deduplication
                                         if let Some(reasoning) = delta
                                             .get("reasoning_content")
                                             .or_else(|| delta.get("reasoning"))
                                             .and_then(|v| v.as_str())
                                         {
-                                            if !reasoning.is_empty() {
+                                            let delta_chunk = reasoning_dedup.feed(reasoning);
+                                            if !delta_chunk.is_empty() {
                                                 let _ = tx
                                                     .send(StreamChunk::ThinkingDelta(
-                                                        reasoning.to_string(),
+                                                        delta_chunk.to_string(),
                                                     ))
                                                     .await;
                                             }
