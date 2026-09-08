@@ -81,6 +81,7 @@ pub struct AgentRunner {
     recovery: crate::agent::recovery::RecoveryManager,
     system_prompt: Option<String>,
     checkpoints: std::sync::Arc<std::sync::Mutex<crate::agent::undo::CheckpointManager>>,
+    subagents: std::sync::Arc<crate::agent::subagent::SubagentManager>,
     max_turns: usize,
 }
 impl AgentRunner {
@@ -94,15 +95,16 @@ impl AgentRunner {
         let max_turns = config.max_turns.unwrap_or(100).clamp(10, 500);
         let mut tools = tools;
         let client_arc = std::sync::Arc::new(client.clone());
-        let spawn_tool = std::sync::Arc::new(crate::agent::subagent::SpawnSubagentTool::new(
+        let subagents = std::sync::Arc::new(crate::agent::subagent::SubagentManager::new(
             client_arc.clone(),
             config.clone(),
             tools.clone(),
         ));
-        let batch_tool = std::sync::Arc::new(crate::agent::subagent::SpawnBatchSubagentsTool::new(
-            client_arc,
-            config.clone(),
-            tools.clone(),
+        let spawn_tool = std::sync::Arc::new(crate::agent::subagent::SpawnSubagentTool::from_manager(
+            (*subagents).clone(),
+        ));
+        let batch_tool = std::sync::Arc::new(crate::agent::subagent::SpawnBatchSubagentsTool::from_manager(
+            (*subagents).clone(),
         ));
         tools.register(spawn_tool);
         tools.register(batch_tool);
@@ -118,9 +120,15 @@ impl AgentRunner {
             checkpoints: std::sync::Arc::new(std::sync::Mutex::new(
                 crate::agent::undo::CheckpointManager::new(tool_ctx.cwd.clone()),
             )),
+            subagents,
             system_prompt: None,
             max_turns,
         }
+    }
+
+    /// Access the shared SubagentManager.
+    pub fn subagents(&self) -> &std::sync::Arc<crate::agent::subagent::SubagentManager> {
+        &self.subagents
     }
 
     /// Sets a custom AdvisorRegistry.

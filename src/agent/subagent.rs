@@ -1185,6 +1185,12 @@ async fn execute_subagent_loop(
                 info.turns = turns;
             }
 
+            // Persist output artifact for agent://<id> and agent://<name> URI resolution
+            let artifacts_dir = tool_ctx.cwd.join(".fusion").join("artifacts");
+            if let Ok(_) = std::fs::create_dir_all(&artifacts_dir) {
+                let _ = std::fs::write(artifacts_dir.join(format!("{}.txt", id)), &content);
+                let _ = std::fs::write(artifacts_dir.join(format!("{}.txt", name)), &content);
+            }
             return Ok(SubagentResult {
                 id: id.to_string(),
                 name: name.to_string(),

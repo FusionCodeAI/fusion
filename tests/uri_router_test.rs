@@ -235,3 +235,20 @@ async fn test_file_read_tool_error_on_nonexistent_uri() {
 
     assert!(err.to_string().contains("File not found") || err.to_string().contains("ghost"));
 }
+
+#[test]
+fn test_resolve_agent_and_artifact_uri() {
+    let dir = tempdir().expect("Failed to create tempdir");
+    let artifacts_dir = dir.path().join(".fusion").join("artifacts");
+    fs::create_dir_all(&artifacts_dir).expect("create artifacts dir");
+    let artifact_file = artifacts_dir.join("scout_arch.txt");
+    fs::write(&artifact_file, "Architecture findings: clean modules.").expect("write artifact");
+
+    // Resolve via agent://scout_arch
+    let resolved = resolve_internal_uri("agent://scout_arch", Some(dir.path()));
+    assert_eq!(resolved, Some(artifact_file.clone()));
+
+    // Resolve via artifact://scout_arch
+    let resolved_artifact = resolve_internal_uri("artifact://scout_arch", Some(dir.path()));
+    assert_eq!(resolved_artifact, Some(artifact_file));
+}

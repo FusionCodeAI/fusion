@@ -21,6 +21,8 @@ pub fn resolve_internal_uri(raw_path: &str, workspace_root: Option<&Path>) -> Op
         resolve_skill_uri(trimmed, workspace_root)
     } else if trimmed.starts_with("rule://") {
         resolve_rule_uri(trimmed, workspace_root)
+    } else if trimmed.starts_with("agent://") || trimmed.starts_with("artifact://") {
+        resolve_agent_uri(trimmed, workspace_root)
     } else {
         None
     }
@@ -152,6 +154,43 @@ fn resolve_skill_uri(raw_path: &str, workspace_root: Option<&Path>) -> Option<Pa
                 .join(format!("{skill_name}.md"));
             if c4.exists() {
                 return Some(c4);
+            }
+        }
+    }
+
+    None
+}
+/// Resolves an `agent://<id_or_name>` or `artifact://<id>` URI to its persisted output file path.
+fn resolve_agent_uri(raw_path: &str, workspace_root: Option<&Path>) -> Option<PathBuf> {
+    let rest = raw_path
+        .strip_prefix("agent://")
+        .or_else(|| raw_path.strip_prefix("artifact://"))?
+        .trim();
+    let rest = rest.trim_start_matches('/').trim();
+    if rest.is_empty() {
+        return None;
+    }
+
+    let mut search_dirs = Vec::new();
+    if let Some(root) = workspace_root {
+        search_dirs.push(root.join(".fusion").join("artifacts"));
+    }
+    if let Ok(cwd) = std::env::current_dir() {
+        search_dirs.push(cwd.join(".fusion").join("artifacts"));
+    }
+    search_dirs.push(crate::config::Config::config_dir().join("artifacts"));
+
+    let candidates = [
+        format!("{}.txt", rest),
+        format!("{}.md", rest),
+        rest.to_string(),
+    ];
+
+    for dir in &search_dirs {
+        for candidate in &candidates {
+            let path = dir.join(candidate);
+            if path.exists() && path.is_file() {
+                return Some(path);
             }
         }
     }

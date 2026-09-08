@@ -123,8 +123,9 @@ pub enum SlashCommand {
     Mcp { args: Vec<String> },
     /// Decompose a high-level goal into a multi-phase execution DAG: `/goal <objective>`
     Goal { prompt: String },
-    /// View, execute, or cancel the active phased execution plan: `/plan [status|stages|cancel]`
     Plan { args: Vec<String> },
+    /// Inspect active and recent subagent worker tasks: `/subagents` or `/workers`
+    Subagents { args: Vec<String> },
     /// Unrecognized slash command.
     Unknown { name: String, args: Vec<String> },
 }
@@ -604,6 +605,14 @@ pub static COMMAND_PALETTE: &[CommandDescriptor] = &[
         description: "View or manage the active phased execution plan",
         examples: &["/plan", "/plan status", "/plan stages"],
     },
+    CommandDescriptor {
+        name: "/subagents",
+        aliases: &["/workers", "/subagent"],
+        syntax: "/subagents [list]",
+        category: CommandCategory::Session,
+        description: "Inspect active background subagent workers and execution status",
+        examples: &["/subagents", "/workers"],
+    },
 ];
 
 /// Returns all static command palette entries.
@@ -761,6 +770,9 @@ impl SlashCommand {
                 prompt: args.join(" "),
             },
             "/plan" => SlashCommand::Plan {
+                args: args.to_vec(),
+            },
+            "/subagents" | "/subagent" | "/workers" | "/worker" => SlashCommand::Subagents {
                 args: args.to_vec(),
             },
             _ => SlashCommand::Unknown {
@@ -1185,10 +1197,55 @@ pub fn execute_slash_command(
             println!("{}", output);
             CommandResult::Continue
         }
+        SlashCommand::Subagents { args } => {
+            handle_subagents(args, runner);
+            CommandResult::Continue
+        }
         SlashCommand::Unknown { name, args } => {
             handle_unknown(name, args);
             CommandResult::Continue
         }
+    }
+}
+
+fn handle_subagents(_args: &[String], runner: &mut AgentRunner) {
+    let subagents = runner.subagents().clone();
+    let workers = if let Ok(handle) = tokio::runtime::Handle::try_current() {
+        tokio::task::block_in_place(|| {
+            handle.block_on(async move {
+                subagents.list_subagents().await
+            })
+        })
+    } else {
+        Vec::new()
+    };
+    println!("\x1b[1;36mSubagent Workers Status\x1b[0m (Concurrency limit: 16 parallel)");
+    if workers.is_empty() {
+        println!("  \x1b[2;37mNo subagent workers currently active in this session.\x1b[0m");
+        println!("  Spawn workers dynamically via \x1b[1;33mspawn_subagent\x1b[0m, \x1b[1;33mspawn_subagents_batch\x1b[0m, or \x1b[1;36m/goal <task>\x1b[0m.\n");
+    } else {
+        for info in workers {
+            let status_badge = match &info.status {
+                crate::agent::subagent::SubagentStatus::Running { turn, current_tool } => {
+                    if let Some(tool) = current_tool {
+                        format!("\x1b[1;32m● Running (turn {}, tool: {})\x1b[0m", turn, tool)
+                    } else {
+                        format!("\x1b[1;32m● Running (turn {})\x1b[0m", turn)
+                    }
+                }
+                crate::agent::subagent::SubagentStatus::Completed { turns, .. } => {
+                    format!("\x1b[1;34m✓ Completed ({} turns)\x1b[0m", turns)
+                }
+                crate::agent::subagent::SubagentStatus::Failed { error } => {
+                    format!("\x1b[1;31m✗ Failed: {}\x1b[0m", error)
+                }
+                crate::agent::subagent::SubagentStatus::Cancelled => "\x1b[1;30m■ Cancelled\x1b[0m".to_string(),
+                crate::agent::subagent::SubagentStatus::Pending => "\x1b[2;37m◌ Pending\x1b[0m".to_string(),
+            };
+            println!("  [{}] \x1b[1;37m{}\x1b[0m ({:?}) - {}", info.id, info.name, info.role, status_badge);
+            println!("    \x1b[2;37mTask: {}\x1b[0m", info.task);
+        }
+        println!();
     }
 }
 
@@ -4800,6 +4857,54 @@ mod tests {
         assert_eq!(
             SlashCommand::parse("/notif status"),
             Some(SlashCommand::Notify {
+                args: vec!["status".to_string()]
+            })
+        );
+    }
+
+    #[test]
+    fn test_parse_subagents() {
+        assert_eq!(
+            SlashCommand::parse("/subagents"),
+            Some(SlashCommand::Subagents { args: Vec::new() })
+        );
+        assert_eq!(
+            SlashCommand::parse("/workers"),
+            Some(SlashCommand::Subagents { args: Vec::new() })
+        );
+        assert_eq!(
+            SlashCommand::parse("/subagent list"),
+            Some(SlashCommand::Subagents {
+                args: vec!["list".to_string()]
+            })
+        );
+    }
+
+    #[test]
+    fn test_parse_mcp() {
+        assert_eq!(
+            SlashCommand::parse("/mcp"),
+            Some(SlashCommand::Mcp { args: Vec::new() })
+        );
+        assert_eq!(
+            SlashCommand::parse("/mcp status"),
+            Some(SlashCommand::Mcp {
+                args: vec!["status".to_string()]
+            })
+        );
+    }
+
+    #[test]
+    fn test_parse_goal_and_plan() {
+        assert_eq!(
+            SlashCommand::parse("/goal build web server"),
+            Some(SlashCommand::Goal {
+                prompt: "build web server".to_string()
+            })
+        );
+        assert_eq!(
+            SlashCommand::parse("/plan status"),
+            Some(SlashCommand::Plan {
                 args: vec!["status".to_string()]
             })
         );
