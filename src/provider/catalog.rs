@@ -652,9 +652,22 @@ impl CatalogFetcher {
         // below, commented out, and can be re-enabled per provider.
         let (fusion_key, fusion_url) = config.get_key_and_url("fusion");
         let fusion_fut = self.fetch_fusion(Some(&fusion_url), fusion_key.as_deref());
-        let (fusion_res,) = tokio::join!(fusion_fut);
+
+        // Auto-probe local Antigravity Tools daemon on 127.0.0.1:8045
+        let local_endpoint = crate::provider::local_daemon::detect_antigravity_daemon();
+        let local_fut = async {
+            if let Some(endpoint) = local_endpoint {
+                crate::provider::local_daemon::fetch_antigravity_models(&endpoint).await
+            } else {
+                Vec::new()
+            }
+        };
+
+        let (fusion_res, local_models) = tokio::join!(fusion_fut, local_fut);
 
         let mut models = Vec::new();
+        // Local daemon models are prioritized for instant free inference
+        models.extend(local_models);
         if let Ok(m) = fusion_res {
             models.extend(m);
         }

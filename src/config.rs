@@ -36,9 +36,19 @@ pub const SUPPORTED_PROVIDERS: &[&str] = &[
     "xai",
     "openrouter",
     "ollama",
+    "antigravity",
+    "codex",
+    "local",
 ];
 
 pub const MODEL_SHORTHANDS: &[(&str, &str, &str)] = &[
+    // Local Antigravity Daemon (Free Inference via local port 8045)
+    ("opus-4.6", "antigravity", "claude-opus-4-6"),
+    ("opus-thinking", "antigravity", "claude-opus-4-6-thinking"),
+    ("sonnet-4.6", "antigravity", "claude-sonnet-4-6"),
+    ("sonnet-4.5", "antigravity", "claude-sonnet-4-5"),
+    ("gemini-3.8", "antigravity", "gemini-3.8-flash-high"),
+    ("antigravity", "antigravity", "claude-opus-4-6"),
     // Fusion Gateway models
     ("minimax", "fusion", "MiniMaxAI/MiniMax-M2.7"),
     ("minimax-m2.7", "fusion", "MiniMaxAI/MiniMax-M2.7"),
@@ -963,6 +973,16 @@ impl Config {
     pub fn detect_provider_for_model(model: &str) -> Option<&'static str> {
         let lower = model.trim().to_lowercase();
 
+        // Check for local Antigravity daemon models
+        if lower.starts_with("claude-opus-4-6")
+            || lower.starts_with("claude-opus-4.6")
+            || lower.starts_with("claude-sonnet-4-6")
+            || lower.starts_with("gemini-3.8")
+            || lower.starts_with("gemini-3.7")
+        {
+            return Some("antigravity");
+        }
+
         if lower.starts_with("minimax") || lower.contains("minimax") {
             return Some("fusion");
         }
@@ -1048,6 +1068,9 @@ impl Config {
             || lower == "grok"
             || lower == "claude"
             || lower == "fusion"
+            || lower == "antigravity"
+            || lower == "codex"
+            || lower == "local"
     }
 
     /// Normalizes model name for a specific provider.
@@ -1137,11 +1160,51 @@ impl Config {
                     .unwrap_or_else(|| "http://localhost:11434".to_string());
                 (None, url)
             }
+            "antigravity" | "antigravity-daemon" => {
+                let env_key = std::env::var("ANTIGRAVITY_API_KEY").ok();
+                if let Some(endpoint) = crate::provider::local_daemon::detect_antigravity_daemon() {
+                    (env_key.or(Some(endpoint.api_key)), endpoint.base_url)
+                } else {
+                    let url = std::env::var("ANTIGRAVITY_BASE_URL")
+                        .unwrap_or_else(|_| "http://127.0.0.1:8045/v1".to_string());
+                    (env_key, url)
+                }
+            }
+            "codex" => {
+                if let Some(endpoint) = crate::provider::local_daemon::detect_codex_auth() {
+                    (Some(endpoint.api_key), endpoint.base_url)
+                } else {
+                    let key = std::env::var("OPENAI_CODEX_OAUTH_TOKEN")
+                        .or_else(|_| std::env::var("CODEX_API_KEY"))
+                        .ok();
+                    let url = std::env::var("CODEX_BASE_URL")
+                        .unwrap_or_else(|_| "https://chatgpt.com/backend-api/codex".to_string());
+                    (key, url)
+                }
+            }
+            "local" => {
+                if let Some(endpoint) = crate::provider::local_daemon::detect_antigravity_daemon() {
+                    (Some(endpoint.api_key), endpoint.base_url)
+                } else if let Some(endpoint) = crate::provider::local_daemon::detect_codex_auth() {
+                    (Some(endpoint.api_key), endpoint.base_url)
+                } else {
+                    let url = "http://127.0.0.1:8045/v1".to_string();
+                    (None, url)
+                }
+            }
             _ => {
                 let key = self
                     .fusion_api_key
                     .clone()
                     .or_else(|| std::env::var("FUSION_API_KEY").ok());
+
+                // If no Fusion key is set, check if local Antigravity daemon is alive for free zero-config fallback!
+                if key.is_none() {
+                    if let Some(endpoint) = crate::provider::local_daemon::detect_antigravity_daemon() {
+                        return (Some(endpoint.api_key), endpoint.base_url);
+                    }
+                }
+
                 let url = self
                     .fusion_base_url
                     .clone()
@@ -1156,6 +1219,8 @@ impl Config {
     /// Returns an actionable setup hint for the given provider's API key.
     pub fn key_hint(provider: &str) -> &'static str {
         match provider.to_lowercase().as_str() {
+            "antigravity" | "local" => "Ensure Antigravity Tools is running on http://127.0.0.1:8045 or configure ~/.antigravity_tools/gui_config.json.",
+            "codex" => "Authenticate with Codex CLI (~/.codex/auth.json) or set OPENAI_CODEX_OAUTH_TOKEN.",
             "deepseek" => "Set DEEPSEEK_API_KEY in your environment (export DEEPSEEK_API_KEY=sk-...) or add \"deepseek_api_key\": \"sk-...\" to ~/.fusion/config.json. Get a key at https://platform.deepseek.com/",
             "anthropic" | "claude" => "Set ANTHROPIC_API_KEY in your environment (export ANTHROPIC_API_KEY=sk-ant-...) or add \"anthropic_api_key\": \"sk-ant-...\" to ~/.fusion/config.json. Get a key at https://console.anthropic.com/",
             "openai" => "Set OPENAI_API_KEY in your environment (export OPENAI_API_KEY=sk-...) or add \"openai_api_key\": \"sk-...\" to ~/.fusion/config.json. Get a key at https://platform.openai.com/api-keys",

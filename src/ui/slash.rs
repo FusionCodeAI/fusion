@@ -2631,13 +2631,23 @@ fn handle_provider(name: Option<&str>, runner: &mut AgentRunner) {
             return;
         }
 
-        if trimmed == "fusion" {
-            runner.config_mut().default_provider = "fusion".to_string();
-            println!("\x1b[1;32m✓\x1b[0m Active provider is \x1b[1;37mfusion\x1b[0m\n");
-        } else {
-            println!(
-                "\x1b[1;33mNote:\x1b[0m Fusion CLI uses the Fusion Gateway. Supported provider is 'fusion'.\n"
-            );
+        match trimmed.as_str() {
+            "fusion" => {
+                runner.config_mut().default_provider = "fusion".to_string();
+                println!("\x1b[1;32m✓\x1b[0m Active provider is \x1b[1;37mfusion\x1b[0m\n");
+            }
+            "antigravity" | "local" => {
+                runner.config_mut().default_provider = "antigravity".to_string();
+                println!("\x1b[1;32m✓\x1b[0m Switched to \x1b[1;36mLocal Antigravity Daemon\x1b[0m (http://127.0.0.1:8045/v1 — Free Inference)\n");
+            }
+            "codex" => {
+                runner.config_mut().default_provider = "codex".to_string();
+                println!("\x1b[1;32m✓\x1b[0m Switched to \x1b[1;36mCodex / ChatGPT Subscription\x1b[0m (Free Inference)\n");
+            }
+            other => {
+                runner.config_mut().default_provider = other.to_string();
+                println!("\x1b[1;32m✓\x1b[0m Active provider set to \x1b[1;37m{}\x1b[0m\n", other);
+            }
         }
     } else {
         print_provider_info(runner);

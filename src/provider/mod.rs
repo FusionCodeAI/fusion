@@ -2,6 +2,7 @@ pub mod anthropic;
 pub mod catalog;
 pub mod client;
 pub mod offline;
+pub mod local_daemon;
 pub mod ollama;
 pub mod openai;
 pub mod openrouter;
@@ -16,6 +17,10 @@ pub use catalog::{
     CatalogModel, CatalogSource, ModelCatalog, ModelCatalogCache, ModelEntry,
 };
 pub use client::LlmClient;
+pub use local_daemon::{
+    detect_antigravity_daemon, detect_codex_auth, fetch_antigravity_models, probe_local_daemons,
+    LocalDaemonEndpoint,
+};
 pub use offline::{
     auto_switch_offline, auto_switch_offline_sync, check_internet_connectivity,
     check_internet_connectivity_async, is_offline, is_online, ping_ollama, ping_ollama_sync,
