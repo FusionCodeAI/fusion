@@ -1428,7 +1428,20 @@ async fn run_todo_subcommand(args: &[String]) {
     match op {
         "view" | "list" | "show" => {
             let state = crate::tools::todo::GLOBAL_TODO_STATE.read().await;
-            println!("\n{}\n", state.view());
+            let term_width = crate::ui::table::get_terminal_width().clamp(40, 84);
+            let summary_title = format!(
+                "Tasks [{}/{}]",
+                state.completed_count(),
+                state.total_count()
+            );
+            let card = crate::ui::tool_card::ToolOutputCard::new(
+                "todo",
+                summary_title,
+                state.view(),
+                true,
+                None,
+            );
+            println!("\n{}\n", card.render(term_width));
         }
         "clear" | "rm" => {
             let mut state = crate::tools::todo::GLOBAL_TODO_STATE.write().await;
@@ -1443,7 +1456,21 @@ async fn run_todo_subcommand(args: &[String]) {
             }
             let mut state = crate::tools::todo::GLOBAL_TODO_STATE.write().await;
             if state.done(&target) {
-                println!("\x1b[1;32m✓\x1b[0m Marked task as completed.\n");
+                println!("\x1b[1;32m✓\x1b[0m Marked task as completed.");
+                let term_width = crate::ui::table::get_terminal_width().clamp(40, 84);
+                let summary_title = format!(
+                    "Tasks [{}/{}]",
+                    state.completed_count(),
+                    state.total_count()
+                );
+                let card = crate::ui::tool_card::ToolOutputCard::new(
+                    "todo",
+                    summary_title,
+                    state.view(),
+                    true,
+                    None,
+                );
+                println!("\n{}\n", card.render(term_width));
             } else {
                 println!("\x1b[1;31mError:\x1b[0m Task not found: {}\n", target);
             }
@@ -1456,13 +1483,41 @@ async fn run_todo_subcommand(args: &[String]) {
             }
             let mut state = crate::tools::todo::GLOBAL_TODO_STATE.write().await;
             state.append("Tasks", vec![task]);
-            println!("\x1b[1;32m✓\x1b[0m Added task to checklist.\n");
+            println!("\x1b[1;32m✓\x1b[0m Added task to checklist.");
+            let term_width = crate::ui::table::get_terminal_width().clamp(40, 84);
+            let summary_title = format!(
+                "Tasks [{}/{}]",
+                state.completed_count(),
+                state.total_count()
+            );
+            let card = crate::ui::tool_card::ToolOutputCard::new(
+                "todo",
+                summary_title,
+                state.view(),
+                true,
+                None,
+            );
+            println!("\n{}\n", card.render(term_width));
         }
         _ => {
             let task = args.join(" ");
             let mut state = crate::tools::todo::GLOBAL_TODO_STATE.write().await;
             state.append("Tasks", vec![task]);
-            println!("\x1b[1;32m✓\x1b[0m Added task to checklist.\n");
+            println!("\x1b[1;32m✓\x1b[0m Added task to checklist.");
+            let term_width = crate::ui::table::get_terminal_width().clamp(40, 84);
+            let summary_title = format!(
+                "Tasks [{}/{}]",
+                state.completed_count(),
+                state.total_count()
+            );
+            let card = crate::ui::tool_card::ToolOutputCard::new(
+                "todo",
+                summary_title,
+                state.view(),
+                true,
+                None,
+            );
+            println!("\n{}\n", card.render(term_width));
         }
     }
 }

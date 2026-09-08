@@ -377,6 +377,41 @@ pub fn parse_tool_info(name: &str, args: &serde_json::Value) -> (String, String)
                 .unwrap_or("");
             (format!("Fetched {}", url), "read".to_string())
         }
+        "todo" => {
+            let op = args.get("op").and_then(|v| v.as_str()).unwrap_or("view");
+            let task = args
+                .get("task")
+                .and_then(|v| v.as_str())
+                .or_else(|| args.get("phase").and_then(|v| v.as_str()))
+                .unwrap_or("");
+            let label = match op {
+                "init" => "Initialized task tracker".to_string(),
+                "done" => {
+                    if task.is_empty() {
+                        "Completed task".to_string()
+                    } else {
+                        format!("Completed {}", task)
+                    }
+                }
+                "start" => {
+                    if task.is_empty() {
+                        "Started task".to_string()
+                    } else {
+                        format!("Started {}", task)
+                    }
+                }
+                "block" => {
+                    if task.is_empty() {
+                        "Blocked task".to_string()
+                    } else {
+                        format!("Blocked {}", task)
+                    }
+                }
+                "append" => "Added tasks to checklist".to_string(),
+                _ => "Checked task checklist".to_string(),
+            };
+            (label, "todo".to_string())
+        }
         other => (format!("Used {}", other), "other".to_string()),
     }
 }
@@ -512,6 +547,17 @@ pub fn parse_tool_active_label(name: &str, args: &serde_json::Value) -> String {
                 .and_then(|v| v.as_str())
                 .unwrap_or("");
             format!("Fetching {}", url)
+        }
+        "todo" => {
+            let op = args.get("op").and_then(|v| v.as_str()).unwrap_or("view");
+            match op {
+                "init" => "Initializing task checklist".to_string(),
+                "done" => "Completing milestone".to_string(),
+                "start" => "Starting task".to_string(),
+                "block" => "Blocking task".to_string(),
+                "append" => "Appending tasks".to_string(),
+                _ => "Updating task checklist".to_string(),
+            }
         }
         other => format!("Using {}", other),
     }
@@ -846,7 +892,10 @@ pub async fn run_turn_ui(
                 let _ = prompt.render_current();
             }
             AgentEvent::ToolFinished {
-                success, output, ..
+                name,
+                success,
+                output,
+                ..
             } => {
                 clear_prompt_frame(prompt);
                 let mut out = stdout();
@@ -865,6 +914,22 @@ pub async fn run_turn_ui(
                         }
                     }
                 }
+
+                // If todo tool finished successfully, render the updated checklist card directly on chat
+                if name == "todo" && success && !output.trim().is_empty() {
+                    let term_width = crate::ui::table::get_terminal_width().clamp(40, 84);
+                    let card = crate::ui::tool_card::ToolOutputCard::new(
+                        "todo",
+                        "Task Progress Checklist",
+                        &output,
+                        true,
+                        None,
+                    );
+                    let card_rendered = card.render(term_width);
+                    let _ = writeln!(out, "\r\n{}\r\n", card_rendered);
+                    let _ = out.flush();
+                }
+
                 prompt.set_running_status(None);
                 *is_thinking = false;
                 reset_prompt_render_state(prompt);
