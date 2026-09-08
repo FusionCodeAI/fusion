@@ -88,10 +88,15 @@ pub enum ChangeKind {
 }
 
 impl ChangeKind {
+    pub const ADDED: ChangeKind = ChangeKind::Addition;
+    pub const DELETED: ChangeKind = ChangeKind::Deletion;
+    pub const UNCHANGED: ChangeKind = ChangeKind::Context;
+    #[allow(non_upper_case_globals)]
     pub const Added: ChangeKind = ChangeKind::Addition;
+    #[allow(non_upper_case_globals)]
     pub const Deleted: ChangeKind = ChangeKind::Deletion;
+    #[allow(non_upper_case_globals)]
     pub const Unchanged: ChangeKind = ChangeKind::Context;
-
     pub fn prefix(&self) -> char {
         match self {
             Self::Context => ' ',

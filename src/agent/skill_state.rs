@@ -238,7 +238,7 @@ pub fn extract_state_patch(text: &str) -> ExtractedPatch {
     }
 
     // 2. Whole-output JSON: entire output is a JSON payload with state_patch
-    if (trimmed.starts_with('{') && trimmed.ends_with('}')) {
+    if trimmed.starts_with('{') && trimmed.ends_with('}') {
         if let Ok(Value::Object(obj)) = serde_json::from_str::<Value>(trimmed) {
             if let Some((patch, action)) = parse_object_for_patch(&obj) {
                 return ExtractedPatch {
