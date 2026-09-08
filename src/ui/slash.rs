@@ -682,6 +682,37 @@ pub static COMMAND_PALETTE: &[CommandDescriptor] = &[
         description: "View side-by-side git diff of working tree changes",
         examples: &["/diff", "/diff src/main.rs"],
     },
+    CommandDescriptor {
+        name: "/todo",
+        aliases: &["/tasks", "/checklist"],
+        syntax: "/todo [view|add|done|start|block|clear] [args...]",
+        category: CommandCategory::Session,
+        description: "View, manage, or add milestones to the autonomous phased task tracker",
+        examples: &[
+            "/todo",
+            "/todo add Implement auth middleware",
+            "/todo done 1",
+            "/todo start 2",
+            "/todo block 3 \"Waiting on API keys\"",
+            "/todo clear",
+        ],
+    },
+    CommandDescriptor {
+        name: "/editor",
+        aliases: &["/edit"],
+        syntax: "/editor [file_path]",
+        category: CommandCategory::Core,
+        description: "Launch the interactive in-terminal text editor to draft prompts or edit files",
+        examples: &["/editor", "/editor src/main.rs", "/edit prompt.md"],
+    },
+    CommandDescriptor {
+        name: "/review",
+        aliases: &[],
+        syntax: "/review [file_path]",
+        category: CommandCategory::Core,
+        description: "Interactive hunk-by-hunk git diff reviewer ([y] accept, [n] reject, [q] finish)",
+        examples: &["/review", "/review src/lib.rs"],
+    },
 ];
 
 /// Returns all static command palette entries.
@@ -2144,6 +2175,67 @@ View or modify Fusion configuration settings (`~/.fusion/config.json`).
 # Slash Command: `/tools`
 
 Lists all registered tools available to the assistant during the conversation.
+"#;
+                print_markdown(text);
+            }
+            "todo" | "tasks" | "checklist" => {
+                let text = r#"
+# Slash Command: `/todo [view|add|done|start|block|clear]`
+
+Autonomous phased task execution tracker (arXiv:2608.26263).
+Tracks milestones across complex workflows with automatic in-progress task promotion.
+
+### Usage
+- `/todo` - Display current task checklist and progress summary.
+- `/todo add <task>` - Append a new task to the active checklist.
+- `/todo done <query>` - Mark a task or entire phase as completed.
+- `/todo start <query>` - Set a specific task as in-progress.
+- `/todo block <query> [reason]` - Mark a task as blocked with optional reason.
+- `/todo clear` - Remove all tasks from the checklist.
+
+### Examples
+- `/todo`
+- `/todo add Build database schema`
+- `/todo done 1`
+- `/todo clear`
+"#;
+                print_markdown(text);
+            }
+            "editor" | "edit" => {
+                let text = r#"
+# Slash Command: `/editor [file_path]`
+
+Launch the full-screen interactive in-terminal text editor without leaving the TUI.
+
+### Controls
+- **Typing / Backspace / Enter**: Standard text editing with automatic line splitting.
+- **Arrow Keys / Home / End / PageUp / PageDown**: Cursor navigation.
+- **Ctrl+S**: Save file and update prompt buffer.
+- **Esc / Ctrl+Q**: Exit editor.
+
+### Examples
+- `/editor` - Open scratchpad buffer to author multi-paragraph prompt.
+- `/editor src/main.rs` - Open and edit an existing file.
+"#;
+                print_markdown(text);
+            }
+            "review" => {
+                let text = r#"
+# Slash Command: `/review [path]`
+
+Launch the interactive hunk-by-hunk git working tree diff reviewer.
+
+### Single-Key Controls
+- `[y]` - Accept current diff hunk.
+- `[n]` - Reject current diff hunk.
+- `[a]` - Accept all remaining hunks.
+- `[r]` - Reject all remaining hunks.
+- `[↑ / ↓ / j / k]` - Navigate between diff hunks.
+- `[q]` - Finish review session and exit.
+
+### Examples
+- `/review` - Review all uncommitted workspace diffs.
+- `/review src/lib.rs` - Review diffs for a specific file.
 "#;
                 print_markdown(text);
             }
