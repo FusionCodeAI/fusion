@@ -2582,31 +2582,42 @@ fn sanitize_filename(name: &str) -> String {
 
 fn handle_model(name: Option<&str>, runner: &mut AgentRunner, session: &mut Session) {
     if let Some(raw_name) = name {
-        let mut parts = raw_name.split_whitespace();
-        let model_part = parts.next();
-        let effort_part = parts.next();
+        let trimmed = raw_name.trim();
+        if !trimmed.is_empty() {
+            let mut parts = trimmed.split_whitespace();
+            let model_part = parts.next();
+            let effort_part = parts.next();
 
-        if let Some(model_name) = model_part {
-            if model_name.is_empty() {
-                print_model_info(runner, session);
+            if let Some(model_name) = model_part {
+                let (provider, canonical_model) =
+                    Config::resolve_model(model_name, Some(&runner.config().default_provider));
+                runner.config_mut().default_provider = provider.clone();
+                runner.config_mut().default_model = canonical_model.clone();
+                session.set_active_model(&canonical_model);
+                if let Some(effort) = effort_part {
+                    session.set_metadata("reasoning_effort", effort);
+                }
+                println!("\x1b[2;37m● Switched to {}\x1b[0m\r\n", canonical_model);
                 return;
             }
+        }
+    }
 
+    // Interactive terminal launch of ModelPicker widget
+    use std::io::IsTerminal;
+    if std::io::stdout().is_terminal() && std::io::stdin().is_terminal() {
+        if let Ok(Some(selected)) = crate::ui::pick_model() {
             let (provider, canonical_model) =
-                Config::resolve_model(model_name, Some(&runner.config().default_provider));
-            runner.config_mut().default_provider = provider.clone();
+                Config::resolve_model(&selected.id, Some(&selected.provider));
+            runner.config_mut().default_provider = provider;
             runner.config_mut().default_model = canonical_model.clone();
             session.set_active_model(&canonical_model);
-            if let Some(effort) = effort_part {
-                session.set_metadata("reasoning_effort", effort);
-            }
             println!("\x1b[2;37m● Switched to {}\x1b[0m\r\n", canonical_model);
-        } else {
-            print_model_info(runner, session);
+            return;
         }
-    } else {
-        print_model_info(runner, session);
     }
+
+    print_model_info(runner, session);
 }
 
 fn print_model_info(runner: &AgentRunner, session: &Session) {
@@ -2617,6 +2628,20 @@ fn print_model_info(runner: &AgentRunner, session: &Session) {
         "\x1b[1;36mActive Model:\x1b[0m \x1b[1;37m{}\x1b[0m (Provider: \x1b[1;33m{}\x1b[0m)",
         current_model, current_provider
     );
+
+    let local_daemon_active = crate::provider::local_daemon::detect_antigravity_daemon()
+        .map(|d| d.is_alive)
+        .unwrap_or(false);
+
+    if local_daemon_active {
+        println!("\n\x1b[1;32mLocal Antigravity Daemon Models (Free Inference via 127.0.0.1:8045):\x1b[0m");
+        println!("  \x1b[1;33mClaude Opus 4.6 (Thinking):\x1b[0m claude-opus-4-6 (shorthands: opus, opus-4.6, opus-thinking)");
+        println!("  \x1b[1;33mClaude Sonnet 4.6:\x1b[0m          claude-sonnet-4-6 (shorthands: sonnet-4.6)");
+        println!("  \x1b[1;33mGemini 3.8 Flash High:\x1b[0m      gemini-3.8-flash-high (shorthands: gemini-3.8)");
+    } else {
+        println!("\n\x1b[2;37mLocal Antigravity Daemon (127.0.0.1:8045):\x1b[0m not detected (start Antigravity Tools for free inference)");
+    }
+
     println!("\n\x1b[1;34mFusion Gateway Models:\x1b[0m");
     println!("  \x1b[1;33mDeepSeek V4 Flash:\x1b[0m deepseek-ai/DeepSeek-V4-Flash-0731 (shorthands: deepseek, flash, v4, fusion)");
     println!("  \x1b[1;33mMiniMax M2.7:\x1b[0m      MiniMaxAI/MiniMax-M2.7 (shorthands: minimax, minimax-m2.7)");
@@ -2835,18 +2860,36 @@ fn open_browser(url: &str) -> bool {
 
 fn print_provider_info(runner: &AgentRunner) {
     let current_provider = &runner.config().default_provider;
+    let provider_desc = match current_provider.as_str() {
+        "antigravity" | "local" => "Local Antigravity Daemon - http://127.0.0.1:8045/v1 (Free Inference)",
+        "codex" => "Codex / ChatGPT Subscription (Free Inference)",
+        _ => "Fusion Gateway - https://api.fusioncode.app/v1",
+    };
     println!(
-        "\x1b[1;36mActive Provider:\x1b[0m \x1b[1;33m{}\x1b[0m (Fusion Gateway - https://api.fusioncode.app/v1)\n",
-        current_provider
+        "\x1b[1;36mActive Provider:\x1b[0m \x1b[1;33m{}\x1b[0m ({})\n",
+        current_provider, provider_desc
     );
 
+    let antigravity_active = crate::provider::local_daemon::detect_antigravity_daemon()
+        .map(|d| d.is_alive)
+        .unwrap_or(false);
+    let codex_active = crate::provider::local_daemon::detect_codex_auth().is_some();
     let fusion_key =
         std::env::var("FUSION_API_KEY").is_ok() || runner.config().fusion_api_key.is_some();
 
+    print_provider_status("antigravity", "Antigravity (Local)", antigravity_active, current_provider);
+    if codex_active {
+        print_provider_status("codex", "Codex (Local)", true, current_provider);
+    }
     print_provider_status("fusion", "Fusion Gateway", fusion_key, current_provider);
-    println!(
-        "\nAuthenticate with \x1b[1;36m/login\x1b[0m or set \x1b[1;33mFUSION_API_KEY\x1b[0m.\n"
-    );
+
+    if !antigravity_active && !fusion_key {
+        println!(
+            "\nAuthenticate with \x1b[1;36m/login\x1b[0m, set \x1b[1;33mFUSION_API_KEY\x1b[0m, or start Antigravity Tools locally.\n"
+        );
+    } else {
+        println!("\nUse \x1b[1;36m/provider <name>\x1b[0m to switch.\n");
+    }
 }
 
 fn print_provider_status(name: &str, label: &str, has_key: bool, current: &str) {

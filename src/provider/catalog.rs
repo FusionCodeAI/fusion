@@ -1241,13 +1241,24 @@ pub async fn sync_catalog(config: &Config, force: bool) -> ModelCatalog {
 /// Convenience synchronous lookup for the active catalog.
 /// Checks the 24-hour disk cache first, falling back to stale cache or the embedded static catalog.
 pub fn get_catalog() -> ModelCatalog {
-    if let Some(cached) = load_cached_catalog() {
+    let mut catalog = if let Some(cached) = load_cached_catalog() {
         cached
     } else if let Some(stale) = load_stale_cached_catalog() {
         stale
     } else {
         ModelCatalog::static_catalog()
+    };
+
+    // If local Antigravity daemon is present, prepend local models if not already in catalog
+    if crate::provider::local_daemon::detect_antigravity_daemon().is_some() {
+        for local_model in crate::provider::local_daemon::default_local_models().into_iter().rev() {
+            if !catalog.models.iter().any(|m| m.id.eq_ignore_ascii_case(&local_model.id)) {
+                catalog.models.insert(0, local_model);
+            }
+        }
     }
+
+    catalog
 }
 
 /// Convenience function returning models, optionally filtered by provider.
@@ -1568,8 +1579,13 @@ fn format_display_name(id: &str) -> String {
 
 /// Returns the comprehensive built-in static catalog.
 pub fn static_model_list() -> Vec<CatalogModel> {
-    vec![
-        // Fusion
+    let mut list = Vec::new();
+
+    // Local Antigravity Daemon (Free Inference via local port 8045)
+    list.extend(crate::provider::local_daemon::default_local_models());
+
+    // Fusion Gateway
+    list.push(
         CatalogModel::new(
             "deepseek-ai/DeepSeek-V4-Flash-0731",
             "DeepSeek V4 Flash",
@@ -1579,12 +1595,16 @@ pub fn static_model_list() -> Vec<CatalogModel> {
         .with_max_output(8_192)
         .with_badges(["Fast", "Default"])
         .with_description("Fusion gateway high-speed 1M context flash model"),
+    );
+    list.push(
         CatalogModel::new("MiniMaxAI/MiniMax-M2.7", "MiniMax M2.7", "fusion")
             .with_context(204_800)
             .with_max_output(8_192)
             .with_badges(["Reasoning"])
             .with_description("MiniMax M2.7 frontier coding and reasoning model"),
-    ]
+    );
+
+    list
 }
 
 // ============================================================================

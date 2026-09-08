@@ -458,6 +458,30 @@ pub async fn fetch_antigravity_models(
     }
 }
 
+/// Returns the curated default models available through the local Antigravity daemon.
+pub fn default_local_models() -> Vec<CatalogModel> {
+    vec![
+        CatalogModel::new("claude-opus-4-6", "Claude Opus 4.6", "antigravity")
+            .with_context(200_000)
+            .with_max_output(64_000)
+            .with_badges(["Reasoning", "Thinking", "Local Daemon (Free)"])
+            .with_pricing(0.0, 0.0)
+            .with_description("Anthropic Claude Opus 4.6 with reasoning via local Antigravity Tools daemon (127.0.0.1:8045)"),
+        CatalogModel::new("claude-sonnet-4-6", "Claude Sonnet 4.6", "antigravity")
+            .with_context(200_000)
+            .with_max_output(64_000)
+            .with_badges(["Flagship", "Coding", "Local Daemon (Free)"])
+            .with_pricing(0.0, 0.0)
+            .with_description("Anthropic Claude Sonnet 4.6 via local Antigravity Tools daemon (127.0.0.1:8045)"),
+        CatalogModel::new("gemini-3.8-flash-high", "Gemini 3.8 Flash High", "antigravity")
+            .with_context(1_048_576)
+            .with_max_output(64_000)
+            .with_badges(["1M Context", "Ultra-Fast", "Local Daemon (Free)"])
+            .with_pricing(0.0, 0.0)
+            .with_description("Google Gemini 3.8 Flash High via local Antigravity Tools daemon (127.0.0.1:8045)"),
+    ]
+}
+
 // ---------------------------------------------------------------------------
 // Codex OAuth Token Refresh (Spec 2.2)
 // ---------------------------------------------------------------------------

@@ -1046,7 +1046,35 @@ impl Config {
             }
         }
 
-        // 3. Check model shorthands
+        // 3. Provider-specific shorthands when antigravity/local provider is active
+        if let Some(cp) = current_provider {
+            let cp_lower = cp.trim().to_lowercase();
+            if cp_lower == "antigravity" || cp_lower == "local" {
+                match trimmed.to_lowercase().as_str() {
+                    "opus" | "opus-4.6" | "opus-4-6" => {
+                        return ("antigravity".to_string(), "claude-opus-4-6".to_string())
+                    }
+                    "opus-thinking" => {
+                        return ("antigravity".to_string(), "claude-opus-4-6-thinking".to_string())
+                    }
+                    "sonnet" | "sonnet-4.6" | "sonnet-4-6" => {
+                        return ("antigravity".to_string(), "claude-sonnet-4-6".to_string())
+                    }
+                    "sonnet-4.5" | "sonnet-4-5" => {
+                        return ("antigravity".to_string(), "claude-sonnet-4-5".to_string())
+                    }
+                    "gemini" | "gemini-3.8" => {
+                        return ("antigravity".to_string(), "gemini-3.8-flash-high".to_string())
+                    }
+                    "gemini-3.7" => {
+                        return ("antigravity".to_string(), "gemini-3.7-flash-high".to_string())
+                    }
+                    _ => {}
+                }
+            }
+        }
+
+        // 4. Check model shorthands
         if let Some((prov, canonical)) = Self::resolve_model_shorthand(trimmed) {
             return (prov.to_string(), canonical.to_string());
         }

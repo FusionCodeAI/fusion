@@ -36,17 +36,19 @@ use crate::ui::prompt::RawModeGuard;
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum ProviderTab {
     All,
+    Local,
     Fusion,
 }
 
 impl ProviderTab {
     /// Ordered list of all tabs.
-    pub const ALL: [ProviderTab; 2] = [ProviderTab::All, ProviderTab::Fusion];
+    pub const ALL: [ProviderTab; 3] = [ProviderTab::All, ProviderTab::Local, ProviderTab::Fusion];
 
     /// Human-readable tab label.
     pub fn name(&self) -> &'static str {
         match self {
             ProviderTab::All => "All",
+            ProviderTab::Local => "Local",
             ProviderTab::Fusion => "Fusion",
         }
     }
@@ -55,6 +57,7 @@ impl ProviderTab {
     pub fn short_name(&self) -> &'static str {
         match self {
             ProviderTab::All => "All",
+            ProviderTab::Local => "Loc",
             ProviderTab::Fusion => "Fus",
         }
     }
@@ -63,6 +66,11 @@ impl ProviderTab {
     pub fn matches_provider(&self, provider: &str) -> bool {
         match self {
             ProviderTab::All => true,
+            ProviderTab::Local => {
+                provider.eq_ignore_ascii_case("antigravity")
+                    || provider.eq_ignore_ascii_case("local")
+                    || provider.eq_ignore_ascii_case("codex")
+            }
             ProviderTab::Fusion => provider.eq_ignore_ascii_case("fusion"),
         }
     }
@@ -70,21 +78,27 @@ impl ProviderTab {
     /// Cycle forward to the next tab (`Tab`).
     pub fn next(&self) -> Self {
         match self {
-            ProviderTab::All => ProviderTab::Fusion,
+            ProviderTab::All => ProviderTab::Local,
+            ProviderTab::Local => ProviderTab::Fusion,
             ProviderTab::Fusion => ProviderTab::All,
         }
     }
 
     /// Cycle backward to the previous tab (`Shift+Tab` / `BackTab`).
     pub fn prev(&self) -> Self {
-        self.next()
+        match self {
+            ProviderTab::All => ProviderTab::Fusion,
+            ProviderTab::Local => ProviderTab::All,
+            ProviderTab::Fusion => ProviderTab::Local,
+        }
     }
 
     /// Get zero-based index of this tab.
     pub fn index(&self) -> usize {
         match self {
             ProviderTab::All => 0,
-            ProviderTab::Fusion => 1,
+            ProviderTab::Local => 1,
+            ProviderTab::Fusion => 2,
         }
     }
 
@@ -286,6 +300,9 @@ impl From<crate::provider::catalog::CatalogModel> for ModelEntry {
     fn from(cm: crate::provider::catalog::CatalogModel) -> Self {
         let ctx_display = cm.formatted_context_window();
         let out_display = cm.formatted_max_output();
+        let is_local = cm.provider.eq_ignore_ascii_case("antigravity")
+            || cm.provider.eq_ignore_ascii_case("local")
+            || cm.badges.iter().any(|b| b.contains("Free") || b.contains("Local"));
         Self {
             id: cm.id,
             name: cm.name,
@@ -302,10 +319,18 @@ impl From<crate::provider::catalog::CatalogModel> for ModelEntry {
             } else {
                 out_display
             },
-            input_cost_per_m: None,
-            output_cost_per_m: None,
-            pricing_display: None,
-            speed: None,
+            input_cost_per_m: cm.input_cost_per_m,
+            output_cost_per_m: cm.output_cost_per_m,
+            pricing_display: if is_local {
+                Some("Free".to_string())
+            } else {
+                None
+            },
+            speed: if is_local {
+                Some("Local".to_string())
+            } else {
+                None
+            },
             badges: cm.badges,
             description: cm.description,
         }
@@ -1548,7 +1573,42 @@ fn badge_style(badge: &str) -> (Color, bool) {
 /// Curated flagship and popular models matching fx.sh catalog across all 6 providers.
 pub fn default_models() -> Vec<ModelEntry> {
     vec![
-        // Fusion
+        // Local Antigravity Daemon (Free Inference via local port 8045)
+        ModelEntry::with_tokens(
+            "claude-opus-4-6",
+            "antigravity",
+            200_000,
+            64_000,
+            vec!["Reasoning", "Thinking", "Free Local"],
+        )
+        .with_name("Claude Opus 4.6")
+        .with_speed("Fast")
+        .with_free_pricing()
+        .with_description("Anthropic Claude Opus 4.6 via local Antigravity daemon (127.0.0.1:8045)"),
+        ModelEntry::with_tokens(
+            "claude-sonnet-4-6",
+            "antigravity",
+            200_000,
+            64_000,
+            vec!["Flagship", "Coding", "Free Local"],
+        )
+        .with_name("Claude Sonnet 4.6")
+        .with_speed("Ultra-Fast")
+        .with_free_pricing()
+        .with_description("Anthropic Claude Sonnet 4.6 via local Antigravity daemon (127.0.0.1:8045)"),
+        ModelEntry::with_tokens(
+            "gemini-3.8-flash-high",
+            "antigravity",
+            1_048_576,
+            64_000,
+            vec!["1M Context", "Fast", "Free Local"],
+        )
+        .with_name("Gemini 3.8 Flash High")
+        .with_speed("Ultra-Fast")
+        .with_free_pricing()
+        .with_description("Google Gemini 3.8 Flash High via local Antigravity daemon (127.0.0.1:8045)"),
+
+        // Fusion Gateway
         ModelEntry::with_tokens(
             "deepseek-ai/DeepSeek-V4-Flash-0731",
             "fusion",
@@ -1592,17 +1652,23 @@ mod tests {
         let tab = ProviderTab::All;
         assert_eq!(tab.name(), "All");
         assert_eq!(tab.index(), 0);
-        assert_eq!(tab.next(), ProviderTab::Fusion);
-        assert_eq!(tab.next().next(), ProviderTab::All);
+        assert_eq!(tab.next(), ProviderTab::Local);
+        assert_eq!(tab.next().next(), ProviderTab::Fusion);
+        assert_eq!(tab.next().next().next(), ProviderTab::All);
 
         assert_eq!(ProviderTab::All.prev(), ProviderTab::Fusion);
-        assert_eq!(ProviderTab::Fusion.prev(), ProviderTab::All);
+        assert_eq!(ProviderTab::Fusion.prev(), ProviderTab::Local);
+        assert_eq!(ProviderTab::Local.prev(), ProviderTab::All);
     }
 
     #[test]
     fn test_provider_tab_matching() {
         assert!(ProviderTab::All.matches_provider("fusion"));
         assert!(ProviderTab::All.matches_provider("anything"));
+        assert!(ProviderTab::Local.matches_provider("antigravity"));
+        assert!(ProviderTab::Local.matches_provider("local"));
+        assert!(ProviderTab::Local.matches_provider("codex"));
+        assert!(!ProviderTab::Local.matches_provider("fusion"));
         assert!(ProviderTab::Fusion.matches_provider("fusion"));
         assert!(!ProviderTab::Fusion.matches_provider("other"));
     }
@@ -1610,8 +1676,9 @@ mod tests {
     #[test]
     fn test_provider_tab_from_index() {
         assert_eq!(ProviderTab::from_index(0), Some(ProviderTab::All));
-        assert_eq!(ProviderTab::from_index(1), Some(ProviderTab::Fusion));
-        assert_eq!(ProviderTab::from_index(2), None);
+        assert_eq!(ProviderTab::from_index(1), Some(ProviderTab::Local));
+        assert_eq!(ProviderTab::from_index(2), Some(ProviderTab::Fusion));
+        assert_eq!(ProviderTab::from_index(3), None);
     }
 
     #[test]
@@ -1680,9 +1747,11 @@ mod tests {
         assert!(models
             .iter()
             .any(|m| m.id == "deepseek-ai/DeepSeek-V4-Flash-0731"));
-        for m in &models {
-            assert_eq!(m.provider, "fusion");
-        }
+        assert!(models.iter().any(|m| m.id == "claude-opus-4-6"));
+        assert!(models.iter().any(|m| m.id == "claude-sonnet-4-6"));
+        assert!(models.iter().any(|m| m.id == "gemini-3.8-flash-high"));
+        assert!(models.iter().any(|m| m.provider == "antigravity"));
+        assert!(models.iter().any(|m| m.provider == "fusion"));
     }
 
     #[test]
@@ -1690,7 +1759,13 @@ mod tests {
         let mut picker = ModelPicker::new();
         assert_eq!(picker.active_tab(), ProviderTab::All);
         let all_count = picker.filtered_count();
-        assert!(all_count >= 2);
+        assert!(all_count >= 5);
+
+        picker.set_tab(ProviderTab::Local);
+        assert_eq!(picker.active_tab(), ProviderTab::Local);
+        for m in picker.filtered_models() {
+            assert_eq!(m.provider, "antigravity");
+        }
 
         picker.set_tab(ProviderTab::Fusion);
         assert_eq!(picker.active_tab(), ProviderTab::Fusion);
@@ -1704,6 +1779,7 @@ mod tests {
         let models = default_models();
         let groups = group_by_provider(&models);
         assert!(!groups.is_empty());
+        assert!(groups.iter().any(|(tab, _)| *tab == ProviderTab::Local));
         assert!(groups.iter().any(|(tab, _)| *tab == ProviderTab::Fusion));
     }
 
@@ -1768,7 +1844,7 @@ mod tests {
         picker.select_page_down(5);
         assert_eq!(picker.selected_index(), picker.filtered_count() - 1);
 
-        picker.select_page_up(1);
+        picker.select_page_up(5);
         assert_eq!(picker.selected_index(), 0);
         picker.select_last();
         assert_eq!(picker.selected_index(), picker.filtered_count() - 1);
@@ -1797,19 +1873,22 @@ mod tests {
         );
         assert_eq!(picker.selected_index(), 1);
 
-        // Tab switches provider
+        // Tab switches provider to Local
         assert_eq!(picker.handle_key(KeyCode::Tab, KeyModifiers::NONE), None);
-        assert_eq!(picker.active_tab(), ProviderTab::Fusion);
+        assert_eq!(picker.active_tab(), ProviderTab::Local);
 
-        // Enter selects model
+        // Enter selects model in Local
         let res = picker.handle_key(KeyCode::Enter, KeyModifiers::NONE);
         match res {
             Some(ModelPickerResult::Selected(m)) => {
-                assert_eq!(m.provider, "fusion");
+                assert_eq!(m.provider, "antigravity");
             }
             _ => panic!("Expected ModelPickerResult::Selected"),
         }
 
+        // Tab switches to Fusion
+        picker.handle_key(KeyCode::Tab, KeyModifiers::NONE);
+        assert_eq!(picker.active_tab(), ProviderTab::Fusion);
         // Typing query and Backspace / Ctrl+U
         picker.handle_key(KeyCode::Char('c'), KeyModifiers::NONE);
         picker.handle_key(KeyCode::Char('h'), KeyModifiers::NONE);
