@@ -191,10 +191,7 @@ fn resolve_candidate_path(candidate: &str, workspace_root: &Path) -> Option<(Str
 /// - Appends a `<file-mention path="...">\n...\n</file-mention>` block
 ///
 /// Returns the expanded prompt string and the list of injected file paths.
-pub fn expand_file_mentions(
-    user_prompt: &str,
-    workspace_root: &Path,
-) -> (String, Vec<PathBuf>) {
+pub fn expand_file_mentions(user_prompt: &str, workspace_root: &Path) -> (String, Vec<PathBuf>) {
     let candidates = extract_mention_candidates(user_prompt);
     if candidates.is_empty() {
         return (user_prompt.to_string(), Vec::new());
@@ -205,16 +202,23 @@ pub fn expand_file_mentions(
     let mut mention_blocks = Vec::new();
 
     for candidate in candidates {
-        if let Some((clean_path, target_file)) = resolve_candidate_path(&candidate, workspace_root) {
+        if let Some((clean_path, target_file)) = resolve_candidate_path(&candidate, workspace_root)
+        {
             let path_buf = PathBuf::from(&clean_path);
             if seen_paths.insert(path_buf.clone()) {
                 if let Some(content) = read_file_capped(&target_file) {
                     let block = if content.is_empty() {
                         format!("<file-mention path=\"{}\">\n</file-mention>", clean_path)
                     } else if content.ends_with('\n') {
-                        format!("<file-mention path=\"{}\">\n{}</file-mention>", clean_path, content)
+                        format!(
+                            "<file-mention path=\"{}\">\n{}</file-mention>",
+                            clean_path, content
+                        )
                     } else {
-                        format!("<file-mention path=\"{}\">\n{}\n</file-mention>", clean_path, content)
+                        format!(
+                            "<file-mention path=\"{}\">\n{}\n</file-mention>",
+                            clean_path, content
+                        )
                     };
 
                     mention_blocks.push(block);

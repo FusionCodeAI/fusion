@@ -294,8 +294,7 @@ async fn test_cut_default_tab_delimiter() {
 
 #[tokio::test]
 async fn test_cut_whitespace_delimited_extension() {
-    let (code, stdout, stderr) =
-        run_sh("printf 'a    b    c\\n1   2   3\\n' | cut -w -f 2").await;
+    let (code, stdout, stderr) = run_sh("printf 'a    b    c\\n1   2   3\\n' | cut -w -f 2").await;
     assert_eq!(code, 0, "stderr: {stderr}");
     let lines: Vec<&str> = stdout.trim().lines().collect();
     assert_eq!(lines, vec!["b", "2"]);
@@ -442,8 +441,7 @@ async fn test_head_multiple_files_with_headers_and_quiet() {
     assert!(stdout.contains("line2_1"));
 
     // With -q, headers are suppressed
-    let (code_q, stdout_q, stderr_q) =
-        run_sh_in(tmp.path(), "head -q -n 1 f1.txt f2.txt").await;
+    let (code_q, stdout_q, stderr_q) = run_sh_in(tmp.path(), "head -q -n 1 f1.txt f2.txt").await;
     assert_eq!(code_q, 0, "stderr: {stderr_q}");
     assert!(
         !stdout_q.contains("==>"),

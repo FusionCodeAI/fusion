@@ -124,10 +124,9 @@ pub fn find_server_in_map(
 
             ext_with_dot.as_ref().map_or(false, |dot_ext| {
                 &ft_lower == dot_ext || ft_lower == ext.as_deref().unwrap_or_default()
-            }) || file_name
-                .as_ref()
-                .map_or(false, |fname| &ft_lower == fname || ft_no_dot == fname.as_str())
-                || path_str == ft_lower
+            }) || file_name.as_ref().map_or(false, |fname| {
+                &ft_lower == fname || ft_no_dot == fname.as_str()
+            }) || path_str == ft_lower
                 || path_str.ends_with(&format!(".{ft_no_dot}"))
         });
 

@@ -75,7 +75,10 @@ fn test_curated_prompts_variables_extracted() {
     assert_eq!(prompts.len(), 6);
 
     // 1. Rust: TDD Fix Loop
-    let tdd = prompts.iter().find(|p| p.name == "Rust: TDD Fix Loop").unwrap();
+    let tdd = prompts
+        .iter()
+        .find(|p| p.name == "Rust: TDD Fix Loop")
+        .unwrap();
     assert_eq!(tdd.category, "Rust");
     assert!(tdd.variables.contains(&"test_name".to_string()));
     assert!(tdd.variables.contains(&"test_file".to_string()));
@@ -397,10 +400,7 @@ fn test_widget_rendering_compact_terminal() {
 #[test]
 fn test_keyboard_navigation_selection() {
     let mut state = PromptPickerState::default();
-    assert_eq!(
-        state.selected_prompt().unwrap().name,
-        "Rust: TDD Fix Loop"
-    );
+    assert_eq!(state.selected_prompt().unwrap().name, "Rust: TDD Fix Loop");
 
     // Down arrow moves to second item
     state.handle_key(KeyCode::Down, KeyModifiers::NONE);
@@ -411,10 +411,7 @@ fn test_keyboard_navigation_selection() {
 
     // Up arrow moves back to first item
     state.handle_key(KeyCode::Up, KeyModifiers::NONE);
-    assert_eq!(
-        state.selected_prompt().unwrap().name,
-        "Rust: TDD Fix Loop"
-    );
+    assert_eq!(state.selected_prompt().unwrap().name, "Rust: TDD Fix Loop");
 
     // Up arrow wraps around to last item
     state.handle_key(KeyCode::Up, KeyModifiers::NONE);
@@ -422,10 +419,7 @@ fn test_keyboard_navigation_selection() {
 
     // Down arrow wraps around to first item
     state.handle_key(KeyCode::Down, KeyModifiers::NONE);
-    assert_eq!(
-        state.selected_prompt().unwrap().name,
-        "Rust: TDD Fix Loop"
-    );
+    assert_eq!(state.selected_prompt().unwrap().name, "Rust: TDD Fix Loop");
 }
 
 #[test]

@@ -52,32 +52,50 @@ impl ExportFormat {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum SlashCommand {
     /// Show general help, command palette, or help for a specific command: `/help [command]`
-    Help { command: Option<String> },
+    Help {
+        command: Option<String>,
+    },
     /// Open the rich interactive categorized command palette: `/palette [filter]`
-    Palette { filter: Option<String> },
+    Palette {
+        filter: Option<String>,
+    },
     /// Inspect or switch the active LLM model: `/model [name]`
-    Model { name: Option<String> },
+    Model {
+        name: Option<String>,
+    },
     /// Inspect or switch the active LLM provider: `/provider [name]`
-    Provider { name: Option<String> },
+    Provider {
+        name: Option<String>,
+    },
     /// Log in to the Fusion API via browser: `/login`
     Login,
     /// Enable, disable, toggle, or query advisors: `/advisors [on|off|toggle|status]`
-    Advisors { state: Option<String> },
+    Advisors {
+        state: Option<String>,
+    },
     /// Manage, recall, and insert code snippets: `/snippet [subcommand]`
-    Snippet { args: Vec<String> },
+    Snippet {
+        args: Vec<String>,
+    },
     /// Organize and filter sessions with customizable tags: `/tag [subcommand]`
-    Tag { args: Vec<String> },
+    Tag {
+        args: Vec<String>,
+    },
     /// Manage persistent sessions: `/session [subcommand]`
     Session(SessionCommand),
     /// Pin important turns and manage session checkpoints: `/bookmark [name]`
-    Bookmark { args: Vec<String> },
+    Bookmark {
+        args: Vec<String>,
+    },
     /// Branch the current session into an independent fork: `/fork [title] [turn]`
     Fork {
         title: Option<String>,
         turn: Option<usize>,
     },
     /// Undo/rewind working tree checkpoints and conversation turns: `/rewind [steps]` or `/undo [steps]`
-    Rewind { turns: Option<usize> },
+    Rewind {
+        turns: Option<usize>,
+    },
     /// Force context window compaction to reduce token overhead: `/compact`
     Compact,
     /// Fetch and display cloud account quota, current month spend, token usage, and prefix cache savings: `/usage`
@@ -90,7 +108,9 @@ pub enum SlashCommand {
         path: Option<String>,
     },
     /// Export sanitized privacy-respecting diagnostic trace: `/trace [path]`
-    Trace { path: Option<String> },
+    Trace {
+        path: Option<String>,
+    },
     /// Clear conversation history in the active session and reset view: `/clear`
     Clear,
     /// Exit the interactive REPL session: `/quit`
@@ -100,42 +120,75 @@ pub enum SlashCommand {
     /// View or update runtime configuration: `/config [subcommand]`
     Config(ConfigCommand),
     /// Apply or inspect pre-built configuration presets: `/preset [name]`
-    Preset { name: Option<String> },
+    Preset {
+        name: Option<String>,
+    },
     /// List all available registered tools: `/tools`
     Tools,
     /// Interactive fuzzy file finder: `/file [query]`
-    File { query: Option<String> },
+    File {
+        query: Option<String>,
+    },
     /// Manage extensible domain skills: `/skills [subcommand]`
     Skills(SkillsCommand),
     /// Manage, save, and load prompt templates: `/prompt [subcommand]`
     Prompt(PromptCommand),
     /// Inspect crash state and resume interrupted turns: `/recover [subcommand]`
-    Recover { args: Vec<String> },
+    Recover {
+        args: Vec<String>,
+    },
     /// Benchmark configured LLM providers measuring TTFT and tokens/sec: `/benchmark [provider] [options]`
-    Benchmark { args: Vec<String> },
+    Benchmark {
+        args: Vec<String>,
+    },
     /// Check or manage background auto-updates: `/update [now|status|check]`
-    Update { args: Vec<String> },
+    Update {
+        args: Vec<String>,
+    },
     /// Structural trajectory analysis and causal backward slicing on active session: `/strace [report|graph|slice]`
-    Strace { args: Vec<String> },
+    Strace {
+        args: Vec<String>,
+    },
     /// Test or configure notifications: `/notify [test|status|on|off]`
-    Notify { args: Vec<String> },
+    Notify {
+        args: Vec<String>,
+    },
     /// Inspect or manage Model Context Protocol servers: `/mcp [list|status|reload]`
-    Mcp { args: Vec<String> },
+    Mcp {
+        args: Vec<String>,
+    },
     /// Decompose a high-level goal into a multi-phase execution DAG: `/goal <objective>`
-    Goal { prompt: String },
-    Plan { args: Vec<String> },
+    Goal {
+        prompt: String,
+    },
+    Plan {
+        args: Vec<String>,
+    },
     /// Inspect active and recent subagent worker tasks: `/subagents` or `/workers`
-    Subagents { args: Vec<String> },
+    Subagents {
+        args: Vec<String>,
+    },
     /// View side-by-side git working tree diffs: `/diff [path]`
-    Diff { path: Option<String> },
+    Diff {
+        path: Option<String>,
+    },
     /// View, manage, or add items to the phased todo task tracker: `/todo [view|add|done|clear]`
-    Todo { args: Vec<String> },
+    Todo {
+        args: Vec<String>,
+    },
     /// Launch the interactive in-TUI text editor or open target file: `/editor [file]`
-    Editor { path: Option<String> },
+    Editor {
+        path: Option<String>,
+    },
     /// Interactive hunk-by-hunk git diff reviewer: `/review [path]`
-    Review { path: Option<String> },
+    Review {
+        path: Option<String>,
+    },
     /// Unrecognized slash command.
-    Unknown { name: String, args: Vec<String> },
+    Unknown {
+        name: String,
+        args: Vec<String>,
+    },
 }
 
 /// Subcommands for the `/session` slash command.
@@ -794,18 +847,18 @@ impl SlashCommand {
             "/diff" | "/d" => {
                 let path = args.first().cloned();
                 SlashCommand::Diff { path }
-            },
+            }
             "/todo" | "/tasks" | "/checklist" => SlashCommand::Todo {
                 args: args.to_vec(),
             },
             "/editor" | "/edit" => {
                 let path = args.first().cloned();
                 SlashCommand::Editor { path }
-            },
+            }
             "/review" => {
                 let path = args.first().cloned();
                 SlashCommand::Review { path }
-            },
+            }
             _ => SlashCommand::Unknown {
                 name: tokens[0].clone(),
                 args: args.to_vec(),
@@ -1211,7 +1264,8 @@ pub fn execute_slash_command(
             if let Ok(handle) = tokio::runtime::Handle::try_current() {
                 tokio::task::block_in_place(move || {
                     handle.block_on(async move {
-                        let output = crate::ui::slash_mcp::handle_mcp_command(&args_clone, &cwd).await;
+                        let output =
+                            crate::ui::slash_mcp::handle_mcp_command(&args_clone, &cwd).await;
                         println!("{}", output);
                     });
                 });
@@ -1259,9 +1313,7 @@ fn handle_subagents(_args: &[String], runner: &mut AgentRunner) {
     let subagents = runner.subagents().clone();
     let workers = if let Ok(handle) = tokio::runtime::Handle::try_current() {
         tokio::task::block_in_place(|| {
-            handle.block_on(async move {
-                subagents.list_subagents().await
-            })
+            handle.block_on(async move { subagents.list_subagents().await })
         })
     } else {
         Vec::new()
@@ -1286,10 +1338,17 @@ fn handle_subagents(_args: &[String], runner: &mut AgentRunner) {
                 crate::agent::subagent::SubagentStatus::Failed { error } => {
                     format!("\x1b[1;31m✗ Failed: {}\x1b[0m", error)
                 }
-                crate::agent::subagent::SubagentStatus::Cancelled => "\x1b[1;30m■ Cancelled\x1b[0m".to_string(),
-                crate::agent::subagent::SubagentStatus::Pending => "\x1b[2;37m◌ Pending\x1b[0m".to_string(),
+                crate::agent::subagent::SubagentStatus::Cancelled => {
+                    "\x1b[1;30m■ Cancelled\x1b[0m".to_string()
+                }
+                crate::agent::subagent::SubagentStatus::Pending => {
+                    "\x1b[2;37m◌ Pending\x1b[0m".to_string()
+                }
             };
-            println!("  [{}] \x1b[1;37m{}\x1b[0m ({:?}) - {}", info.id, info.name, info.role, status_badge);
+            println!(
+                "  [{}] \x1b[1;37m{}\x1b[0m ({:?}) - {}",
+                info.id, info.name, info.role, status_badge
+            );
             println!("    \x1b[2;37mTask: {}\x1b[0m", info.task);
         }
         println!();
@@ -1304,7 +1363,9 @@ fn handle_diff(_path: Option<&str>, runner: &mut AgentRunner) {
                 println!("\x1b[1;32m✓ Working tree clean\x1b[0m — no uncommitted modifications.");
             } else {
                 let term_width = crate::ui::table::get_terminal_width().max(60);
-                let rendered = crate::ui::diff_viewer::SideBySideDiffViewer::render_diff_terminal(&diff_text, term_width);
+                let rendered = crate::ui::diff_viewer::SideBySideDiffViewer::render_diff_terminal(
+                    &diff_text, term_width,
+                );
                 println!("{}", rendered);
             }
         }
@@ -1321,7 +1382,10 @@ fn handle_todo(args: &[String]) {
                 run_todo_subcommand(args).await;
             })
         });
-    } else if let Ok(rt) = tokio::runtime::Builder::new_current_thread().enable_all().build() {
+    } else if let Ok(rt) = tokio::runtime::Builder::new_current_thread()
+        .enable_all()
+        .build()
+    {
         rt.block_on(async {
             run_todo_subcommand(args).await;
         });
@@ -1390,10 +1454,17 @@ fn handle_editor(path: Option<&str>) {
                 if let Err(e) = std::fs::write(p, &saved_text) {
                     eprintln!("\x1b[1;31mError saving to {}:\x1b[0m {e}\n", p.display());
                 } else {
-                    println!("\x1b[1;32m✓\x1b[0m Saved {} lines to {}\n", saved_text.lines().count(), p.display());
+                    println!(
+                        "\x1b[1;32m✓\x1b[0m Saved {} lines to {}\n",
+                        saved_text.lines().count(),
+                        p.display()
+                    );
                 }
             } else {
-                println!("\x1b[1;32m✓\x1b[0m Editor closed with {} characters.\n", saved_text.len());
+                println!(
+                    "\x1b[1;32m✓\x1b[0m Editor closed with {} characters.\n",
+                    saved_text.len()
+                );
             }
         }
         Ok(None) => {
@@ -1437,7 +1508,10 @@ fn handle_review(_path: Option<&str>, runner: &mut AgentRunner) {
 fn handle_prompts() {
     match crate::ui::pick_prompt_interactive() {
         Ok(Some(template)) => {
-            println!("\x1b[1;32m✓ Selected Prompt Template:\x1b[0m \x1b[1;37m{}\x1b[0m ({})\n", template.name, template.category);
+            println!(
+                "\x1b[1;32m✓ Selected Prompt Template:\x1b[0m \x1b[1;37m{}\x1b[0m ({})\n",
+                template.name, template.category
+            );
             println!("{}\n", template.template);
         }
         Ok(None) => {
@@ -2287,7 +2361,7 @@ fn handle_rewind(turns: Option<usize>, runner: &AgentRunner, session: &mut Sessi
                         } else {
                             chk.files
                                 .iter()
-                                 .map(|p| p.display().to_string())
+                                .map(|p| p.display().to_string())
                                 .collect::<Vec<_>>()
                                 .join(", ")
                         };
@@ -2318,10 +2392,9 @@ fn handle_rewind(turns: Option<usize>, runner: &AgentRunner, session: &mut Sessi
                         Ok(res) => {
                             print!("{}", crate::agent::undo::format_undo_report(&res));
                             if let Some(insp) = inspection {
-                                let has_diffs = insp
-                                    .files
-                                    .iter()
-                                    .any(|f| f.colorized_diff.is_some() || f.unified_diff.is_some());
+                                let has_diffs = insp.files.iter().any(|f| {
+                                    f.colorized_diff.is_some() || f.unified_diff.is_some()
+                                });
                                 if has_diffs {
                                     println!("  \x1b[1;36mRestored File Diffs:\x1b[0m");
                                     for file_diff in &insp.files {
@@ -2835,7 +2908,10 @@ fn handle_provider(name: Option<&str>, runner: &mut AgentRunner) {
             }
             other => {
                 runner.config_mut().default_provider = other.to_string();
-                println!("\x1b[1;32m✓\x1b[0m Active provider set to \x1b[1;37m{}\x1b[0m\n", other);
+                println!(
+                    "\x1b[1;32m✓\x1b[0m Active provider set to \x1b[1;37m{}\x1b[0m\n",
+                    other
+                );
             }
         }
     } else {
@@ -3025,7 +3101,9 @@ fn open_browser(url: &str) -> bool {
 fn print_provider_info(runner: &AgentRunner) {
     let current_provider = &runner.config().default_provider;
     let provider_desc = match current_provider.as_str() {
-        "antigravity" | "local" => "Local Antigravity Daemon - http://127.0.0.1:8045/v1 (Free Inference)",
+        "antigravity" | "local" => {
+            "Local Antigravity Daemon - http://127.0.0.1:8045/v1 (Free Inference)"
+        }
         "codex" => "Codex / ChatGPT Subscription (Free Inference)",
         _ => "Fusion Gateway - https://api.fusioncode.app/v1",
     };
@@ -3041,7 +3119,12 @@ fn print_provider_info(runner: &AgentRunner) {
     let fusion_key =
         std::env::var("FUSION_API_KEY").is_ok() || runner.config().fusion_api_key.is_some();
 
-    print_provider_status("antigravity", "Antigravity (Local)", antigravity_active, current_provider);
+    print_provider_status(
+        "antigravity",
+        "Antigravity (Local)",
+        antigravity_active,
+        current_provider,
+    );
     if codex_active {
         print_provider_status("codex", "Codex (Local)", true, current_provider);
     }
@@ -4659,7 +4742,9 @@ mod tests {
                 file_path.clone(),
                 "code.rs".to_string(),
                 crate::agent::undo::FileState::from_str("fn hello() {}\n"),
-                Some(crate::agent::undo::FileState::from_str("fn hello() {}\nfn world() {}\n")),
+                Some(crate::agent::undo::FileState::from_str(
+                    "fn hello() {}\nfn world() {}\n",
+                )),
             );
             chk.add_snapshot(snap);
             mgr.push_checkpoint(chk);

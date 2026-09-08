@@ -270,10 +270,7 @@ fn test_fuzzy_match_files_subsequence_fuzzy_matching() {
 
 #[test]
 fn test_fuzzy_match_files_no_match() {
-    let files = vec![
-        "src/main.rs".to_string(),
-        "Cargo.toml".to_string(),
-    ];
+    let files = vec!["src/main.rs".to_string(), "Cargo.toml".to_string()];
 
     let matches = fuzzy_match_files("nonexistent_symbol_xyz", &files);
     assert!(matches.is_empty());
@@ -382,7 +379,9 @@ fn test_prompt_handle_event_arrow_navigation_and_tab_insertion() {
 
     // Down arrow moves selection from 0 to 1
     let down_event = Event::Key(KeyEvent::new(KeyCode::Down, KeyModifiers::NONE));
-    let res = prompt.handle_event(down_event).expect("handle_event failed");
+    let res = prompt
+        .handle_event(down_event)
+        .expect("handle_event failed");
     assert_eq!(res, None);
     assert_eq!(prompt.at_file_selection(), 1);
 
@@ -413,7 +412,9 @@ fn test_prompt_handle_event_enter_insertion() {
 
     // Enter key inserts the selected file without submitting the prompt
     let enter_event = Event::Key(KeyEvent::new(KeyCode::Enter, KeyModifiers::NONE));
-    let res = prompt.handle_event(enter_event).expect("handle_event failed");
+    let res = prompt
+        .handle_event(enter_event)
+        .expect("handle_event failed");
     // Should NOT submit the prompt, but return None and insert text
     assert_eq!(res, None);
     assert_eq!(prompt.buffer_text(), "read crates/fusion-shell/src/main.rs");

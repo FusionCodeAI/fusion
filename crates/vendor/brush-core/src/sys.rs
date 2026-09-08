@@ -28,6 +28,6 @@ pub mod tokio_process;
 pub mod fs;
 
 pub use platform::{
-	PlatformError, async_pipe, commands, fd, input, poll, process, resource, signal, terminal,
+    PlatformError, async_pipe, commands, fd, input, poll, process, resource, signal, terminal,
 };
 pub(crate) use platform::{env, network, users};

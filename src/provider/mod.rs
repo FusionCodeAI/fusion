@@ -1,8 +1,8 @@
 pub mod anthropic;
 pub mod catalog;
 pub mod client;
-pub mod offline;
 pub mod local_daemon;
+pub mod offline;
 pub mod ollama;
 pub mod openai;
 pub mod openrouter;

@@ -134,8 +134,7 @@ fn test_message_serialization_task_lifecycle() {
     assert!(offer_json.contains("\"task_id\":\"task-101\""));
     assert!(offer_json.contains("\"rust\""));
 
-    let offer_back: MeshMessage =
-        serde_json::from_str(&offer_json).expect("deserialize TaskOffer");
+    let offer_back: MeshMessage = serde_json::from_str(&offer_json).expect("deserialize TaskOffer");
     assert_eq!(offer, offer_back);
 
     // 2. TaskAccept
@@ -349,7 +348,10 @@ async fn test_task_offer_and_accept_roundtrip_auto_accept() {
     assert!(worker.auto_accept().await);
 
     // Requester and worker discover each other in the mesh
-    let discovered = requester.discover_peers().await.expect("requester discover");
+    let discovered = requester
+        .discover_peers()
+        .await
+        .expect("requester discover");
     assert_eq!(discovered.len(), 1);
     let worker_discovered = worker.discover_peers().await.expect("worker discover");
     assert_eq!(worker_discovered.len(), 1);
@@ -644,10 +646,7 @@ async fn test_tcp_localhost_fallback_mode() {
     assert_eq!(discovered[0].peer_id, node_b.peer_id());
 
     // Ping / Pong over TCP
-    let pong = node_a
-        .ping(node_b.peer_id())
-        .await
-        .expect("ping over TCP");
+    let pong = node_a.ping(node_b.peer_id()).await.expect("ping over TCP");
     match pong {
         MeshMessage::Pong { active_model, .. } => {
             assert_eq!(active_model, "tcp-node-b");
@@ -676,7 +675,10 @@ async fn test_stale_socket_cleanup_resilience() {
         .expect("start node");
 
     // Discovery should not crash or panic when encountering dead socket
-    let discovered = node.discover_peers().await.expect("discover with stale file");
+    let discovered = node
+        .discover_peers()
+        .await
+        .expect("discover with stale file");
     assert_eq!(discovered.len(), 0);
 
     node.shutdown().await;

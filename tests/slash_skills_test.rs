@@ -22,9 +22,18 @@ use slash_skills::{
 #[test]
 fn test_handle_skills_command_empty_args_renders_table() {
     let output = handle_skills_command(&[], None);
-    assert!(output.contains("Name"), "Table should contain 'Name' column header");
-    assert!(output.contains("Source"), "Table should contain 'Source' column header");
-    assert!(output.contains("Triggers"), "Table should contain 'Triggers' column header");
+    assert!(
+        output.contains("Name"),
+        "Table should contain 'Name' column header"
+    );
+    assert!(
+        output.contains("Source"),
+        "Table should contain 'Source' column header"
+    );
+    assert!(
+        output.contains("Triggers"),
+        "Table should contain 'Triggers' column header"
+    );
     assert!(
         output.contains("Enabled Status") || output.contains("Enabled"),
         "Table should contain 'Enabled' column header"
@@ -66,9 +75,15 @@ version: "1.0.0"
 
     let output = handle_skills_command(&["list".to_string()], Some(temp.path()));
 
-    assert!(output.contains("cloudflare-workers"), "Should list skill name");
+    assert!(
+        output.contains("cloudflare-workers"),
+        "Should list skill name"
+    );
     assert!(output.contains("Project"), "Source should indicate Project");
-    assert!(output.contains("wrangler.jsonc"), "Triggers should include wrangler.jsonc");
+    assert!(
+        output.contains("wrangler.jsonc"),
+        "Triggers should include wrangler.jsonc"
+    );
     assert!(output.contains("Enabled"), "Status should be Enabled");
 }
 
@@ -147,10 +162,7 @@ Always use multi-stage builds.
 "#;
     fs::write(doc_dir.join("SKILL.md"), skill_content).expect("Failed to write SKILL.md");
 
-    let output = handle_skills_command(
-        &["show docker-deploy".to_string()],
-        Some(temp.path()),
-    );
+    let output = handle_skills_command(&["show docker-deploy".to_string()], Some(temp.path()));
 
     assert!(output.contains("### Skill: docker-deploy"));
 }
@@ -230,16 +242,11 @@ fn test_handle_skills_command_enable_disable_missing_name() {
 
 #[test]
 fn test_handle_skills_command_enable_disable_not_found() {
-    let out_en = handle_skills_command(
-        &["enable".to_string(), "phantom-skill".to_string()],
-        None,
-    );
+    let out_en = handle_skills_command(&["enable".to_string(), "phantom-skill".to_string()], None);
     assert!(out_en.contains("Skill 'phantom-skill' not found."));
 
-    let out_dis = handle_skills_command(
-        &["disable".to_string(), "phantom-skill".to_string()],
-        None,
-    );
+    let out_dis =
+        handle_skills_command(&["disable".to_string(), "phantom-skill".to_string()], None);
     assert!(out_dis.contains("Skill 'phantom-skill' not found."));
 }
 

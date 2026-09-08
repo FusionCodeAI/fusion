@@ -488,8 +488,15 @@ pub fn tokenize_line<'a>(line: &'a str, lang: Language) -> Vec<SyntaxToken<'a>> 
         // Comments
         if matches!(
             lang,
-            Language::Rust | Language::C | Language::Cpp | Language::JavaScript | Language::TypeScript | Language::Go
-        ) && i + 1 < len && bytes[i] == b'/' && bytes[i + 1] == b'/'
+            Language::Rust
+                | Language::C
+                | Language::Cpp
+                | Language::JavaScript
+                | Language::TypeScript
+                | Language::Go
+        ) && i + 1 < len
+            && bytes[i] == b'/'
+            && bytes[i + 1] == b'/'
         {
             tokens.push(SyntaxToken {
                 kind: TokenKind::Comment,
@@ -533,16 +540,17 @@ pub fn tokenize_line<'a>(line: &'a str, lang: Language) -> Vec<SyntaxToken<'a>> 
             || (bytes[i] == b'.' && i + 1 < len && bytes[i + 1].is_ascii_digit())
         {
             let start = i;
-            if i + 1 < len && bytes[i] == b'0' && (bytes[i + 1] == b'x' || bytes[i + 1] == b'b' || bytes[i + 1] == b'o') {
+            if i + 1 < len
+                && bytes[i] == b'0'
+                && (bytes[i + 1] == b'x' || bytes[i + 1] == b'b' || bytes[i + 1] == b'o')
+            {
                 i += 2;
                 while i < len && (bytes[i].is_ascii_hexdigit() || bytes[i] == b'_') {
                     i += 1;
                 }
             } else {
                 while i < len
-                    && (bytes[i].is_ascii_alphanumeric()
-                        || bytes[i] == b'.'
-                        || bytes[i] == b'_')
+                    && (bytes[i].is_ascii_alphanumeric() || bytes[i] == b'.' || bytes[i] == b'_')
                 {
                     i += 1;
                 }
@@ -560,7 +568,9 @@ pub fn tokenize_line<'a>(line: &'a str, lang: Language) -> Vec<SyntaxToken<'a>> 
         {
             let start = i;
             i += 1;
-            while i < len && (bytes[i].is_ascii_alphanumeric() || bytes[i] == b'_' || bytes[i] == b'[') {
+            while i < len
+                && (bytes[i].is_ascii_alphanumeric() || bytes[i] == b'_' || bytes[i] == b'[')
+            {
                 i += 1;
             }
             tokens.push(SyntaxToken {
@@ -644,55 +654,236 @@ fn is_keyword(word: &str, lang: Language) -> bool {
     match lang {
         Language::Rust => matches!(
             word,
-            "as" | "async" | "await" | "break" | "const" | "continue" | "crate" | "dyn"
-                | "else" | "enum" | "extern" | "false" | "fn" | "for" | "if" | "impl"
-                | "in" | "let" | "loop" | "match" | "mod" | "move" | "mut" | "pub"
-                | "ref" | "return" | "self" | "Self" | "static" | "struct" | "super"
-                | "trait" | "true" | "type" | "unsafe" | "use" | "where" | "while"
+            "as" | "async"
+                | "await"
+                | "break"
+                | "const"
+                | "continue"
+                | "crate"
+                | "dyn"
+                | "else"
+                | "enum"
+                | "extern"
+                | "false"
+                | "fn"
+                | "for"
+                | "if"
+                | "impl"
+                | "in"
+                | "let"
+                | "loop"
+                | "match"
+                | "mod"
+                | "move"
+                | "mut"
+                | "pub"
+                | "ref"
+                | "return"
+                | "self"
+                | "Self"
+                | "static"
+                | "struct"
+                | "super"
+                | "trait"
+                | "true"
+                | "type"
+                | "unsafe"
+                | "use"
+                | "where"
+                | "while"
         ),
         Language::Python => matches!(
             word,
-            "and" | "as" | "assert" | "async" | "await" | "break" | "class" | "continue"
-                | "def" | "del" | "elif" | "else" | "except" | "False" | "finally" | "for"
-                | "from" | "global" | "if" | "import" | "in" | "is" | "lambda" | "None"
-                | "nonlocal" | "not" | "or" | "pass" | "raise" | "return" | "True" | "try"
-                | "while" | "with" | "yield" | "self"
+            "and"
+                | "as"
+                | "assert"
+                | "async"
+                | "await"
+                | "break"
+                | "class"
+                | "continue"
+                | "def"
+                | "del"
+                | "elif"
+                | "else"
+                | "except"
+                | "False"
+                | "finally"
+                | "for"
+                | "from"
+                | "global"
+                | "if"
+                | "import"
+                | "in"
+                | "is"
+                | "lambda"
+                | "None"
+                | "nonlocal"
+                | "not"
+                | "or"
+                | "pass"
+                | "raise"
+                | "return"
+                | "True"
+                | "try"
+                | "while"
+                | "with"
+                | "yield"
+                | "self"
         ),
         Language::JavaScript | Language::TypeScript => matches!(
             word,
-            "async" | "await" | "break" | "case" | "catch" | "class" | "const" | "continue"
-                | "debugger" | "default" | "delete" | "do" | "else" | "export" | "extends"
-                | "false" | "finally" | "for" | "from" | "function" | "if" | "import"
-                | "in" | "instanceof" | "let" | "new" | "null" | "return" | "super"
-                | "switch" | "this" | "throw" | "true" | "try" | "typeof" | "var"
-                | "void" | "while" | "with" | "yield" | "type" | "interface"
+            "async"
+                | "await"
+                | "break"
+                | "case"
+                | "catch"
+                | "class"
+                | "const"
+                | "continue"
+                | "debugger"
+                | "default"
+                | "delete"
+                | "do"
+                | "else"
+                | "export"
+                | "extends"
+                | "false"
+                | "finally"
+                | "for"
+                | "from"
+                | "function"
+                | "if"
+                | "import"
+                | "in"
+                | "instanceof"
+                | "let"
+                | "new"
+                | "null"
+                | "return"
+                | "super"
+                | "switch"
+                | "this"
+                | "throw"
+                | "true"
+                | "try"
+                | "typeof"
+                | "var"
+                | "void"
+                | "while"
+                | "with"
+                | "yield"
+                | "type"
+                | "interface"
         ),
         Language::Go => matches!(
             word,
-            "break" | "case" | "chan" | "const" | "continue" | "default" | "defer"
-                | "else" | "fallthrough" | "for" | "func" | "go" | "goto" | "if"
-                | "import" | "interface" | "map" | "package" | "range" | "return"
-                | "select" | "struct" | "switch" | "type" | "var" | "true" | "false" | "nil"
+            "break"
+                | "case"
+                | "chan"
+                | "const"
+                | "continue"
+                | "default"
+                | "defer"
+                | "else"
+                | "fallthrough"
+                | "for"
+                | "func"
+                | "go"
+                | "goto"
+                | "if"
+                | "import"
+                | "interface"
+                | "map"
+                | "package"
+                | "range"
+                | "return"
+                | "select"
+                | "struct"
+                | "switch"
+                | "type"
+                | "var"
+                | "true"
+                | "false"
+                | "nil"
         ),
         Language::C | Language::Cpp => matches!(
             word,
-            "auto" | "break" | "case" | "char" | "const" | "continue" | "default"
-                | "do" | "double" | "else" | "enum" | "extern" | "float" | "for"
-                | "goto" | "if" | "int" | "long" | "register" | "return" | "short"
-                | "signed" | "sizeof" | "static" | "struct" | "switch" | "typedef"
-                | "union" | "unsigned" | "void" | "volatile" | "while" | "class"
-                | "public" | "private" | "protected" | "virtual" | "override" | "namespace"
+            "auto"
+                | "break"
+                | "case"
+                | "char"
+                | "const"
+                | "continue"
+                | "default"
+                | "do"
+                | "double"
+                | "else"
+                | "enum"
+                | "extern"
+                | "float"
+                | "for"
+                | "goto"
+                | "if"
+                | "int"
+                | "long"
+                | "register"
+                | "return"
+                | "short"
+                | "signed"
+                | "sizeof"
+                | "static"
+                | "struct"
+                | "switch"
+                | "typedef"
+                | "union"
+                | "unsigned"
+                | "void"
+                | "volatile"
+                | "while"
+                | "class"
+                | "public"
+                | "private"
+                | "protected"
+                | "virtual"
+                | "override"
+                | "namespace"
         ),
         Language::Shell => matches!(
             word,
-            "if" | "then" | "else" | "elif" | "fi" | "case" | "esac" | "for"
-                | "select" | "while" | "until" | "do" | "done" | "in" | "function"
-                | "time" | "return" | "exit"
+            "if" | "then"
+                | "else"
+                | "elif"
+                | "fi"
+                | "case"
+                | "esac"
+                | "for"
+                | "select"
+                | "while"
+                | "until"
+                | "do"
+                | "done"
+                | "in"
+                | "function"
+                | "time"
+                | "return"
+                | "exit"
         ),
         _ => matches!(
             word,
-            "fn" | "let" | "def" | "if" | "else" | "for" | "while" | "return"
-                | "function" | "class" | "import" | "export" | "true" | "false"
+            "fn" | "let"
+                | "def"
+                | "if"
+                | "else"
+                | "for"
+                | "while"
+                | "return"
+                | "function"
+                | "class"
+                | "import"
+                | "export"
+                | "true"
+                | "false"
         ),
     }
 }
@@ -735,7 +926,8 @@ fn is_type_name(word: &str) -> bool {
             | "string"
             | "any"
             | "void"
-    ) || (word.starts_with(|c: char| c.is_ascii_uppercase()) && word.chars().any(|c| c.is_ascii_lowercase()))
+    ) || (word.starts_with(|c: char| c.is_ascii_uppercase())
+        && word.chars().any(|c| c.is_ascii_lowercase()))
 }
 
 fn tokens_to_spans<'a>(tokens: &[SyntaxToken<'a>]) -> Vec<Span<'a>> {
@@ -891,7 +1083,8 @@ impl<'a> EditorWidget<'a> {
                 let raw_line = &self.buffer.lines[line_idx];
                 let tokens = tokenize_line(raw_line, lang);
                 let styled_spans = tokens_to_spans(&tokens);
-                let sliced = slice_spans(styled_spans, self.buffer.scroll_offset_col, content_width);
+                let sliced =
+                    slice_spans(styled_spans, self.buffer.scroll_offset_col, content_width);
                 line_spans.extend(sliced);
             }
 
@@ -1200,11 +1393,7 @@ pub fn edit_text_interactive(
 
     // Explicit teardown
     let _ = terminal::disable_raw_mode();
-    let _ = execute!(
-        terminal.backend_mut(),
-        LeaveAlternateScreen,
-        cursor::Show
-    );
+    let _ = execute!(terminal.backend_mut(), LeaveAlternateScreen, cursor::Show);
 
     if saved || !buffer.is_modified {
         Ok(Some(buffer.to_text()))

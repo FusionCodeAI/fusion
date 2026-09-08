@@ -19,8 +19,8 @@ pub mod tool_card;
 
 use fusion::ui::table::{strip_ansi, visible_width};
 use tool_card::{
-    format_duration, is_read_only_tool, render_tool_cards, ToolOutputCard, ToolStatus,
-    ANSI_CYAN, ANSI_GRAY, ANSI_GREEN, ANSI_RED, ANSI_RESET,
+    format_duration, is_read_only_tool, render_tool_cards, ToolOutputCard, ToolStatus, ANSI_CYAN,
+    ANSI_GRAY, ANSI_GREEN, ANSI_RED, ANSI_RESET,
 };
 
 // ============================================================================
@@ -43,7 +43,10 @@ fn test_tool_card_basic_layout() {
     assert_eq!(lines.len(), 3, "Expected 3 lines (top, content, bottom)");
 
     // Top border: ╭─ bash: cargo test (15ms) ───────────────────────────────────╮
-    assert!(lines[0].starts_with("╭─ "), "Top border must start with '╭─ '");
+    assert!(
+        lines[0].starts_with("╭─ "),
+        "Top border must start with '╭─ '"
+    );
     assert!(lines[0].ends_with('╮'), "Top border must end with '╮'");
     assert!(
         lines[0].contains("bash: cargo test (15ms)"),
@@ -51,7 +54,10 @@ fn test_tool_card_basic_layout() {
     );
 
     // Content: │ 15 passed in 0.02s ... │
-    assert!(lines[1].starts_with("│ "), "Content line must start with '│ '");
+    assert!(
+        lines[1].starts_with("│ "),
+        "Content line must start with '│ '"
+    );
     assert!(lines[1].ends_with(" │"), "Content line must end with ' │'");
     assert!(
         lines[1].contains("15 passed in 0.02s"),
@@ -59,7 +65,10 @@ fn test_tool_card_basic_layout() {
     );
 
     // Bottom border: ╰─────────────────────────────────────────────────────────────╯
-    assert!(lines[2].starts_with('╰'), "Bottom border must start with '╰'");
+    assert!(
+        lines[2].starts_with('╰'),
+        "Bottom border must start with '╰'"
+    );
     assert!(lines[2].ends_with('╯'), "Bottom border must end with '╯'");
     assert!(
         lines[2].chars().all(|c| c == '╰' || c == '╯' || c == '─'),
@@ -80,18 +89,17 @@ fn test_tool_card_basic_layout() {
 
 #[test]
 fn test_tool_card_empty_content() {
-    let card = ToolOutputCard::success(
-        "touch",
-        "foo.txt",
-        "",
-        Some(Duration::from_millis(5)),
-    );
+    let card = ToolOutputCard::success("touch", "foo.txt", "", Some(Duration::from_millis(5)));
 
     let rendered = card.render(60);
     let plain = strip_ansi(&rendered);
     let lines: Vec<&str> = plain.lines().collect();
 
-    assert_eq!(lines.len(), 2, "Empty content card should have 2 lines (top & bottom border)");
+    assert_eq!(
+        lines.len(),
+        2,
+        "Empty content card should have 2 lines (top & bottom border)"
+    );
     assert_eq!(visible_width(lines[0]), 60);
     assert_eq!(visible_width(lines[1]), 60);
 }
@@ -105,7 +113,11 @@ fn test_tool_card_multiline_content() {
     let plain = strip_ansi(&rendered);
     let lines: Vec<&str> = plain.lines().collect();
 
-    assert_eq!(lines.len(), 5, "Expected 5 lines (top + 3 content + bottom)");
+    assert_eq!(
+        lines.len(),
+        5,
+        "Expected 5 lines (top + 3 content + bottom)"
+    );
     for (i, line) in lines.iter().enumerate() {
         assert_eq!(visible_width(line), 50, "Line {} width mismatch", i);
     }
@@ -274,8 +286,7 @@ fn test_tool_card_custom_max_lines() {
         content.push_str(&format!("Entry {}\n", i));
     }
 
-    let card = ToolOutputCard::success("log", "tail", content.trim_end(), None)
-        .with_max_lines(5);
+    let card = ToolOutputCard::success("log", "tail", content.trim_end(), None).with_max_lines(5);
 
     let rendered = card.render(60);
     assert!(
@@ -448,7 +459,10 @@ fn test_header_chip_long_title_truncation() {
         50,
         "Header line with very long title must fit terminal width 50"
     );
-    assert!(lines[0].contains('…'), "Long title should be truncated with ellipsis");
+    assert!(
+        lines[0].contains('…'),
+        "Long title should be truncated with ellipsis"
+    );
 }
 
 #[test]

@@ -248,7 +248,9 @@ fn test_expand_file_mentions_deduplication() {
 
     assert_eq!(injected, vec![PathBuf::from("Cargo.toml")]);
     // Ensure only one file-mention tag is appended
-    let count = expanded.matches("<file-mention path=\"Cargo.toml\">").count();
+    let count = expanded
+        .matches("<file-mention path=\"Cargo.toml\">")
+        .count();
     assert_eq!(count, 1);
 }
 

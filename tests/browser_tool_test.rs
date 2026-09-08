@@ -407,21 +407,22 @@ fn test_unescape_html_entities() {
 #[test]
 fn test_url_normalization() {
     assert_eq!(normalize_url("example.com"), "https://example.com");
-    assert_eq!(normalize_url("http://localhost:8080"), "http://localhost:8080");
+    assert_eq!(
+        normalize_url("http://localhost:8080"),
+        "http://localhost:8080"
+    );
     assert_eq!(normalize_url("https://fusion.ai"), "https://fusion.ai");
     assert_eq!(normalize_url("about:blank"), "about:blank");
 }
 
 #[test]
 fn test_parse_ws_url() {
-    let (host, port, path) =
-        parse_ws_url("ws://127.0.0.1:9222/devtools/page/ABC123").unwrap();
+    let (host, port, path) = parse_ws_url("ws://127.0.0.1:9222/devtools/page/ABC123").unwrap();
     assert_eq!(host, "127.0.0.1");
     assert_eq!(port, 9222);
     assert_eq!(path, "/devtools/page/ABC123");
 
-    let (host2, port2, path2) =
-        parse_ws_url("ws://localhost:9222/devtools/browser/xyz").unwrap();
+    let (host2, port2, path2) = parse_ws_url("ws://localhost:9222/devtools/browser/xyz").unwrap();
     assert_eq!(host2, "localhost");
     assert_eq!(port2, 9222);
     assert_eq!(path2, "/devtools/browser/xyz");
@@ -539,18 +540,13 @@ async fn test_parameter_validation_errors() {
 
     // Type missing text
     let err_type = tool
-        .execute(
-            json!({ "action": "type", "selector": "#username" }),
-            &ctx,
-        )
+        .execute(json!({ "action": "type", "selector": "#username" }), &ctx)
         .await;
     assert!(err_type.is_err());
     assert!(err_type.unwrap_err().to_string().contains("text"));
 
     // EvaluateJs missing code
-    let err_eval = tool
-        .execute(json!({ "action": "evaluate_js" }), &ctx)
-        .await;
+    let err_eval = tool.execute(json!({ "action": "evaluate_js" }), &ctx).await;
     assert!(err_eval.is_err());
     assert!(err_eval.unwrap_err().to_string().contains("code"));
 
@@ -621,11 +617,17 @@ async fn test_mock_cdp_http_client() {
     let client = CdpClient::new(&base_url);
     assert!(client.is_online().await, "Mock CDP should be online");
 
-    let ver = client.version().await.expect("version query should succeed");
+    let ver = client
+        .version()
+        .await
+        .expect("version query should succeed");
     assert_eq!(ver.browser, "Chrome/124.0.6367.60");
     assert_eq!(ver.protocol_version, "1.3");
 
-    let tabs = client.list_tabs().await.expect("list_tabs query should succeed");
+    let tabs = client
+        .list_tabs()
+        .await
+        .expect("list_tabs query should succeed");
     assert_eq!(tabs.len(), 1);
     assert_eq!(tabs[0].id, "PAGE_001");
     assert_eq!(tabs[0].title, "Fusion Home");

@@ -315,7 +315,10 @@ impl PromptPickerState {
     pub fn new(prompts: Vec<PromptTemplate>) -> Self {
         let mut categories = vec!["All".to_string()];
         for p in &prompts {
-            if !categories.iter().any(|c| c.eq_ignore_ascii_case(&p.category)) {
+            if !categories
+                .iter()
+                .any(|c| c.eq_ignore_ascii_case(&p.category))
+            {
                 categories.push(p.category.clone());
             }
         }
@@ -945,10 +948,7 @@ impl<'a> PromptPickerWidget<'a> {
                 ));
             } else {
                 spans.push(Span::raw("  "));
-                spans.push(Span::styled(
-                    &prompt.name,
-                    Style::default().fg(Color::Gray),
-                ));
+                spans.push(Span::styled(&prompt.name, Style::default().fg(Color::Gray)));
                 spans.push(Span::raw(" "));
                 spans.push(Span::styled(
                     format!("[{}]", prompt.category),
@@ -1024,10 +1024,7 @@ impl<'a> PromptPickerWidget<'a> {
                     Style::default().fg(Color::DarkGray),
                 )];
                 if prompt.variables.is_empty() {
-                    var_spans.push(Span::styled(
-                        "None",
-                        Style::default().fg(Color::DarkGray),
-                    ));
+                    var_spans.push(Span::styled("None", Style::default().fg(Color::DarkGray)));
                 } else {
                     for v in &prompt.variables {
                         var_spans.push(Span::styled(

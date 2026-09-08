@@ -41,14 +41,32 @@ async fn test_read_line_slicing_start_end() {
         .expect("Read tool execution failed for :2-4 selector");
 
     // Must contain lines 2, 3, and 4
-    assert!(result.contains("Line 2"), "Result should contain Line 2: {result}");
-    assert!(result.contains("Line 3"), "Result should contain Line 3: {result}");
-    assert!(result.contains("Line 4"), "Result should contain Line 4: {result}");
+    assert!(
+        result.contains("Line 2"),
+        "Result should contain Line 2: {result}"
+    );
+    assert!(
+        result.contains("Line 3"),
+        "Result should contain Line 3: {result}"
+    );
+    assert!(
+        result.contains("Line 4"),
+        "Result should contain Line 4: {result}"
+    );
 
     // Must not contain lines 1, 5, or 6
-    assert!(!result.contains("Line 1"), "Result should not contain Line 1: {result}");
-    assert!(!result.contains("Line 5"), "Result should not contain Line 5: {result}");
-    assert!(!result.contains("Line 6"), "Result should not contain Line 6: {result}");
+    assert!(
+        !result.contains("Line 1"),
+        "Result should not contain Line 1: {result}"
+    );
+    assert!(
+        !result.contains("Line 5"),
+        "Result should not contain Line 5: {result}"
+    );
+    assert!(
+        !result.contains("Line 6"),
+        "Result should not contain Line 6: {result}"
+    );
 }
 
 #[tokio::test]
@@ -70,9 +88,18 @@ async fn test_read_line_number_formatting() {
         .expect("Read tool execution failed");
 
     // Line numbers should follow "{:6} | <line>" format with 1-based original line indexing
-    assert!(result.contains("     2 | Beta"), "Line 2 formatting mismatch: {result}");
-    assert!(result.contains("     3 | Gamma"), "Line 3 formatting mismatch: {result}");
-    assert!(result.contains("     4 | Delta"), "Line 4 formatting mismatch: {result}");
+    assert!(
+        result.contains("     2 | Beta"),
+        "Line 2 formatting mismatch: {result}"
+    );
+    assert!(
+        result.contains("     3 | Gamma"),
+        "Line 3 formatting mismatch: {result}"
+    );
+    assert!(
+        result.contains("     4 | Delta"),
+        "Line 4 formatting mismatch: {result}"
+    );
 
     // Whole file read formatting
     let whole_result = tool
@@ -85,8 +112,14 @@ async fn test_read_line_number_formatting() {
         .await
         .expect("Read tool execution failed for whole file");
 
-    assert!(whole_result.contains("     1 | Alpha"), "Line 1 formatting mismatch: {whole_result}");
-    assert!(whole_result.contains("     5 | Epsilon"), "Line 5 formatting mismatch: {whole_result}");
+    assert!(
+        whole_result.contains("     1 | Alpha"),
+        "Line 1 formatting mismatch: {whole_result}"
+    );
+    assert!(
+        whole_result.contains("     5 | Epsilon"),
+        "Line 5 formatting mismatch: {whole_result}"
+    );
 }
 
 #[tokio::test]
@@ -108,8 +141,14 @@ async fn test_read_raw_verbatim_output() {
         .expect("Read tool execution failed for :raw selector");
 
     // Should match verbatim content without any line number prefixes (no " | ")
-    assert_eq!(result, sample_content, "Raw output should be exact verbatim content");
-    assert!(!result.contains("     1 | "), "Raw output must not contain line number formatting");
+    assert_eq!(
+        result, sample_content,
+        "Raw output should be exact verbatim content"
+    );
+    assert!(
+        !result.contains("     1 | "),
+        "Raw output must not contain line number formatting"
+    );
 }
 
 #[tokio::test]
@@ -131,8 +170,14 @@ async fn test_read_combined_slicing_and_raw() {
         .expect("Read tool execution failed for :2-4:raw selector");
 
     // Verbatim slice of rows 2, 3, 4 without line number formatting
-    assert_eq!(result, "Row 2\nRow 3\nRow 4\n", "Combined slice and raw should return exact sliced lines");
-    assert!(!result.contains(" | "), "Combined slice and raw must not contain line number formatting");
+    assert_eq!(
+        result, "Row 2\nRow 3\nRow 4\n",
+        "Combined slice and raw should return exact sliced lines"
+    );
+    assert!(
+        !result.contains(" | "),
+        "Combined slice and raw must not contain line number formatting"
+    );
 }
 
 #[tokio::test]
@@ -155,9 +200,18 @@ async fn test_read_start_offset_selector() {
 
     assert!(!result.contains("Line 1"), "Should not contain Line 1");
     assert!(!result.contains("Line 2"), "Should not contain Line 2");
-    assert!(result.contains("     3 | Line 3"), "Should contain Line 3 with line number 3");
-    assert!(result.contains("     4 | Line 4"), "Should contain Line 4 with line number 4");
-    assert!(result.contains("     5 | Line 5"), "Should contain Line 5 with line number 5");
+    assert!(
+        result.contains("     3 | Line 3"),
+        "Should contain Line 3 with line number 3"
+    );
+    assert!(
+        result.contains("     4 | Line 4"),
+        "Should contain Line 4 with line number 4"
+    );
+    assert!(
+        result.contains("     5 | Line 5"),
+        "Should contain Line 5 with line number 5"
+    );
 }
 
 #[tokio::test]
@@ -215,10 +269,19 @@ pub struct UserRecord {
         .expect("Read tool execution failed for :defs selector");
 
     // Must retain declarations
-    assert!(result.contains("compute_sum"), "Output should contain function declaration: {result}");
-    assert!(result.contains("UserRecord"), "Output should contain struct declaration: {result}");
+    assert!(
+        result.contains("compute_sum"),
+        "Output should contain function declaration: {result}"
+    );
+    assert!(
+        result.contains("UserRecord"),
+        "Output should contain struct declaration: {result}"
+    );
     // Must contain elision marker `...`
-    assert!(result.contains("..."), "Output should contain elision marker `...`: {result}");
+    assert!(
+        result.contains("..."),
+        "Output should contain elision marker `...`: {result}"
+    );
 }
 
 #[tokio::test]
@@ -236,7 +299,10 @@ async fn test_read_oversized_file_automatic_summary() {
     }
     // Verify line count exceeds 500
     let line_count = large_content.lines().count();
-    assert!(line_count > 500, "Test file should exceed 500 lines, got {line_count}");
+    assert!(
+        line_count > 500,
+        "Test file should exceed 500 lines, got {line_count}"
+    );
     fs::write(&file_path, &large_content).expect("Failed to write large_module.rs");
 
     // Reading without explicit selectors or limits triggers automatic summary
@@ -250,7 +316,10 @@ async fn test_read_oversized_file_automatic_summary() {
         .await
         .expect("Read tool execution failed for oversized file");
 
-    assert!(result.contains("Summary:"), "Oversized file should contain Summary banner: {result}");
+    assert!(
+        result.contains("Summary:"),
+        "Oversized file should contain Summary banner: {result}"
+    );
     assert!(
         result.contains("lines elided; re-issue with line range selector"),
         "Oversized file should guide re-issue with line range selector: {result}"

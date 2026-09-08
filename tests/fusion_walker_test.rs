@@ -52,10 +52,7 @@ fn test_gitignore_basic_filtering() {
     write_file(root.join("app.log"), "root log line");
 
     // Create root .gitignore
-    write_file(
-        root.join(".gitignore"),
-        "target/\n*.log\nlogs/\n",
-    );
+    write_file(root.join(".gitignore"), "target/\n*.log\nlogs/\n");
 
     // Walk with gitignore enabled
     let request = WalkRequest::new(root)
@@ -90,9 +87,7 @@ fn test_gitignore_toggle_disabled() {
     write_file(root.join(".gitignore"), "target/\n*.log\n");
 
     // Walk with gitignore disabled
-    let request = WalkRequest::new(root)
-        .gitignore(false)
-        .hidden(false);
+    let request = WalkRequest::new(root).gitignore(false).hidden(false);
 
     let paths = collect_sorted_paths(&request);
 
@@ -119,14 +114,15 @@ fn test_gitignore_negation_and_whitelisting() {
         "*.txt\n!keep.txt\n!docs/important.txt\n",
     );
 
-    let request = WalkRequest::new(root)
-        .gitignore(true)
-        .hidden(false);
+    let request = WalkRequest::new(root).gitignore(true).hidden(false);
 
     let paths = collect_sorted_paths(&request);
 
     assert!(paths.contains(&"src/code.rs".to_string()));
-    assert!(paths.contains(&"keep.txt".to_string()), "keep.txt should be whitelisted");
+    assert!(
+        paths.contains(&"keep.txt".to_string()),
+        "keep.txt should be whitelisted"
+    );
     assert!(
         paths.contains(&"docs/important.txt".to_string()),
         "docs/important.txt should be whitelisted"
@@ -155,7 +151,10 @@ fn test_nested_gitignore_hierarchical_filtering() {
     // Subpackage level files
     write_file(root.join("packages/sub/sub.tmp"), "temp in sub");
     write_file(root.join("packages/sub/sub.data"), "data in sub");
-    write_file(root.join("packages/sub/special.data"), "special data in sub");
+    write_file(
+        root.join("packages/sub/special.data"),
+        "special data in sub",
+    );
     write_file(root.join("packages/sub/sub.txt"), "text in sub");
 
     // Nested .gitignore in packages/sub/
@@ -164,9 +163,7 @@ fn test_nested_gitignore_hierarchical_filtering() {
         "*.data\n!special.data\n",
     );
 
-    let request = WalkRequest::new(root)
-        .gitignore(true)
-        .hidden(false);
+    let request = WalkRequest::new(root).gitignore(true).hidden(false);
 
     let paths = collect_sorted_paths(&request);
 
@@ -196,18 +193,14 @@ fn test_git_directory_pruning() {
     write_file(root.join(".git/objects/00/abc"), "blob");
 
     // With skip_git(true) and hidden(true), .git must be completely omitted
-    let request_skip = WalkRequest::new(root)
-        .hidden(true)
-        .skip_git(true);
+    let request_skip = WalkRequest::new(root).hidden(true).skip_git(true);
 
     let paths_skip = collect_sorted_paths(&request_skip);
     assert!(paths_skip.contains(&"main.rs".to_string()));
     assert!(!paths_skip.iter().any(|p| p.starts_with(".git")));
 
     // With skip_git(false) and hidden(true), .git contents are visited
-    let request_keep = WalkRequest::new(root)
-        .hidden(true)
-        .skip_git(false);
+    let request_keep = WalkRequest::new(root).hidden(true).skip_git(false);
 
     let paths_keep = collect_sorted_paths(&request_keep);
     assert!(paths_keep.contains(&"main.rs".to_string()));
@@ -224,16 +217,14 @@ fn test_node_modules_pruning() {
     write_file(root.join("node_modules/foo/package.json"), "{}");
     write_file(root.join("node_modules/foo/index.js"), "");
 
-    let request_pruned = WalkRequest::new(root)
-        .skip_node_modules(true);
+    let request_pruned = WalkRequest::new(root).skip_node_modules(true);
 
     let paths_pruned = collect_sorted_paths(&request_pruned);
     assert!(paths_pruned.contains(&"package.json".to_string()));
     assert!(paths_pruned.contains(&"index.ts".to_string()));
     assert!(!paths_pruned.iter().any(|p| p.starts_with("node_modules")));
 
-    let request_unpruned = WalkRequest::new(root)
-        .skip_node_modules(false);
+    let request_unpruned = WalkRequest::new(root).skip_node_modules(false);
 
     let paths_unpruned = collect_sorted_paths(&request_unpruned);
     assert!(paths_unpruned.iter().any(|p| p.starts_with("node_modules")));
@@ -249,7 +240,10 @@ fn test_directory_error_nonexistent_root() {
     let request = WalkRequest::new(&non_existent);
 
     let result = request.collect();
-    assert!(result.is_err(), "walking a nonexistent root directory must fail");
+    assert!(
+        result.is_err(),
+        "walking a nonexistent root directory must fail"
+    );
 
     match result.unwrap_err() {
         WalkError::InvalidData { path, message } => {
@@ -291,8 +285,7 @@ fn test_directory_error_mode_skip_skippable() {
     let _guard = RestorePerms(restricted_dir.clone());
 
     // In SkipSkippable mode, the walker silently ignores permission errors on subdirectories
-    let request = WalkRequest::new(root)
-        .directory_errors(DirectoryErrorMode::SkipSkippable);
+    let request = WalkRequest::new(root).directory_errors(DirectoryErrorMode::SkipSkippable);
 
     let outcome = request.collect();
     assert!(
@@ -300,7 +293,12 @@ fn test_directory_error_mode_skip_skippable() {
         "SkipSkippable should not abort on unreadable subdirectories"
     );
 
-    let paths: Vec<String> = outcome.unwrap().entries.into_iter().map(|e| e.path).collect();
+    let paths: Vec<String> = outcome
+        .unwrap()
+        .entries
+        .into_iter()
+        .map(|e| e.path)
+        .collect();
     assert!(paths.contains(&"public/readme.txt".to_string()));
     assert!(paths.contains(&"public_after/note.txt".to_string()));
     assert!(!paths.contains(&"restricted/secret.txt".to_string()));
@@ -341,8 +339,7 @@ fn test_directory_error_mode_visit_reports_error() {
         return;
     }
 
-    let request = WalkRequest::new(root)
-        .directory_errors(DirectoryErrorMode::Visit);
+    let request = WalkRequest::new(root).directory_errors(DirectoryErrorMode::Visit);
 
     let recorded_errors: Rc<RefCell<Vec<PathBuf>>> = Rc::new(RefCell::new(Vec::new()));
     let visited_entries: Rc<RefCell<Vec<String>>> = Rc::new(RefCell::new(Vec::new()));
@@ -353,7 +350,9 @@ fn test_directory_error_mode_visit_reports_error() {
     let status = request.for_each_entry_with_heartbeat(
         || Ok::<(), Infallible>(()),
         |entry| {
-            entries_clone.borrow_mut().push(entry.relative_path.to_string());
+            entries_clone
+                .borrow_mut()
+                .push(entry.relative_path.to_string());
             Ok(WalkDecision::Include)
         },
         |err: DirectoryError<'_>| {
@@ -362,7 +361,10 @@ fn test_directory_error_mode_visit_reports_error() {
         },
     );
 
-    assert!(status.is_ok(), "traversal with error callback should succeed");
+    assert!(
+        status.is_ok(),
+        "traversal with error callback should succeed"
+    );
     assert_eq!(status.unwrap(), WalkStatus::Complete);
 
     let errors = recorded_errors.borrow();
@@ -393,7 +395,9 @@ fn test_broken_symlink_directory_error_handling() {
 
     // Under FollowLinks::Never, broken symlink is reported as a Symlink entry
     let request_never = WalkRequest::new(root).follow_links(FollowLinks::Never);
-    let outcome_never = request_never.collect().expect("collecting with FollowLinks::Never should succeed");
+    let outcome_never = request_never
+        .collect()
+        .expect("collecting with FollowLinks::Never should succeed");
     let symlink_entry = outcome_never
         .entries
         .iter()
@@ -405,7 +409,9 @@ fn test_broken_symlink_directory_error_handling() {
     let request_always = WalkRequest::new(root)
         .follow_links(FollowLinks::Always)
         .directory_errors(DirectoryErrorMode::SkipSkippable);
-    let outcome_always = request_always.collect().expect("collecting with FollowLinks::Always and SkipSkippable should succeed");
+    let outcome_always = request_always
+        .collect()
+        .expect("collecting with FollowLinks::Always and SkipSkippable should succeed");
     assert!(outcome_always.entries.iter().any(|e| e.path == "valid.txt"));
 }
 
@@ -472,9 +478,7 @@ fn test_depth_root_emission() {
     write_file(root.join("child.txt"), "child");
 
     // emit_root(true) with depth starting at 0 yields root
-    let request_with_root = WalkRequest::new(root)
-        .emit_root(true)
-        .depth(0, 1);
+    let request_with_root = WalkRequest::new(root).emit_root(true).depth(0, 1);
 
     let outcome_root = request_with_root.collect().expect("collect should succeed");
     let entries = outcome_root.entries;
@@ -486,9 +490,7 @@ fn test_depth_root_emission() {
     assert!(entries.iter().any(|e| e.path == "child.txt"));
 
     // emit_root(false) does not emit root even with min_depth=0
-    let request_no_root = WalkRequest::new(root)
-        .emit_root(false)
-        .depth(0, 1);
+    let request_no_root = WalkRequest::new(root).emit_root(false).depth(0, 1);
 
     let outcome_no_root = request_no_root.collect().expect("collect should succeed");
     assert!(
@@ -507,7 +509,9 @@ fn test_depth_inverted_bounds_returns_empty() {
 
     // min_depth > max_depth
     let request = WalkRequest::new(root).depth(5, 2);
-    let outcome = request.collect().expect("inverted depth bounds should complete cleanly");
+    let outcome = request
+        .collect()
+        .expect("inverted depth bounds should complete cleanly");
 
     assert!(
         outcome.entries.is_empty(),
@@ -523,16 +527,12 @@ fn test_depth_max_zero_bounds() {
     write_file(root.join("file.txt"), "data");
 
     // emit_root(false) with depth(0, 0) yields nothing
-    let request_empty = WalkRequest::new(root)
-        .emit_root(false)
-        .depth(0, 0);
+    let request_empty = WalkRequest::new(root).emit_root(false).depth(0, 0);
     let outcome_empty = request_empty.collect().expect("should succeed");
     assert!(outcome_empty.entries.is_empty());
 
     // emit_root(true) with depth(0, 0) yields ONLY the root directory
-    let request_root_only = WalkRequest::new(root)
-        .emit_root(true)
-        .depth(0, 0);
+    let request_root_only = WalkRequest::new(root).emit_root(true).depth(0, 0);
     let outcome_root_only = request_root_only.collect().expect("should succeed");
     assert_eq!(outcome_root_only.entries.len(), 1);
     assert!(outcome_root_only.entries[0].path.is_empty());
@@ -554,7 +554,9 @@ fn test_collect_files_and_collect_dirs() {
 
     let request = WalkRequest::new(root);
 
-    let files = request.collect_files().expect("collect_files should succeed");
+    let files = request
+        .collect_files()
+        .expect("collect_files should succeed");
     assert!(files.iter().all(|e| e.is_file()));
     let file_paths: Vec<&str> = files.iter().map(|e| e.path.as_str()).collect();
     assert!(file_paths.contains(&"src/lib.rs"));

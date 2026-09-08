@@ -47,7 +47,10 @@ index abcdef1..1234567 100644
 
     // Verify lines
     assert_eq!(hunk.lines.len(), 5);
-    assert_eq!(hunk.lines[0], (ChangeKind::Context, "fn main() {".to_string()));
+    assert_eq!(
+        hunk.lines[0],
+        (ChangeKind::Context, "fn main() {".to_string())
+    );
     assert_eq!(
         hunk.lines[1],
         (ChangeKind::Deletion, "    println!(\"hello\");".to_string())

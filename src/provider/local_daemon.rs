@@ -266,9 +266,7 @@ pub fn detect_codex_auth_at(path: &Path) -> Option<LocalDaemonEndpoint> {
         return None;
     }
 
-    let account_id = tokens
-        .account_id
-        .filter(|id| !id.trim().is_empty());
+    let account_id = tokens.account_id.filter(|id| !id.trim().is_empty());
 
     Some(LocalDaemonEndpoint {
         provider: "codex".to_string(),
@@ -298,7 +296,10 @@ pub async fn probe_local_daemons() -> Vec<LocalDaemonEndpoint> {
 
     if let Some(ep) = detect_codex_auth() {
         if ep.is_alive {
-            info!("Codex auth credentials found (account: {:?})", ep.account_id);
+            info!(
+                "Codex auth credentials found (account: {:?})",
+                ep.account_id
+            );
             endpoints.push(ep);
         }
     }
@@ -382,10 +383,7 @@ pub fn parse_antigravity_models_json(
                 || id_lower.contains("gpt-4")
                 || id_lower.contains("image")
             {
-                model = model
-                    .with_vision()
-                    .with_tool_use()
-                    .with_function_calling();
+                model = model.with_vision().with_tool_use().with_function_calling();
             }
 
             model
@@ -400,9 +398,7 @@ pub fn parse_antigravity_models_json(
 /// Queries `GET {base_url}/models` with `Authorization: Bearer {api_key}`.
 /// Parses `data[].id` and maps to `CatalogModel` with `provider: "antigravity"`
 /// and badge `"Local Daemon (Free)"`.
-pub async fn fetch_antigravity_models(
-    endpoint: &LocalDaemonEndpoint,
-) -> Vec<CatalogModel> {
+pub async fn fetch_antigravity_models(endpoint: &LocalDaemonEndpoint) -> Vec<CatalogModel> {
     let url = format!("{}/models", endpoint.base_url.trim_end_matches('/'));
 
     let client = match reqwest::Client::builder()
@@ -433,7 +429,10 @@ pub async fn fetch_antigravity_models(
             return Vec::new();
         }
         Err(e) => {
-            warn!("Network error fetching Antigravity models from {}: {e}", url);
+            warn!(
+                "Network error fetching Antigravity models from {}: {e}",
+                url
+            );
             return Vec::new();
         }
     };
@@ -562,10 +561,7 @@ pub async fn refresh_codex_token_at(path: &Path) -> Result<LocalDaemonEndpoint, 
     std::fs::write(path, updated_json)
         .map_err(|e| format!("Failed to write updated auth to {}: {e}", path.display()))?;
 
-    let account_id = auth_file
-        .tokens
-        .as_ref()
-        .and_then(|t| t.account_id.clone());
+    let account_id = auth_file.tokens.as_ref().and_then(|t| t.account_id.clone());
 
     Ok(LocalDaemonEndpoint {
         provider: "codex".to_string(),

@@ -33,35 +33,35 @@ pub mod stream_json;
 pub mod text;
 
 pub use engine::{
-	EditMode, FileOp, FileOpIntent, HeaderKind, Inspection, ModeEngine, PreviewFile, Resolved,
-	StagedFile,
+    EditMode, FileOp, FileOpIntent, HeaderKind, Inspection, ModeEngine, PreviewFile, Resolved,
+    StagedFile,
 };
 pub use error::{EditError, EditResult};
 pub use path_policy::PathPolicy;
 pub use session::{
-	ApplyOutcome, ApplyRequest, EditWriter, FileOutcome, PreviewBatch, Session, WriteRequest,
-	WriteResponse,
+    ApplyOutcome, ApplyRequest, EditWriter, FileOutcome, PreviewBatch, Session, WriteRequest,
+    WriteResponse,
 };
 pub use store::EditStore;
 pub use stream_json::{ArgSnapshot, ArgStream, EditEntry};
 
 /// Prompt text for a mode (the tool description).
 pub const fn description(mode: EditMode) -> &'static str {
-	match mode {
-		EditMode::Replace => include_str!("../prompts/replace.md"),
-		EditMode::Patch => include_str!("../prompts/patch.md"),
-		EditMode::ApplyPatch => include_str!("../prompts/apply_patch.md"),
-		EditMode::Hashline => include_str!("../prompts/hashline.md"),
-		EditMode::Sloppy => include_str!("../prompts/sloppy.md"),
-	}
+    match mode {
+        EditMode::Replace => include_str!("../prompts/replace.md"),
+        EditMode::Patch => include_str!("../prompts/patch.md"),
+        EditMode::ApplyPatch => include_str!("../prompts/apply_patch.md"),
+        EditMode::Hashline => include_str!("../prompts/hashline.md"),
+        EditMode::Sloppy => include_str!("../prompts/sloppy.md"),
+    }
 }
 
 /// Lark grammar for modes that expose a custom (non-JSON) wire format.
 pub const fn grammar(mode: EditMode) -> Option<&'static str> {
-	match mode {
-		EditMode::ApplyPatch => Some(include_str!("../grammars/apply_patch.lark")),
-		EditMode::Hashline => Some(include_str!("../grammars/hashline.lark")),
-		EditMode::Sloppy => Some(include_str!("../grammars/sloppy.lark")),
-		EditMode::Replace | EditMode::Patch => None,
-	}
+    match mode {
+        EditMode::ApplyPatch => Some(include_str!("../grammars/apply_patch.lark")),
+        EditMode::Hashline => Some(include_str!("../grammars/hashline.lark")),
+        EditMode::Sloppy => Some(include_str!("../grammars/sloppy.lark")),
+        EditMode::Replace | EditMode::Patch => None,
+    }
 }

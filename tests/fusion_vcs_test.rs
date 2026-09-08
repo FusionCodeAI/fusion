@@ -142,14 +142,20 @@ fn test_in_process_discovery_nested_subdirectories() {
         .expect("should find repo from nested directory");
 
     assert_eq!(repo.root(), root);
-    assert_eq!(repo.prefix_of(&deep_dir), Some("src/engine/vcs/".to_string()));
+    assert_eq!(
+        repo.prefix_of(&deep_dir),
+        Some("src/engine/vcs/".to_string())
+    );
 
     // Also verify detect() from deep dir
     let detected = detect(&deep_dir)
         .expect("detect deep dir")
         .expect("should detect repo from nested dir");
     assert_eq!(detected.root(), root);
-    assert_eq!(detected.prefix_of(&deep_dir), Some("src/engine/vcs/".to_string()));
+    assert_eq!(
+        detected.prefix_of(&deep_dir),
+        Some("src/engine/vcs/".to_string())
+    );
 }
 
 #[test]
@@ -205,14 +211,29 @@ fn test_in_process_discovery_linked_worktree_pointer() {
     let canonical_root = root.canonicalize().expect("canonical root");
     let canonical_wt = wt_path.canonicalize().expect("canonical wt");
     assert_eq!(repo.root().canonicalize().expect("repo root"), canonical_wt);
-    assert_eq!(repo.primary_root().canonicalize().expect("primary root"), canonical_root);
-    assert!(repo.is_linked_worktree(), "should identify as linked worktree");
+    assert_eq!(
+        repo.primary_root().canonicalize().expect("primary root"),
+        canonical_root
+    );
+    assert!(
+        repo.is_linked_worktree(),
+        "should identify as linked worktree"
+    );
 
     let linked = repo.linked_worktree();
     assert!(linked.is_some());
     let linked_info = linked.unwrap();
-    assert_eq!(linked_info.root.canonicalize().expect("linked root"), canonical_wt);
-    assert_eq!(linked_info.primary_root.canonicalize().expect("linked primary root"), canonical_root);
+    assert_eq!(
+        linked_info.root.canonicalize().expect("linked root"),
+        canonical_wt
+    );
+    assert_eq!(
+        linked_info
+            .primary_root
+            .canonicalize()
+            .expect("linked primary root"),
+        canonical_root
+    );
     // .git in worktree is a file pointer, not a directory
     assert!(wt_path.join(".git").is_file());
 
@@ -220,7 +241,10 @@ fn test_in_process_discovery_linked_worktree_pointer() {
     let sub = wt_path.join("nested");
     fs::create_dir_all(&sub).expect("create nested in worktree");
     let sub_repo = GitRepo::discover(&sub).unwrap().unwrap();
-    assert_eq!(sub_repo.root().canonicalize().expect("sub repo root"), canonical_wt);
+    assert_eq!(
+        sub_repo.root().canonicalize().expect("sub repo root"),
+        canonical_wt
+    );
     assert!(sub_repo.is_linked_worktree());
 }
 
@@ -238,10 +262,17 @@ fn test_in_process_diff_query_unstaged_staged_and_revisions() {
 
     // Initially clean
     assert!(!repo.has_diff(&DiffOptions::default()).unwrap());
-    assert_eq!(repo.changed_files(&DiffOptions::default()).unwrap(), Vec::<String>::new());
+    assert_eq!(
+        repo.changed_files(&DiffOptions::default()).unwrap(),
+        Vec::<String>::new()
+    );
 
     // 1. Modify file.txt (unstaged change)
-    fs::write(root.join("file.txt"), "line1\nline2 modified\nline3\nline4\n").unwrap();
+    fs::write(
+        root.join("file.txt"),
+        "line1\nline2 modified\nline3\nline4\n",
+    )
+    .unwrap();
 
     assert!(repo.has_diff(&DiffOptions::default()).unwrap());
     let unstaged_diff = repo.diff_text(&DiffOptions::default()).unwrap();
@@ -261,7 +292,8 @@ fn test_in_process_diff_query_unstaged_staged_and_revisions() {
     assert_eq!(numstats[0].removed, Some(1));
 
     // 2. Stage the modification in-process using repo.stage_files
-    repo.stage_files(&["file.txt".to_string()]).expect("in-process stage");
+    repo.stage_files(&["file.txt".to_string()])
+        .expect("in-process stage");
 
     // After staging: unstaged diff is empty, staged diff has the changes
     assert!(!repo.has_diff(&DiffOptions::default()).unwrap());
@@ -274,7 +306,11 @@ fn test_in_process_diff_query_unstaged_staged_and_revisions() {
     assert!(staged_diff.contains("+line2 modified"));
 
     // 3. Add an unstaged new change on top of staged change
-    fs::write(root.join("file.txt"), "line1\nline2 modified\nline3\nline4 extra\n").unwrap();
+    fs::write(
+        root.join("file.txt"),
+        "line1\nline2 modified\nline3\nline4 extra\n",
+    )
+    .unwrap();
     let worktree_diff = repo.diff_text(&DiffOptions::default()).unwrap();
     assert!(worktree_diff.contains("-line4"));
     assert!(worktree_diff.contains("+line4 extra"));
@@ -301,7 +337,6 @@ fn test_in_process_diff_query_unstaged_staged_and_revisions() {
 
 #[test]
 fn test_git_status_and_diff_without_git_cli() {
-
     let temp = create_test_repo();
     let root = temp.path();
     fixture_commit(root, "existing.txt", "hello\n", "init");
@@ -404,7 +439,6 @@ fn test_git_status_and_diff_without_git_cli() {
 
 #[test]
 fn test_in_process_status_transitions() {
-
     let temp = create_test_repo();
     let root = temp.path();
     fixture_commit(root, "seed.txt", "data\n", "seed");

@@ -4,12 +4,12 @@ use brush_core::{ExecutionResult, builtins};
 pub(crate) struct FalseCommand {}
 
 impl builtins::SimpleCommand for FalseCommand {
-	fn get_content(
-		_name: &str,
-		content_type: builtins::ContentType,
-		_options: &builtins::ContentOptions,
-	) -> Result<String, brush_core::Error> {
-		match content_type {
+    fn get_content(
+        _name: &str,
+        content_type: builtins::ContentType,
+        _options: &builtins::ContentOptions,
+    ) -> Result<String, brush_core::Error> {
+        match content_type {
 			builtins::ContentType::DetailedHelp => Ok("Returns a failure exit status.".into()),
 			builtins::ContentType::ShortUsage => Ok("false".into()),
 			builtins::ContentType::ShortDescription => Ok("false - fail".into()),
@@ -18,12 +18,12 @@ impl builtins::SimpleCommand for FalseCommand {
 					.into(),
 			),
 		}
-	}
+    }
 
-	fn execute<SE: brush_core::ShellExtensions, I: Iterator<Item = S>, S: AsRef<str>>(
-		_context: brush_core::ExecutionContext<'_, SE>,
-		_args: I,
-	) -> Result<ExecutionResult, brush_core::Error> {
-		Ok(ExecutionResult::general_error())
-	}
+    fn execute<SE: brush_core::ShellExtensions, I: Iterator<Item = S>, S: AsRef<str>>(
+        _context: brush_core::ExecutionContext<'_, SE>,
+        _args: I,
+    ) -> Result<ExecutionResult, brush_core::Error> {
+        Ok(ExecutionResult::general_error())
+    }
 }

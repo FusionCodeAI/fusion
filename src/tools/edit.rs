@@ -303,7 +303,6 @@ pub async fn apply_hashline_patch(
             .await
             .map_err(|e| anyhow::anyhow!("Failed to read file '{}': {e}", full_path.display()))?;
 
-
         let mut block_resolutions = Vec::new();
         let mut resolve_warnings = Vec::new();
         let resolved_edits = if has_block_edit(&edits) {
@@ -329,7 +328,9 @@ pub async fn apply_hashline_patch(
                 on_empty_paste: EmptyPaste::Throw,
             },
         )
-        .map_err(|e| anyhow::anyhow!("Failed to apply hashline edits to '{}': {e}", section_path))?;
+        .map_err(|e| {
+            anyhow::anyhow!("Failed to apply hashline edits to '{}': {e}", section_path)
+        })?;
 
         let updated_content = apply_result.text;
 
@@ -346,7 +347,8 @@ pub async fn apply_hashline_patch(
             .map_err(|e| anyhow::anyhow!("Failed to update file '{}': {e}", full_path.display()))?;
 
         let stats = compute_diff_stats(&current_content, &updated_content);
-        let unified_diff = generate_unified_diff(&current_content, &updated_content, &section_path, 3);
+        let unified_diff =
+            generate_unified_diff(&current_content, &updated_content, &section_path, 3);
 
         if unified_diff.trim().is_empty() {
             results.push(format!(
@@ -453,9 +455,12 @@ impl Tool for EditFileTool {
         }
 
         // Standard exact search-and-replace mode
-        let path_str = path_opt.ok_or_else(|| anyhow::anyhow!("Missing required parameter: path"))?;
-        let old_text = old_text_opt.ok_or_else(|| anyhow::anyhow!("Missing required parameter: old_text"))?;
-        let new_text = new_text_opt.ok_or_else(|| anyhow::anyhow!("Missing required parameter: new_text"))?;
+        let path_str =
+            path_opt.ok_or_else(|| anyhow::anyhow!("Missing required parameter: path"))?;
+        let old_text =
+            old_text_opt.ok_or_else(|| anyhow::anyhow!("Missing required parameter: old_text"))?;
+        let new_text =
+            new_text_opt.ok_or_else(|| anyhow::anyhow!("Missing required parameter: new_text"))?;
 
         let full_path = resolve_path(path_str, &ctx.cwd);
 

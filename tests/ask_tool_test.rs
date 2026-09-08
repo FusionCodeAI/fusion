@@ -11,8 +11,7 @@ async fn test_ask_tool_name_and_metadata() {
     assert_eq!(tool.name(), "ask");
     assert!(!tool.description().is_empty());
     assert!(
-        tool.description().contains("decision")
-            || tool.description().contains("questions"),
+        tool.description().contains("decision") || tool.description().contains("questions"),
         "Description should describe asking questions or decision making"
     );
 
@@ -100,7 +99,9 @@ async fn test_parameter_schema_structure() {
 
     assert!(item_props.contains_key("recommended"));
     assert_eq!(
-        item_props["recommended"].get("type").and_then(|v| v.as_str()),
+        item_props["recommended"]
+            .get("type")
+            .and_then(|v| v.as_str()),
         Some("integer")
     );
 
@@ -223,7 +224,11 @@ async fn test_multi_question_formatting() {
 
     let res = tool.execute(multi_args, &ctx).await.unwrap();
     let lines: Vec<&str> = res.lines().collect();
-    assert_eq!(lines.len(), 3, "Output should contain 3 lines, one per question");
+    assert_eq!(
+        lines.len(),
+        3,
+        "Output should contain 3 lines, one per question"
+    );
     assert_eq!(lines[0], "database: Selected option: PostgreSQL");
     assert_eq!(lines[1], "cache: Selected option: Memcached");
     assert_eq!(lines[2], "deployment: Selected option: Docker Container");
@@ -258,19 +263,25 @@ async fn test_interactive_choice_resolution_and_rendering() {
     // Test interactive response by numeric index
     let mut reader1 = Cursor::new(b"1\n");
     let mut writer1 = Vec::new();
-    let choice1 = tool.prompt_question(&q, &mut reader1, &mut writer1).unwrap();
+    let choice1 = tool
+        .prompt_question(&q, &mut reader1, &mut writer1)
+        .unwrap();
     assert_eq!(choice1, "Blue-Green");
 
     // Test interactive response by label string (case-insensitive)
     let mut reader2 = Cursor::new(b"recreate\n");
     let mut writer2 = Vec::new();
-    let choice2 = tool.prompt_question(&q, &mut reader2, &mut writer2).unwrap();
+    let choice2 = tool
+        .prompt_question(&q, &mut reader2, &mut writer2)
+        .unwrap();
     assert_eq!(choice2, "Recreate");
 
     // Test interactive response with empty input (hits Enter) -> returns recommended
     let mut reader3 = Cursor::new(b"\n");
     let mut writer3 = Vec::new();
-    let choice3 = tool.prompt_question(&q, &mut reader3, &mut writer3).unwrap();
+    let choice3 = tool
+        .prompt_question(&q, &mut reader3, &mut writer3)
+        .unwrap();
     assert_eq!(choice3, "Canary");
 }
 

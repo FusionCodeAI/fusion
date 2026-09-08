@@ -203,11 +203,20 @@ impl TodoState {
         let now = current_timestamp_ms();
 
         // Check if query is an explicit ID match first (#1 or 1)
-        let is_id_query = q.strip_prefix('#').unwrap_or(q).trim().parse::<usize>().is_ok();
+        let is_id_query = q
+            .strip_prefix('#')
+            .unwrap_or(q)
+            .trim()
+            .parse::<usize>()
+            .is_ok();
 
         if !is_id_query {
             // 1. Check if query matches an entire phase by exact name (case-insensitive)
-            if let Some(phase_idx) = self.phases.iter().position(|p| p.name.eq_ignore_ascii_case(q)) {
+            if let Some(phase_idx) = self
+                .phases
+                .iter()
+                .position(|p| p.name.eq_ignore_ascii_case(q))
+            {
                 let mut marked_any = false;
                 for item in &mut self.phases[phase_idx].items {
                     if item.status != TodoStatus::Completed && item.status != TodoStatus::Dropped {
@@ -239,7 +248,11 @@ impl TodoState {
 
         // 3. Check if query matches a phase as a substring (if no task matched)
         let q_lower = q.to_lowercase();
-        if let Some(phase_idx) = self.phases.iter().position(|p| p.name.to_lowercase().contains(&q_lower)) {
+        if let Some(phase_idx) = self
+            .phases
+            .iter()
+            .position(|p| p.name.to_lowercase().contains(&q_lower))
+        {
             let mut marked_any = false;
             for item in &mut self.phases[phase_idx].items {
                 if item.status != TodoStatus::Completed && item.status != TodoStatus::Dropped {
@@ -319,7 +332,11 @@ impl TodoState {
         let now = current_timestamp_ms();
         let phase_name = phase.trim().to_string();
 
-        let phase_idx = match self.phases.iter().position(|p| p.name.eq_ignore_ascii_case(&phase_name)) {
+        let phase_idx = match self
+            .phases
+            .iter()
+            .position(|p| p.name.eq_ignore_ascii_case(&phase_name))
+        {
             Some(idx) => idx,
             None => {
                 self.phases.push(TodoPhase {
@@ -377,17 +394,29 @@ impl TodoState {
                         out.push_str(&format!("- {symbol} #{}: {}\n", item.id, item.task));
                     }
                     TodoStatus::InProgress => {
-                        out.push_str(&format!("- {symbol} #{}: {} (in progress)\n", item.id, item.task));
+                        out.push_str(&format!(
+                            "- {symbol} #{}: {} (in progress)\n",
+                            item.id, item.task
+                        ));
                     }
                     TodoStatus::Blocked => {
                         if let Some(reason) = &item.reason {
-                            out.push_str(&format!("- {symbol} #{}: {} (blocked: {})\n", item.id, item.task, reason));
+                            out.push_str(&format!(
+                                "- {symbol} #{}: {} (blocked: {})\n",
+                                item.id, item.task, reason
+                            ));
                         } else {
-                            out.push_str(&format!("- {symbol} #{}: {} (blocked)\n", item.id, item.task));
+                            out.push_str(&format!(
+                                "- {symbol} #{}: {} (blocked)\n",
+                                item.id, item.task
+                            ));
                         }
                     }
                     TodoStatus::Dropped => {
-                        out.push_str(&format!("- {symbol} #{}: {} (dropped)\n", item.id, item.task));
+                        out.push_str(&format!(
+                            "- {symbol} #{}: {} (dropped)\n",
+                            item.id, item.task
+                        ));
                     }
                     TodoStatus::Pending => {
                         out.push_str(&format!("- {symbol} #{}: {}\n", item.id, item.task));
@@ -577,7 +606,8 @@ impl TodoState {
         for (p_idx, phase) in self.phases.iter().enumerate() {
             for (i_idx, item) in phase.items.iter().enumerate() {
                 if item.status == TodoStatus::Blocked
-                    && (item.task.eq_ignore_ascii_case(q) || item.task.to_lowercase().contains(&q_lower))
+                    && (item.task.eq_ignore_ascii_case(q)
+                        || item.task.to_lowercase().contains(&q_lower))
                 {
                     return Some((p_idx, i_idx));
                 }

@@ -1,6 +1,7 @@
 pub mod ask;
 pub mod ast_edit;
 pub mod bash;
+pub mod browser;
 pub mod clipboard;
 pub mod compat;
 pub mod deps;
@@ -8,10 +9,6 @@ pub mod diff_stats;
 pub mod docgen;
 pub mod edit;
 pub mod env_cleaner;
-pub mod browser;
-pub mod mcp_discovery;
-pub mod todo;
-pub mod vector_search;
 pub mod fetch;
 pub mod file;
 pub mod git;
@@ -27,6 +24,7 @@ pub mod json_schema;
 pub mod lsp;
 pub mod mcp;
 pub mod mcp_bridge;
+pub mod mcp_discovery;
 pub mod mock_server;
 pub mod patch;
 pub mod ports;
@@ -37,18 +35,17 @@ pub mod sqlite;
 pub mod symbols;
 pub mod syntax;
 pub mod system;
+pub mod todo;
 pub mod tree;
 pub mod types;
 pub mod uri_router;
+pub mod vector_search;
 pub mod watch;
 pub mod web_search;
-pub use browser::BrowserTool;
-pub use mcp_discovery::McpDiscoveryTool;
-pub use todo::TodoTool;
-pub use vector_search::VectorSearchTool;
-pub use ast_edit::AstEditTool;
 pub use ask::AskTool;
+pub use ast_edit::AstEditTool;
 pub use bash::BashTool;
+pub use browser::BrowserTool;
 pub use clipboard::{
     ClipboardBackendKind, ClipboardManager, ClipboardStatus, ClipboardTool, ReadClipboardTool,
     WriteClipboardTool, DEFAULT_CLIPBOARD_TIMEOUT,
@@ -82,6 +79,8 @@ pub use hex::*;
 pub use json_schema::*;
 pub use lsp::LspTool;
 pub use mcp::*;
+pub use mcp_bridge::McpToolBridge;
+pub use mcp_discovery::McpDiscoveryTool;
 pub use mock_server::*;
 pub use patch::PatchTool;
 pub use ports::*;
@@ -99,10 +98,11 @@ pub use symbols::{
 };
 pub use syntax::*;
 pub use system::*;
+pub use todo::TodoTool;
 pub use tree::*;
 pub use types::*;
 pub use uri_router::resolve_internal_uri;
-pub use mcp_bridge::McpToolBridge;
+pub use vector_search::VectorSearchTool;
 pub use watch::{
     global_watcher_manager, ChangeKind, FileChange, FileRecord, FileSnapshot, WatchConfig,
     WatchTool, WatcherInfo, WatcherManager, WorkspaceWatcher,

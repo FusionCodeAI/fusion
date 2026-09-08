@@ -71,7 +71,9 @@ pub fn handle_plan_command(args: &[String], current_dag: Option<&SubagentDag>) -
                 let summary = PlanSummary::from_dag(dag);
                 format_execution_report(&summary)
             }
-            None => "No active plan to run. Use /goal <objective> first to create a plan.".to_string(),
+            None => {
+                "No active plan to run. Use /goal <objective> first to create a plan.".to_string()
+            }
         },
         "help" | "-h" | "--help" => format_plan_help(),
         other => format!(
@@ -107,7 +109,10 @@ fn format_stages(dag: &SubagentDag) -> String {
                 ));
                 out.push_str(&format!("    Description: {}\n", task.description.trim()));
                 if !task.dependencies.is_empty() {
-                    out.push_str(&format!("    Dependencies: {}\n", task.dependencies.join(", ")));
+                    out.push_str(&format!(
+                        "    Dependencies: {}\n",
+                        task.dependencies.join(", ")
+                    ));
                 }
             }
         }
@@ -116,7 +121,12 @@ fn format_stages(dag: &SubagentDag) -> String {
             let stage_title = if stage.name.to_lowercase().starts_with("stage") {
                 format!("▶ {} [{}]", stage.name, stage.status)
             } else {
-                format!("▶ Stage {}: {} [{}]", stage.stage_index + 1, stage.name, stage.status)
+                format!(
+                    "▶ Stage {}: {} [{}]",
+                    stage.stage_index + 1,
+                    stage.name,
+                    stage.status
+                )
             };
             out.push_str(&format!("\n{}\n", stage_title));
 
@@ -152,7 +162,9 @@ fn format_plan_help() -> String {
     out.push_str("Usage: /plan <subcommand>\n\n");
     out.push_str("Subcommands:\n");
     out.push_str("  status  - Displays the ASCII execution status of the active DAG plan\n");
-    out.push_str("  stages  - Lists all stages and their constituent task nodes with descriptions\n");
+    out.push_str(
+        "  stages  - Lists all stages and their constituent task nodes with descriptions\n",
+    );
     out.push_str("  run     - Executes the active plan autonomously (aliases: execute, start)\n");
     out.push_str("  cancel  - Resets the active plan\n");
     out

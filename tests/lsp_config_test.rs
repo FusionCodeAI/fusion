@@ -36,13 +36,13 @@ fn test_default_servers_parse() {
     assert!(ts_server.root_markers.contains(&"package.json".to_string()));
 
     // Verify pyright
-    let py_server = servers
-        .get("pyright")
-        .expect("pyright should be present");
+    let py_server = servers.get("pyright").expect("pyright should be present");
     assert_eq!(py_server.command, "pyright-langserver");
     assert!(py_server.args.contains(&"--stdio".to_string()));
     assert!(py_server.file_types.contains(&".py".to_string()));
-    assert!(py_server.root_markers.contains(&"pyproject.toml".to_string()));
+    assert!(py_server
+        .root_markers
+        .contains(&"pyproject.toml".to_string()));
 }
 
 #[test]
@@ -60,8 +60,8 @@ fn test_find_server_for_file_go() {
     let server_dot = find_server_for_file(Path::new(".go")).expect("should find server for .go");
     assert_eq!(server_dot.command, "gopls");
 
-    let server_path =
-        find_server_for_file(Path::new("cmd/server/main.go")).expect("should find server for main.go");
+    let server_path = find_server_for_file(Path::new("cmd/server/main.go"))
+        .expect("should find server for main.go");
     assert_eq!(server_path.command, "gopls");
 }
 

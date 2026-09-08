@@ -43,7 +43,8 @@ impl IsolatedWorkspace {
     /// The worktree is created from `HEAD` on a new branch named `fusion-task-<task_id>`.
     /// If a previous run left the branch or path intact, `-B` safely reinitializes it.
     pub fn create_for_task(task_id: &str, base_path: &Path) -> Result<Self, IsoError> {
-        let base_path = std::fs::canonicalize(base_path).unwrap_or_else(|_| base_path.to_path_buf());
+        let base_path =
+            std::fs::canonicalize(base_path).unwrap_or_else(|_| base_path.to_path_buf());
         let manager = WorktreeManager::new(&base_path);
 
         let worktree_path = manager.worktree_path_for_task(task_id);

@@ -292,13 +292,62 @@ fn test_line_runs_interleaved_modifications() {
 
     // Expect: common1 (1), removed1 (1), added1 (1), common2 (1), removed2 (1), added2 (1), common3 (1)
     assert_eq!(runs.len(), 7);
-    assert_eq!(runs[0], Run { count: 1, added: false, removed: false });
-    assert_eq!(runs[1], Run { count: 1, added: false, removed: true });
-    assert_eq!(runs[2], Run { count: 1, added: true, removed: false });
-    assert_eq!(runs[3], Run { count: 1, added: false, removed: false });
-    assert_eq!(runs[4], Run { count: 1, added: false, removed: true });
-    assert_eq!(runs[5], Run { count: 1, added: true, removed: false });
-    assert_eq!(runs[6], Run { count: 1, added: false, removed: false });
+    assert_eq!(
+        runs[0],
+        Run {
+            count: 1,
+            added: false,
+            removed: false
+        }
+    );
+    assert_eq!(
+        runs[1],
+        Run {
+            count: 1,
+            added: false,
+            removed: true
+        }
+    );
+    assert_eq!(
+        runs[2],
+        Run {
+            count: 1,
+            added: true,
+            removed: false
+        }
+    );
+    assert_eq!(
+        runs[3],
+        Run {
+            count: 1,
+            added: false,
+            removed: false
+        }
+    );
+    assert_eq!(
+        runs[4],
+        Run {
+            count: 1,
+            added: false,
+            removed: true
+        }
+    );
+    assert_eq!(
+        runs[5],
+        Run {
+            count: 1,
+            added: true,
+            removed: false
+        }
+    );
+    assert_eq!(
+        runs[6],
+        Run {
+            count: 1,
+            added: false,
+            removed: false
+        }
+    );
 }
 
 #[test]
@@ -360,9 +409,7 @@ fn test_structured_patch_hunks_single_replacement_default_context() {
     let lines = hunk_lines_to_strings(hunk);
     assert_eq!(
         lines,
-        vec![
-            " 2", " 3", " 4", " 5", "-old", "+new", " 7", " 8", " 9", " 10"
-        ]
+        vec![" 2", " 3", " 4", " 5", "-old", "+new", " 7", " 8", " 9", " 10"]
     );
 }
 
@@ -453,10 +500,7 @@ fn test_structured_patch_hunks_eof_newline_markers() {
     let hunks1 = structured_patch_hunks_u16(&old1, &new1, Some(1));
     assert_eq!(hunks1.len(), 1);
     let lines1 = hunk_lines_to_strings(&hunks1[0]);
-    assert_eq!(
-        lines1,
-        vec![" first", "-old_tail", no_nl, "+new_tail"]
-    );
+    assert_eq!(lines1, vec![" first", "-old_tail", no_nl, "+new_tail"]);
 
     // Case 2: New text missing EOF newline, old text has it
     let old2 = to_u16("first\nold_tail\n");
@@ -464,10 +508,7 @@ fn test_structured_patch_hunks_eof_newline_markers() {
     let hunks2 = structured_patch_hunks_u16(&old2, &new2, Some(1));
     assert_eq!(hunks2.len(), 1);
     let lines2 = hunk_lines_to_strings(&hunks2[0]);
-    assert_eq!(
-        lines2,
-        vec![" first", "-old_tail", "+new_tail", no_nl]
-    );
+    assert_eq!(lines2, vec![" first", "-old_tail", "+new_tail", no_nl]);
 
     // Case 3: Both missing EOF newline
     let old3 = to_u16("first\nold_tail");
@@ -557,18 +598,11 @@ fn test_precomputed_runs_matches_direct_hunks() {
 
     let old_tokens = line_tokens_u16(&old_text);
     let new_tokens = line_tokens_u16(&new_text);
-    let runs = line_runs_str(
-        "aaa\nbbb\nccc\nddd\neee\n",
-        "aaa\nBBB\nccc\nDDD\neee\n",
-    );
+    let runs = line_runs_str("aaa\nbbb\nccc\nddd\neee\n", "aaa\nBBB\nccc\nDDD\neee\n");
 
     let direct_hunks = structured_patch_hunks_u16(&old_text, &new_text, Some(1));
-    let precomputed_hunks = structured_patch_hunks_from_runs_u16(
-        Some(1),
-        &old_tokens,
-        &new_tokens,
-        &runs,
-    );
+    let precomputed_hunks =
+        structured_patch_hunks_from_runs_u16(Some(1), &old_tokens, &new_tokens, &runs);
 
     assert_eq!(direct_hunks, precomputed_hunks);
 }
@@ -617,8 +651,22 @@ fn test_line_runs_completely_disjoint() {
 
     let runs = line_runs_str(old, new);
     assert_eq!(runs.len(), 2);
-    assert_eq!(runs[0], Run { count: 2, added: false, removed: true });
-    assert_eq!(runs[1], Run { count: 2, added: true, removed: false });
+    assert_eq!(
+        runs[0],
+        Run {
+            count: 2,
+            added: false,
+            removed: true
+        }
+    );
+    assert_eq!(
+        runs[1],
+        Run {
+            count: 2,
+            added: true,
+            removed: false
+        }
+    );
 }
 
 #[test]
@@ -665,7 +713,10 @@ fn test_structured_patch_hunks_context_at_boundaries() {
     assert_eq!(hunks1[0].old_start, 1);
     assert_eq!(hunks1[0].new_start, 1);
     let lines1 = hunk_lines_to_strings(&hunks1[0]);
-    assert_eq!(lines1, vec!["-first_old", "+first_new", " second", " third"]);
+    assert_eq!(
+        lines1,
+        vec!["-first_old", "+first_new", " second", " third"]
+    );
 
     // Change at the very last line
     let old2 = to_u16("first\nsecond\nlast_old\n");

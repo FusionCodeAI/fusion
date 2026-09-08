@@ -54,10 +54,7 @@ fn test_discover_mcp_config_paths_all_workspace_candidates() {
         cursor_idx.is_some(),
         ".cursor/mcp.json should be discovered"
     );
-    assert!(
-        claude_idx.is_some(),
-        ".claude.json should be discovered"
-    );
+    assert!(claude_idx.is_some(), ".claude.json should be discovered");
 
     assert!(
         fusion_idx.unwrap() < cursor_idx.unwrap(),

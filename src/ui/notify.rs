@@ -819,7 +819,6 @@ impl Notification {
         self.trigger
     }
 
-
     /// Returns the active notification priority level.
     pub fn get_priority(&self) -> NotificationPriority {
         self.priority.unwrap_or_else(|| match self.urgency {
@@ -1098,10 +1097,7 @@ end run"#;
 
     /// Renders rich Kitty OSC 99 desktop notification escape sequence with title and body parameters.
     pub fn render_osc99(&self) -> String {
-        let id = self
-            .category
-            .as_deref()
-            .unwrap_or("1");
+        let id = self.category.as_deref().unwrap_or("1");
 
         let mut meta = vec![
             format!("i={id}"),
@@ -1164,12 +1160,8 @@ end run"#;
             TerminalOscProtocol::Osc9 => {
                 format!("\x1b]9;{clean_title}: {clean_body}\x07")
             }
-            TerminalOscProtocol::Osc99 => {
-                self.render_osc99()
-            }
-            TerminalOscProtocol::Bell => {
-                TERMINAL_BELL.to_string()
-            }
+            TerminalOscProtocol::Osc99 => self.render_osc99(),
+            TerminalOscProtocol::Bell => TERMINAL_BELL.to_string(),
             TerminalOscProtocol::All => {
                 let proto = detect_terminal_osc_protocol();
                 self.render_terminal_osc_protocol(proto)
@@ -1230,7 +1222,9 @@ end run"#;
                         .backend
                         .clone()
                         .unwrap_or_else(NotificationBackend::detect);
-                    if backend != NotificationBackend::TerminalOsc && backend != NotificationBackend::Disabled {
+                    if backend != NotificationBackend::TerminalOsc
+                        && backend != NotificationBackend::Disabled
+                    {
                         let _ = notification.send_desktop(backend);
                     }
                 }
@@ -1273,7 +1267,9 @@ end run"#;
                 .backend
                 .clone()
                 .unwrap_or_else(NotificationBackend::detect);
-            if backend != NotificationBackend::TerminalOsc && backend != NotificationBackend::Disabled {
+            if backend != NotificationBackend::TerminalOsc
+                && backend != NotificationBackend::Disabled
+            {
                 match self.send_desktop(backend) {
                     Ok(()) => {
                         outcome.desktop_sent = true;
@@ -1647,7 +1643,8 @@ pub fn base64_encode(input: &[u8]) -> String {
 
 /// Checks if a string contains C0/C1 control characters that are unsafe inside an OSC payload.
 pub fn is_osc99_unsafe(s: &str) -> bool {
-    s.chars().any(|c| (c as u32) <= 0x1f || ((c as u32) >= 0x7f && (c as u32) <= 0x9f))
+    s.chars()
+        .any(|c| (c as u32) <= 0x1f || ((c as u32) >= 0x7f && (c as u32) <= 0x9f))
 }
 
 /// Emits an OSC 99 chunk, using base64 encoding (`e=1`) if payload contains unsafe control characters.
@@ -1835,11 +1832,7 @@ pub fn notify_completion_with_config(
 }
 
 /// Convenience helper for ask notifications integrating application `Config`.
-pub fn notify_ask_with_config(
-    config: &crate::config::Config,
-    title: &str,
-    prompt: &str,
-) -> bool {
+pub fn notify_ask_with_config(config: &crate::config::Config, title: &str, prompt: &str) -> bool {
     if !config.notify_enabled {
         return false;
     }
@@ -1854,12 +1847,10 @@ pub fn format_osc99_notification(title: &str, body: &str) -> String {
 }
 
 /// Formats a rich Kitty OSC 99 desktop notification with title, body, and explicit trigger.
-pub fn format_osc99_with_trigger(
-    title: &str,
-    body: &str,
-    trigger: NotificationTrigger,
-) -> String {
-    Notification::new(title, body).trigger(trigger).render_osc99()
+pub fn format_osc99_with_trigger(title: &str, body: &str, trigger: NotificationTrigger) -> String {
+    Notification::new(title, body)
+        .trigger(trigger)
+        .render_osc99()
 }
 
 /// Emits an inline terminal OSC notification directly to standard error.
@@ -2393,7 +2384,10 @@ mod tests {
 
         // Plain Bell is never wrapped
         std::env::set_var("TMUX", "/tmp/tmux-1000/default,1234,0");
-        assert_eq!(format_multiplexer_terminal_sequence(TERMINAL_BELL), TERMINAL_BELL);
+        assert_eq!(
+            format_multiplexer_terminal_sequence(TERMINAL_BELL),
+            TERMINAL_BELL
+        );
 
         // Restore env
         if let Some(val) = orig_tmux {
@@ -2447,8 +2441,7 @@ mod tests {
         assert!(osc.contains("i=complete-1:p=body;Complete\x1b\\"));
 
         // Test base64 encoding of unsafe control characters in payload
-        let unsafe_notif = Notification::new("Line 1\nLine 2", "")
-            .category("unsafe");
+        let unsafe_notif = Notification::new("Line 1\nLine 2", "").category("unsafe");
         let unsafe_osc = unsafe_notif.render_osc99();
         assert!(unsafe_osc.contains("e=1"));
         assert!(unsafe_osc.contains("TGluZSAxCkxpbmUgMg=="));

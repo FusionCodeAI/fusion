@@ -7,6 +7,7 @@ pub mod colors;
 pub mod context_view;
 pub mod context_warning;
 pub mod diff_view;
+pub mod diff_viewer;
 pub mod doc_render;
 pub mod editor;
 pub mod file_picker;
@@ -29,12 +30,10 @@ pub mod rate_limit_banner;
 pub mod repl;
 pub mod review;
 pub mod side_by_side;
-pub mod diff_viewer;
 pub mod slash;
 pub mod slash_mcp;
 pub mod slash_plan;
 pub mod slash_skills;
-pub mod tool_card;
 pub mod sound;
 pub mod spinner;
 pub mod stats_card;
@@ -43,11 +42,14 @@ pub mod table;
 pub mod termux;
 pub mod theme;
 pub mod title;
+pub mod tool_card;
 pub mod usage_card;
 pub mod voice;
 pub use editor::{edit_text_interactive, EditorBuffer as TuiEditorBuffer, EditorWidget};
 pub use prompt_picker::{pick_prompt_interactive, PromptPickerWidget, PromptTemplate};
-pub use review::{run_diff_review_interactive, DiffHunkReviewState, ReviewHunk, ReviewSession, ReviewWidget};
+pub use review::{
+    run_diff_review_interactive, DiffHunkReviewState, ReviewHunk, ReviewSession, ReviewWidget,
+};
 // Re-exports for convenient top-level access
 pub use agent_tree::{
     render_tree_ansi, render_tree_diagram, render_tree_plain, AgentTree, AgentTreeAction,

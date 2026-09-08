@@ -20,8 +20,8 @@ use fusion_shell::{
     cancel::{AbortReason, CancelToken},
     execute_shell, execute_shell_streams,
     process::{
-        KILL_SIGNAL, Process, ProcessStatus, SpawnRegistry, TERM_SIGNAL, TerminationTargets,
-        kill_process_group,
+        kill_process_group, Process, ProcessStatus, SpawnRegistry, TerminationTargets, KILL_SIGNAL,
+        TERM_SIGNAL,
     },
     shell::{Shell, ShellExecuteOptions, ShellOptions, ShellRunOptions, StreamSinks},
 };
@@ -131,7 +131,10 @@ mod process_lifecycle_tests {
             .await
             .expect("terminate_tree execution");
 
-        assert!(terminated, "terminate_tree must succeed in stopping process");
+        assert!(
+            terminated,
+            "terminate_tree must succeed in stopping process"
+        );
 
         let _ = child.wait();
         tokio::time::sleep(Duration::from_millis(50)).await;
@@ -488,8 +491,14 @@ mod shell_execution_and_streaming_tests {
 
         assert_eq!(result.exit_code, Some(0));
 
-        let stdout_bytes: Vec<u8> = stdout_rx.drain().flat_map(|b: Bytes| b.to_vec()).collect::<Vec<u8>>();
-        let stderr_bytes: Vec<u8> = stderr_rx.drain().flat_map(|b: Bytes| b.to_vec()).collect::<Vec<u8>>();
+        let stdout_bytes: Vec<u8> = stdout_rx
+            .drain()
+            .flat_map(|b: Bytes| b.to_vec())
+            .collect::<Vec<u8>>();
+        let stderr_bytes: Vec<u8> = stderr_rx
+            .drain()
+            .flat_map(|b: Bytes| b.to_vec())
+            .collect::<Vec<u8>>();
 
         let stdout_str = String::from_utf8_lossy(&stdout_bytes);
         let stderr_str = String::from_utf8_lossy(&stderr_bytes);

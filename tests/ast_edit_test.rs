@@ -7,10 +7,10 @@
 //! 4. Tool execution against files on disk (single and multiple files).
 //! 5. Error handling for unsupported languages, invalid patterns, and missing files.
 
-use std::collections::HashMap;
 use fusion::tools::ast_edit::*;
 use fusion::tools::types::{Tool, ToolContext};
 use serde_json::json;
+use std::collections::HashMap;
 use tempfile::tempdir;
 
 // ---------------------------------------------------------------------------
@@ -21,10 +21,9 @@ use tempfile::tempdir;
 fn test_tool_metadata() {
     let tool = AstEditTool::new();
     assert_eq!(tool.name(), "ast_edit");
-    assert!(
-        tool.description()
-            .contains("Structural syntax-aware code rewriting")
-    );
+    assert!(tool
+        .description()
+        .contains("Structural syntax-aware code rewriting"));
     assert!(tool.description().contains("tree-sitter AST patterns"));
 
     let schema = tool.parameters();
@@ -105,7 +104,8 @@ function run() {
     let pat = "console.log($$$ARGS)";
     let template = "console.warn($$$ARGS)";
 
-    let result = apply_rewrite(source, "javascript", pat, template).expect("rewrite should succeed");
+    let result =
+        apply_rewrite(source, "javascript", pat, template).expect("rewrite should succeed");
     assert!(result.contains("console.warn(\"Starting server\", port)"));
     assert!(!result.contains("console.log"));
 }
@@ -116,7 +116,8 @@ fn test_typescript_require_to_import() {
     let pat = "const $MOD = require($PATH)";
     let template = "import $MOD from $PATH";
 
-    let result = apply_rewrite(source, "typescript", pat, template).expect("rewrite should succeed");
+    let result =
+        apply_rewrite(source, "typescript", pat, template).expect("rewrite should succeed");
     assert_eq!(result.trim(), r#"import express from "express";"#);
 }
 
@@ -198,8 +199,13 @@ fn test_unsupported_language_returns_error() {
 #[test]
 fn test_no_matches_returns_unmodified_source() {
     let source = "fn foo() { let x = 42; }";
-    let result = apply_rewrite(source, "rust", "fn nonexistent() { $$$ }", "fn replacement() {}")
-        .expect("unmatched pattern should return unmodified source without error");
+    let result = apply_rewrite(
+        source,
+        "rust",
+        "fn nonexistent() { $$$ }",
+        "fn replacement() {}",
+    )
+    .expect("unmatched pattern should return unmodified source without error");
     assert_eq!(result, source);
 }
 
@@ -211,12 +217,9 @@ fn test_no_matches_returns_unmodified_source() {
 async fn test_tool_execute_single_file() {
     let dir = tempdir().expect("tempdir");
     let file_path = dir.path().join("main.rs");
-    tokio::fs::write(
-        &file_path,
-        "fn alpha() {\n    println!(\"hello\");\n}\n",
-    )
-    .await
-    .expect("write test file");
+    tokio::fs::write(&file_path, "fn alpha() {\n    println!(\"hello\");\n}\n")
+        .await
+        .expect("write test file");
 
     let tool = AstEditTool::new();
     let ctx = ToolContext {
@@ -232,7 +235,10 @@ async fn test_tool_execute_single_file() {
         }]
     });
 
-    let output = tool.execute(args, &ctx).await.expect("execute should succeed");
+    let output = tool
+        .execute(args, &ctx)
+        .await
+        .expect("execute should succeed");
     assert!(output.contains("Successfully applied 1 AST replacement"));
     assert!(output.contains("main.rs"));
 
@@ -270,7 +276,10 @@ async fn test_tool_execute_multiple_files() {
         }]
     });
 
-    let output = tool.execute(args, &ctx).await.expect("execute should succeed");
+    let output = tool
+        .execute(args, &ctx)
+        .await
+        .expect("execute should succeed");
     assert!(output.contains("Successfully applied 2 AST replacement(s) across 2 file(s)"));
 
     let c1 = tokio::fs::read_to_string(&file1).await.expect("read a.js");
@@ -284,7 +293,9 @@ async fn test_tool_execute_multiple_files() {
 async fn test_tool_execute_no_matches() {
     let dir = tempdir().expect("tempdir");
     let file = dir.path().join("app.py");
-    tokio::fs::write(&file, "x = 10\n").await.expect("write app.py");
+    tokio::fs::write(&file, "x = 10\n")
+        .await
+        .expect("write app.py");
 
     let tool = AstEditTool::new();
     let ctx = ToolContext {
@@ -300,7 +311,10 @@ async fn test_tool_execute_no_matches() {
         }]
     });
 
-    let output = tool.execute(args, &ctx).await.expect("execute should succeed");
+    let output = tool
+        .execute(args, &ctx)
+        .await
+        .expect("execute should succeed");
     assert!(output.contains("No matching AST patterns found"));
 }
 

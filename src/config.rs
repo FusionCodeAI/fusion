@@ -1055,7 +1055,10 @@ impl Config {
                         return ("antigravity".to_string(), "claude-opus-4-6".to_string())
                     }
                     "opus-thinking" => {
-                        return ("antigravity".to_string(), "claude-opus-4-6-thinking".to_string())
+                        return (
+                            "antigravity".to_string(),
+                            "claude-opus-4-6-thinking".to_string(),
+                        )
                     }
                     "sonnet" | "sonnet-4.6" | "sonnet-4-6" => {
                         return ("antigravity".to_string(), "claude-sonnet-4-6".to_string())
@@ -1064,10 +1067,16 @@ impl Config {
                         return ("antigravity".to_string(), "claude-sonnet-4-5".to_string())
                     }
                     "gemini" | "gemini-3.8" => {
-                        return ("antigravity".to_string(), "gemini-3.8-flash-high".to_string())
+                        return (
+                            "antigravity".to_string(),
+                            "gemini-3.8-flash-high".to_string(),
+                        )
                     }
                     "gemini-3.7" => {
-                        return ("antigravity".to_string(), "gemini-3.7-flash-high".to_string())
+                        return (
+                            "antigravity".to_string(),
+                            "gemini-3.7-flash-high".to_string(),
+                        )
                     }
                     _ => {}
                 }
@@ -1228,7 +1237,9 @@ impl Config {
 
                 // If no Fusion key is set, check if local Antigravity daemon is alive for free zero-config fallback!
                 if key.is_none() {
-                    if let Some(endpoint) = crate::provider::local_daemon::detect_antigravity_daemon() {
+                    if let Some(endpoint) =
+                        crate::provider::local_daemon::detect_antigravity_daemon()
+                    {
                         return (Some(endpoint.api_key), endpoint.base_url);
                     }
                 }

@@ -1,8 +1,8 @@
 //! Comprehensive tests for `/mcp` slash command handler and server formatting table.
 
+use fusion::ui::slash_mcp::{format_mcp_servers_table, handle_mcp_command};
 use std::fs;
 use tempfile::tempdir;
-use fusion::ui::slash_mcp::{format_mcp_servers_table, handle_mcp_command};
 #[test]
 fn test_format_mcp_servers_table_empty() {
     let output = format_mcp_servers_table(&[]);
@@ -24,8 +24,14 @@ fn test_format_mcp_servers_table_populated() {
     let table = format_mcp_servers_table(&servers);
 
     // Verify table headers
-    assert!(table.contains("Server Name"), "Missing 'Server Name' header");
-    assert!(table.contains("Config Source"), "Missing 'Config Source' header");
+    assert!(
+        table.contains("Server Name"),
+        "Missing 'Server Name' header"
+    );
+    assert!(
+        table.contains("Config Source"),
+        "Missing 'Config Source' header"
+    );
     assert!(table.contains("Status"), "Missing 'Status' header");
     assert!(table.contains("Tool Count"), "Missing 'Tool Count' header");
 

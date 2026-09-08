@@ -366,7 +366,8 @@ impl Prompt {
     /// Set a custom file cache (e.g. for testing).
     pub fn set_file_cache(&mut self, files: Vec<String>) {
         self.file_cache = files;
-        self.file_cache_time = Some(std::time::Instant::now() + std::time::Duration::from_secs(3600));
+        self.file_cache_time =
+            Some(std::time::Instant::now() + std::time::Duration::from_secs(3600));
     }
 
     /// Read the currently cached files, if any.
@@ -420,7 +421,9 @@ impl Prompt {
             None => return Vec::new(),
         };
         if self.file_cache.is_empty()
-            || self.file_cache_time.map_or(true, |t| t.elapsed() > std::time::Duration::from_secs(5))
+            || self
+                .file_cache_time
+                .map_or(true, |t| t.elapsed() > std::time::Duration::from_secs(5))
         {
             self.file_cache = Self::scan_workspace_files();
             self.file_cache_time = Some(std::time::Instant::now());
@@ -1254,13 +1257,19 @@ impl Prompt {
 
         let running_lines = if let Some(status) = &self.running_status {
             let max_w = term_cols.saturating_sub(4);
-            let clean_status = status.trim_start_matches('\r').trim_start_matches("\x1b[2K");
+            let clean_status = status
+                .trim_start_matches('\r')
+                .trim_start_matches("\x1b[2K");
             let display_status = if max_w > 0 {
                 truncate_fit(clean_status, max_w)
             } else {
                 clean_status.to_string()
             };
-            write!(out, "\r\x1b[2K\r\n\r\x1b[2K  \x1b[2;37m{}\x1b[0m\r\n\r\n", display_status)?;
+            write!(
+                out,
+                "\r\x1b[2K\r\n\r\x1b[2K  \x1b[2;37m{}\x1b[0m\r\n\r\n",
+                display_status
+            )?;
             3
         } else {
             0
@@ -1730,17 +1739,9 @@ impl Prompt {
                 let display_path = truncate_fit(path, max_path_w);
 
                 if is_selected {
-                    write!(
-                        out,
-                        "\x1b[1;37m📄 {}\x1b[0m\r\n",
-                        display_path
-                    )?;
+                    write!(out, "\x1b[1;37m📄 {}\x1b[0m\r\n", display_path)?;
                 } else {
-                    write!(
-                        out,
-                        "\x1b[2;37m📄 {}\x1b[0m\r\n",
-                        display_path
-                    )?;
+                    write!(out, "\x1b[2;37m📄 {}\x1b[0m\r\n", display_path)?;
                 }
                 total_lines += 1;
             }
@@ -1928,7 +1929,11 @@ pub fn fuzzy_match_files(query: &str, files: &[String]) -> Vec<String> {
                 if let Some(&qc) = q_chars.peek() {
                     if c == qc {
                         q_chars.next();
-                        if prev_char == '/' || prev_char == '_' || prev_char == '-' || prev_char == '.' {
+                        if prev_char == '/'
+                            || prev_char == '_'
+                            || prev_char == '-'
+                            || prev_char == '.'
+                        {
                             boundary_matches += 1;
                         }
                     }
@@ -1946,7 +1951,11 @@ pub fn fuzzy_match_files(query: &str, files: &[String]) -> Vec<String> {
     }
 
     scored.sort_by(|a, b| b.0.cmp(&a.0).then_with(|| a.1.cmp(b.1)));
-    scored.into_iter().take(50).map(|(_, f)| f.clone()).collect()
+    scored
+        .into_iter()
+        .take(50)
+        .map(|(_, f)| f.clone())
+        .collect()
 }
 fn truncate_fit(s: &str, max_len: usize) -> String {
     if max_len == 0 {
@@ -3186,7 +3195,10 @@ mod tests {
     #[test]
     fn test_render_at_file_dropdown() {
         let mut prompt = Prompt::new();
-        prompt.set_file_cache(vec!["src/main.rs".to_string(), "src/ui/prompt.rs".to_string()]);
+        prompt.set_file_cache(vec![
+            "src/main.rs".to_string(),
+            "src/ui/prompt.rs".to_string(),
+        ]);
         let buffer: Vec<char> = "@main".chars().collect();
         let mut buf = Vec::new();
         let mut last_lines = 0;
@@ -3197,8 +3209,16 @@ mod tests {
             .expect("render_to failed");
 
         let rendered = String::from_utf8_lossy(&buf);
-        assert!(rendered.contains("📄 src/main.rs"), "Dropdown must contain document icon and path: {}", rendered);
-        assert!(rendered.contains("Tab/Enter Insert"), "Dropdown must contain keybinding hint: {}", rendered);
+        assert!(
+            rendered.contains("📄 src/main.rs"),
+            "Dropdown must contain document icon and path: {}",
+            rendered
+        );
+        assert!(
+            rendered.contains("Tab/Enter Insert"),
+            "Dropdown must contain keybinding hint: {}",
+            rendered
+        );
     }
 
     #[test]
@@ -3216,7 +3236,9 @@ mod tests {
             KeyCode::Down,
             KeyModifiers::NONE,
         ));
-        let res = prompt.handle_event(down_event).expect("handle_event failed");
+        let res = prompt
+            .handle_event(down_event)
+            .expect("handle_event failed");
         assert_eq!(res, None);
         assert_eq!(prompt.at_file_selection(), 1);
 
@@ -3252,7 +3274,9 @@ mod tests {
             KeyCode::Esc,
             KeyModifiers::NONE,
         ));
-        let res2 = prompt.handle_event(esc_event2).expect("handle_event failed");
+        let res2 = prompt
+            .handle_event(esc_event2)
+            .expect("handle_event failed");
         assert_eq!(res2, Some(PromptResult::Cancel));
     }
 }

@@ -14,13 +14,13 @@
 //!    - Git-backed workspace diffing (git worktree / git diff path)
 //! 4. Backend resolution, probes, and `BackendKind` contracts.
 
-use std::fs;
-use std::path::{Path, PathBuf};
-use std::process::Command;
 use fusion::agent::subagent::WorkspaceIsolation;
 use fusion_iso::{
     backend, backend_kind, clone_candidates, default_backend, resolve, BackendKind, ChangeKind,
 };
+use std::fs;
+use std::path::{Path, PathBuf};
+use std::process::Command;
 use tempfile::tempdir;
 
 // ===========================================================================
@@ -29,7 +29,11 @@ use tempfile::tempdir;
 
 /// Populate a sample directory hierarchy with predictable text files.
 fn populate_sample_workspace(root: &Path) {
-    fs::write(root.join("README.md"), "# Test Project\nInitial readme text.\n").unwrap();
+    fs::write(
+        root.join("README.md"),
+        "# Test Project\nInitial readme text.\n",
+    )
+    .unwrap();
     fs::write(
         root.join("config.json"),
         "{\n  \"version\": 1,\n  \"name\": \"fusion-test\"\n}\n",
@@ -182,7 +186,10 @@ async fn test_multiple_concurrent_isolations() {
     let merged1 = iso1.merged.clone();
     let merged2 = iso2.merged.clone();
 
-    assert_ne!(merged1, merged2, "Isolations must have distinct merged paths");
+    assert_ne!(
+        merged1, merged2,
+        "Isolations must have distinct merged paths"
+    );
     assert!(merged1.exists());
     assert!(merged2.exists());
 
@@ -713,7 +720,10 @@ async fn test_rcopy_backend_direct() {
     fs::write(merged.join("direct_rcopy.txt"), "direct rcopy test").unwrap();
 
     // Diff
-    let diff = rcopy.diff(&lower, &merged).await.expect("rcopy.diff failed");
+    let diff = rcopy
+        .diff(&lower, &merged)
+        .await
+        .expect("rcopy.diff failed");
     assert_eq!(diff.files.len(), 1);
     assert_eq!(diff.files[0].path, Path::new("direct_rcopy.txt"));
     assert_eq!(diff.files[0].op, ChangeKind::Added);

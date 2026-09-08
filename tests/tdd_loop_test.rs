@@ -49,7 +49,9 @@ test result: FAILED. 2 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; 
     assert_eq!(failure.test_name, "tests::test_sub");
     assert_eq!(failure.file.as_deref(), Some("src/lib.rs"));
     assert_eq!(failure.line, Some(42));
-    assert!(failure.error_message.contains("assertion `left == right` failed"));
+    assert!(failure
+        .error_message
+        .contains("assertion `left == right` failed"));
     assert!(failure.error_message.contains("left: 3"));
     assert!(failure.error_message.contains("right: 5"));
 }
@@ -84,7 +86,11 @@ test result: FAILED. 0 passed; 1 failed; 0 ignored; finished in 0.00s
     assert_eq!(failure.line, Some(15));
     assert_eq!(failure.error_message, "attempt to divide by zero");
     assert!(failure.stack_trace.is_some());
-    assert!(failure.stack_trace.as_deref().unwrap().contains("rust_begin_unwind"));
+    assert!(failure
+        .stack_trace
+        .as_deref()
+        .unwrap()
+        .contains("rust_begin_unwind"));
 }
 
 #[test]
@@ -109,7 +115,9 @@ error: could not compile `fusion` due to 1 previous error
     assert_eq!(failure.file.as_deref(), Some("src/billing.rs"));
     assert_eq!(failure.line, Some(24));
     assert!(failure.error_message.contains("error[E0425]"));
-    assert!(failure.error_message.contains("cannot find value `calculate_total`"));
+    assert!(failure
+        .error_message
+        .contains("cannot find value `calculate_total`"));
 }
 
 // ============================================================================
@@ -185,7 +193,9 @@ FAILED tests/test_ops.py::TestOps::test_divide - ZeroDivisionError: division by 
     assert_eq!(failure.test_name, "TestOps.test_divide");
     assert_eq!(failure.file.as_deref(), Some("tests/test_ops.py"));
     assert_eq!(failure.line, Some(25));
-    assert!(failure.error_message.contains("ZeroDivisionError: division by zero"));
+    assert!(failure
+        .error_message
+        .contains("ZeroDivisionError: division by zero"));
 }
 
 #[test]
@@ -203,11 +213,15 @@ FAILED tests/test_account.py::test_negative_deposit - ValueError: deposit cannot
 
     assert_eq!(failures[0].test_name, "test_withdraw_insufficient_funds");
     assert_eq!(failures[0].file.as_deref(), Some("tests/test_account.py"));
-    assert!(failures[0].error_message.contains("InsufficientFundsError: balance is 0"));
+    assert!(failures[0]
+        .error_message
+        .contains("InsufficientFundsError: balance is 0"));
 
     assert_eq!(failures[1].test_name, "test_negative_deposit");
     assert_eq!(failures[1].file.as_deref(), Some("tests/test_account.py"));
-    assert!(failures[1].error_message.contains("ValueError: deposit cannot be negative"));
+    assert!(failures[1]
+        .error_message
+        .contains("ValueError: deposit cannot be negative"));
 }
 
 // ============================================================================
@@ -306,7 +320,8 @@ fn test_ansi_color_stripping() {
 
 #[test]
 fn test_passing_test_runs() {
-    let passing_cargo = "test result: ok. 12 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out";
+    let passing_cargo =
+        "test result: ok. 12 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out";
     let (passed, failures) = TddEngine::parse_test_output(passing_cargo, 0);
     assert!(passed);
     assert!(failures.is_empty());
@@ -336,19 +351,35 @@ fn test_phase_state_transitions() {
 
     // 2. Red phase test passes -> transitions to Green
     phase = phase.next_phase(true);
-    assert_eq!(phase, TddPhase::Green, "Passing test in Red must transition to Green");
+    assert_eq!(
+        phase,
+        TddPhase::Green,
+        "Passing test in Red must transition to Green"
+    );
 
     // 3. Green phase test passes -> transitions to Refactor
     phase = phase.next_phase(true);
-    assert_eq!(phase, TddPhase::Refactor, "Passing test in Green advances to Refactor");
+    assert_eq!(
+        phase,
+        TddPhase::Refactor,
+        "Passing test in Green advances to Refactor"
+    );
 
     // 4. Refactor breaks test -> drops back to Red
     let broken_refactor = phase.next_phase(false);
-    assert_eq!(broken_refactor, TddPhase::Red, "Broken test in Refactor reverts to Red");
+    assert_eq!(
+        broken_refactor,
+        TddPhase::Red,
+        "Broken test in Refactor reverts to Red"
+    );
 
     // 5. Refactor test passes -> transitions to Completed
     phase = phase.next_phase(true);
-    assert_eq!(phase, TddPhase::Completed, "Passing test in Refactor finishes as Completed");
+    assert_eq!(
+        phase,
+        TddPhase::Completed,
+        "Passing test in Refactor finishes as Completed"
+    );
     assert!(phase.is_terminal());
 
     // 6. Completed phase remains Completed
@@ -363,8 +394,11 @@ fn test_phase_state_transitions() {
 #[test]
 fn test_correction_guidance_generation() {
     let failures = vec![
-        TestFailure::new("tests::test_add", "assertion `left == right` failed\n  left: 4\n right: 5")
-            .with_location("src/math.rs", 18),
+        TestFailure::new(
+            "tests::test_add",
+            "assertion `left == right` failed\n  left: 4\n right: 5",
+        )
+        .with_location("src/math.rs", 18),
         TestFailure::new("tests::test_zero_div", "attempt to divide by zero")
             .with_location("src/math.rs", 32)
             .with_stack_trace("at math::div (src/math.rs:32:5)"),

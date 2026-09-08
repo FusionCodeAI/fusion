@@ -253,10 +253,7 @@ impl CdpWebSocket {
             anyhow::bail!("Timed out waiting for CDP WebSocket handshake response");
         }
 
-        Ok(Self {
-            stream,
-            next_id: 1,
-        })
+        Ok(Self { stream, next_id: 1 })
     }
 
     /// Sends a masked text frame to the CDP WebSocket server (RFC 6455).
@@ -415,10 +412,7 @@ impl CdpWebSocket {
     }
 
     /// Captures a screenshot as a base64-encoded string.
-    pub async fn capture_screenshot(
-        &mut self,
-        selector: Option<&str>,
-    ) -> anyhow::Result<String> {
+    pub async fn capture_screenshot(&mut self, selector: Option<&str>) -> anyhow::Result<String> {
         let _ = self.call_method("Page.enable", json!({})).await;
 
         let clip = if let Some(sel) = selector {
@@ -505,7 +499,9 @@ impl CdpWebSocket {
     /// Queries a node ID using `DOM.querySelector`.
     pub async fn query_selector(&mut self, selector: &str) -> anyhow::Result<Option<i64>> {
         let _ = self.call_method("DOM.enable", json!({})).await;
-        let doc = self.call_method("DOM.getDocument", json!({ "depth": 1 })).await?;
+        let doc = self
+            .call_method("DOM.getDocument", json!({ "depth": 1 }))
+            .await?;
         let root_id = doc
             .get("root")
             .and_then(|r| r.get("nodeId"))
@@ -586,10 +582,26 @@ impl CdpWebSocket {
         })()"#;
 
         let val = self.evaluate_js(js).await?;
-        let title = val.get("title").and_then(|v| v.as_str()).unwrap_or("").to_string();
-        let url = val.get("url").and_then(|v| v.as_str()).unwrap_or("").to_string();
-        let text = val.get("text").and_then(|v| v.as_str()).unwrap_or("").to_string();
-        let html = val.get("html").and_then(|v| v.as_str()).unwrap_or("").to_string();
+        let title = val
+            .get("title")
+            .and_then(|v| v.as_str())
+            .unwrap_or("")
+            .to_string();
+        let url = val
+            .get("url")
+            .and_then(|v| v.as_str())
+            .unwrap_or("")
+            .to_string();
+        let text = val
+            .get("text")
+            .and_then(|v| v.as_str())
+            .unwrap_or("")
+            .to_string();
+        let html = val
+            .get("html")
+            .and_then(|v| v.as_str())
+            .unwrap_or("")
+            .to_string();
 
         Ok(PageContent {
             title,
@@ -705,9 +717,10 @@ impl CdpClient {
 
     /// Connects a WebSocket to the specified tab.
     pub async fn connect_tab(&self, tab: &CdpTab) -> anyhow::Result<CdpWebSocket> {
-        let ws_url = tab.websocket_debugger_url.as_deref().ok_or_else(|| {
-            anyhow::anyhow!("Tab '{}' has no webSocketDebuggerUrl", tab.id)
-        })?;
+        let ws_url = tab
+            .websocket_debugger_url
+            .as_deref()
+            .ok_or_else(|| anyhow::anyhow!("Tab '{}' has no webSocketDebuggerUrl", tab.id))?;
         CdpWebSocket::connect(ws_url).await
     }
 }
@@ -759,7 +772,9 @@ impl BrowserTool {
             )
             .send()
             .await
-            .map_err(|e| anyhow::anyhow!("HTTP fallback request failed for '{}': {}", norm_url, e))?;
+            .map_err(|e| {
+                anyhow::anyhow!("HTTP fallback request failed for '{}': {}", norm_url, e)
+            })?;
 
         let status = resp.status().as_u16();
         let body = resp.text().await.unwrap_or_default();
@@ -845,17 +860,21 @@ impl Tool for BrowserTool {
 
         match action {
             BrowserAction::Open => {
-                let target_url = parsed_args
-                    .url
-                    .as_deref()
-                    .unwrap_or("about:blank");
+                let target_url = parsed_args.url.as_deref().unwrap_or("about:blank");
 
                 if cdp_online {
                     let tab = cdp_client.new_tab(Some(target_url)).await?;
                     let mut out = String::from("# Browser Tab Opened (CDP)\n\n");
                     out.push_str(&format!("- **Target URL**: {}\n", target_url));
                     out.push_str(&format!("- **Tab ID**: {}\n", tab.id));
-                    out.push_str(&format!("- **Title**: {}\n", if tab.title.is_empty() { "New Tab" } else { &tab.title }));
+                    out.push_str(&format!(
+                        "- **Title**: {}\n",
+                        if tab.title.is_empty() {
+                            "New Tab"
+                        } else {
+                            &tab.title
+                        }
+                    ));
                     out.push_str(&format!("- **CDP Endpoint**: {}\n", cdp_client.base_url()));
                     if let Some(ws) = &tab.websocket_debugger_url {
                         out.push_str(&format!("- **WebSocket**: `{}`\n", ws));
@@ -868,7 +887,10 @@ impl Tool for BrowserTool {
                     out.push_str(&format!("- **URL**: {}\n", fallback.url));
                     out.push_str(&format!("- **Title**: {}\n", fallback.title));
                     out.push_str(&format!("- **HTTP Status**: {}\n", fallback.status));
-                    out.push_str(&format!("- **Content Length**: {} bytes\n\n", fallback.content_length));
+                    out.push_str(&format!(
+                        "- **Content Length**: {} bytes\n\n",
+                        fallback.content_length
+                    ));
                     out.push_str("## Page Content Preview\n\n");
                     let preview = truncate_content(&fallback.content, 4000);
                     out.push_str(&preview);
@@ -903,16 +925,22 @@ impl Tool for BrowserTool {
                     let mut out = String::from("# Browser Navigation Complete (CDP)\n\n");
                     out.push_str(&format!("- **Navigated To**: {}\n", norm_url));
                     out.push_str(&format!("- **Tab ID**: {}\n", active_tab.id));
-                    out.push_str(&format!("- **Status**: Navigation requested successfully\n"));
+                    out.push_str(&format!(
+                        "- **Status**: Navigation requested successfully\n"
+                    ));
                     Ok(out)
                 } else {
                     // Headless HTTP fallback
                     let fallback = self.fetch_http(&norm_url).await?;
-                    let mut out = String::from("# Navigation Complete (Headless HTTP Fallback Mode)\n\n");
+                    let mut out =
+                        String::from("# Navigation Complete (Headless HTTP Fallback Mode)\n\n");
                     out.push_str(&format!("- **URL**: {}\n", fallback.url));
                     out.push_str(&format!("- **Title**: {}\n", fallback.title));
                     out.push_str(&format!("- **HTTP Status**: {}\n", fallback.status));
-                    out.push_str(&format!("- **Content Length**: {} bytes\n\n", fallback.content_length));
+                    out.push_str(&format!(
+                        "- **Content Length**: {} bytes\n\n",
+                        fallback.content_length
+                    ));
                     out.push_str("## Page Content Preview\n\n");
                     let preview = truncate_content(&fallback.content, 4000);
                     out.push_str(&preview);
@@ -976,7 +1004,8 @@ impl Tool for BrowserTool {
                     }
                     Ok(out)
                 } else {
-                    let mut out = String::from("# Screenshot Unavailable (CDP Browser Required)\n\n");
+                    let mut out =
+                        String::from("# Screenshot Unavailable (CDP Browser Required)\n\n");
                     out.push_str(
                         "Capturing rendered visual screenshots requires an active Chrome DevTools Protocol session.\n\n",
                     );
@@ -1002,7 +1031,10 @@ impl Tool for BrowserTool {
                     let mut ws = cdp_client.connect_tab(active_tab).await?;
                     let result = ws.click(selector).await?;
 
-                    let tag = result.get("tag").and_then(|v| v.as_str()).unwrap_or("element");
+                    let tag = result
+                        .get("tag")
+                        .and_then(|v| v.as_str())
+                        .unwrap_or("element");
                     let text = result.get("text").and_then(|v| v.as_str()).unwrap_or("");
 
                     let mut out = String::from("# Element Clicked Successfully\n\n");
@@ -1014,7 +1046,8 @@ impl Tool for BrowserTool {
                     out.push_str(&format!("- **Tab Title**: {}\n", active_tab.title));
                     Ok(out)
                 } else {
-                    let mut out = String::from("# Click Action Unavailable (CDP Browser Required)\n\n");
+                    let mut out =
+                        String::from("# Click Action Unavailable (CDP Browser Required)\n\n");
                     out.push_str(&format!(
                         "Interactively clicking DOM element `{}` requires an active Chrome DevTools Protocol session.\n\n",
                         selector
@@ -1028,10 +1061,9 @@ impl Tool for BrowserTool {
                 let selector = parsed_args.selector.as_deref().ok_or_else(|| {
                     anyhow::anyhow!("Parameter 'selector' is required for action 'type'")
                 })?;
-                let text = parsed_args
-                    .text
-                    .as_deref()
-                    .ok_or_else(|| anyhow::anyhow!("Parameter 'text' is required for action 'type'"))?;
+                let text = parsed_args.text.as_deref().ok_or_else(|| {
+                    anyhow::anyhow!("Parameter 'text' is required for action 'type'")
+                })?;
 
                 if cdp_online {
                     let tabs = cdp_client.list_tabs().await?;
@@ -1042,7 +1074,10 @@ impl Tool for BrowserTool {
                     let mut ws = cdp_client.connect_tab(active_tab).await?;
                     let result = ws.type_text(selector, text).await?;
 
-                    let tag = result.get("tag").and_then(|v| v.as_str()).unwrap_or("input");
+                    let tag = result
+                        .get("tag")
+                        .and_then(|v| v.as_str())
+                        .unwrap_or("input");
 
                     let mut out = String::from("# Text Input Successful\n\n");
                     out.push_str(&format!("- **Selector**: `{}`\n", selector));
@@ -1052,7 +1087,8 @@ impl Tool for BrowserTool {
                     out.push_str(&format!("- **Tab Title**: {}\n", active_tab.title));
                     Ok(out)
                 } else {
-                    let mut out = String::from("# Type Action Unavailable (CDP Browser Required)\n\n");
+                    let mut out =
+                        String::from("# Type Action Unavailable (CDP Browser Required)\n\n");
                     out.push_str(&format!(
                         "Typing into DOM element `{}` requires an active Chrome DevTools Protocol session.\n\n",
                         selector
@@ -1087,9 +1123,8 @@ impl Tool for BrowserTool {
                     out.push_str("\n```\n");
                     Ok(out)
                 } else {
-                    let mut out = format!(
-                        "# JavaScript Evaluation Unavailable (CDP Browser Required)\n\n"
-                    );
+                    let mut out =
+                        format!("# JavaScript Evaluation Unavailable (CDP Browser Required)\n\n");
                     out.push_str(
                         "Evaluating client-side JavaScript in a web page requires an active Chrome DevTools Protocol session.\n\n",
                     );
@@ -1111,7 +1146,10 @@ impl Tool for BrowserTool {
                     let mut out = String::from("# Page Content (CDP Active Tab)\n\n");
                     out.push_str(&format!("- **Title**: {}\n", content.title));
                     out.push_str(&format!("- **URL**: {}\n", content.url));
-                    out.push_str(&format!("- **Text Length**: {} characters\n\n", content.text.len()));
+                    out.push_str(&format!(
+                        "- **Text Length**: {} characters\n\n",
+                        content.text.len()
+                    ));
                     out.push_str("## Extracted Text Content\n\n");
                     out.push_str(&truncate_content(&content.text, 8000));
                     out.push('\n');
@@ -1123,7 +1161,10 @@ impl Tool for BrowserTool {
                     out.push_str(&format!("- **Title**: {}\n", fallback.title));
                     out.push_str(&format!("- **URL**: {}\n", fallback.url));
                     out.push_str(&format!("- **HTTP Status**: {}\n", fallback.status));
-                    out.push_str(&format!("- **Length**: {} bytes\n\n", fallback.content_length));
+                    out.push_str(&format!(
+                        "- **Length**: {} bytes\n\n",
+                        fallback.content_length
+                    ));
                     out.push_str("## Extracted Text Content\n\n");
                     out.push_str(&truncate_content(&fallback.content, 8000));
                     out.push_str("\n\n---\n");
@@ -1471,7 +1512,8 @@ pub fn strip_non_content_tags(html: &str) -> String {
 
 /// Unescapes common HTML entities.
 pub fn unescape_html_entities(s: &str) -> String {
-    let mut res = s.replace("&amp;", "&")
+    let mut res = s
+        .replace("&amp;", "&")
         .replace("&lt;", "<")
         .replace("&gt;", ">")
         .replace("&quot;", "\"")
@@ -1580,10 +1622,7 @@ pub fn base64_encode(data: &[u8]) -> String {
 
 /// Decodes standard RFC 4648 base64 string into raw bytes.
 pub fn base64_decode(input: &str) -> Option<Vec<u8>> {
-    let clean: Vec<u8> = input
-        .bytes()
-        .filter(|b| !b.is_ascii_whitespace())
-        .collect();
+    let clean: Vec<u8> = input.bytes().filter(|b| !b.is_ascii_whitespace()).collect();
     if clean.is_empty() {
         return Some(Vec::new());
     }

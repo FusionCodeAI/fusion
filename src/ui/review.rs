@@ -324,8 +324,7 @@ impl ReviewSession {
             if line.starts_with("@@ ") || line.starts_with("@@-") {
                 flush_open_hunk(&mut open_hunk, &mut hunks);
 
-                if let Some((old_start, old_len, new_start, new_len)) =
-                    parse_hunk_coordinates(line)
+                if let Some((old_start, old_len, new_start, new_len)) = parse_hunk_coordinates(line)
                 {
                     let file_path = current_file_path
                         .clone()
@@ -356,8 +355,7 @@ impl ReviewSession {
                         .push((ChangeKind::Context, line[1..].to_string()));
                 } else if line.is_empty() {
                     // Empty context line (some formatters omit the leading space)
-                    hunk.lines
-                        .push((ChangeKind::Context, String::new()));
+                    hunk.lines.push((ChangeKind::Context, String::new()));
                 } else if line.starts_with('\\') {
                     // Ignore metadata lines like `\ No newline at end of file`
                 } else {
@@ -662,7 +660,12 @@ impl<'a> Widget for &ReviewWidget<'a> {
                 )),
                 Line::from(""),
                 Line::from(vec![
-                    Span::styled("[q]", Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD)),
+                    Span::styled(
+                        "[q]",
+                        Style::default()
+                            .fg(Color::Cyan)
+                            .add_modifier(Modifier::BOLD),
+                    ),
                     Span::styled(" Finish / Quit", Style::default().fg(Color::White)),
                 ]),
             ];
@@ -692,15 +695,15 @@ impl<'a> Widget for &ReviewWidget<'a> {
 
         // 1. Render Header Block
         let badge_style = match hunk.state {
-            DiffHunkReviewState::Accepted => {
-                Style::default().fg(Color::Green).add_modifier(Modifier::BOLD)
-            }
+            DiffHunkReviewState::Accepted => Style::default()
+                .fg(Color::Green)
+                .add_modifier(Modifier::BOLD),
             DiffHunkReviewState::Rejected => {
                 Style::default().fg(Color::Red).add_modifier(Modifier::BOLD)
             }
-            DiffHunkReviewState::Pending => {
-                Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD)
-            }
+            DiffHunkReviewState::Pending => Style::default()
+                .fg(Color::Yellow)
+                .add_modifier(Modifier::BOLD),
         };
 
         let badge_span = Span::styled(format!(" {} ", hunk.state.badge_label()), badge_style);
@@ -712,12 +715,16 @@ impl<'a> Widget for &ReviewWidget<'a> {
             Span::styled(" File: ", Style::default().fg(Color::DarkGray)),
             Span::styled(
                 &hunk.file_path,
-                Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD),
+                Style::default()
+                    .fg(Color::Cyan)
+                    .add_modifier(Modifier::BOLD),
             ),
             Span::styled("  ", Style::default()),
             Span::styled(
                 hunk.header(),
-                Style::default().fg(Color::Magenta).add_modifier(Modifier::BOLD),
+                Style::default()
+                    .fg(Color::Magenta)
+                    .add_modifier(Modifier::BOLD),
             ),
             Span::styled("  ", Style::default()),
             Span::styled(
@@ -780,17 +787,47 @@ impl<'a> Widget for &ReviewWidget<'a> {
         // `[y] Accept  [n] Reject  [a] Accept All  [r] Reject All  [↑↓] Prev/Next  [q] Finish`
         let footer_spans = vec![
             Span::styled(" ", Style::default()),
-            Span::styled("[y]", Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD)),
+            Span::styled(
+                "[y]",
+                Style::default()
+                    .fg(Color::Cyan)
+                    .add_modifier(Modifier::BOLD),
+            ),
             Span::styled(" Accept  ", Style::default().fg(Color::White)),
-            Span::styled("[n]", Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD)),
+            Span::styled(
+                "[n]",
+                Style::default()
+                    .fg(Color::Cyan)
+                    .add_modifier(Modifier::BOLD),
+            ),
             Span::styled(" Reject  ", Style::default().fg(Color::White)),
-            Span::styled("[a]", Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD)),
+            Span::styled(
+                "[a]",
+                Style::default()
+                    .fg(Color::Cyan)
+                    .add_modifier(Modifier::BOLD),
+            ),
             Span::styled(" Accept All  ", Style::default().fg(Color::White)),
-            Span::styled("[r]", Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD)),
+            Span::styled(
+                "[r]",
+                Style::default()
+                    .fg(Color::Cyan)
+                    .add_modifier(Modifier::BOLD),
+            ),
             Span::styled(" Reject All  ", Style::default().fg(Color::White)),
-            Span::styled("[↑↓]", Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD)),
+            Span::styled(
+                "[↑↓]",
+                Style::default()
+                    .fg(Color::Cyan)
+                    .add_modifier(Modifier::BOLD),
+            ),
             Span::styled(" Prev/Next  ", Style::default().fg(Color::White)),
-            Span::styled("[q]", Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD)),
+            Span::styled(
+                "[q]",
+                Style::default()
+                    .fg(Color::Cyan)
+                    .add_modifier(Modifier::BOLD),
+            ),
             Span::styled(" Finish", Style::default().fg(Color::White)),
         ];
 

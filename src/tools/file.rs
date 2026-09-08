@@ -1,7 +1,7 @@
 use async_trait::async_trait;
-use fusion_walker::WalkRequest;
 use fusion_ast::summary::{summarize_code, SummaryOptions};
 use fusion_ast::SupportLang;
+use fusion_walker::WalkRequest;
 use serde_json::{json, Value};
 use std::path::{Path, PathBuf};
 use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
@@ -334,30 +334,30 @@ fn render_oversized_summary(
 
     if let Some(summary) = summary_opt {
         if summary.parsed && summary.elided {
-        for segment in &summary.segments {
-            if segment.kind == "kept" {
-                for line_num in segment.start_line..=segment.end_line {
-                    let line = content_lines
-                        .get((line_num - 1) as usize)
-                        .copied()
-                        .unwrap_or("");
+            for segment in &summary.segments {
+                if segment.kind == "kept" {
+                    for line_num in segment.start_line..=segment.end_line {
+                        let line = content_lines
+                            .get((line_num - 1) as usize)
+                            .copied()
+                            .unwrap_or("");
+                        if line_numbers {
+                            let _ = write!(output, "{:6} | {}\n", line_num, line);
+                        } else {
+                            output.push_str(line);
+                            output.push('\n');
+                        }
+                    }
+                } else if segment.kind == "elided" {
+                    let span = (segment.end_line.saturating_sub(segment.start_line) + 1) as usize;
+                    elided_lines_count += span;
                     if line_numbers {
-                        let _ = write!(output, "{:6} | {}\n", line_num, line);
+                        let _ = write!(output, "{:>6} | ...\n", "...");
                     } else {
-                        output.push_str(line);
-                        output.push('\n');
+                        output.push_str("...\n");
                     }
                 }
-            } else if segment.kind == "elided" {
-                let span = (segment.end_line.saturating_sub(segment.start_line) + 1) as usize;
-                elided_lines_count += span;
-                if line_numbers {
-                    let _ = write!(output, "{:>6} | ...\n", "...");
-                } else {
-                    output.push_str("...\n");
-                }
             }
-        }
         }
     }
 
@@ -625,7 +625,10 @@ fn decode_entity_owned(entity: &str) -> Option<String> {
     }
 
     if let Some(num_str) = entity.strip_prefix('#') {
-        let code = if let Some(hex_str) = num_str.strip_prefix('x').or_else(|| num_str.strip_prefix('X')) {
+        let code = if let Some(hex_str) = num_str
+            .strip_prefix('x')
+            .or_else(|| num_str.strip_prefix('X'))
+        {
             u32::from_str_radix(hex_str, 16).ok()
         } else {
             num_str.parse::<u32>().ok()
@@ -974,13 +977,18 @@ impl ReadFileTool {
             .build()
             .unwrap_or_else(|_| reqwest::Client::new());
 
-        let resp = client.get(&clean_url).send().await.map_err(|e| {
-            anyhow::anyhow!("Failed to read URL '{}': {e}", path)
-        })?;
+        let resp = client
+            .get(&clean_url)
+            .send()
+            .await
+            .map_err(|e| anyhow::anyhow!("Failed to read URL '{}': {e}", path))?;
 
         let status = resp.status();
         if status != reqwest::StatusCode::OK {
-            return Ok(format!("HTTP Error {}: Failed to read URL {}", status, path));
+            return Ok(format!(
+                "HTTP Error {}: Failed to read URL {}",
+                status, path
+            ));
         }
 
         let content_type = resp
@@ -1793,7 +1801,10 @@ mod tests {
             .execute(json!({ "path": "test_lines.txt:raw" }), &ctx)
             .await
             .unwrap();
-        assert_eq!(res, (1..=10).map(|i| format!("Line {i}\n")).collect::<String>());
+        assert_eq!(
+            res,
+            (1..=10).map(|i| format!("Line {i}\n")).collect::<String>()
+        );
 
         // 4. :2-4:raw
         let res = read_tool

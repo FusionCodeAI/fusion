@@ -47,7 +47,11 @@ fn test_parse_cursor_format() {
     fs::write(&cursor_mcp, cursor_content).unwrap();
 
     let configs = McpDiscoveryEngine::discover_workspace_only(root);
-    assert_eq!(configs.len(), 1, "Should discover 1 server from .cursor/mcp.json");
+    assert_eq!(
+        configs.len(),
+        1,
+        "Should discover 1 server from .cursor/mcp.json"
+    );
 
     let cfg = &configs[0];
     assert_eq!(cfg.name, "weather-service");
@@ -59,7 +63,10 @@ fn test_parse_cursor_format() {
     assert_eq!(cfg.env.get("PORT").map(|s| s.as_str()), Some("8080"));
     assert_eq!(cfg.env.get("DEBUG").map(|s| s.as_str()), Some("true"));
     let masked_key = cfg.env.get("API_KEY").expect("API_KEY should be present");
-    assert_ne!(masked_key, "cursor-secret-key-1234567890", "API_KEY must be sanitized");
+    assert_ne!(
+        masked_key, "cursor-secret-key-1234567890",
+        "API_KEY must be sanitized"
+    );
     assert!(masked_key.contains("***") || masked_key.contains("..."));
 }
 
@@ -89,7 +96,11 @@ fn test_parse_vscode_format_object() {
     fs::write(&vscode_mcp, vscode_content).unwrap();
 
     let configs = McpDiscoveryEngine::discover_workspace_only(root);
-    assert_eq!(configs.len(), 1, "Should discover 1 server from .vscode/mcp.json");
+    assert_eq!(
+        configs.len(),
+        1,
+        "Should discover 1 server from .vscode/mcp.json"
+    );
 
     let cfg = &configs[0];
     assert_eq!(cfg.name, "vscode-sqlite");
@@ -190,19 +201,30 @@ fn test_parse_claude_desktop_format() {
     fs::write(&claude_mcp, claude_content).unwrap();
 
     let configs = McpDiscoveryEngine::discover_workspace_only(root);
-    assert_eq!(configs.len(), 2, "Should discover 2 servers from .claude/mcp.json");
+    assert_eq!(
+        configs.len(),
+        2,
+        "Should discover 2 servers from .claude/mcp.json"
+    );
 
     let fs_cfg = configs.iter().find(|c| c.name == "filesystem").unwrap();
     assert_eq!(fs_cfg.command, "npx");
     assert_eq!(
         fs_cfg.args,
-        vec!["-y", "@modelcontextprotocol/server-filesystem", "/workspace"]
+        vec![
+            "-y",
+            "@modelcontextprotocol/server-filesystem",
+            "/workspace"
+        ]
     );
 
     let gh_cfg = configs.iter().find(|c| c.name == "github").unwrap();
     assert_eq!(gh_cfg.command, "npx");
     let token = gh_cfg.env.get("GITHUB_TOKEN").expect("GITHUB_TOKEN exists");
-    assert_ne!(token, "ghp_mocktoken9876543210fedcba", "Token must be sanitized");
+    assert_ne!(
+        token, "ghp_mocktoken9876543210fedcba",
+        "Token must be sanitized"
+    );
 }
 
 #[test]
@@ -311,12 +333,27 @@ fn test_parse_fusion_workspace_configs_and_precedence() {
 #[test]
 fn test_environment_sanitization_rules() {
     let mut env = HashMap::new();
-    env.insert("OPENAI_API_KEY".to_string(), "sk-proj-1234567890abcdef1234567890".to_string());
-    env.insert("ANTHROPIC_API_KEY".to_string(), "sk-ant-api03-abcdef1234567890".to_string());
-    env.insert("DATABASE_PASSWORD".to_string(), "supersecretpassword".to_string());
-    env.insert("AWS_SECRET_ACCESS_KEY".to_string(), "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY".to_string());
+    env.insert(
+        "OPENAI_API_KEY".to_string(),
+        "sk-proj-1234567890abcdef1234567890".to_string(),
+    );
+    env.insert(
+        "ANTHROPIC_API_KEY".to_string(),
+        "sk-ant-api03-abcdef1234567890".to_string(),
+    );
+    env.insert(
+        "DATABASE_PASSWORD".to_string(),
+        "supersecretpassword".to_string(),
+    );
+    env.insert(
+        "AWS_SECRET_ACCESS_KEY".to_string(),
+        "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY".to_string(),
+    );
     env.insert("CLIENT_SECRET".to_string(), "secret123".to_string());
-    env.insert("AUTH_BEARER_TOKEN".to_string(), "bearer_token_xyz".to_string());
+    env.insert(
+        "AUTH_BEARER_TOKEN".to_string(),
+        "bearer_token_xyz".to_string(),
+    );
 
     // Safe variables
     env.insert("PORT".to_string(), "3000".to_string());
@@ -333,12 +370,27 @@ fn test_environment_sanitization_rules() {
     assert_eq!(sanitized.get("RUST_LOG").unwrap(), "info");
 
     // Verify sensitive variables are sanitized
-    assert_ne!(sanitized.get("OPENAI_API_KEY").unwrap(), "sk-proj-1234567890abcdef1234567890");
-    assert_ne!(sanitized.get("ANTHROPIC_API_KEY").unwrap(), "sk-ant-api03-abcdef1234567890");
-    assert_ne!(sanitized.get("DATABASE_PASSWORD").unwrap(), "supersecretpassword");
-    assert_ne!(sanitized.get("AWS_SECRET_ACCESS_KEY").unwrap(), "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY");
+    assert_ne!(
+        sanitized.get("OPENAI_API_KEY").unwrap(),
+        "sk-proj-1234567890abcdef1234567890"
+    );
+    assert_ne!(
+        sanitized.get("ANTHROPIC_API_KEY").unwrap(),
+        "sk-ant-api03-abcdef1234567890"
+    );
+    assert_ne!(
+        sanitized.get("DATABASE_PASSWORD").unwrap(),
+        "supersecretpassword"
+    );
+    assert_ne!(
+        sanitized.get("AWS_SECRET_ACCESS_KEY").unwrap(),
+        "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY"
+    );
     assert_ne!(sanitized.get("CLIENT_SECRET").unwrap(), "secret123");
-    assert_ne!(sanitized.get("AUTH_BEARER_TOKEN").unwrap(), "bearer_token_xyz");
+    assert_ne!(
+        sanitized.get("AUTH_BEARER_TOKEN").unwrap(),
+        "bearer_token_xyz"
+    );
 
     // Verification of helper functions
     assert!(is_sensitive_variable("OPENAI_API_KEY", "sk-..."));
@@ -405,8 +457,8 @@ fn test_strip_json_comments() {
     }"#;
 
     let stripped = strip_json_comments(jsonc);
-    let parsed: serde_json::Value = serde_json::from_str(&stripped)
-        .expect("Stripped JSONC must parse as valid standard JSON");
+    let parsed: serde_json::Value =
+        serde_json::from_str(&stripped).expect("Stripped JSONC must parse as valid standard JSON");
 
     assert_eq!(parsed["name"], "test");
     assert_eq!(parsed["url"], "http://example.com/api");
@@ -469,7 +521,10 @@ async fn test_mcp_discovery_tool_execute() {
     assert!(summary_result.contains("demo-tool"));
     assert!(summary_result.contains("node"));
     assert!(summary_result.contains("PORT=9000"));
-    assert!(!summary_result.contains("top-secret-val"), "Secret must be sanitized");
+    assert!(
+        !summary_result.contains("top-secret-val"),
+        "Secret must be sanitized"
+    );
 
     // 2. Execute with JSON format
     let json_result = tool

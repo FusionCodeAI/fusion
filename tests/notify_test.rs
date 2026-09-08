@@ -131,8 +131,7 @@ fn test_rich_osc99_kitty_protocol_title_and_body() {
 #[test]
 fn test_rich_osc99_unsafe_characters_base64_encoding() {
     // Unsafe C0 control characters such as newlines must be base64-encoded with e=1
-    let notif = Notification::new("Multi\nLine\nTitle", "Line A\nLine B")
-        .category("unsafe-test");
+    let notif = Notification::new("Multi\nLine\nTitle", "Line A\nLine B").category("unsafe-test");
 
     let osc99 = notif.render_osc99();
     assert!(osc99.contains(":e=1;"));

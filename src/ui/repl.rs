@@ -943,13 +943,21 @@ pub async fn run_turn_ui(
                 crate::agent::subagent::SubagentProgress::ToolStarted { tool, .. } => {
                     clear_prompt_frame(prompt);
                     let mut out = stdout();
-                    let _ = write!(out, "\r\x1b[2K\x1b[1;36m│\x1b[0m  \x1b[33m⠋ {}\x1b[0m\r\n", tool);
+                    let _ = write!(
+                        out,
+                        "\r\x1b[2K\x1b[1;36m│\x1b[0m  \x1b[33m⠋ {}\x1b[0m\r\n",
+                        tool
+                    );
                     let _ = out.flush();
                 }
                 crate::agent::subagent::SubagentProgress::ToolCompleted { tool, .. } => {
                     clear_prompt_frame(prompt);
                     let mut out = stdout();
-                    let _ = write!(out, "\r\x1b[2K\x1b[1;36m│\x1b[0m  \x1b[32m✓ {}\x1b[0m\r\n", tool);
+                    let _ = write!(
+                        out,
+                        "\r\x1b[2K\x1b[1;36m│\x1b[0m  \x1b[32m✓ {}\x1b[0m\r\n",
+                        tool
+                    );
                     let _ = out.flush();
                 }
                 crate::agent::subagent::SubagentProgress::Completed { turns_taken, .. } => {

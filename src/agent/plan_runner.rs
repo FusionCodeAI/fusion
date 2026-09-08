@@ -27,12 +27,11 @@ pub enum PlanRunnerError {
     },
 
     #[error("Task '{task_id}' failed: {error}")]
-    TaskExecutionFailed {
-        task_id: String,
-        error: String,
-    },
+    TaskExecutionFailed { task_id: String, error: String },
 
-    #[error("Task '{task_id}' prerequisite dependency '{dep_id}' not completed (status: {dep_status})")]
+    #[error(
+        "Task '{task_id}' prerequisite dependency '{dep_id}' not completed (status: {dep_status})"
+    )]
     DependencyNotMet {
         task_id: String,
         dep_id: String,
@@ -40,9 +39,7 @@ pub enum PlanRunnerError {
     },
 
     #[error("Task '{task_id}' not found in DAG")]
-    TaskNotFound {
-        task_id: String,
-    },
+    TaskNotFound { task_id: String },
 
     #[error("Cannot run empty plan")]
     EmptyPlan,
@@ -163,7 +160,8 @@ impl PlanSummary {
                 DagTaskStatus::Completed { output, .. } => {
                     completed_tasks += 1;
                     task_results.insert(id.clone(), output.clone());
-                    tokens_spent += crate::agent::tokens::estimate_text_tokens(&task.description) as u64;
+                    tokens_spent +=
+                        crate::agent::tokens::estimate_text_tokens(&task.description) as u64;
                     tokens_spent += crate::agent::tokens::estimate_text_tokens(output) as u64;
                 }
                 DagTaskStatus::Failed { .. } => {
@@ -239,7 +237,10 @@ impl PlanSummary {
     /// subagent tasks run, tokens spent, and final status (`[✓] Completed in N stages`).
     pub fn format_report(&self) -> String {
         let mut out = String::new();
-        out.push_str(&format!("Plan Execution Report: {} (ID: {})\n", self.dag_name, self.dag_id));
+        out.push_str(&format!(
+            "Plan Execution Report: {} (ID: {})\n",
+            self.dag_name, self.dag_id
+        ));
         out.push_str(&format!("Goal: {}\n", self.goal));
         out.push_str(&"=".repeat(60));
         out.push('\n');
@@ -252,13 +253,22 @@ impl PlanSummary {
                     format!("[✓] Completed in {} stages", self.completed_stages)
                 }
                 DagOverallStatus::Failed => {
-                    format!("[✗] Failed ({} of {} stages completed)", self.completed_stages, self.total_stages)
+                    format!(
+                        "[✗] Failed ({} of {} stages completed)",
+                        self.completed_stages, self.total_stages
+                    )
                 }
                 DagOverallStatus::InProgress => {
-                    format!("[•] In Progress ({} of {} stages completed)", self.completed_stages, self.total_stages)
+                    format!(
+                        "[•] In Progress ({} of {} stages completed)",
+                        self.completed_stages, self.total_stages
+                    )
                 }
                 DagOverallStatus::PartiallyCompleted => {
-                    format!("[⏸] Partially Completed ({} of {} stages)", self.completed_stages, self.total_stages)
+                    format!(
+                        "[⏸] Partially Completed ({} of {} stages)",
+                        self.completed_stages, self.total_stages
+                    )
                 }
                 DagOverallStatus::Cancelled => "[✗] Cancelled".to_string(),
                 DagOverallStatus::NotStarted => {
@@ -268,12 +278,20 @@ impl PlanSummary {
         };
 
         out.push_str(&format!("Status:              {}\n", status_str));
-        out.push_str(&format!("Stages Executed:     {}/{} completed\n", self.completed_stages, self.total_stages));
-        out.push_str(&format!("Subagent Tasks Run:  {} completed, {} failed, {} skipped ({} total)\n",
-            self.completed_tasks, self.failed_tasks, self.skipped_tasks, self.total_tasks));
+        out.push_str(&format!(
+            "Stages Executed:     {}/{} completed\n",
+            self.completed_stages, self.total_stages
+        ));
+        out.push_str(&format!(
+            "Subagent Tasks Run:  {} completed, {} failed, {} skipped ({} total)\n",
+            self.completed_tasks, self.failed_tasks, self.skipped_tasks, self.total_tasks
+        ));
         out.push_str(&format!("Tokens Spent:        {}\n", self.tokens_spent));
         if self.wall_duration_ms > 0 {
-            out.push_str(&format!("Duration:            {}ms\n", self.wall_duration_ms));
+            out.push_str(&format!(
+                "Duration:            {}ms\n",
+                self.wall_duration_ms
+            ));
         }
 
         if !self.task_results.is_empty() {
@@ -309,10 +327,7 @@ impl PlanSummary {
             "- **Stages:** {}/{} completed\n",
             self.completed_stages, self.total_stages
         ));
-        out.push_str(&format!(
-            "- **Tokens Spent:** {}\n",
-            self.tokens_spent
-        ));
+        out.push_str(&format!("- **Tokens Spent:** {}\n", self.tokens_spent));
         out.push_str(&format!(
             "- **Wall Clock Time:** {}ms\n\n",
             self.wall_duration_ms
@@ -530,7 +545,8 @@ impl PlanRunner {
         if tokens_spent == 0 {
             for task in self.dag.tasks.values() {
                 if let DagTaskStatus::Completed { ref output, .. } = task.status {
-                    tokens_spent += crate::agent::tokens::estimate_text_tokens(&task.description) as u64;
+                    tokens_spent +=
+                        crate::agent::tokens::estimate_text_tokens(&task.description) as u64;
                     tokens_spent += crate::agent::tokens::estimate_text_tokens(output) as u64;
                 }
             }
@@ -581,12 +597,12 @@ impl PlanRunner {
                     task_id: task_id.clone(),
                 })?;
             for dep in &task.dependencies {
-                let dep_task = self
-                    .dag
-                    .get_task(dep)
-                    .ok_or_else(|| PlanRunnerError::TaskNotFound {
-                        task_id: dep.clone(),
-                    })?;
+                let dep_task =
+                    self.dag
+                        .get_task(dep)
+                        .ok_or_else(|| PlanRunnerError::TaskNotFound {
+                            task_id: dep.clone(),
+                        })?;
                 if !dep_task.status.is_completed() {
                     return Err(PlanRunnerError::DependencyNotMet {
                         task_id: task_id.clone(),
@@ -663,8 +679,11 @@ impl PlanRunner {
             match result {
                 Ok(sub_res) => {
                     if sub_res.success {
-                        self.dag
-                            .mark_task_completed(&task_id, sub_res.output.clone(), task_elapsed);
+                        self.dag.mark_task_completed(
+                            &task_id,
+                            sub_res.output.clone(),
+                            task_elapsed,
+                        );
                         completed_tasks.push(task_id.clone());
                         task_outputs.insert(task_id, sub_res.output);
                     } else {
@@ -736,10 +755,9 @@ impl PlanRunner {
             stage_results.push(stage_res);
 
             if !is_success {
-                let (failed_task, error) = failed_list
-                    .first()
-                    .cloned()
-                    .unwrap_or_else(|| ("unknown".to_string(), "Stage execution failed".to_string()));
+                let (failed_task, error) = failed_list.first().cloned().unwrap_or_else(|| {
+                    ("unknown".to_string(), "Stage execution failed".to_string())
+                });
                 return Err(PlanRunnerError::TaskExecutionFailed {
                     task_id: failed_task,
                     error,
@@ -760,7 +778,8 @@ impl PlanRunner {
         if tokens_spent == 0 {
             for task in self.dag.tasks.values() {
                 if let DagTaskStatus::Completed { ref output, .. } = task.status {
-                    tokens_spent += crate::agent::tokens::estimate_text_tokens(&task.description) as u64;
+                    tokens_spent +=
+                        crate::agent::tokens::estimate_text_tokens(&task.description) as u64;
                     tokens_spent += crate::agent::tokens::estimate_text_tokens(output) as u64;
                 }
             }

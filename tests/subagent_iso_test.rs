@@ -52,11 +52,23 @@ fn init_git_repo(dir: &Path) {
     run(&["config", "commit.gpgsign", "false"]);
 
     // Populate initial files
-    fs::write(dir.join("README.md"), "# Fusion Isolated Test\nInitial content.\n").unwrap();
+    fs::write(
+        dir.join("README.md"),
+        "# Fusion Isolated Test\nInitial content.\n",
+    )
+    .unwrap();
     let src = dir.join("src");
     fs::create_dir_all(&src).unwrap();
-    fs::write(src.join("main.rs"), "fn main() {\n    println!(\"hello\");\n}\n").unwrap();
-    fs::write(src.join("lib.rs"), "pub fn add(a: i32, b: i32) -> i32 { a + b }\n").unwrap();
+    fs::write(
+        src.join("main.rs"),
+        "fn main() {\n    println!(\"hello\");\n}\n",
+    )
+    .unwrap();
+    fs::write(
+        src.join("lib.rs"),
+        "pub fn add(a: i32, b: i32) -> i32 { a + b }\n",
+    )
+    .unwrap();
 
     run(&["add", "."]);
     run(&["commit", "-m", "Initial commit"]);
@@ -111,10 +123,7 @@ fn test_collect_diff_clean_workspace() {
         .expect("create_for_task should succeed");
 
     let diff = iso.collect_diff().expect("collect_diff should succeed");
-    assert!(
-        diff.trim().is_empty(),
-        "Expected clean diff, got: {diff}"
-    );
+    assert!(diff.trim().is_empty(), "Expected clean diff, got: {diff}");
 
     iso.cleanup().expect("cleanup");
 }
@@ -151,7 +160,11 @@ fn test_collect_diff_added_file() {
 
     // Add a new file inside isolated worktree
     let new_file = iso.path().join("NEW_FEATURE.md");
-    fs::write(&new_file, "# New Feature Specification\nBrand new feature.\n").unwrap();
+    fs::write(
+        &new_file,
+        "# New Feature Specification\nBrand new feature.\n",
+    )
+    .unwrap();
 
     let diff = iso.collect_diff().expect("collect_diff should succeed");
     assert!(!diff.is_empty(), "Diff should capture added file");
@@ -288,10 +301,10 @@ fn test_raii_drop_cleanup() {
 fn test_concurrent_isolated_workspaces() {
     let (_temp, repo_path) = create_test_repo();
 
-    let iso1 = IsolatedWorkspace::create_for_task("task-worker-1", &repo_path)
-        .expect("worker 1 create");
-    let iso2 = IsolatedWorkspace::create_for_task("task-worker-2", &repo_path)
-        .expect("worker 2 create");
+    let iso1 =
+        IsolatedWorkspace::create_for_task("task-worker-1", &repo_path).expect("worker 1 create");
+    let iso2 =
+        IsolatedWorkspace::create_for_task("task-worker-2", &repo_path).expect("worker 2 create");
 
     assert_ne!(iso1.path(), iso2.path());
     assert_ne!(iso1.branch(), iso2.branch());
@@ -329,7 +342,10 @@ fn test_recreate_for_same_task_id() {
     // Second run with same task_id should succeed cleanly
     let iso2 = IsolatedWorkspace::create_for_task(task_id, &repo_path).expect("second run");
     assert!(iso2.path().exists());
-    assert!(!iso2.path().join("temp.txt").exists(), "Worktree should be clean");
+    assert!(
+        !iso2.path().join("temp.txt").exists(),
+        "Worktree should be clean"
+    );
 
     iso2.cleanup().expect("cleanup 2");
 }
@@ -340,7 +356,10 @@ fn test_error_on_non_git_repository() {
     let non_git_path = temp.path();
 
     let res = IsolatedWorkspace::create_for_task("task-fail", non_git_path);
-    assert!(res.is_err(), "create_for_task should fail on non-git directory");
+    assert!(
+        res.is_err(),
+        "create_for_task should fail on non-git directory"
+    );
 }
 
 #[test]
@@ -355,10 +374,15 @@ fn test_worktree_manager_direct_methods() {
     let branch = manager.branch_for_task(task_id);
 
     assert_eq!(branch, "fusion-task-direct-test");
-    assert_eq!(path, repo_path.join(".fusion").join("worktrees").join(task_id));
+    assert_eq!(
+        path,
+        repo_path.join(".fusion").join("worktrees").join(task_id)
+    );
 
     // Create worktree directly
-    manager.create_worktree(&path, &branch).expect("create_worktree");
+    manager
+        .create_worktree(&path, &branch)
+        .expect("create_worktree");
     assert!(path.exists());
     assert!(manager.branch_exists(&branch));
 

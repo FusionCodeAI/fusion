@@ -82,7 +82,6 @@ async fn main() -> anyhow::Result<()> {
         }
     }
 
-
     if cli.acp {
         // Agent Client Protocol (ACP) stdio adapter mode for editors & IDEs
         tokio::select! {

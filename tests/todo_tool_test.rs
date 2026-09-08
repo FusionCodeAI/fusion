@@ -218,10 +218,7 @@ async fn test_todo_tool_lifecycle_transitions() {
         let state = GLOBAL_TODO_STATE.read().await;
         let blocked_item = state.get_task("Third task").unwrap();
         assert_eq!(blocked_item.status, TodoStatus::Blocked);
-        assert_eq!(
-            blocked_item.reason.as_deref(),
-            Some("Missing credentials")
-        );
+        assert_eq!(blocked_item.reason.as_deref(), Some("Missing credentials"));
     }
 
     // 5. Unblock the task
@@ -309,35 +306,69 @@ async fn test_todo_tool_error_handling() {
     // Missing 'op' parameter
     let err_no_op = tool.execute(json!({}), &ctx).await;
     assert!(err_no_op.is_err());
-    assert!(err_no_op.unwrap_err().to_string().contains("Missing required parameter 'op'"));
+    assert!(err_no_op
+        .unwrap_err()
+        .to_string()
+        .contains("Missing required parameter 'op'"));
 
     // Unknown operation
     let err_bad_op = tool.execute(json!({ "op": "dance" }), &ctx).await;
     assert!(err_bad_op.is_err());
-    assert!(err_bad_op.unwrap_err().to_string().contains("Unknown todo operation 'dance'"));
+    assert!(err_bad_op
+        .unwrap_err()
+        .to_string()
+        .contains("Unknown todo operation 'dance'"));
 
     // Start with non-existent task
-    let err_start_missing = tool.execute(json!({ "op": "start", "task": "Ghost" }), &ctx).await;
+    let err_start_missing = tool
+        .execute(json!({ "op": "start", "task": "Ghost" }), &ctx)
+        .await;
     assert!(err_start_missing.is_err());
-    assert!(err_start_missing.unwrap_err().to_string().contains("no task matching 'Ghost'"));
+    assert!(err_start_missing
+        .unwrap_err()
+        .to_string()
+        .contains("no task matching 'Ghost'"));
 
     // Done with non-existent task
-    let err_done_missing = tool.execute(json!({ "op": "done", "task": "Ghost" }), &ctx).await;
+    let err_done_missing = tool
+        .execute(json!({ "op": "done", "task": "Ghost" }), &ctx)
+        .await;
     assert!(err_done_missing.is_err());
-    assert!(err_done_missing.unwrap_err().to_string().contains("no task or phase matching 'Ghost'"));
+    assert!(err_done_missing
+        .unwrap_err()
+        .to_string()
+        .contains("no task or phase matching 'Ghost'"));
 
     // Block with non-existent task
-    let err_block_missing = tool.execute(json!({ "op": "block", "task": "Ghost" }), &ctx).await;
+    let err_block_missing = tool
+        .execute(json!({ "op": "block", "task": "Ghost" }), &ctx)
+        .await;
     assert!(err_block_missing.is_err());
-    assert!(err_block_missing.unwrap_err().to_string().contains("no task matching 'Ghost'"));
+    assert!(err_block_missing
+        .unwrap_err()
+        .to_string()
+        .contains("no task matching 'Ghost'"));
 
     // Append with empty items
-    let err_append_empty = tool.execute(json!({ "op": "append", "phase": "Empty", "items": [] }), &ctx).await;
+    let err_append_empty = tool
+        .execute(
+            json!({ "op": "append", "phase": "Empty", "items": [] }),
+            &ctx,
+        )
+        .await;
     assert!(err_append_empty.is_err());
-    assert!(err_append_empty.unwrap_err().to_string().contains("requires 'items'"));
+    assert!(err_append_empty
+        .unwrap_err()
+        .to_string()
+        .contains("requires 'items'"));
 
     // Init with empty list
-    let err_init_empty = tool.execute(json!({ "op": "init", "list": [] }), &ctx).await;
+    let err_init_empty = tool
+        .execute(json!({ "op": "init", "list": [] }), &ctx)
+        .await;
     assert!(err_init_empty.is_err());
-    assert!(err_init_empty.unwrap_err().to_string().contains("must be a non-empty array"));
+    assert!(err_init_empty
+        .unwrap_err()
+        .to_string()
+        .contains("must be a non-empty array"));
 }

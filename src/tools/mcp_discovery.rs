@@ -217,8 +217,17 @@ pub fn is_sensitive_variable(key: &str, val: &str) -> bool {
 
     // Check known secret keywords in key name
     const SENSITIVE_KEYWORDS: &[&str] = &[
-        "KEY", "TOKEN", "SECRET", "AUTH", "PASS", "CREDENTIAL",
-        "PRIVATE", "BEARER", "SIGNATURE", "CERT", "TICKET",
+        "KEY",
+        "TOKEN",
+        "SECRET",
+        "AUTH",
+        "PASS",
+        "CREDENTIAL",
+        "PRIVATE",
+        "BEARER",
+        "SIGNATURE",
+        "CERT",
+        "TICKET",
     ];
 
     for kw in SENSITIVE_KEYWORDS {
@@ -228,7 +237,8 @@ pub fn is_sensitive_variable(key: &str, val: &str) -> bool {
     }
 
     // Check with Fusion's dedicated env_cleaner
-    crate::tools::env_cleaner::is_sensitive_key(key) || crate::tools::env_cleaner::is_sensitive_value(val)
+    crate::tools::env_cleaner::is_sensitive_key(key)
+        || crate::tools::env_cleaner::is_sensitive_value(val)
 }
 
 /// Masks a sensitive credential value for safe display and logging.
@@ -358,7 +368,10 @@ impl McpDiscoveryEngine {
     }
 
     /// Discovers MCP servers with an optional explicit home directory.
-    pub fn discover_all_with_home(workspace_root: &Path, home_dir: Option<&Path>) -> Vec<McpServerConfig> {
+    pub fn discover_all_with_home(
+        workspace_root: &Path,
+        home_dir: Option<&Path>,
+    ) -> Vec<McpServerConfig> {
         let paths = Self::candidate_paths_with_home(workspace_root, home_dir);
         let mut configs = Vec::new();
         let mut seen_names = HashSet::new();
@@ -395,7 +408,10 @@ impl McpDiscoveryEngine {
     }
 
     /// Returns candidate configuration file paths with an optional explicit home directory.
-    pub fn candidate_paths_with_home(workspace_root: &Path, home_dir: Option<&Path>) -> Vec<PathBuf> {
+    pub fn candidate_paths_with_home(
+        workspace_root: &Path,
+        home_dir: Option<&Path>,
+    ) -> Vec<PathBuf> {
         let mut candidates = Vec::new();
 
         // 1. Workspace: .fusion/mcp.json and .fusion/mcp_servers.json
@@ -430,15 +446,24 @@ impl McpDiscoveryEngine {
 
             // Platform-specific Claude Desktop config locations
             #[cfg(target_os = "macos")]
-            candidates.push(home.join("Library/Application Support/Claude/claude_desktop_config.json"));
+            candidates
+                .push(home.join("Library/Application Support/Claude/claude_desktop_config.json"));
 
             #[cfg(target_os = "windows")]
             if let Ok(appdata) = std::env::var("APPDATA") {
-                candidates.push(PathBuf::from(appdata).join("Claude").join("claude_desktop_config.json"));
+                candidates.push(
+                    PathBuf::from(appdata)
+                        .join("Claude")
+                        .join("claude_desktop_config.json"),
+                );
             }
 
             #[cfg(all(unix, not(target_os = "macos")))]
-            candidates.push(home.join(".config").join("claude").join("claude_desktop_config.json"));
+            candidates.push(
+                home.join(".config")
+                    .join("claude")
+                    .join("claude_desktop_config.json"),
+            );
         }
 
         candidates
@@ -452,7 +477,10 @@ impl McpDiscoveryEngine {
     }
 
     /// Parses a JSON or JSONC string into a list of [`McpServerConfig`]s.
-    pub fn parse_json_str(content: &str, source_file: &Path) -> anyhow::Result<Vec<McpServerConfig>> {
+    pub fn parse_json_str(
+        content: &str,
+        source_file: &Path,
+    ) -> anyhow::Result<Vec<McpServerConfig>> {
         let clean = strip_json_comments(content);
         let val: Value = serde_json::from_str(&clean)
             .with_context(|| format!("Invalid JSON in '{}'", source_file.display()))?;
@@ -492,7 +520,9 @@ impl McpDiscoveryEngine {
                     } else if let Some(section_arr) = section_val.as_array() {
                         for (idx, item) in section_arr.iter().enumerate() {
                             let default_name = format!("{}_{}", key, idx + 1);
-                            if let Some(cfg) = parse_server_item(item, Some(&default_name), source_file) {
+                            if let Some(cfg) =
+                                parse_server_item(item, Some(&default_name), source_file)
+                            {
                                 configs.push(cfg);
                             }
                         }
@@ -507,14 +537,17 @@ impl McpDiscoveryEngine {
                         matched_sections = true;
                         if let Some(servers_obj) = servers_val.as_object() {
                             for (name, item) in servers_obj {
-                                if let Some(cfg) = parse_server_item(item, Some(name), source_file) {
+                                if let Some(cfg) = parse_server_item(item, Some(name), source_file)
+                                {
                                     configs.push(cfg);
                                 }
                             }
                         } else if let Some(servers_arr) = servers_val.as_array() {
                             for (idx, item) in servers_arr.iter().enumerate() {
                                 let default_name = format!("vscode_server_{}", idx + 1);
-                                if let Some(cfg) = parse_server_item(item, Some(&default_name), source_file) {
+                                if let Some(cfg) =
+                                    parse_server_item(item, Some(&default_name), source_file)
+                                {
                                     configs.push(cfg);
                                 }
                             }
@@ -531,7 +564,9 @@ impl McpDiscoveryEngine {
                             matched_sections = true;
                             if let Some(servers_obj) = mcp_servers.as_object() {
                                 for (name, item) in servers_obj {
-                                    if let Some(cfg) = parse_server_item(item, Some(name), source_file) {
+                                    if let Some(cfg) =
+                                        parse_server_item(item, Some(name), source_file)
+                                    {
                                         configs.push(cfg);
                                     }
                                 }
@@ -783,8 +818,14 @@ impl Tool for McpDiscoveryTool {
             ctx.cwd.clone()
         };
 
-        let force_reload = args.get("reload").and_then(|v| v.as_bool()).unwrap_or(false);
-        let workspace_only = args.get("workspace_only").and_then(|v| v.as_bool()).unwrap_or(false);
+        let force_reload = args
+            .get("reload")
+            .and_then(|v| v.as_bool())
+            .unwrap_or(false);
+        let workspace_only = args
+            .get("workspace_only")
+            .and_then(|v| v.as_bool())
+            .unwrap_or(false);
         let format = args
             .get("format")
             .and_then(|v| v.as_str())

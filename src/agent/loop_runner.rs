@@ -101,12 +101,12 @@ impl AgentRunner {
             config.clone(),
             tools.clone(),
         ));
-        let spawn_tool = std::sync::Arc::new(crate::agent::subagent::SpawnSubagentTool::from_manager(
-            (*subagents).clone(),
-        ));
-        let batch_tool = std::sync::Arc::new(crate::agent::subagent::SpawnBatchSubagentsTool::from_manager(
-            (*subagents).clone(),
-        ));
+        let spawn_tool = std::sync::Arc::new(
+            crate::agent::subagent::SpawnSubagentTool::from_manager((*subagents).clone()),
+        );
+        let batch_tool = std::sync::Arc::new(
+            crate::agent::subagent::SpawnBatchSubagentsTool::from_manager((*subagents).clone()),
+        );
         tools.register(spawn_tool);
         tools.register(batch_tool);
         Self {
@@ -281,10 +281,7 @@ impl AgentRunner {
     }
 
     /// Sets a custom ToolPolicyEngine.
-    pub fn with_tool_policy(
-        mut self,
-        policy: crate::agent::tool_policy::ToolPolicyEngine,
-    ) -> Self {
+    pub fn with_tool_policy(mut self, policy: crate::agent::tool_policy::ToolPolicyEngine) -> Self {
         self.tool_policy = policy;
         self
     }
@@ -465,7 +462,11 @@ impl AgentRunner {
         if !mentioned_files.is_empty() {
             let file_names: Vec<String> = mentioned_files
                 .iter()
-                .filter_map(|p| p.file_name().and_then(|n| n.to_str()).map(|s| s.to_string()))
+                .filter_map(|p| {
+                    p.file_name()
+                        .and_then(|n| n.to_str())
+                        .map(|s| s.to_string())
+                })
                 .collect();
             let _ = event_tx.send(AgentEvent::Status(format!(
                 "Auto-injected file context: {}",
@@ -516,8 +517,12 @@ impl AgentRunner {
         let mut system_message_content = base_system_prompt.to_string();
 
         // Repository context auto-injection (AGENTS.md / CLAUDE.md)
-        if let Some(repo_ctx) = crate::agent::context_injector::detect_and_load_repo_context(&self.tool_ctx.cwd) {
-            let _ = event_tx.send(AgentEvent::Status("Repository context auto-injected from workspace instructions".to_string()));
+        if let Some(repo_ctx) =
+            crate::agent::context_injector::detect_and_load_repo_context(&self.tool_ctx.cwd)
+        {
+            let _ = event_tx.send(AgentEvent::Status(
+                "Repository context auto-injected from workspace instructions".to_string(),
+            ));
             system_message_content.push_str(&repo_ctx);
         }
         // Domain skills dynamic injection

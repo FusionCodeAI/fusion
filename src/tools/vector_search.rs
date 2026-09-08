@@ -889,10 +889,7 @@ impl Tool for VectorSearchTool {
             .filter(|s| !s.is_empty())
             .map(PathBuf::from);
 
-        let limit = args
-            .get("limit")
-            .and_then(|v| v.as_u64())
-            .unwrap_or(10) as usize;
+        let limit = args.get("limit").and_then(|v| v.as_u64()).unwrap_or(10) as usize;
         let limit = limit.clamp(1, 100);
 
         let format = args
@@ -961,10 +958,7 @@ impl Tool for VectorSearchTool {
                 output.push_str(&format!("   {}\n", line));
             }
             if content_lines.len() > 8 {
-                output.push_str(&format!(
-                    "   ... ({} lines total)\n",
-                    content_lines.len()
-                ));
+                output.push_str(&format!("   ... ({} lines total)\n", content_lines.len()));
             }
             output.push_str("   ------------------------------------------------------------\n\n");
         }
@@ -984,25 +978,16 @@ mod tests {
     #[test]
     fn test_tokenize_camel_case() {
         assert_eq!(tokenize("camelCase"), vec!["camel", "case"]);
-        assert_eq!(
-            tokenize("getUserById"),
-            vec!["get", "user", "by", "id"]
-        );
+        assert_eq!(tokenize("getUserById"), vec!["get", "user", "by", "id"]);
         assert_eq!(tokenize("XMLParser"), vec!["xml", "parser"]);
-        assert_eq!(
-            tokenize("XMLHttpRequest"),
-            vec!["xml", "http", "request"]
-        );
+        assert_eq!(tokenize("XMLHttpRequest"), vec!["xml", "http", "request"]);
         assert_eq!(tokenize("v2Api"), vec!["v2", "api"]);
     }
 
     #[test]
     fn test_tokenize_snake_case() {
         assert_eq!(tokenize("snake_case"), vec!["snake", "case"]);
-        assert_eq!(
-            tokenize("my_variable_name"),
-            vec!["my", "variable", "name"]
-        );
+        assert_eq!(tokenize("my_variable_name"), vec!["my", "variable", "name"]);
         assert_eq!(
             tokenize("SCREAMING_SNAKE_CASE"),
             vec!["screaming", "snake", "case"]

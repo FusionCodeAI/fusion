@@ -21,7 +21,11 @@ fn test_encode_message_format() {
     assert!(encoded_str.contains("\r\n\r\n"));
 
     let parts: Vec<&str> = encoded_str.split("\r\n\r\n").collect();
-    assert_eq!(parts.len(), 2, "must have header and body separated by \\r\\n\\r\\n");
+    assert_eq!(
+        parts.len(),
+        2,
+        "must have header and body separated by \\r\\n\\r\\n"
+    );
 
     let header_line = parts[0];
     let body_str = parts[1];
@@ -55,7 +59,10 @@ fn test_decode_message_complete_frame() {
 
     let decoded = decode_message(&mut buf).expect("should decode complete message");
     assert_eq!(decoded, payload);
-    assert!(buf.is_empty(), "buffer should be fully drained after complete frame");
+    assert!(
+        buf.is_empty(),
+        "buffer should be fully drained after complete frame"
+    );
 }
 
 #[test]
@@ -65,7 +72,11 @@ fn test_decode_message_partial_buffer_headers() {
 
     let result = decode_message(&mut partial_buf);
     assert!(result.is_none(), "partial header should return None");
-    assert_eq!(partial_buf.len(), original_len, "buffer must not be modified");
+    assert_eq!(
+        partial_buf.len(),
+        original_len,
+        "buffer must not be modified"
+    );
 }
 
 #[test]
@@ -104,7 +115,10 @@ fn test_decode_message_partial_buffer_body() {
 
     let decoded = decode_message(&mut partial_buf).expect("should decode once complete");
     assert_eq!(decoded, payload);
-    assert!(partial_buf.is_empty(), "buffer should be completely drained");
+    assert!(
+        partial_buf.is_empty(),
+        "buffer should be completely drained"
+    );
 }
 
 #[test]
@@ -131,7 +145,10 @@ fn test_decode_message_multiple_frames() {
     assert_eq!(decoded2, msg2);
 
     assert!(buf.is_empty(), "buffer should be empty after both messages");
-    assert!(decode_message(&mut buf).is_none(), "empty buffer yields None");
+    assert!(
+        decode_message(&mut buf).is_none(),
+        "empty buffer yields None"
+    );
 }
 
 #[test]

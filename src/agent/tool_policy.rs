@@ -315,9 +315,7 @@ pub fn parse_toml_to_value(input: &str) -> Result<Value, PolicyError> {
                 .entry(last_seg.clone())
                 .or_insert_with(|| Value::Array(Vec::new()))
                 .as_array_mut()
-                .ok_or_else(|| {
-                    PolicyError::Parse(format!("Expected array at '{}'", last_seg))
-                })?;
+                .ok_or_else(|| PolicyError::Parse(format!("Expected array at '{}'", last_seg)))?;
             arr.push(Value::Object(serde_json::Map::new()));
             continue;
         }
@@ -373,14 +371,23 @@ pub fn parse_toml_to_value(input: &str) -> Result<Value, PolicyError> {
             if is_array_target {
                 let mut curr = &mut root;
                 for seg in &current_path[..current_path.len() - 1] {
-                    curr = curr.get_mut(seg).and_then(|v| v.as_object_mut()).ok_or_else(|| {
-                        PolicyError::Parse(format!("Failed traversing to array target segment '{}'", seg))
-                    })?;
+                    curr = curr
+                        .get_mut(seg)
+                        .and_then(|v| v.as_object_mut())
+                        .ok_or_else(|| {
+                            PolicyError::Parse(format!(
+                                "Failed traversing to array target segment '{}'",
+                                seg
+                            ))
+                        })?;
                 }
                 let last_seg = current_path.last().unwrap();
-                let arr = curr.get_mut(last_seg).and_then(|v| v.as_array_mut()).ok_or_else(|| {
-                    PolicyError::Parse(format!("Expected array at '{}'", last_seg))
-                })?;
+                let arr = curr
+                    .get_mut(last_seg)
+                    .and_then(|v| v.as_array_mut())
+                    .ok_or_else(|| {
+                        PolicyError::Parse(format!("Expected array at '{}'", last_seg))
+                    })?;
                 if let Some(last_obj) = arr.last_mut().and_then(|v| v.as_object_mut()) {
                     insert_dotted_key(last_obj, &key, parsed_val);
                 }
@@ -406,7 +413,11 @@ pub fn parse_toml_to_value(input: &str) -> Result<Value, PolicyError> {
 }
 
 fn insert_dotted_key(map: &mut serde_json::Map<String, Value>, key: &str, val: Value) {
-    let parts: Vec<&str> = key.split('.').map(|s| s.trim()).filter(|s| !s.is_empty()).collect();
+    let parts: Vec<&str> = key
+        .split('.')
+        .map(|s| s.trim())
+        .filter(|s| !s.is_empty())
+        .collect();
     if parts.len() <= 1 {
         map.insert(key.to_string(), val);
     } else {
@@ -550,7 +561,16 @@ impl ToolPolicyEngine {
     /// Creates a new `ToolPolicyEngine` with default built-in safety rules.
     pub fn new() -> Self {
         let mut safe_read_only_tools = HashSet::new();
-        for tool in ["read", "file_read", "grep", "glob", "lsp", "symbols", "syntax", "search"] {
+        for tool in [
+            "read",
+            "file_read",
+            "grep",
+            "glob",
+            "lsp",
+            "symbols",
+            "syntax",
+            "search",
+        ] {
             safe_read_only_tools.insert(tool.to_string());
         }
 
@@ -596,9 +616,8 @@ impl ToolPolicyEngine {
     /// Loads custom rules from an explicit file path.
     pub fn load_from_file<P: AsRef<Path>>(path: P) -> Result<Self, PolicyError> {
         let path = path.as_ref();
-        let content = std::fs::read_to_string(path).map_err(|e| {
-            PolicyError::Io(path.display().to_string(), e.to_string())
-        })?;
+        let content = std::fs::read_to_string(path)
+            .map_err(|e| PolicyError::Io(path.display().to_string(), e.to_string()))?;
         Self::from_toml(&content)
     }
 
@@ -612,7 +631,11 @@ impl ToolPolicyEngine {
         let mut engine = Self::new();
 
         // 1. Default action / decision
-        if let Some(def) = config.default_decision.as_ref().or(config.default_action.as_ref()) {
+        if let Some(def) = config
+            .default_decision
+            .as_ref()
+            .or(config.default_action.as_ref())
+        {
             if let Some(action) = RuleAction::from_str_loose(def) {
                 engine.default_decision = action.to_decision("Default policy decision");
             }
@@ -683,7 +706,9 @@ impl ToolPolicyEngine {
         // 5. Tools section
         if let Some(tools) = config.tools {
             for t in tools.allow {
-                engine.custom_tool_actions.insert(t.clone(), RuleAction::Allow);
+                engine
+                    .custom_tool_actions
+                    .insert(t.clone(), RuleAction::Allow);
                 engine.safe_read_only_tools.insert(t);
             }
             for t in tools.ask {
@@ -753,9 +778,8 @@ impl ToolPolicyEngine {
 
         // 3. Sensitive file access check
         if let Some(sensitive_pattern) = self.find_sensitive_file(tool_name, args) {
-            let msg = format!(
-                "Access to sensitive file or pattern detected: '{sensitive_pattern}'"
-            );
+            let msg =
+                format!("Access to sensitive file or pattern detected: '{sensitive_pattern}'");
             return self.sensitive_files_action.to_decision(msg);
         }
 
@@ -803,7 +827,13 @@ impl ToolPolicyEngine {
             if let Some(cmd) = extract_command_str(args) {
                 for token in cmd.split_whitespace() {
                     let cleaned = token.trim_matches(|c| {
-                        c == '\'' || c == '"' || c == ';' || c == '>' || c == '<' || c == '|' || c == '`'
+                        c == '\''
+                            || c == '"'
+                            || c == ';'
+                            || c == '>'
+                            || c == '<'
+                            || c == '|'
+                            || c == '`'
                     });
                     if let Some(matched) = self.matches_sensitive_path(cleaned) {
                         return Some(matched);
@@ -822,9 +852,7 @@ impl ToolPolicyEngine {
         // Check custom patterns first
         for pat in &self.sensitive_patterns {
             let pat_lower = pat.to_ascii_lowercase();
-            if filename == pat_lower
-                || filename.contains(&pat_lower)
-                || lower.contains(&pat_lower)
+            if filename == pat_lower || filename.contains(&pat_lower) || lower.contains(&pat_lower)
             {
                 return Some(pat.clone());
             }

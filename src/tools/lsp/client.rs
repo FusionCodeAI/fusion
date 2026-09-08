@@ -1,9 +1,9 @@
+use serde_json::Value;
 use std::collections::HashMap;
 use std::path::Path;
 use std::process::Stdio;
 use std::sync::atomic::{AtomicI64, Ordering};
 use std::sync::{Arc, Mutex};
-use serde_json::Value;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::process::{Child, Command};
 use tokio::sync::mpsc;
@@ -50,7 +50,8 @@ pub fn encode_message(payload: &Value) -> Vec<u8> {
 /// - Leaves `buf` unmodified.
 /// - Returns `None`.
 pub fn decode_message(buf: &mut Vec<u8>) -> Option<Value> {
-    let (header_len, body_offset) = if let Some(pos) = buf.windows(4).position(|w| w == b"\r\n\r\n") {
+    let (header_len, body_offset) = if let Some(pos) = buf.windows(4).position(|w| w == b"\r\n\r\n")
+    {
         (pos, pos + 4)
     } else if let Some(pos) = buf.windows(2).position(|w| w == b"\n\n") {
         (pos, pos + 2)
@@ -143,7 +144,10 @@ impl LspClient {
         });
 
         // Response tracking
-        let pending = Arc::new(Mutex::new(HashMap::<i64, oneshot::Sender<Result<Value, String>>>::new()));
+        let pending = Arc::new(Mutex::new(HashMap::<
+            i64,
+            oneshot::Sender<Result<Value, String>>,
+        >::new()));
         let pending_clone = pending.clone();
         let writer_tx_clone = writer_tx.clone();
 
@@ -310,7 +314,8 @@ impl LspClient {
 
     /// Sends `initialized` notification to the language server.
     pub async fn initialized(&self) -> anyhow::Result<()> {
-        self.send_notification("initialized", serde_json::json!({})).await
+        self.send_notification("initialized", serde_json::json!({}))
+            .await
     }
 
     /// Sends `textDocument/didOpen` notification.
@@ -328,7 +333,12 @@ impl LspClient {
     }
 
     /// Sends `textDocument/definition` request and returns matching location entries.
-    pub async fn goto_definition(&self, path: &Path, line: u32, character: u32) -> anyhow::Result<Vec<Value>> {
+    pub async fn goto_definition(
+        &self,
+        path: &Path,
+        line: u32,
+        character: u32,
+    ) -> anyhow::Result<Vec<Value>> {
         let uri = path_to_uri(path);
         let params = serde_json::json!({
             "textDocument": {
@@ -353,7 +363,12 @@ impl LspClient {
     }
 
     /// Sends `textDocument/references` request and returns reference location entries.
-    pub async fn find_references(&self, path: &Path, line: u32, character: u32) -> anyhow::Result<Vec<Value>> {
+    pub async fn find_references(
+        &self,
+        path: &Path,
+        line: u32,
+        character: u32,
+    ) -> anyhow::Result<Vec<Value>> {
         let uri = path_to_uri(path);
         let params = serde_json::json!({
             "textDocument": {

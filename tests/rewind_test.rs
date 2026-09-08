@@ -169,7 +169,8 @@ fn test_checkpoint_create_modify_and_revert_with_undo_last() {
 fn test_checkpoint_manager_ext_trait_undo_last() {
     let dir = make_temp_dir();
     let file_path = dir.join("greeter.rs");
-    let original_content = "pub fn greet(name: &str) -> String {\n    format!(\"Hello, {}!\", name)\n}\n";
+    let original_content =
+        "pub fn greet(name: &str) -> String {\n    format!(\"Hello, {}!\", name)\n}\n";
     fs::write(&file_path, original_content).expect("write original file");
 
     let mut mgr = CheckpointManager::new(dir.clone());
@@ -180,7 +181,8 @@ fn test_checkpoint_manager_ext_trait_undo_last() {
         .expect("create manual checkpoint");
 
     // Modify file
-    let modified_content = "pub fn greet(name: &str) -> String {\n    format!(\"Greetings, {}!\", name)\n}\n";
+    let modified_content =
+        "pub fn greet(name: &str) -> String {\n    format!(\"Greetings, {}!\", name)\n}\n";
     fs::write(&file_path, modified_content).expect("write modified file");
 
     // Revert using trait method syntax: mgr.undo_last(&dir)
@@ -191,7 +193,10 @@ fn test_checkpoint_manager_ext_trait_undo_last() {
         original_content
     );
     assert_eq!(mgr.redo_count(), 1);
-    assert_eq!(mgr.peek_redo().map(|c| c.id.as_str()), Some(chk_id.as_str()));
+    assert_eq!(
+        mgr.peek_redo().map(|c| c.id.as_str()),
+        Some(chk_id.as_str())
+    );
 
     let _ = fs::remove_dir_all(dir);
 }
@@ -217,7 +222,8 @@ fn test_diff_inspection_on_reverted_checkpoint() {
 
     let modified = "struct Service {\n    port: u16,\n    host: String,\n}\n\nimpl Service {\n    fn new() -> Self {\n        Self { port: 3000, host: \"127.0.0.1\".into() }\n    }\n}\n";
     fs::write(&file_path, modified).expect("write modified");
-    mgr.capture_after_tool(&chk_id, &dir).expect("capture after");
+    mgr.capture_after_tool(&chk_id, &dir)
+        .expect("capture after");
 
     // Revert with undo_last
     let undo_res = undo_last(&mut mgr, &dir).expect("undo_last");
@@ -240,14 +246,12 @@ fn test_diff_inspection_on_reverted_checkpoint() {
     let unified = diff.unified_diff.as_ref().unwrap();
     // Check diff content contains removed and added lines
     assert!(
-        unified.contains("-        Self { port: 8080 }")
-            || unified.contains("port: 8080"),
+        unified.contains("-        Self { port: 8080 }") || unified.contains("port: 8080"),
         "diff should contain old line: {}",
         unified
     );
     assert!(
-        unified.contains("+    host: String,")
-            || unified.contains("port: 3000"),
+        unified.contains("+    host: String,") || unified.contains("port: 3000"),
         "diff should contain new line: {}",
         unified
     );

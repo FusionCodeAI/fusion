@@ -71,7 +71,8 @@ pub fn discover_mcp_config_paths(root: &Path) -> Vec<PathBuf> {
 /// precedence over later ones for each server name.
 pub fn load_server_configs_from_root(root: impl AsRef<Path>) -> Vec<McpServerConfig> {
     let paths = discover_mcp_config_paths(root.as_ref());
-    let mut merged: std::collections::HashMap<String, McpServerConfig> = std::collections::HashMap::new();
+    let mut merged: std::collections::HashMap<String, McpServerConfig> =
+        std::collections::HashMap::new();
     let mut ordered_names = Vec::new();
 
     for path in paths {
@@ -187,7 +188,6 @@ impl McpToolBridge {
         discover_mcp_config_paths(root)
     }
 
-
     /// Loads MCP tools from a raw JSON string without touching the filesystem.
     ///
     /// Useful for tests and programmatic configuration.
@@ -222,8 +222,11 @@ mod tests {
     // in-memory transport (no actual stdio process is spawned).
     fn make_mock_handler(
         tools: Vec<McpToolDefinition>,
-    ) -> Arc<dyn Fn(String, Option<serde_json::Value>) -> Result<serde_json::Value, McpError> + Send + Sync>
-    {
+    ) -> Arc<
+        dyn Fn(String, Option<serde_json::Value>) -> Result<serde_json::Value, McpError>
+            + Send
+            + Sync,
+    > {
         let tools = Arc::new(tools);
         Arc::new(move |method: String, params: Option<serde_json::Value>| {
             match method.as_str() {
@@ -336,10 +339,17 @@ mod tests {
         client.initialize().await.unwrap();
 
         let tool_defs = client.list_tools().await.unwrap();
-        let tool: DynTool = Arc::new(McpTool::new(Arc::clone(&client), tool_defs[0].clone(), None));
+        let tool: DynTool = Arc::new(McpTool::new(
+            Arc::clone(&client),
+            tool_defs[0].clone(),
+            None,
+        ));
 
         let ctx = ToolContext::default();
-        let result = tool.execute(json!({ "name": "world" }), &ctx).await.unwrap();
+        let result = tool
+            .execute(json!({ "name": "world" }), &ctx)
+            .await
+            .unwrap();
         assert_eq!(result, "ok:greet");
     }
 
@@ -375,7 +385,10 @@ mod tests {
         let tools = McpToolBridge::load_from_json(&json).await;
         // "inactive" is disabled → 0 tools from it.
         // "active" fails to spawn → 0 tools, but no panic.
-        assert!(tools.is_empty(), "disabled/failed servers must yield no tools");
+        assert!(
+            tools.is_empty(),
+            "disabled/failed servers must yield no tools"
+        );
     }
 
     // -----------------------------------------------------------------------

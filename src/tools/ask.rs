@@ -240,7 +240,11 @@ pub fn prompt_question_tui(q: &Question) -> anyhow::Result<String> {
         for (idx, opt) in q.options.iter().enumerate() {
             let is_curr = idx == selected_idx;
             let is_rec = q.recommended == Some(idx);
-            let rec_chip = if is_rec { " \x1b[1;32m(Recommended)\x1b[0m" } else { "" };
+            let rec_chip = if is_rec {
+                " \x1b[1;32m(Recommended)\x1b[0m"
+            } else {
+                ""
+            };
 
             let marker = if q.multi {
                 let check_mark = if checked[idx] { "✓" } else { " " };
@@ -298,9 +302,13 @@ pub fn prompt_question_tui(q: &Question) -> anyhow::Result<String> {
         if let Event::Key(key) = event::read()? {
             if key.kind == KeyEventKind::Press {
                 // Esc or Ctrl+C immediately cancels the prompt and aborts turn
-                if key.code == KeyCode::Esc || (key.modifiers.contains(KeyModifiers::CONTROL) && key.code == KeyCode::Char('c')) {
+                if key.code == KeyCode::Esc
+                    || (key.modifiers.contains(KeyModifiers::CONTROL)
+                        && key.code == KeyCode::Char('c'))
+                {
                     for _ in 0..last_rendered_lines {
-                        let _ = execute!(out, cursor::MoveToPreviousLine(1), cursor::MoveToColumn(0));
+                        let _ =
+                            execute!(out, cursor::MoveToPreviousLine(1), cursor::MoveToColumn(0));
                         let _ = write!(out, "\x1b[2K");
                     }
                     let _ = execute!(out, cursor::Show);
@@ -394,17 +402,19 @@ pub fn is_interactive_terminal() -> bool {
 
 /// Renders question and choices with `(Recommended)` chips into the given writer.
 pub fn render_question_prompt<W: Write>(writer: &mut W, q: &Question) -> std::io::Result<()> {
-    writeln!(writer, "\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")?;
+    writeln!(
+        writer,
+        "\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+    )?;
     writeln!(writer, "❓ {}", q.question)?;
-    writeln!(writer, "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")?;
+    writeln!(
+        writer,
+        "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+    )?;
 
     for (idx, opt) in q.options.iter().enumerate() {
         let is_recommended = q.recommended == Some(idx);
-        let chip = if is_recommended {
-            " (Recommended)"
-        } else {
-            ""
-        };
+        let chip = if is_recommended { " (Recommended)" } else { "" };
         writeln!(writer, "  [{}] {}{}", idx + 1, opt.label, chip)?;
         if let Some(desc) = &opt.description {
             if !desc.trim().is_empty() {
@@ -711,14 +721,20 @@ mod tests {
         let q1 = Question {
             id: "db".into(),
             question: "Database choice".into(),
-            options: vec![QuestionOption::new("PostgreSQL"), QuestionOption::new("SQLite")],
+            options: vec![
+                QuestionOption::new("PostgreSQL"),
+                QuestionOption::new("SQLite"),
+            ],
             multi: false,
             recommended: Some(0),
         };
         let q2 = Question {
             id: "cache".into(),
             question: "Cache choice".into(),
-            options: vec![QuestionOption::new("Redis"), QuestionOption::new("Memcached")],
+            options: vec![
+                QuestionOption::new("Redis"),
+                QuestionOption::new("Memcached"),
+            ],
             multi: false,
             recommended: Some(1),
         };
@@ -758,7 +774,10 @@ mod tests {
         let q = Question {
             id: "db".into(),
             question: "Pick DB".into(),
-            options: vec![QuestionOption::new("PostgreSQL"), QuestionOption::new("SQLite")],
+            options: vec![
+                QuestionOption::new("PostgreSQL"),
+                QuestionOption::new("SQLite"),
+            ],
             multi: false,
             recommended: Some(0),
         };
@@ -775,7 +794,10 @@ mod tests {
         let q = Question {
             id: "db".into(),
             question: "Pick DB".into(),
-            options: vec![QuestionOption::new("PostgreSQL"), QuestionOption::new("SQLite")],
+            options: vec![
+                QuestionOption::new("PostgreSQL"),
+                QuestionOption::new("SQLite"),
+            ],
             multi: false,
             recommended: Some(0),
         };
@@ -792,7 +814,10 @@ mod tests {
         let q = Question {
             id: "db".into(),
             question: "Pick DB".into(),
-            options: vec![QuestionOption::new("PostgreSQL"), QuestionOption::new("SQLite")],
+            options: vec![
+                QuestionOption::new("PostgreSQL"),
+                QuestionOption::new("SQLite"),
+            ],
             multi: false,
             recommended: Some(1),
         };

@@ -505,7 +505,10 @@ fn format_cell(cell: &DiffCell, col_width: usize, lineno_width: usize) -> String
     let total_vis_len = lineno_vis_len + sign_vis_len + content_vis_len;
     let pad_spaces = col_width.saturating_sub(total_vis_len);
 
-    format!("{lineno_colored}{colored_content}{}", " ".repeat(pad_spaces))
+    format!(
+        "{lineno_colored}{colored_content}{}",
+        " ".repeat(pad_spaces)
+    )
 }
 
 /// Parse git header arguments like "a/src/main.rs b/src/main.rs".

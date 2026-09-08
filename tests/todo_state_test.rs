@@ -95,12 +95,10 @@ fn test_init_replaces_and_auto_promotes() {
 #[test]
 fn test_start_by_substring_and_demotion() {
     let mut state = TodoState::new();
-    state.init(vec![
-        (
-            "Core".to_string(),
-            vec!["Task Alpha".to_string(), "Task Beta".to_string()],
-        ),
-    ]);
+    state.init(vec![(
+        "Core".to_string(),
+        vec!["Task Alpha".to_string(), "Task Beta".to_string()],
+    )]);
 
     assert_eq!(state.current_task().unwrap().task, "Task Alpha");
 
@@ -138,10 +136,7 @@ fn test_done_task_promotes_next_pending() {
             "Phase 1".to_string(),
             vec!["Step 1".to_string(), "Step 2".to_string()],
         ),
-        (
-            "Phase 2".to_string(),
-            vec!["Step 3".to_string()],
-        ),
+        ("Phase 2".to_string(), vec!["Step 3".to_string()]),
     ]);
 
     // Initial: Step 1 is in progress
@@ -185,18 +180,21 @@ fn test_done_entire_phase() {
             "Setup".to_string(),
             vec!["Init repo".to_string(), "Add dependencies".to_string()],
         ),
-        (
-            "Build".to_string(),
-            vec!["Compile binary".to_string()],
-        ),
+        ("Build".to_string(), vec!["Compile binary".to_string()]),
     ]);
 
     // Complete the entire "Setup" phase by name
     let ok = state.done("Setup");
     assert!(ok);
 
-    assert_eq!(state.get_task_by_id(1).unwrap().status, TodoStatus::Completed);
-    assert_eq!(state.get_task_by_id(2).unwrap().status, TodoStatus::Completed);
+    assert_eq!(
+        state.get_task_by_id(1).unwrap().status,
+        TodoStatus::Completed
+    );
+    assert_eq!(
+        state.get_task_by_id(2).unwrap().status,
+        TodoStatus::Completed
+    );
     assert_eq!(state.completed_count(), 2);
 
     // Next phase task "Compile binary" should now be in progress
@@ -212,16 +210,14 @@ fn test_done_entire_phase() {
 #[test]
 fn test_block_and_unblock_workflow() {
     let mut state = TodoState::new();
-    state.init(vec![
-        (
-            "Core".to_string(),
-            vec![
-                "First Task".to_string(),
-                "Second Task".to_string(),
-                "Third Task".to_string(),
-            ],
-        ),
-    ]);
+    state.init(vec![(
+        "Core".to_string(),
+        vec![
+            "First Task".to_string(),
+            "Second Task".to_string(),
+            "Third Task".to_string(),
+        ],
+    )]);
 
     // First Task is in progress
     assert_eq!(state.current_task().unwrap().task, "First Task");
@@ -259,16 +255,14 @@ fn test_block_and_unblock_workflow() {
 #[test]
 fn test_drop_task_transitions() {
     let mut state = TodoState::new();
-    state.init(vec![
-        (
-            "Phase 1".to_string(),
-            vec![
-                "Active Task".to_string(),
-                "Obsolete Task".to_string(),
-                "Later Task".to_string(),
-            ],
-        ),
-    ]);
+    state.init(vec![(
+        "Phase 1".to_string(),
+        vec![
+            "Active Task".to_string(),
+            "Obsolete Task".to_string(),
+            "Later Task".to_string(),
+        ],
+    )]);
 
     // Drop non-active task
     let dropped_non_active = state.drop_task("Obsolete Task");
@@ -295,12 +289,16 @@ fn test_drop_task_transitions() {
 #[test]
 fn test_append_existing_and_new_phase() {
     let mut state = TodoState::new();
-    state.init(vec![
-        ("Planning".to_string(), vec!["Design spec".to_string()]),
-    ]);
+    state.init(vec![(
+        "Planning".to_string(),
+        vec!["Design spec".to_string()],
+    )]);
 
     // Append to existing phase
-    state.append("Planning", vec!["Review spec".to_string(), "Approve spec".to_string()]);
+    state.append(
+        "Planning",
+        vec!["Review spec".to_string(), "Approve spec".to_string()],
+    );
     assert_eq!(state.phases[0].items.len(), 3);
     assert_eq!(state.total_count(), 3);
     assert_eq!(state.get_task_by_id(2).unwrap().task, "Review spec");
@@ -322,18 +320,16 @@ fn test_append_existing_and_new_phase() {
 #[test]
 fn test_view_formatting_with_statuses() {
     let mut state = TodoState::new();
-    state.init(vec![
-        (
-            "Phase 1: Foundation".to_string(),
-            vec![
-                "Setup project".to_string(),
-                "Write core logic".to_string(),
-                "Add database layer".to_string(),
-                "Legacy migration".to_string(),
-                "Verify release".to_string(),
-            ],
-        ),
-    ]);
+    state.init(vec![(
+        "Phase 1: Foundation".to_string(),
+        vec![
+            "Setup project".to_string(),
+            "Write core logic".to_string(),
+            "Add database layer".to_string(),
+            "Legacy migration".to_string(),
+            "Verify release".to_string(),
+        ],
+    )]);
 
     // Setup diverse task statuses
     state.done("Setup project"); // Completed
@@ -344,13 +340,20 @@ fn test_view_formatting_with_statuses() {
     let view_output = state.view();
 
     // Verify checklist headers and count
-    assert!(view_output.contains("# Tasks [1/5]"), "View missing tasks header with count");
-    assert!(view_output.contains("## Phase 1: Foundation"), "View missing phase header");
+    assert!(
+        view_output.contains("# Tasks [1/5]"),
+        "View missing tasks header with count"
+    );
+    assert!(
+        view_output.contains("## Phase 1: Foundation"),
+        "View missing phase header"
+    );
 
     // Verify status symbols
     assert!(view_output.contains("- [x] #1: Setup project"));
     assert!(view_output.contains("- [>] #2: Write core logic (in progress)"));
-    assert!(view_output.contains("- [!] #3: Add database layer (blocked: Database credentials pending)"));
+    assert!(view_output
+        .contains("- [!] #3: Add database layer (blocked: Database credentials pending)"));
     assert!(view_output.contains("- [-] #4: Legacy migration (dropped)"));
     assert!(view_output.contains("- [ ] #5: Verify release"));
 
@@ -364,9 +367,10 @@ fn test_compact_summary_states() {
     let mut state = TodoState::new();
     assert_eq!(state.compact_summary(), "[0/0 done] No tasks");
 
-    state.init(vec![
-        ("Phase".to_string(), vec!["Task 1".to_string(), "Task 2".to_string()]),
-    ]);
+    state.init(vec![(
+        "Phase".to_string(),
+        vec!["Task 1".to_string(), "Task 2".to_string()],
+    )]);
     assert_eq!(state.compact_summary(), "[0/2 done] Current: Task 1");
 
     state.done("Task 1");
@@ -389,12 +393,10 @@ fn test_compact_summary_states() {
 #[test]
 fn test_serde_roundtrip() {
     let mut state = TodoState::new();
-    state.init(vec![
-        (
-            "Phase Alpha".to_string(),
-            vec!["Task 1".to_string(), "Task 2".to_string()],
-        ),
-    ]);
+    state.init(vec![(
+        "Phase Alpha".to_string(),
+        vec!["Task 1".to_string(), "Task 2".to_string()],
+    )]);
     state.done("Task 1");
 
     let json_str = serde_json::to_string_pretty(&state).expect("Failed to serialize TodoState");

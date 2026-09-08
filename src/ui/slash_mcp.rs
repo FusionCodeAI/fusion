@@ -93,11 +93,7 @@ pub fn format_mcp_servers_table(servers: &[(&str, &str, usize, bool)]) -> String
 
     // Data rows
     for (name, source, tool_count, is_connected) in servers {
-        let status_str = if *is_connected {
-            "Connected"
-        } else {
-            "Failed"
-        };
+        let status_str = if *is_connected { "Connected" } else { "Failed" };
         out.push_str(&format!(
             "│ {:<nw$} │ {:<sw$} │ {:<stw$} │ {:<tw$} │\n",
             name,
@@ -188,11 +184,7 @@ async fn handle_list(workspace_root: &Path) -> String {
         configured_servers.len()
     ));
     for (cfg, source) in &configured_servers {
-        let status = if cfg.disabled {
-            " (disabled)"
-        } else {
-            ""
-        };
+        let status = if cfg.disabled { " (disabled)" } else { "" };
         out.push_str(&format!(
             "  • {} [{}]{}: {} {}\n",
             cfg.name,
@@ -263,11 +255,8 @@ async fn handle_status(workspace_root: &Path) -> String {
         let name = cfg.name.clone();
         let manager = McpManager::new();
         // Test connectivity with 5-second timeout to prevent hanging on stalled processes
-        let test_res = tokio::time::timeout(
-            Duration::from_secs(5),
-            manager.connect_server(cfg),
-        )
-        .await;
+        let test_res =
+            tokio::time::timeout(Duration::from_secs(5), manager.connect_server(cfg)).await;
 
         match test_res {
             Ok(Ok(tools)) => {

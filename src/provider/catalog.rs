@@ -1251,8 +1251,15 @@ pub fn get_catalog() -> ModelCatalog {
 
     // If local Antigravity daemon is present, prepend local models if not already in catalog
     if crate::provider::local_daemon::detect_antigravity_daemon().is_some() {
-        for local_model in crate::provider::local_daemon::default_local_models().into_iter().rev() {
-            if !catalog.models.iter().any(|m| m.id.eq_ignore_ascii_case(&local_model.id)) {
+        for local_model in crate::provider::local_daemon::default_local_models()
+            .into_iter()
+            .rev()
+        {
+            if !catalog
+                .models
+                .iter()
+                .any(|m| m.id.eq_ignore_ascii_case(&local_model.id))
+            {
                 catalog.models.insert(0, local_model);
             }
         }

@@ -531,9 +531,19 @@ impl SideBySideDocument {
 
         // Tokenized line change representation
         enum LineChange<'a> {
-            Equal { old_no: usize, new_no: usize, text: &'a str },
-            Delete { old_no: usize, text: &'a str },
-            Insert { new_no: usize, text: &'a str },
+            Equal {
+                old_no: usize,
+                new_no: usize,
+                text: &'a str,
+            },
+            Delete {
+                old_no: usize,
+                text: &'a str,
+            },
+            Insert {
+                new_no: usize,
+                text: &'a str,
+            },
         }
 
         let mut all_changes: Vec<LineChange> = Vec::new();
@@ -622,10 +632,11 @@ impl SideBySideDocument {
                 for i in 0..max_len {
                     match (deletes.get(i), inserts.get(i)) {
                         (Some(&(old_no, del_text)), Some(&(new_no, ins_text))) => {
-                            let mut row = SideBySideRow::modified(old_no, del_text, new_no, ins_text);
+                            let mut row =
+                                SideBySideRow::modified(old_no, del_text, new_no, ins_text);
                             if compute_word_diff {
                                 let (del_ranges, ins_ranges) =
-                                     compute_intra_line_highlights(del_text, ins_text);
+                                    compute_intra_line_highlights(del_text, ins_text);
                                 row.left.highlights = del_ranges;
                                 row.right.highlights = ins_ranges;
                             }
@@ -666,7 +677,11 @@ impl SideBySideDocument {
 
                 for ch in &all_changes[hunk_start..hunk_end] {
                     match ch {
-                        LineChange::Equal { old_no, new_no, text } => {
+                        LineChange::Equal {
+                            old_no,
+                            new_no,
+                            text,
+                        } => {
                             if first_old {
                                 old_start = *old_no;
                                 first_old = false;
@@ -721,14 +736,8 @@ impl SideBySideDocument {
                     new_start = 1;
                 }
 
-                let hunk = SideBySideHunk::new(
-                    old_start,
-                    old_count,
-                    new_start,
-                    new_count,
-                    "",
-                    rows,
-                );
+                let hunk =
+                    SideBySideHunk::new(old_start, old_count, new_start, new_count, "", rows);
                 hunks.push(hunk);
             }
         }

@@ -209,7 +209,10 @@ fn test_handle_plan_command_run_completed_dag() {
 
     let output = handle_plan_command(&["run".to_string()], Some(&dag));
     assert!(output.contains(&format!("[✓] Completed in {} stages", num_stages)));
-    assert!(output.contains(&format!("Stages Executed:     {}/{} completed", num_stages, num_stages)));
+    assert!(output.contains(&format!(
+        "Stages Executed:     {}/{} completed",
+        num_stages, num_stages
+    )));
 }
 
 // =========================================================================

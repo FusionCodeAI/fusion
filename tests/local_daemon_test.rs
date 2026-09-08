@@ -125,7 +125,10 @@ fn test_parse_codex_auth_full() {
     let tokens = auth.tokens.expect("tokens missing");
     assert_eq!(tokens.access_token.as_deref(), Some("access-jwt-abc-123"));
     assert_eq!(tokens.account_id.as_deref(), Some("acc-uuid-456"));
-    assert_eq!(tokens.refresh_token.as_deref(), Some("refresh-token-rt-789"));
+    assert_eq!(
+        tokens.refresh_token.as_deref(),
+        Some("refresh-token-rt-789")
+    );
 }
 
 #[test]
@@ -206,13 +209,15 @@ fn test_detect_antigravity_with_live_listener() {
     )
     .unwrap();
 
-    let endpoint = detect_antigravity_daemon_at(&config_path)
-        .expect("Should detect live endpoint");
+    let endpoint = detect_antigravity_daemon_at(&config_path).expect("Should detect live endpoint");
 
     assert_eq!(endpoint.provider, "antigravity");
     assert_eq!(endpoint.base_url, format!("http://127.0.0.1:{}/v1", port));
     assert_eq!(endpoint.api_key, "sk-live-test-key");
-    assert!(endpoint.is_alive, "Expected is_alive to be true for open port");
+    assert!(
+        endpoint.is_alive,
+        "Expected is_alive to be true for open port"
+    );
 
     drop(listener);
 
@@ -255,7 +260,10 @@ fn test_detect_codex_missing_access_token() {
     .unwrap();
 
     let result = detect_codex_auth_at(&path);
-    assert!(result.is_none(), "Must return None when access_token is missing");
+    assert!(
+        result.is_none(),
+        "Must return None when access_token is missing"
+    );
 }
 
 #[test]
@@ -274,7 +282,10 @@ fn test_detect_codex_empty_access_token() {
     .unwrap();
 
     let result = detect_codex_auth_at(&path);
-    assert!(result.is_none(), "Must return None when access_token is whitespace");
+    assert!(
+        result.is_none(),
+        "Must return None when access_token is whitespace"
+    );
 }
 
 #[test]
@@ -336,8 +347,14 @@ fn test_parse_antigravity_models_json_mapping() {
     assert!(opus.badges.contains(&"Local Daemon (Free)".to_string()));
     assert_eq!(opus.input_cost_per_m, Some(0.0));
     assert_eq!(opus.output_cost_per_m, Some(0.0));
-    assert!(opus.capabilities.reasoning, "Thinking model should have reasoning flag");
-    assert!(opus.capabilities.vision, "Claude model should have vision flag");
+    assert!(
+        opus.capabilities.reasoning,
+        "Thinking model should have reasoning flag"
+    );
+    assert!(
+        opus.capabilities.vision,
+        "Claude model should have vision flag"
+    );
 
     // Check Sonnet model (name defaults to id when missing)
     let sonnet = &models[1];
@@ -382,7 +399,10 @@ async fn test_probe_local_daemons_from_paths_both_present() {
     let ag_path = dir.path().join("gui_config.json");
     fs::write(
         &ag_path,
-        format!(r#"{{"proxy": {{"port": {}, "api_key": "sk-ag"}}}}"#, ag_port),
+        format!(
+            r#"{{"proxy": {{"port": {}, "api_key": "sk-ag"}}}}"#,
+            ag_port
+        ),
     )
     .unwrap();
 
@@ -406,18 +426,10 @@ async fn test_probe_local_daemons_antigravity_offline_fallback_to_codex() {
 
     // Closed port for Antigravity (daemon not running)
     let ag_path = dir.path().join("gui_config.json");
-    fs::write(
-        &ag_path,
-        r#"{"proxy": {"port": 1, "api_key": "sk-ag"}}"#,
-    )
-    .unwrap();
+    fs::write(&ag_path, r#"{"proxy": {"port": 1, "api_key": "sk-ag"}}"#).unwrap();
 
     let codex_path = dir.path().join("auth.json");
-    fs::write(
-        &codex_path,
-        r#"{"tokens": {"access_token": "token-cdx"}}"#,
-    )
-    .unwrap();
+    fs::write(&codex_path, r#"{"tokens": {"access_token": "token-cdx"}}"#).unwrap();
 
     let endpoints = probe_local_daemons_from_paths(Some(&ag_path), Some(&codex_path)).await;
     // Antigravity is offline (port 1 is closed), so only Codex is available
@@ -448,8 +460,15 @@ async fn test_fetch_antigravity_models_mock_http() {
             let req_str = String::from_utf8_lossy(&buf[..n]);
 
             // Verify requested path and authorization header
-            assert!(req_str.starts_with("GET /models") || req_str.starts_with("GET /v1/models") || req_str.contains("/models"));
-            assert!(req_str.contains("authorization: Bearer sk-mock-key") || req_str.contains("Authorization: Bearer sk-mock-key"));
+            assert!(
+                req_str.starts_with("GET /models")
+                    || req_str.starts_with("GET /v1/models")
+                    || req_str.contains("/models")
+            );
+            assert!(
+                req_str.contains("authorization: Bearer sk-mock-key")
+                    || req_str.contains("Authorization: Bearer sk-mock-key")
+            );
 
             let response_body = r#"{
                 "object": "list",
@@ -480,7 +499,9 @@ async fn test_fetch_antigravity_models_mock_http() {
     assert_eq!(models.len(), 2);
     assert_eq!(models[0].id, "claude-opus-4-6");
     assert_eq!(models[0].provider, "antigravity");
-    assert!(models[0].badges.contains(&"Local Daemon (Free)".to_string()));
+    assert!(models[0]
+        .badges
+        .contains(&"Local Daemon (Free)".to_string()));
     assert_eq!(models[1].id, "gemini-3.8-flash-high");
 }
 

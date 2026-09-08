@@ -4,9 +4,9 @@ use std::path::{Path, PathBuf};
 use std::str::FromStr;
 use std::sync::Arc;
 
-use fusion_iso::{ChangeKind, Diff, IsolationBackend};
 use async_trait::async_trait;
 use chrono::Utc;
+use fusion_iso::{ChangeKind, Diff, IsolationBackend};
 use futures::future::join_all;
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
@@ -633,12 +633,14 @@ impl SubagentManager {
             let _ = progress_tx.send(start_event.clone());
             let _ = global_tx.send(start_event.clone());
             if let Some(tx) = &loop_event_tx {
-                let _ = tx.send(crate::agent::loop_runner::AgentEvent::SubagentProgressEvent {
-                    id: task_id.clone(),
-                    name: task_name.clone(),
-                    role: task_role.clone(),
-                    progress: start_event,
-                });
+                let _ = tx.send(
+                    crate::agent::loop_runner::AgentEvent::SubagentProgressEvent {
+                        id: task_id.clone(),
+                        name: task_name.clone(),
+                        role: task_role.clone(),
+                        progress: start_event,
+                    },
+                );
             }
             // Update status to Running
             {
@@ -857,7 +859,10 @@ impl WorkspaceIsolation {
                 ChangeKind::Added => {
                     if src_path.exists() {
                         if dest_path.exists() {
-                            if let (Ok(c1), Ok(c2)) = (tokio::fs::read(&src_path).await, tokio::fs::read(&dest_path).await) {
+                            if let (Ok(c1), Ok(c2)) = (
+                                tokio::fs::read(&src_path).await,
+                                tokio::fs::read(&dest_path).await,
+                            ) {
                                 if c1 == c2 {
                                     continue;
                                 }
@@ -868,7 +873,10 @@ impl WorkspaceIsolation {
                 }
                 ChangeKind::Modified => {
                     if src_path.exists() && dest_path.exists() {
-                        if let (Ok(c1), Ok(c2)) = (tokio::fs::read(&src_path).await, tokio::fs::read(&dest_path).await) {
+                        if let (Ok(c1), Ok(c2)) = (
+                            tokio::fs::read(&src_path).await,
+                            tokio::fs::read(&dest_path).await,
+                        ) {
                             if c1 == c2 {
                                 continue;
                             }
@@ -884,7 +892,9 @@ impl WorkspaceIsolation {
             }
         }
 
-        Ok(Diff { files: subagent_changes })
+        Ok(Diff {
+            files: subagent_changes,
+        })
     }
 
     /// Merges the captured file mutations from `merged` back into `lower`.
@@ -1016,12 +1026,14 @@ async fn execute_subagent_loop(
                     | SubagentProgress::Completed { .. }
                     | SubagentProgress::Failed { .. }
             ) {
-                let _ = tx.send(crate::agent::loop_runner::AgentEvent::SubagentProgressEvent {
-                    id: id.to_string(),
-                    name: name.to_string(),
-                    role: role.clone(),
-                    progress: event,
-                });
+                let _ = tx.send(
+                    crate::agent::loop_runner::AgentEvent::SubagentProgressEvent {
+                        id: id.to_string(),
+                        name: name.to_string(),
+                        role: role.clone(),
+                        progress: event,
+                    },
+                );
             }
         }
     };
@@ -1142,7 +1154,9 @@ async fn execute_subagent_loop(
                             if let Err(e) = iso.merge(&diff).await {
                                 tracing::error!(
                                     "Failed to merge isolated changes for subagent '{}' ({}): {}",
-                                    name, id, e
+                                    name,
+                                    id,
+                                    e
                                 );
                             } else {
                                 tracing::info!(
@@ -1152,12 +1166,18 @@ async fn execute_subagent_loop(
                             }
                         }
                         iso.cleanup();
-                        if text.is_empty() { None } else { Some(text) }
+                        if text.is_empty() {
+                            None
+                        } else {
+                            Some(text)
+                        }
                     }
                     Err(e) => {
                         tracing::warn!(
                             "Failed to capture diff for isolated workspace '{}' ({}): {}",
-                            name, id, e
+                            name,
+                            id,
+                            e
                         );
                         iso.cleanup();
                         None
@@ -1877,7 +1897,10 @@ mod tests {
     }
     #[tokio::test]
     async fn test_workspace_isolation_lifecycle() {
-        let test_id = format!("test-life-{}", uuid::Uuid::new_v4().to_string()[..8].to_string());
+        let test_id = format!(
+            "test-life-{}",
+            uuid::Uuid::new_v4().to_string()[..8].to_string()
+        );
         let temp_dir = std::env::temp_dir().join(&test_id);
         let _ = std::fs::remove_dir_all(&temp_dir);
         std::fs::create_dir_all(&temp_dir).expect("Failed to create test temp dir");
@@ -1895,8 +1918,11 @@ mod tests {
         );
 
         // Modify an existing file and create a new file in isolated workspace
-        std::fs::write(iso.merged.join("hello.txt"), "Hello Modified in Isolated Workspace")
-            .expect("Failed to write modified file");
+        std::fs::write(
+            iso.merged.join("hello.txt"),
+            "Hello Modified in Isolated Workspace",
+        )
+        .expect("Failed to write modified file");
         std::fs::write(iso.merged.join("created.txt"), "Newly Created File")
             .expect("Failed to write newly created file");
 
@@ -1908,7 +1934,10 @@ mod tests {
         assert!(!temp_dir.join("created.txt").exists());
 
         // Capture changes
-        let changes = iso.capture_changes().await.expect("Failed to capture changes");
+        let changes = iso
+            .capture_changes()
+            .await
+            .expect("Failed to capture changes");
         assert!(!changes.is_empty());
 
         // Merge changes back into lower
@@ -1933,7 +1962,10 @@ mod tests {
 
     #[tokio::test]
     async fn test_workspace_isolation_cancelled_no_merge() {
-        let test_id = format!("test-cancel-{}", uuid::Uuid::new_v4().to_string()[..8].to_string());
+        let test_id = format!(
+            "test-cancel-{}",
+            uuid::Uuid::new_v4().to_string()[..8].to_string()
+        );
         let temp_dir = std::env::temp_dir().join(&test_id);
         let _ = std::fs::remove_dir_all(&temp_dir);
         std::fs::create_dir_all(&temp_dir).expect("Failed to create test temp dir");

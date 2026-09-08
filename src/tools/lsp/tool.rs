@@ -94,16 +94,8 @@ impl Tool for LspTool {
             .and_then(|v| v.as_u64())
             .unwrap_or(1);
 
-        let line_0 = if line_1 > 0 {
-            (line_1 - 1) as u32
-        } else {
-            0
-        };
-        let char_0 = if char_1 > 0 {
-            (char_1 - 1) as u32
-        } else {
-            0
-        };
+        let line_0 = if line_1 > 0 { (line_1 - 1) as u32 } else { 0 };
+        let char_0 = if char_1 > 0 { (char_1 - 1) as u32 } else { 0 };
 
         let explicit_symbol = args
             .get("symbol")
@@ -201,7 +193,9 @@ async fn execute_with_lsp(
 
         let result = match action {
             "definition" => {
-                let locs = client.goto_definition(resolved_path, line_0, char_0).await?;
+                let locs = client
+                    .goto_definition(resolved_path, line_0, char_0)
+                    .await?;
                 if locs.is_empty() {
                     Ok(format!(
                         "No LSP definitions found at {}:{}:{}.",
@@ -214,7 +208,9 @@ async fn execute_with_lsp(
                 }
             }
             "references" => {
-                let locs = client.find_references(resolved_path, line_0, char_0).await?;
+                let locs = client
+                    .find_references(resolved_path, line_0, char_0)
+                    .await?;
                 if locs.is_empty() {
                     Ok(format!(
                         "No LSP references found at {}:{}:{}.",
@@ -232,7 +228,9 @@ async fn execute_with_lsp(
                     "textDocument": { "uri": uri },
                     "position": { "line": line_0, "character": char_0 }
                 });
-                let res = client.send_request("textDocument/typeDefinition", params).await?;
+                let res = client
+                    .send_request("textDocument/typeDefinition", params)
+                    .await?;
                 let locs = parse_locations_response(res);
                 if locs.is_empty() {
                     Ok(format!(
@@ -250,7 +248,9 @@ async fn execute_with_lsp(
                 let params = json!({
                     "textDocument": { "uri": uri }
                 });
-                let res = client.send_request("textDocument/diagnostic", params).await?;
+                let res = client
+                    .send_request("textDocument/diagnostic", params)
+                    .await?;
                 Ok(format_lsp_diagnostics(&res, file_str))
             }
             "symbols" => {
@@ -266,7 +266,9 @@ async fn execute_with_lsp(
                 }
                 let uri = path_to_uri(resolved_path);
                 let params = json!({ "textDocument": { "uri": uri } });
-                let res = client.send_request("textDocument/documentSymbol", params).await?;
+                let res = client
+                    .send_request("textDocument/documentSymbol", params)
+                    .await?;
                 Ok(format_lsp_symbols(&res))
             }
             _ => anyhow::bail!("Unsupported action: {}", action),
@@ -291,9 +293,7 @@ async fn fallback_handler(
     server_error: Option<&str>,
     ctx: &ToolContext,
 ) -> anyhow::Result<String> {
-    let server_name = server_opt
-        .map(|s| s.command.as_str())
-        .unwrap_or("unknown");
+    let server_name = server_opt.map(|s| s.command.as_str()).unwrap_or("unknown");
     let reason = if let Some(err) = server_error {
         format!("Language server '{}' failed ({})", server_name, err)
     } else if server_opt.is_some() {
@@ -589,7 +589,10 @@ fn format_symbols_recursive(arr: &[Value], depth: usize, out: &mut String) {
             .map(|l| l + 1)
             .unwrap_or(1);
 
-        out.push_str(&format!("{}[{}] {} (line {})\n", indent, kind_name, name, line));
+        out.push_str(&format!(
+            "{}[{}] {} (line {})\n",
+            indent, kind_name, name, line
+        ));
 
         if let Some(children) = item.get("children").and_then(|c| c.as_array()) {
             format_symbols_recursive(children, depth + 1, out);

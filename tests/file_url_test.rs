@@ -140,24 +140,57 @@ async fn test_url_reading_200_ok_sanitization() {
         .expect("execution should succeed");
 
     // Verify main content and converted markdown
-    assert!(result.contains("# Welcome to Fusion"), "Missing H1: {result}");
+    assert!(
+        result.contains("# Welcome to Fusion"),
+        "Missing H1: {result}"
+    );
     assert!(
         result.contains("This is the first paragraph with [documentation link](https://example.com/docs) and some useful text."),
         "Missing paragraph with link: {result}"
     );
-    assert!(result.contains("Second paragraph with a\nline break right here."), "Missing line break: {result}");
+    assert!(
+        result.contains("Second paragraph with a\nline break right here."),
+        "Missing line break: {result}"
+    );
     assert!(result.contains("## Features List"), "Missing H2: {result}");
-    assert!(result.contains("- Lightning Fast Engine"), "Missing list item 1: {result}");
-    assert!(result.contains("- Subagent Collaboration"), "Missing list item 2: {result}");
+    assert!(
+        result.contains("- Lightning Fast Engine"),
+        "Missing list item 1: {result}"
+    );
+    assert!(
+        result.contains("- Subagent Collaboration"),
+        "Missing list item 2: {result}"
+    );
 
     // Verify stripped blocks
-    assert!(!result.contains("Site Banner Header"), "Header block was not stripped: {result}");
-    assert!(!result.contains("Ignored header text"), "Header block text was not stripped: {result}");
-    assert!(!result.contains("Main Navigation"), "Nav attribute was not stripped: {result}");
-    assert!(!result.contains("About Us"), "Nav links were not stripped: {result}");
-    assert!(!result.contains("tracking_token_12345"), "Script block was not stripped: {result}");
-    assert!(!result.contains("background: #333"), "Style block was not stripped: {result}");
-    assert!(!result.contains("Fusion Authors"), "Footer block was not stripped: {result}");
+    assert!(
+        !result.contains("Site Banner Header"),
+        "Header block was not stripped: {result}"
+    );
+    assert!(
+        !result.contains("Ignored header text"),
+        "Header block text was not stripped: {result}"
+    );
+    assert!(
+        !result.contains("Main Navigation"),
+        "Nav attribute was not stripped: {result}"
+    );
+    assert!(
+        !result.contains("About Us"),
+        "Nav links were not stripped: {result}"
+    );
+    assert!(
+        !result.contains("tracking_token_12345"),
+        "Script block was not stripped: {result}"
+    );
+    assert!(
+        !result.contains("background: #333"),
+        "Style block was not stripped: {result}"
+    );
+    assert!(
+        !result.contains("Fusion Authors"),
+        "Footer block was not stripped: {result}"
+    );
 }
 
 #[test]
@@ -287,7 +320,10 @@ async fn test_url_reading_connection_failure() {
     let unreachable_url = "http://127.0.0.1:1/test";
     let res = tool.execute(json!({ "path": unreachable_url }), &ctx).await;
 
-    assert!(res.is_err(), "Expected connection error for unreachable port");
+    assert!(
+        res.is_err(),
+        "Expected connection error for unreachable port"
+    );
     let err_str = res.err().unwrap().to_string();
     assert!(
         err_str.contains("Failed to read URL"),
@@ -316,7 +352,10 @@ fn test_uri_router_url_handling() {
     // resolve_internal_uri must pass HTTP and HTTPS URLs through cleanly as None
     assert_eq!(resolve_internal_uri("http://example.com", None), None);
     assert_eq!(resolve_internal_uri("https://example.com/api", None), None);
-    assert_eq!(resolve_internal_uri("http://localhost:8080/doc.html", None), None);
+    assert_eq!(
+        resolve_internal_uri("http://localhost:8080/doc.html", None),
+        None
+    );
 
     // is_http_url checks
     assert!(is_http_url("http://example.com"));

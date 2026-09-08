@@ -3,14 +3,14 @@
 //! - Test format_locations and format_lsp_diagnostics
 //! - Test symbol extraction and URI conversion helpers
 
-use std::path::{Path, PathBuf};
-use serde_json::json;
+use fusion::tools::lsp::client::path_to_uri;
 use fusion::tools::lsp::{
     extract_identifier_at_pos, extract_symbol_from_file, format_locations, format_lsp_diagnostics,
     format_lsp_symbols, parse_locations_response, uri_to_path_buf, LspTool,
 };
-use fusion::tools::lsp::client::path_to_uri;
 use fusion::tools::types::{Tool, ToolContext};
+use serde_json::json;
+use std::path::{Path, PathBuf};
 
 // =========================================================================
 // 1. format_locations Tests
@@ -170,7 +170,10 @@ fn test_format_lsp_diagnostics_empty_cases() {
 
     // Empty items array
     let res_empty_items = format_lsp_diagnostics(&json!({ "items": [] }), "src/main.rs");
-    assert_eq!(res_empty_items, "No diagnostics reported for 'src/main.rs'.");
+    assert_eq!(
+        res_empty_items,
+        "No diagnostics reported for 'src/main.rs'."
+    );
 
     // Empty array directly
     let res_empty_arr = format_lsp_diagnostics(&json!([]), "src/main.rs");
@@ -222,7 +225,10 @@ fn test_format_lsp_diagnostics_severities() {
     // Severity 4 -> hint
     assert_eq!(lines[3], "src/lib.rs:4:13: hint: can be simplified");
     // Other -> diagnostic
-    assert_eq!(lines[4], "src/lib.rs:5:1: diagnostic: custom unknown severity");
+    assert_eq!(
+        lines[4],
+        "src/lib.rs:5:1: diagnostic: custom unknown severity"
+    );
 }
 
 #[test]
@@ -250,7 +256,8 @@ fn test_format_lsp_diagnostics_with_source() {
         "expected rustc source prefix, got: {result}"
     );
     assert!(
-        result.contains("src/parser.rs:31:9: [clippy] warning: variable does not need to be mutable"),
+        result
+            .contains("src/parser.rs:31:9: [clippy] warning: variable does not need to be mutable"),
         "expected clippy source prefix, got: {result}"
     );
 }

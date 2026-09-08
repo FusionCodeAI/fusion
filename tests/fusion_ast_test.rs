@@ -399,58 +399,187 @@ fn test_typescript_explicit_lang_option() {
 #[test]
 fn test_language_detection_by_standard_extension() {
     // Core systems and backend languages
-    assert_eq!(SupportLang::from_path(Path::new("src/main.rs")), Some(SupportLang::Rust));
-    assert_eq!(SupportLang::from_path(Path::new("cmd/api/main.go")), Some(SupportLang::Go));
-    assert_eq!(SupportLang::from_path(Path::new("app/index.ts")), Some(SupportLang::TypeScript));
-    assert_eq!(SupportLang::from_path(Path::new("components/App.tsx")), Some(SupportLang::Tsx));
-    assert_eq!(SupportLang::from_path(Path::new("lib/util.js")), Some(SupportLang::JavaScript));
-    assert_eq!(SupportLang::from_path(Path::new("scripts/build.py")), Some(SupportLang::Python));
-    assert_eq!(SupportLang::from_path(Path::new("native/core.c")), Some(SupportLang::C));
-    assert_eq!(SupportLang::from_path(Path::new("native/engine.cpp")), Some(SupportLang::Cpp));
-    assert_eq!(SupportLang::from_path(Path::new("native/engine.cc")), Some(SupportLang::Cpp));
-    assert_eq!(SupportLang::from_path(Path::new("native/engine.cxx")), Some(SupportLang::Cpp));
-    assert_eq!(SupportLang::from_path(Path::new("App.java")), Some(SupportLang::Java));
-    assert_eq!(SupportLang::from_path(Path::new("Program.cs")), Some(SupportLang::CSharp));
-    assert_eq!(SupportLang::from_path(Path::new("app.rb")), Some(SupportLang::Ruby));
-    assert_eq!(SupportLang::from_path(Path::new("index.php")), Some(SupportLang::Php));
-    assert_eq!(SupportLang::from_path(Path::new("Main.swift")), Some(SupportLang::Swift));
-    assert_eq!(SupportLang::from_path(Path::new("main.zig")), Some(SupportLang::Zig));
-    assert_eq!(SupportLang::from_path(Path::new("Main.kt")), Some(SupportLang::Kotlin));
-    assert_eq!(SupportLang::from_path(Path::new("script.lua")), Some(SupportLang::Lua));
-    assert_eq!(SupportLang::from_path(Path::new("deploy.sh")), Some(SupportLang::Bash));
+    assert_eq!(
+        SupportLang::from_path(Path::new("src/main.rs")),
+        Some(SupportLang::Rust)
+    );
+    assert_eq!(
+        SupportLang::from_path(Path::new("cmd/api/main.go")),
+        Some(SupportLang::Go)
+    );
+    assert_eq!(
+        SupportLang::from_path(Path::new("app/index.ts")),
+        Some(SupportLang::TypeScript)
+    );
+    assert_eq!(
+        SupportLang::from_path(Path::new("components/App.tsx")),
+        Some(SupportLang::Tsx)
+    );
+    assert_eq!(
+        SupportLang::from_path(Path::new("lib/util.js")),
+        Some(SupportLang::JavaScript)
+    );
+    assert_eq!(
+        SupportLang::from_path(Path::new("scripts/build.py")),
+        Some(SupportLang::Python)
+    );
+    assert_eq!(
+        SupportLang::from_path(Path::new("native/core.c")),
+        Some(SupportLang::C)
+    );
+    assert_eq!(
+        SupportLang::from_path(Path::new("native/engine.cpp")),
+        Some(SupportLang::Cpp)
+    );
+    assert_eq!(
+        SupportLang::from_path(Path::new("native/engine.cc")),
+        Some(SupportLang::Cpp)
+    );
+    assert_eq!(
+        SupportLang::from_path(Path::new("native/engine.cxx")),
+        Some(SupportLang::Cpp)
+    );
+    assert_eq!(
+        SupportLang::from_path(Path::new("App.java")),
+        Some(SupportLang::Java)
+    );
+    assert_eq!(
+        SupportLang::from_path(Path::new("Program.cs")),
+        Some(SupportLang::CSharp)
+    );
+    assert_eq!(
+        SupportLang::from_path(Path::new("app.rb")),
+        Some(SupportLang::Ruby)
+    );
+    assert_eq!(
+        SupportLang::from_path(Path::new("index.php")),
+        Some(SupportLang::Php)
+    );
+    assert_eq!(
+        SupportLang::from_path(Path::new("Main.swift")),
+        Some(SupportLang::Swift)
+    );
+    assert_eq!(
+        SupportLang::from_path(Path::new("main.zig")),
+        Some(SupportLang::Zig)
+    );
+    assert_eq!(
+        SupportLang::from_path(Path::new("Main.kt")),
+        Some(SupportLang::Kotlin)
+    );
+    assert_eq!(
+        SupportLang::from_path(Path::new("script.lua")),
+        Some(SupportLang::Lua)
+    );
+    assert_eq!(
+        SupportLang::from_path(Path::new("deploy.sh")),
+        Some(SupportLang::Bash)
+    );
 
     // Data, Config, and Markup formats
-    assert_eq!(SupportLang::from_path(Path::new("package.json")), Some(SupportLang::Json));
-    assert_eq!(SupportLang::from_path(Path::new("config.toml")), Some(SupportLang::Toml));
-    assert_eq!(SupportLang::from_path(Path::new("docker-compose.yaml")), Some(SupportLang::Yaml));
-    assert_eq!(SupportLang::from_path(Path::new("ci.yml")), Some(SupportLang::Yaml));
-    assert_eq!(SupportLang::from_path(Path::new("index.html")), Some(SupportLang::Html));
-    assert_eq!(SupportLang::from_path(Path::new("styles.css")), Some(SupportLang::Css));
-    assert_eq!(SupportLang::from_path(Path::new("README.md")), Some(SupportLang::Markdown));
-    assert_eq!(SupportLang::from_path(Path::new("schema.sql")), Some(SupportLang::Sql));
-    assert_eq!(SupportLang::from_path(Path::new("data.xml")), Some(SupportLang::Xml));
+    assert_eq!(
+        SupportLang::from_path(Path::new("package.json")),
+        Some(SupportLang::Json)
+    );
+    assert_eq!(
+        SupportLang::from_path(Path::new("config.toml")),
+        Some(SupportLang::Toml)
+    );
+    assert_eq!(
+        SupportLang::from_path(Path::new("docker-compose.yaml")),
+        Some(SupportLang::Yaml)
+    );
+    assert_eq!(
+        SupportLang::from_path(Path::new("ci.yml")),
+        Some(SupportLang::Yaml)
+    );
+    assert_eq!(
+        SupportLang::from_path(Path::new("index.html")),
+        Some(SupportLang::Html)
+    );
+    assert_eq!(
+        SupportLang::from_path(Path::new("styles.css")),
+        Some(SupportLang::Css)
+    );
+    assert_eq!(
+        SupportLang::from_path(Path::new("README.md")),
+        Some(SupportLang::Markdown)
+    );
+    assert_eq!(
+        SupportLang::from_path(Path::new("schema.sql")),
+        Some(SupportLang::Sql)
+    );
+    assert_eq!(
+        SupportLang::from_path(Path::new("data.xml")),
+        Some(SupportLang::Xml)
+    );
 }
 
 #[test]
 fn test_language_detection_by_special_filenames() {
     // Exact filenames without standard extensions
-    assert_eq!(SupportLang::from_path(Path::new("Makefile")), Some(SupportLang::Make));
-    assert_eq!(SupportLang::from_path(Path::new("makefile")), Some(SupportLang::Make));
-    assert_eq!(SupportLang::from_path(Path::new("GNUmakefile")), Some(SupportLang::Make));
-    assert_eq!(SupportLang::from_path(Path::new("Justfile")), Some(SupportLang::Just));
-    assert_eq!(SupportLang::from_path(Path::new("justfile")), Some(SupportLang::Just));
-    assert_eq!(SupportLang::from_path(Path::new("CMakeLists.txt")), Some(SupportLang::Cmake));
-    assert_eq!(SupportLang::from_path(Path::new("Dockerfile")), Some(SupportLang::Dockerfile));
-    assert_eq!(SupportLang::from_path(Path::new("dockerfile")), Some(SupportLang::Dockerfile));
-    assert_eq!(SupportLang::from_path(Path::new("Dockerfile.prod")), Some(SupportLang::Dockerfile));
-    assert_eq!(SupportLang::from_path(Path::new("Containerfile")), Some(SupportLang::Dockerfile));
+    assert_eq!(
+        SupportLang::from_path(Path::new("Makefile")),
+        Some(SupportLang::Make)
+    );
+    assert_eq!(
+        SupportLang::from_path(Path::new("makefile")),
+        Some(SupportLang::Make)
+    );
+    assert_eq!(
+        SupportLang::from_path(Path::new("GNUmakefile")),
+        Some(SupportLang::Make)
+    );
+    assert_eq!(
+        SupportLang::from_path(Path::new("Justfile")),
+        Some(SupportLang::Just)
+    );
+    assert_eq!(
+        SupportLang::from_path(Path::new("justfile")),
+        Some(SupportLang::Just)
+    );
+    assert_eq!(
+        SupportLang::from_path(Path::new("CMakeLists.txt")),
+        Some(SupportLang::Cmake)
+    );
+    assert_eq!(
+        SupportLang::from_path(Path::new("Dockerfile")),
+        Some(SupportLang::Dockerfile)
+    );
+    assert_eq!(
+        SupportLang::from_path(Path::new("dockerfile")),
+        Some(SupportLang::Dockerfile)
+    );
+    assert_eq!(
+        SupportLang::from_path(Path::new("Dockerfile.prod")),
+        Some(SupportLang::Dockerfile)
+    );
+    assert_eq!(
+        SupportLang::from_path(Path::new("Containerfile")),
+        Some(SupportLang::Dockerfile)
+    );
 
     // Shell profile / rc files
-    assert_eq!(SupportLang::from_path(Path::new(".bashrc")), Some(SupportLang::Bash));
-    assert_eq!(SupportLang::from_path(Path::new(".bash_profile")), Some(SupportLang::Bash));
-    assert_eq!(SupportLang::from_path(Path::new(".zshrc")), Some(SupportLang::Bash));
-    assert_eq!(SupportLang::from_path(Path::new(".zshenv")), Some(SupportLang::Bash));
-    assert_eq!(SupportLang::from_path(Path::new(".emacs")), Some(SupportLang::EmacsLisp));
+    assert_eq!(
+        SupportLang::from_path(Path::new(".bashrc")),
+        Some(SupportLang::Bash)
+    );
+    assert_eq!(
+        SupportLang::from_path(Path::new(".bash_profile")),
+        Some(SupportLang::Bash)
+    );
+    assert_eq!(
+        SupportLang::from_path(Path::new(".zshrc")),
+        Some(SupportLang::Bash)
+    );
+    assert_eq!(
+        SupportLang::from_path(Path::new(".zshenv")),
+        Some(SupportLang::Bash)
+    );
+    assert_eq!(
+        SupportLang::from_path(Path::new(".emacs")),
+        Some(SupportLang::EmacsLisp)
+    );
 }
 
 #[test]

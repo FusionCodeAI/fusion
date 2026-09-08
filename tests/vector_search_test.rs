@@ -28,22 +28,25 @@ use serde_json::json;
 fn test_tokenizer_camel_case_variations() {
     // Standard camelCase
     assert_eq!(tokenize("camelCase"), vec!["camel", "case"]);
-    assert_eq!(
-        tokenize("getUserById"),
-        vec!["get", "user", "by", "id"]
-    );
+    assert_eq!(tokenize("getUserById"), vec!["get", "user", "by", "id"]);
 
     // PascalCase
-    assert_eq!(tokenize("VectorSearchTool"), vec!["vector", "search", "tool"]);
-    assert_eq!(tokenize("LexicalVectorIndex"), vec!["lexical", "vector", "index"]);
+    assert_eq!(
+        tokenize("VectorSearchTool"),
+        vec!["vector", "search", "tool"]
+    );
+    assert_eq!(
+        tokenize("LexicalVectorIndex"),
+        vec!["lexical", "vector", "index"]
+    );
 
     // Consecutive uppercase (acronyms) followed by lowercase
     assert_eq!(tokenize("XMLParser"), vec!["xml", "parser"]);
-    assert_eq!(tokenize("parseHTMLContent"), vec!["parse", "html", "content"]);
     assert_eq!(
-        tokenize("XMLHttpRequest"),
-        vec!["xml", "http", "request"]
+        tokenize("parseHTMLContent"),
+        vec!["parse", "html", "content"]
     );
+    assert_eq!(tokenize("XMLHttpRequest"), vec!["xml", "http", "request"]);
     assert_eq!(tokenize("ASTNode"), vec!["ast", "node"]);
 
     // Digits adjacent to uppercase
@@ -55,24 +58,15 @@ fn test_tokenizer_camel_case_variations() {
 fn test_tokenizer_snake_case_variations() {
     // Standard snake_case
     assert_eq!(tokenize("snake_case"), vec!["snake", "case"]);
-    assert_eq!(
-        tokenize("my_variable_name"),
-        vec!["my", "variable", "name"]
-    );
+    assert_eq!(tokenize("my_variable_name"), vec!["my", "variable", "name"]);
     assert_eq!(
         tokenize("user_id_generator"),
         vec!["user", "id", "generator"]
     );
 
     // SCREAMING_SNAKE_CASE
-    assert_eq!(
-        tokenize("MAX_BUFFER_SIZE"),
-        vec!["max", "buffer", "size"]
-    );
-    assert_eq!(
-        tokenize("DEFAULT_BM25_K1"),
-        vec!["default", "bm25", "k1"]
-    );
+    assert_eq!(tokenize("MAX_BUFFER_SIZE"), vec!["max", "buffer", "size"]);
+    assert_eq!(tokenize("DEFAULT_BM25_K1"), vec!["default", "bm25", "k1"]);
 
     // Leading and trailing underscores
     assert_eq!(tokenize("__init__"), vec!["init"]);
@@ -98,9 +92,7 @@ fn test_tokenizer_mixed_and_punctuation() {
     );
     assert_eq!(
         tokenize("pub async fn execute(&self, args: Value) -> Result<String>"),
-        vec![
-            "pub", "async", "fn", "execute", "self", "args", "value", "result", "string"
-        ]
+        vec!["pub", "async", "fn", "execute", "self", "args", "value", "result", "string"]
     );
 
     // Kebab-case
@@ -134,7 +126,9 @@ fn test_chunker_small_file_single_chunk() {
 fn test_chunker_large_file_with_overlap() {
     let chunker = Chunker::new().with_chunk_size(40).with_overlap(5);
     // Create 100 lines: step is 40 - 5 = 35
-    let lines: Vec<String> = (1..=100).map(|i| format!("let var_{} = {};", i, i)).collect();
+    let lines: Vec<String> = (1..=100)
+        .map(|i| format!("let var_{} = {};", i, i))
+        .collect();
     let content = lines.join("\n");
 
     let chunks = chunker.chunk_text(Path::new("test.rs"), &content);
@@ -498,10 +492,7 @@ impl<K, V> LruCache<K, V> {
     // Query 1: Database connection pool
     let res_db = index.search("postgres database connection acquire pool", 5);
     assert!(!res_db.is_empty());
-    assert_eq!(
-        res_db[0].chunk.file_path,
-        PathBuf::from("src/db/pool.rs")
-    );
+    assert_eq!(res_db[0].chunk.file_path, PathBuf::from("src/db/pool.rs"));
 
     // Query 2: JWT bearer token validation
     let res_auth = index.search("jwt bearer token validate authentication claims", 5);
@@ -569,7 +560,8 @@ impl TestWorkspace {
             fs::create_dir_all(parent).expect("Failed to create parent directories");
         }
         let mut file = File::create(&full_path).expect("Failed to create test file");
-        file.write_all(content.as_bytes()).expect("Failed to write content");
+        file.write_all(content.as_bytes())
+            .expect("Failed to write content");
         full_path
     }
 }

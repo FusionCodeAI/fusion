@@ -312,7 +312,11 @@ impl TddEngine {
         ));
 
         for (idx, failure) in failures.iter().enumerate() {
-            guidance.push_str(&format!("### Failure {}: `{}`\n", idx + 1, failure.test_name));
+            guidance.push_str(&format!(
+                "### Failure {}: `{}`\n",
+                idx + 1,
+                failure.test_name
+            ));
 
             if let Some(file) = &failure.file {
                 if let Some(line) = failure.line {
@@ -345,7 +349,9 @@ impl TddEngine {
         guidance.push_str("### Target Fix Constraints:\n");
         guidance.push_str("1. **Minimal Change Principle**: Modify only the minimal code required to satisfy the failing test(s). Do not introduce speculative features.\n");
         guidance.push_str("2. **Test Invariance**: Never modify, comment out, or delete existing tests or assertions. The test represents the ground truth contract.\n");
-        guidance.push_str("3. **Regression Prevention**: Ensure all previously passing tests continue to pass.\n");
+        guidance.push_str(
+            "3. **Regression Prevention**: Ensure all previously passing tests continue to pass.\n",
+        );
         guidance.push_str("4. **Type & Signature Stability**: Preserve existing public API signatures, types, and error variants.\n");
         guidance.push_str("5. **Phase Progression**: Verify fix with the test runner command to advance from Red to Green phase.\n");
 
@@ -365,9 +371,13 @@ impl TddEngine {
         cmd.args(["-c", command]);
 
         cmd.current_dir(cwd);
-        let output = cmd
-            .output()
-            .with_context(|| format!("Failed to execute verification command: `{}` in `{}`", command, cwd.display()))?;
+        let output = cmd.output().with_context(|| {
+            format!(
+                "Failed to execute verification command: `{}` in `{}`",
+                command,
+                cwd.display()
+            )
+        })?;
 
         let exit_code = output.status.code().unwrap_or(-1);
         let stdout = String::from_utf8_lossy(&output.stdout);
@@ -403,10 +413,13 @@ impl TddEngine {
         cmd.args(["-c", command]);
 
         cmd.current_dir(cwd);
-        let output = cmd
-            .output()
-            .await
-            .with_context(|| format!("Failed to execute verification command: `{}` in `{}`", command, cwd.display()))?;
+        let output = cmd.output().await.with_context(|| {
+            format!(
+                "Failed to execute verification command: `{}` in `{}`",
+                command,
+                cwd.display()
+            )
+        })?;
 
         let exit_code = output.status.code().unwrap_or(-1);
         let stdout = String::from_utf8_lossy(&output.stdout);
@@ -461,7 +474,7 @@ pub fn strip_ansi(input: &str) -> String {
             match chars.peek() {
                 Some(&'[') => {
                     chars.next(); // consume '['
-                    // consume parameters and intermediate bytes until final byte (0x40-0x7E)
+                                  // consume parameters and intermediate bytes until final byte (0x40-0x7E)
                     while let Some(&b) = chars.peek() {
                         chars.next();
                         if ('@'..='~').contains(&b) {
@@ -606,7 +619,9 @@ fn parse_cargo_test(clean: &str) -> Vec<TestFailure> {
     }
 
     // 2. Compiler errors during cargo test (e.g. error[E0425]: ...)
-    if failures.is_empty() && (clean.contains("error[E") || clean.contains("error: aborting due to")) {
+    if failures.is_empty()
+        && (clean.contains("error[E") || clean.contains("error: aborting due to"))
+    {
         for line_str in clean.lines() {
             if line_str.starts_with("error[E") || line_str.starts_with("error:") {
                 let err_msg = line_str.to_string();
@@ -639,7 +654,9 @@ fn parse_cargo_test(clean: &str) -> Vec<TestFailure> {
     if failures.is_empty() {
         if let Some(failures_pos) = clean.find("\nfailures:\n") {
             let after_fail = &clean[failures_pos + 11..];
-            let list_end = after_fail.find("\ntest result:").unwrap_or(after_fail.len());
+            let list_end = after_fail
+                .find("\ntest result:")
+                .unwrap_or(after_fail.len());
             for line_str in after_fail[..list_end].lines() {
                 let t = line_str.trim();
                 if !t.is_empty() && !t.starts_with("----") {
@@ -688,13 +705,17 @@ fn parse_pytest(clean: &str) -> Vec<TestFailure> {
                 if cur.starts_with("E   ") || cur.starts_with("E ") {
                     let msg = cur[2..].trim();
                     error_lines.push(msg.to_string());
-                } else if cur_trim.starts_with('>') || cur_trim.starts_with("def ") || cur_trim.starts_with("_ _") {
+                } else if cur_trim.starts_with('>')
+                    || cur_trim.starts_with("def ")
+                    || cur_trim.starts_with("_ _")
+                {
                     stack_lines.push(cur.to_string());
                 } else if cur_trim.contains(".py:") && file.is_none() {
                     if let Some(colon_pos) = cur_trim.find(".py:") {
                         let file_str = &cur_trim[..colon_pos + 3];
                         let rest = &cur_trim[colon_pos + 4..];
-                        let num_str: String = rest.chars().take_while(|c| c.is_ascii_digit()).collect();
+                        let num_str: String =
+                            rest.chars().take_while(|c| c.is_ascii_digit()).collect();
                         if let Ok(num) = num_str.parse::<usize>() {
                             file = Some(file_str.to_string());
                             line_no = Some(num);
@@ -792,7 +813,9 @@ fn parse_vitest_jest(clean: &str) -> Vec<TestFailure> {
                         }
                     }
                 } else if l.contains('|')
-                    && l.chars().take_while(|c| c.is_whitespace() || c.is_ascii_digit()).any(|c| c.is_ascii_digit())
+                    && l.chars()
+                        .take_while(|c| c.is_whitespace() || c.is_ascii_digit())
+                        .any(|c| c.is_ascii_digit())
                 {
                     stack_lines.push(raw_l.to_string());
                 } else if !stack_lines.is_empty() {
@@ -830,9 +853,13 @@ fn parse_vitest_jest(clean: &str) -> Vec<TestFailure> {
     let mut i = 0;
     while i < lines.len() {
         let line = lines[i].trim();
-        let is_vitest_fail = line.starts_with("FAIL ") || line.starts_with("FAIL\t") || line.starts_with("× ");
+        let is_vitest_fail =
+            line.starts_with("FAIL ") || line.starts_with("FAIL\t") || line.starts_with("× ");
         if is_vitest_fail {
-            let header = line.trim_start_matches("FAIL").trim_start_matches('×').trim();
+            let header = line
+                .trim_start_matches("FAIL")
+                .trim_start_matches('×')
+                .trim();
             let (file_hint, test_name) = if let Some((f, t)) = header.split_once(" > ") {
                 (Some(f.trim().to_string()), t.trim().to_string())
             } else {
@@ -848,7 +875,10 @@ fn parse_vitest_jest(clean: &str) -> Vec<TestFailure> {
             while i < lines.len() {
                 let cur = lines[i];
                 let cur_trim = cur.trim();
-                if cur_trim.starts_with("FAIL ") || cur_trim.starts_with("× ") || cur_trim.starts_with("Tests ") {
+                if cur_trim.starts_with("FAIL ")
+                    || cur_trim.starts_with("× ")
+                    || cur_trim.starts_with("Tests ")
+                {
                     break;
                 }
 
@@ -861,7 +891,10 @@ fn parse_vitest_jest(clean: &str) -> Vec<TestFailure> {
                         }
                     }
                 } else if cur_trim.contains('|')
-                    && cur_trim.chars().take_while(|c| c.is_whitespace() || c.is_ascii_digit()).any(|c| c.is_ascii_digit())
+                    && cur_trim
+                        .chars()
+                        .take_while(|c| c.is_whitespace() || c.is_ascii_digit())
+                        .any(|c| c.is_ascii_digit())
                 {
                     stack_lines.push(cur.to_string());
                 } else if !cur_trim.is_empty() && !cur_trim.starts_with('⎯') {
@@ -907,7 +940,9 @@ fn parse_js_stack_location(line: &str) -> Option<(String, usize)> {
             line
         }
     } else {
-        line.trim_start_matches('❯').trim_start_matches("at ").trim()
+        line.trim_start_matches('❯')
+            .trim_start_matches("at ")
+            .trim()
     };
 
     parse_file_line(candidate)
@@ -927,7 +962,10 @@ fn diagnose_error(error_msg: &str) -> &'static str {
         "Zero division error: Unchecked division operator. Add input zero check or validation."
     } else if lower.contains("typeerror") || lower.contains("mismatched types") {
         "Type inconsistency: Value type does not match expected parameter or return type."
-    } else if lower.contains("not found") || lower.contains("cannot find") || lower.contains("undefined") {
+    } else if lower.contains("not found")
+        || lower.contains("cannot find")
+        || lower.contains("undefined")
+    {
         "Missing symbol: Referenced variable, function, or module is not defined in current scope."
     } else if lower.contains("panicked at") || lower.contains("panic") {
         "Runtime panic: Explicit panic or unwrap on None/Err encountered during execution."

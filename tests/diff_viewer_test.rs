@@ -230,9 +230,18 @@ fn test_render_terminal_colors_and_delimiters() {
     assert!(rendered.contains('╯'));
 
     // Colors
-    assert!(rendered.contains("\x1b[31m"), "Should contain red for deletions");
-    assert!(rendered.contains("\x1b[32m"), "Should contain green for additions");
-    assert!(rendered.contains("\x1b[90m"), "Should contain dim gray for line numbers");
+    assert!(
+        rendered.contains("\x1b[31m"),
+        "Should contain red for deletions"
+    );
+    assert!(
+        rendered.contains("\x1b[32m"),
+        "Should contain green for additions"
+    );
+    assert!(
+        rendered.contains("\x1b[90m"),
+        "Should contain dim gray for line numbers"
+    );
     assert!(rendered.contains("\x1b[0m"), "Should reset ANSI styling");
 
     // Code content
@@ -323,9 +332,8 @@ fn test_terminal_resizing_widths() {
 #[test]
 fn test_long_line_truncation_preserves_grid() {
     let long_line = "x".repeat(200);
-    let diff = format!(
-        "--- a/long.rs\n+++ b/long.rs\n@@ -1,1 +1,1 @@\n-{long_line}\n+{long_line}\n"
-    );
+    let diff =
+        format!("--- a/long.rs\n+++ b/long.rs\n@@ -1,1 +1,1 @@\n-{long_line}\n+{long_line}\n");
 
     let rendered = render_diff_terminal(&diff, 80);
     let plain = strip_ansi(&rendered);
@@ -364,12 +372,18 @@ fn test_terminal_width_zero_fallback() {
 fn test_git_working_tree_diff_live_repo() {
     let repo_root = Path::new(env!("CARGO_MANIFEST_DIR"));
     let res = git_working_tree_diff(repo_root);
-    assert!(res.is_ok(), "git_working_tree_diff should succeed on workspace root");
+    assert!(
+        res.is_ok(),
+        "git_working_tree_diff should succeed on workspace root"
+    );
 }
 
 #[test]
 fn test_git_working_tree_diff_invalid_dir() {
     let invalid_dir = Path::new("/nonexistent_directory_for_test_12345");
     let res = git_working_tree_diff(invalid_dir);
-    assert!(res.is_err(), "git_working_tree_diff should fail on non-existent directory");
+    assert!(
+        res.is_err(),
+        "git_working_tree_diff should fail on non-existent directory"
+    );
 }

@@ -12,7 +12,10 @@ use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use thiserror::Error;
 
-use fusion_ast::ops::{compile_rewrite_rules, resolve_language, resolve_supported_lang, rewrite_source, CompiledRewrite};
+use fusion_ast::ops::{
+    compile_rewrite_rules, resolve_language, resolve_supported_lang, rewrite_source,
+    CompiledRewrite,
+};
 use fusion_ast::SupportLang;
 
 // In integration tests, `fusion::tools` references the library crate.
@@ -27,10 +30,7 @@ pub enum AstEditError {
     UnsupportedLanguage(String),
 
     #[error("Pattern compilation failed for '{pattern}': {message}")]
-    PatternError {
-        pattern: String,
-        message: String,
-    },
+    PatternError { pattern: String, message: String },
 
     #[error("Rewrite failed: {0}")]
     RewriteError(String),
@@ -268,7 +268,9 @@ impl Tool for AstEditTool {
                     }
                 }
             } else if fusion_ast::ops::has_glob_syntax(target) {
-                if let Ok(matched_files) = fusion_ast::ops::collect_matched_files(&ctx.cwd, &[target.clone()]) {
+                if let Ok(matched_files) =
+                    fusion_ast::ops::collect_matched_files(&ctx.cwd, &[target.clone()])
+                {
                     for mf in matched_files {
                         files_to_process.push(mf.absolute_path);
                     }
@@ -339,9 +341,11 @@ impl Tool for AstEditTool {
                 Ok((updated, count)) => {
                     if count > 0 && updated != content {
                         // Write changes atomically
-                        atomic_write(file_path, updated.as_bytes()).await.map_err(|e| {
-                            anyhow::anyhow!("Failed to write '{}': {e}", file_path.display())
-                        })?;
+                        atomic_write(file_path, updated.as_bytes())
+                            .await
+                            .map_err(|e| {
+                                anyhow::anyhow!("Failed to write '{}': {e}", file_path.display())
+                            })?;
 
                         let rel_display = file_path
                             .strip_prefix(&ctx.cwd)

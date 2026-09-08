@@ -19,16 +19,14 @@ use std::net::SocketAddr;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
 
-use fusion::agent::planner_dag::{
-    DagOverallStatus, DagTask, DagTaskStatus, SubagentDag,
-};
+use fusion::agent::planner_dag::{DagOverallStatus, DagTask, DagTaskStatus, SubagentDag};
 use fusion::agent::subagent::{SubagentManager, SubagentRole};
-use plan_runner::{PlanRunner, PlanRunnerError, PlanSummary, StageExecutionResult};
 use fusion::config::Config;
 use fusion::provider::LlmClient;
 use fusion::tools::file::{ReadFileTool, WriteFileTool};
 use fusion::tools::grep::GrepTool;
 use fusion::tools::types::ToolRegistry;
+use plan_runner::{PlanRunner, PlanRunnerError, PlanSummary, StageExecutionResult};
 use serde_json::{json, Value};
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::{TcpListener, TcpStream};
@@ -266,9 +264,19 @@ fn test_render_progress_ascii_empty_plan() {
 fn test_render_progress_ascii_linear_pipeline() {
     let mut dag = SubagentDag::new("Pipeline Plan", "Deliver feature");
 
-    let t1 = DagTask::new("scout", "Scout Codebase", SubagentRole::Scout, "Explore repo");
-    let t2 = DagTask::new("coder", "Implement Logic", SubagentRole::Coder, "Write code")
-        .with_dependency("scout");
+    let t1 = DagTask::new(
+        "scout",
+        "Scout Codebase",
+        SubagentRole::Scout,
+        "Explore repo",
+    );
+    let t2 = DagTask::new(
+        "coder",
+        "Implement Logic",
+        SubagentRole::Coder,
+        "Write code",
+    )
+    .with_dependency("scout");
     let t3 = DagTask::new("tester", "Run Tests", SubagentRole::Tester, "Execute tests")
         .with_dependency("coder");
 
@@ -387,7 +395,13 @@ fn test_render_progress_ascii_parallel_stages() {
 #[tokio::test]
 async fn test_error_out_of_bounds_stage() {
     let mut dag = SubagentDag::new("Small Plan", "Goal");
-    dag.add_task(DagTask::new("task1", "Task 1", SubagentRole::General, "Work")).unwrap();
+    dag.add_task(DagTask::new(
+        "task1",
+        "Task 1",
+        SubagentRole::General,
+        "Work",
+    ))
+    .unwrap();
     dag.compute_stages().unwrap();
 
     let client = Arc::new(LlmClient::new());
@@ -395,14 +409,21 @@ async fn test_error_out_of_bounds_stage() {
     let mut runner = PlanRunner::new(dag, manager);
 
     let err = runner.execute_stage(99).await.unwrap_err();
-    assert!(matches!(err, PlanRunnerError::StageNotFound { stage_idx: 99, total_stages: 1 }));
+    assert!(matches!(
+        err,
+        PlanRunnerError::StageNotFound {
+            stage_idx: 99,
+            total_stages: 1
+        }
+    ));
 }
 
 #[tokio::test]
 async fn test_error_unmet_dependency() {
     let mut dag = SubagentDag::new("Dep Plan", "Goal");
     let t1 = DagTask::new("step1", "Step 1", SubagentRole::General, "First");
-    let t2 = DagTask::new("step2", "Step 2", SubagentRole::General, "Second").with_dependency("step1");
+    let t2 =
+        DagTask::new("step2", "Step 2", SubagentRole::General, "Second").with_dependency("step1");
     dag.add_task(t1).unwrap();
     dag.add_task(t2).unwrap();
     dag.compute_stages().unwrap();
@@ -414,7 +435,9 @@ async fn test_error_unmet_dependency() {
     // Attempt to run stage 1 before stage 0 has completed
     let err = runner.execute_stage(1).await.unwrap_err();
     match err {
-        PlanRunnerError::DependencyNotMet { task_id, dep_id, .. } => {
+        PlanRunnerError::DependencyNotMet {
+            task_id, dep_id, ..
+        } => {
             assert_eq!(task_id, "step2");
             assert_eq!(dep_id, "step1");
         }
@@ -435,9 +458,19 @@ async fn test_stage_by_stage_execution() {
     let manager = SubagentManager::new(client, config, tools).with_max_concurrent(4);
 
     let mut dag = SubagentDag::new("Stage Test Plan", "Test execution stages");
-    let t1 = DagTask::new("scout", "Explore Code", SubagentRole::Scout, "Map directories");
-    let t2 = DagTask::new("coder", "Add Feature", SubagentRole::Coder, "Implement feature")
-        .with_dependency("scout");
+    let t1 = DagTask::new(
+        "scout",
+        "Explore Code",
+        SubagentRole::Scout,
+        "Map directories",
+    );
+    let t2 = DagTask::new(
+        "coder",
+        "Add Feature",
+        SubagentRole::Coder,
+        "Implement feature",
+    )
+    .with_dependency("scout");
     let t3 = DagTask::new("tester", "Verify", SubagentRole::Tester, "Run checks")
         .with_dependency("coder");
 
@@ -455,7 +488,12 @@ async fn test_stage_by_stage_execution() {
     assert_eq!(stage0_res.completed_count(), 1);
     assert_eq!(stage0_res.failed_count(), 0);
     assert_eq!(stage0_res.task_ids, vec!["scout"]);
-    assert!(runner.dag().get_task("scout").unwrap().status.is_completed());
+    assert!(runner
+        .dag()
+        .get_task("scout")
+        .unwrap()
+        .status
+        .is_completed());
 
     let ascii = runner.render_progress_ascii();
     assert!(ascii.contains("[✓] scout"));
@@ -466,14 +504,24 @@ async fn test_stage_by_stage_execution() {
     assert!(stage1_res.is_success());
     assert_eq!(stage1_res.completed_count(), 1);
     assert_eq!(stage1_res.task_ids, vec!["coder"]);
-    assert!(runner.dag().get_task("coder").unwrap().status.is_completed());
+    assert!(runner
+        .dag()
+        .get_task("coder")
+        .unwrap()
+        .status
+        .is_completed());
 
     // Execute Stage 2: Tester
     let stage2_res = runner.execute_stage(2).await.expect("stage 2 success");
     assert!(stage2_res.is_success());
     assert_eq!(stage2_res.completed_count(), 1);
     assert_eq!(stage2_res.task_ids, vec!["tester"]);
-    assert!(runner.dag().get_task("tester").unwrap().status.is_completed());
+    assert!(runner
+        .dag()
+        .get_task("tester")
+        .unwrap()
+        .status
+        .is_completed());
 
     assert_eq!(
         runner.render_progress_ascii(),
@@ -497,18 +545,43 @@ async fn test_run_autonomous_parallel_workflow() {
     let mut dag = SubagentDag::new("Autonomous Parallel Workflow", "Complete full workflow");
 
     // Stage 0: 2 parallel scouts
-    let s1 = DagTask::new("scout_auth", "Inspect Auth", SubagentRole::Scout, "Check token code");
-    let s2 = DagTask::new("scout_db", "Inspect DB", SubagentRole::Scout, "Check schema code");
+    let s1 = DagTask::new(
+        "scout_auth",
+        "Inspect Auth",
+        SubagentRole::Scout,
+        "Check token code",
+    );
+    let s2 = DagTask::new(
+        "scout_db",
+        "Inspect DB",
+        SubagentRole::Scout,
+        "Check schema code",
+    );
 
     // Stage 1: 2 parallel coders
-    let c1 = DagTask::new("coder_auth", "Implement Auth Fix", SubagentRole::Coder, "Fix auth")
-        .with_dependency("scout_auth");
-    let c2 = DagTask::new("coder_db", "Implement DB Migration", SubagentRole::Coder, "Migrate DB")
-        .with_dependency("scout_db");
+    let c1 = DagTask::new(
+        "coder_auth",
+        "Implement Auth Fix",
+        SubagentRole::Coder,
+        "Fix auth",
+    )
+    .with_dependency("scout_auth");
+    let c2 = DagTask::new(
+        "coder_db",
+        "Implement DB Migration",
+        SubagentRole::Coder,
+        "Migrate DB",
+    )
+    .with_dependency("scout_db");
 
     // Stage 2: 1 tester verifying both
-    let t1 = DagTask::new("tester_e2e", "Run E2E Suite", SubagentRole::Tester, "E2E verification")
-        .with_dependencies(["coder_auth", "coder_db"]);
+    let t1 = DagTask::new(
+        "tester_e2e",
+        "Run E2E Suite",
+        SubagentRole::Tester,
+        "E2E verification",
+    )
+    .with_dependencies(["coder_auth", "coder_db"]);
 
     dag.add_task(s1).unwrap();
     dag.add_task(s2).unwrap();
@@ -567,9 +640,19 @@ async fn test_run_autonomous_fail_fast_on_error() {
     let mut dag = SubagentDag::new("Failing Plan", "Demonstrate fail-fast");
 
     // Task 1 will fail because it contains FAIL_TASK
-    let t1 = DagTask::new("scout", "Failing Scout", SubagentRole::Scout, "Analyze: FAIL_TASK");
-    let t2 = DagTask::new("coder", "Never Executed", SubagentRole::Coder, "Implement code")
-        .with_dependency("scout");
+    let t1 = DagTask::new(
+        "scout",
+        "Failing Scout",
+        SubagentRole::Scout,
+        "Analyze: FAIL_TASK",
+    );
+    let t2 = DagTask::new(
+        "coder",
+        "Never Executed",
+        SubagentRole::Coder,
+        "Implement code",
+    )
+    .with_dependency("scout");
 
     dag.add_task(t1).unwrap();
     dag.add_task(t2).unwrap();
@@ -606,10 +689,23 @@ async fn test_execute_active_plan_flow() {
     let tools = create_test_tools();
     let manager = SubagentManager::new(client, config, tools).with_max_concurrent(4);
 
-    let mut dag = SubagentDag::new("Active Autonomous Run", "Test execute_active_plan integration");
-    let t1 = DagTask::new("research", "Research Auth", SubagentRole::Scout, "Investigate auth patterns");
-    let t2 = DagTask::new("implement", "Implement Auth", SubagentRole::Coder, "Write auth handler")
-        .with_dependency("research");
+    let mut dag = SubagentDag::new(
+        "Active Autonomous Run",
+        "Test execute_active_plan integration",
+    );
+    let t1 = DagTask::new(
+        "research",
+        "Research Auth",
+        SubagentRole::Scout,
+        "Investigate auth patterns",
+    );
+    let t2 = DagTask::new(
+        "implement",
+        "Implement Auth",
+        SubagentRole::Coder,
+        "Write auth handler",
+    )
+    .with_dependency("research");
     dag.add_task(t1).unwrap();
     dag.add_task(t2).unwrap();
 

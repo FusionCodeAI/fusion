@@ -213,9 +213,7 @@ impl fmt::Display for PeerStatus {
 pub enum MeshMessage {
     /// Discovery ping sent to probe candidate local peer sockets.
     #[serde(alias = "Ping", alias = "ping")]
-    Ping {
-        peer_id: String,
-    },
+    Ping { peer_id: String },
 
     /// Health and identity response confirming active peer status and model.
     #[serde(alias = "Pong", alias = "pong")]
@@ -235,10 +233,7 @@ pub enum MeshMessage {
 
     /// Task acceptance confirmation returned by a worker peer.
     #[serde(alias = "TaskAccept", alias = "task_accept")]
-    TaskAccept {
-        task_id: String,
-        worker_id: String,
-    },
+    TaskAccept { task_id: String, worker_id: String },
 
     /// Final outcome and output returned after task execution completes.
     #[serde(alias = "TaskResult", alias = "task_result")]
@@ -1300,7 +1295,10 @@ impl MeshNode {
     }
 
     /// Asynchronously broadcasts a message to all known active local peers.
-    pub async fn broadcast(&self, msg: &MeshMessage) -> Vec<(String, Result<(), MeshNetworkError>)> {
+    pub async fn broadcast(
+        &self,
+        msg: &MeshMessage,
+    ) -> Vec<(String, Result<(), MeshNetworkError>)> {
         let peers = self.active_peers().await;
         let mut futures = Vec::with_capacity(peers.len());
 

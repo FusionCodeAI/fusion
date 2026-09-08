@@ -229,19 +229,28 @@ fn resolve_rule_uri(raw_path: &str, workspace_root: Option<&Path>) -> Option<Pat
 
     if let Some(ws) = workspace_root {
         // 1. <workspace>/.fusion/rules/<name>.md
-        let fusion_rule = ws.join(".fusion").join("rules").join(format!("{base_name}.md"));
+        let fusion_rule = ws
+            .join(".fusion")
+            .join("rules")
+            .join(format!("{base_name}.md"));
         if fusion_rule.exists() {
             return Some(fusion_rule);
         }
 
         // 2. <workspace>/.cursor/rules/<name>.mdc
-        let cursor_rule = ws.join(".cursor").join("rules").join(format!("{base_name}.mdc"));
+        let cursor_rule = ws
+            .join(".cursor")
+            .join("rules")
+            .join(format!("{base_name}.mdc"));
         if cursor_rule.exists() {
             return Some(cursor_rule);
         }
 
         // 3. <workspace>/.claude/rules/<name>.md
-        let claude_rule = ws.join(".claude").join("rules").join(format!("{base_name}.md"));
+        let claude_rule = ws
+            .join(".claude")
+            .join("rules")
+            .join(format!("{base_name}.md"));
         if claude_rule.exists() {
             return Some(claude_rule);
         }

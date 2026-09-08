@@ -12,7 +12,11 @@ use serde_json::json;
 #[test]
 fn test_resolve_skill_directory_skill_md() {
     let dir = tempdir().expect("Failed to create tempdir");
-    let skill_dir = dir.path().join(".fusion").join("skills").join("brainstorming");
+    let skill_dir = dir
+        .path()
+        .join(".fusion")
+        .join("skills")
+        .join("brainstorming");
     fs::create_dir_all(&skill_dir).expect("Failed to create skill dir");
     let skill_file = skill_dir.join("SKILL.md");
     fs::write(
@@ -23,7 +27,10 @@ fn test_resolve_skill_directory_skill_md() {
 
     // Resolve via skill://brainstorming
     let resolved = resolve_internal_uri("skill://brainstorming", Some(dir.path()));
-    assert!(resolved.is_some(), "Expected skill://brainstorming to resolve");
+    assert!(
+        resolved.is_some(),
+        "Expected skill://brainstorming to resolve"
+    );
     assert_eq!(resolved.unwrap(), skill_file);
 }
 
@@ -36,7 +43,10 @@ fn test_resolve_skill_single_file_md() {
     fs::write(&skill_file, "# Code Review Skill\nReview pull requests.").expect("write");
 
     let resolved = resolve_internal_uri("skill://code-review", Some(dir.path()));
-    assert!(resolved.is_some(), "Expected skill://code-review to resolve");
+    assert!(
+        resolved.is_some(),
+        "Expected skill://code-review to resolve"
+    );
     assert_eq!(resolved.unwrap(), skill_file);
 }
 
@@ -51,7 +61,10 @@ fn test_resolve_skill_with_subpath() {
     fs::write(&sub_file, "- [ ] item 1\n- [ ] item 2").expect("write");
 
     let resolved = resolve_internal_uri("skill://my-skill/checklist.md", Some(dir.path()));
-    assert!(resolved.is_some(), "Expected skill://my-skill/checklist.md to resolve");
+    assert!(
+        resolved.is_some(),
+        "Expected skill://my-skill/checklist.md to resolve"
+    );
     assert_eq!(resolved.unwrap(), sub_file);
 }
 
@@ -118,10 +131,22 @@ fn test_resolve_rule_with_extension_in_uri() {
 #[test]
 fn test_resolve_unknown_uris_return_none() {
     let dir = tempdir().expect("Failed to create tempdir");
-    assert_eq!(resolve_internal_uri("skill://nonexistent", Some(dir.path())), None);
-    assert_eq!(resolve_internal_uri("rule://nonexistent", Some(dir.path())), None);
-    assert_eq!(resolve_internal_uri("http://example.com", Some(dir.path())), None);
-    assert_eq!(resolve_internal_uri("file:///tmp/foo", Some(dir.path())), None);
+    assert_eq!(
+        resolve_internal_uri("skill://nonexistent", Some(dir.path())),
+        None
+    );
+    assert_eq!(
+        resolve_internal_uri("rule://nonexistent", Some(dir.path())),
+        None
+    );
+    assert_eq!(
+        resolve_internal_uri("http://example.com", Some(dir.path())),
+        None
+    );
+    assert_eq!(
+        resolve_internal_uri("file:///tmp/foo", Some(dir.path())),
+        None
+    );
     assert_eq!(resolve_internal_uri("src/main.rs", Some(dir.path())), None);
     assert_eq!(resolve_internal_uri("skill://", Some(dir.path())), None);
     assert_eq!(resolve_internal_uri("rule://", Some(dir.path())), None);
@@ -133,7 +158,11 @@ async fn test_file_read_tool_reads_skill_uri() {
     let skill_dir = dir.path().join(".fusion").join("skills").join("planning");
     fs::create_dir_all(&skill_dir).unwrap();
     let skill_file = skill_dir.join("SKILL.md");
-    fs::write(&skill_file, "Line 1: Planning\nLine 2: Design\nLine 3: Execute\n").unwrap();
+    fs::write(
+        &skill_file,
+        "Line 1: Planning\nLine 2: Design\nLine 3: Execute\n",
+    )
+    .unwrap();
 
     let tool = FileReadTool::new();
     let ctx = ToolContext {
@@ -190,7 +219,11 @@ async fn test_file_read_tool_reads_rule_uri_with_selector() {
     let rules_dir = dir.path().join(".fusion").join("rules");
     fs::create_dir_all(&rules_dir).unwrap();
     let rule_file = rules_dir.join("safety.md");
-    fs::write(&rule_file, "Line 1: No eval\nLine 2: No sudo\nLine 3: No leaks\n").unwrap();
+    fs::write(
+        &rule_file,
+        "Line 1: No eval\nLine 2: No sudo\nLine 3: No leaks\n",
+    )
+    .unwrap();
 
     let tool = FileReadTool::new();
     let ctx = ToolContext {

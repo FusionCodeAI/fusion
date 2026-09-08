@@ -12,7 +12,6 @@ pub enum Commands {
     },
 }
 
-
 /// Command line interface arguments for fusion
 #[derive(Parser, Debug, Clone)]
 #[command(

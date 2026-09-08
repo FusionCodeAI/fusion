@@ -302,7 +302,10 @@ impl From<crate::provider::catalog::CatalogModel> for ModelEntry {
         let out_display = cm.formatted_max_output();
         let is_local = cm.provider.eq_ignore_ascii_case("antigravity")
             || cm.provider.eq_ignore_ascii_case("local")
-            || cm.badges.iter().any(|b| b.contains("Free") || b.contains("Local"));
+            || cm
+                .badges
+                .iter()
+                .any(|b| b.contains("Free") || b.contains("Local"));
         Self {
             id: cm.id,
             name: cm.name,
@@ -1584,7 +1587,9 @@ pub fn default_models() -> Vec<ModelEntry> {
         .with_name("Claude Opus 4.6")
         .with_speed("Fast")
         .with_free_pricing()
-        .with_description("Anthropic Claude Opus 4.6 via local Antigravity daemon (127.0.0.1:8045)"),
+        .with_description(
+            "Anthropic Claude Opus 4.6 via local Antigravity daemon (127.0.0.1:8045)",
+        ),
         ModelEntry::with_tokens(
             "claude-sonnet-4-6",
             "antigravity",
@@ -1595,7 +1600,9 @@ pub fn default_models() -> Vec<ModelEntry> {
         .with_name("Claude Sonnet 4.6")
         .with_speed("Ultra-Fast")
         .with_free_pricing()
-        .with_description("Anthropic Claude Sonnet 4.6 via local Antigravity daemon (127.0.0.1:8045)"),
+        .with_description(
+            "Anthropic Claude Sonnet 4.6 via local Antigravity daemon (127.0.0.1:8045)",
+        ),
         ModelEntry::with_tokens(
             "gemini-3.8-flash-high",
             "antigravity",
@@ -1606,8 +1613,9 @@ pub fn default_models() -> Vec<ModelEntry> {
         .with_name("Gemini 3.8 Flash High")
         .with_speed("Ultra-Fast")
         .with_free_pricing()
-        .with_description("Google Gemini 3.8 Flash High via local Antigravity daemon (127.0.0.1:8045)"),
-
+        .with_description(
+            "Google Gemini 3.8 Flash High via local Antigravity daemon (127.0.0.1:8045)",
+        ),
         // Fusion Gateway
         ModelEntry::with_tokens(
             "deepseek-ai/DeepSeek-V4-Flash-0731",

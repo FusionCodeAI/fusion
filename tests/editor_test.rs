@@ -18,12 +18,7 @@ pub mod editor;
 use editor::{
     detect_language, tokenize_line, CursorMove, EditorBuffer, EditorWidget, Language, TokenKind,
 };
-use ratatui::{
-    buffer::Buffer,
-    layout::Rect,
-    style::Color,
-    widgets::Widget,
-};
+use ratatui::{buffer::Buffer, layout::Rect, style::Color, widgets::Widget};
 use std::fs;
 use std::path::Path;
 
@@ -569,15 +564,33 @@ fn test_widget_rendering_dimmed_gutter_numbers() {
 fn test_language_detection() {
     assert_eq!(detect_language(Some(Path::new("file.rs"))), Language::Rust);
     assert_eq!(detect_language(Some(Path::new("app.py"))), Language::Python);
-    assert_eq!(detect_language(Some(Path::new("index.ts"))), Language::TypeScript);
-    assert_eq!(detect_language(Some(Path::new("script.js"))), Language::JavaScript);
-    assert_eq!(detect_language(Some(Path::new("config.toml"))), Language::Toml);
-    assert_eq!(detect_language(Some(Path::new("data.json"))), Language::Json);
-    assert_eq!(detect_language(Some(Path::new("README.md"))), Language::Markdown);
+    assert_eq!(
+        detect_language(Some(Path::new("index.ts"))),
+        Language::TypeScript
+    );
+    assert_eq!(
+        detect_language(Some(Path::new("script.js"))),
+        Language::JavaScript
+    );
+    assert_eq!(
+        detect_language(Some(Path::new("config.toml"))),
+        Language::Toml
+    );
+    assert_eq!(
+        detect_language(Some(Path::new("data.json"))),
+        Language::Json
+    );
+    assert_eq!(
+        detect_language(Some(Path::new("README.md"))),
+        Language::Markdown
+    );
     assert_eq!(detect_language(Some(Path::new("run.sh"))), Language::Shell);
     assert_eq!(detect_language(Some(Path::new("main.c"))), Language::C);
     assert_eq!(detect_language(Some(Path::new("main.go"))), Language::Go);
-    assert_eq!(detect_language(Some(Path::new("unknown.xyz"))), Language::Plain);
+    assert_eq!(
+        detect_language(Some(Path::new("unknown.xyz"))),
+        Language::Plain
+    );
     assert_eq!(detect_language(None), Language::Plain);
 }
 
@@ -587,17 +600,27 @@ fn test_syntax_tokenization_rust() {
     let tokens = tokenize_line(line, Language::Rust);
 
     // Verify keywords
-    assert!(tokens.iter().any(|t| t.kind == TokenKind::Keyword && t.text == "pub"));
-    assert!(tokens.iter().any(|t| t.kind == TokenKind::Keyword && t.text == "fn"));
+    assert!(tokens
+        .iter()
+        .any(|t| t.kind == TokenKind::Keyword && t.text == "pub"));
+    assert!(tokens
+        .iter()
+        .any(|t| t.kind == TokenKind::Keyword && t.text == "fn"));
 
     // Verify function name
-    assert!(tokens.iter().any(|t| t.kind == TokenKind::Function && t.text == "add"));
+    assert!(tokens
+        .iter()
+        .any(|t| t.kind == TokenKind::Function && t.text == "add"));
 
     // Verify types
-    assert!(tokens.iter().any(|t| t.kind == TokenKind::Type && t.text == "usize"));
+    assert!(tokens
+        .iter()
+        .any(|t| t.kind == TokenKind::Type && t.text == "usize"));
 
     // Verify comments
-    assert!(tokens.iter().any(|t| t.kind == TokenKind::Comment && t.text.contains("adds one")));
+    assert!(tokens
+        .iter()
+        .any(|t| t.kind == TokenKind::Comment && t.text.contains("adds one")));
 }
 
 #[test]
@@ -605,10 +628,18 @@ fn test_syntax_tokenization_python() {
     let line = "def greet(name: str = 'world'): # greeting";
     let tokens = tokenize_line(line, Language::Python);
 
-    assert!(tokens.iter().any(|t| t.kind == TokenKind::Keyword && t.text == "def"));
-    assert!(tokens.iter().any(|t| t.kind == TokenKind::Function && t.text == "greet"));
-    assert!(tokens.iter().any(|t| t.kind == TokenKind::StringLiteral && t.text == "'world'"));
-    assert!(tokens.iter().any(|t| t.kind == TokenKind::Comment && t.text.contains("greeting")));
+    assert!(tokens
+        .iter()
+        .any(|t| t.kind == TokenKind::Keyword && t.text == "def"));
+    assert!(tokens
+        .iter()
+        .any(|t| t.kind == TokenKind::Function && t.text == "greet"));
+    assert!(tokens
+        .iter()
+        .any(|t| t.kind == TokenKind::StringLiteral && t.text == "'world'"));
+    assert!(tokens
+        .iter()
+        .any(|t| t.kind == TokenKind::Comment && t.text.contains("greeting")));
 }
 
 #[test]
@@ -616,8 +647,16 @@ fn test_syntax_tokenization_numbers_and_strings() {
     let line = "let x = 42 + 3.14 + 0xff; let s = \"string\\\"value\";";
     let tokens = tokenize_line(line, Language::Rust);
 
-    assert!(tokens.iter().any(|t| t.kind == TokenKind::NumberLiteral && t.text == "42"));
-    assert!(tokens.iter().any(|t| t.kind == TokenKind::NumberLiteral && t.text == "3.14"));
-    assert!(tokens.iter().any(|t| t.kind == TokenKind::NumberLiteral && t.text == "0xff"));
-    assert!(tokens.iter().any(|t| t.kind == TokenKind::StringLiteral && t.text == "\"string\\\"value\""));
+    assert!(tokens
+        .iter()
+        .any(|t| t.kind == TokenKind::NumberLiteral && t.text == "42"));
+    assert!(tokens
+        .iter()
+        .any(|t| t.kind == TokenKind::NumberLiteral && t.text == "3.14"));
+    assert!(tokens
+        .iter()
+        .any(|t| t.kind == TokenKind::NumberLiteral && t.text == "0xff"));
+    assert!(tokens
+        .iter()
+        .any(|t| t.kind == TokenKind::StringLiteral && t.text == "\"string\\\"value\""));
 }

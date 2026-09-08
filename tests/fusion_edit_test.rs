@@ -43,11 +43,15 @@ fn test_hashline_header_formatting_and_detection() {
     assert_eq!(format_numbered_line(1, "hello"), "1:hello");
     assert_eq!(format_numbered_lines("foo\nbar\n", 1), "1:foo\n2:bar\n3:");
 
-    assert!(contains_recognizable_hashline_operations("PUT 1.=1:\n+test"));
+    assert!(contains_recognizable_hashline_operations(
+        "PUT 1.=1:\n+test"
+    ));
     assert!(contains_recognizable_hashline_operations("CUT 5.=10"));
     assert!(contains_recognizable_hashline_operations("PUT <1:\n+first"));
     assert!(contains_recognizable_hashline_operations("PUT >5:\n+after"));
-    assert!(!contains_recognizable_hashline_operations("just plain text\nwithout ops"));
+    assert!(!contains_recognizable_hashline_operations(
+        "just plain text\nwithout ops"
+    ));
 }
 
 #[test]
@@ -88,7 +92,10 @@ fn test_parse_patch_block_deletion() {
         .find(|e| matches!(e, Edit::Cut { .. }))
         .expect("must contain an Edit::Cut");
 
-    if let Edit::Cut { range, register, .. } = cut_edit {
+    if let Edit::Cut {
+        range, register, ..
+    } = cut_edit
+    {
         assert_eq!(range.start.line, 5);
         assert_eq!(range.end.line, 10);
         assert_eq!(*register, None);
@@ -118,13 +125,20 @@ PUT 1.=1:
 [src/b.rs#2222]
 CUT 5.=10
 "#;
-    let patch = Patch::parse(patch_text, &default_options()).expect("should parse multi-section patch");
+    let patch =
+        Patch::parse(patch_text, &default_options()).expect("should parse multi-section patch");
     assert_eq!(patch.sections.len(), 2);
 
     assert_eq!(patch.sections[0].path, "src/a.rs");
     assert_eq!(patch.sections[0].file_hash.as_deref(), Some("1111"));
     let parsed_a = patch.sections[0].parse().expect("section a should parse");
-    assert!(parsed_a.edits.iter().any(|e| matches!(e, Edit::Insert { replacement: true, .. })));
+    assert!(parsed_a.edits.iter().any(|e| matches!(
+        e,
+        Edit::Insert {
+            replacement: true,
+            ..
+        }
+    )));
 
     assert_eq!(patch.sections[1].path, "src/b.rs");
     assert_eq!(patch.sections[1].file_hash.as_deref(), Some("2222"));
@@ -247,8 +261,7 @@ fn test_apply_block_deletion_middle() {
     .expect("apply failed");
 
     let expected_lines = vec![
-        "line 1", "line 2", "line 3", "line 4",
-        // lines 5..=10 cut
+        "line 1", "line 2", "line 3", "line 4", // lines 5..=10 cut
         "line 11", "line 12", "line 13", "line 14", "line 15",
     ];
     let expected = format!("{}\n", expected_lines.join("\n"));

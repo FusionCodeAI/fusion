@@ -44,24 +44,24 @@ mod wellknownvars;
 
 /// Re-export parser types used in core definitions.
 pub mod parser {
-	pub use brush_parser::{
-		BindingParseError, ParseError, ParserImpl, SourcePosition, SourcePositionOffset, SourceSpan,
-		TestCommandParseError, WordParseError, ast,
-	};
+    pub use brush_parser::{
+        BindingParseError, ParseError, ParserImpl, SourcePosition, SourcePositionOffset,
+        SourceSpan, TestCommandParseError, WordParseError, ast,
+    };
 }
 
 pub use commands::{CommandArg, ExecutionContext};
 pub use error::{BuiltinError, Error, ErrorKind};
 pub use extensions::ShellExtensions;
 pub use interp::{
-	ExecutionParameters, ExternalCommandInfo, ExternalCommandOutputMarker,
-	ExternalCommandOutputMarkers, ProcessGroupPolicy, SpawnObserver,
+    ExecutionParameters, ExternalCommandInfo, ExternalCommandOutputMarker,
+    ExternalCommandOutputMarkers, ProcessGroupPolicy, SpawnObserver,
 };
 pub use parser::{SourcePosition, SourcePositionOffset, SourceSpan};
 pub use results::{ExecutionControlFlow, ExecutionExitCode, ExecutionResult, ExecutionSpawnResult};
 pub use shell::{
-	CreateOptions, ProfileLoadBehavior, RcLoadBehavior, Shell, ShellBuilder, ShellBuilderState,
-	ShellFd, ShellState,
+    CreateOptions, ProfileLoadBehavior, RcLoadBehavior, Shell, ShellBuilder, ShellBuilderState,
+    ShellFd, ShellState,
 };
 pub use sourceinfo::SourceInfo;
 pub use variables::{ShellValue, ShellVariable};

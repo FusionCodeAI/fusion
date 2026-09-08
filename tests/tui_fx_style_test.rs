@@ -537,17 +537,17 @@ fn test_completed_turn_summary_formatting() {
     // 5s (↑1 ↓57) with leading blank line before the summary
     let summary1 = format_turn_summary(Duration::from_secs(5), 1, 57);
     let plain1 = strip_ansi(&summary1);
-    assert_eq!(plain1, "\r\n  5s (↑1 ↓57)\r\n\r\n");
+    assert_eq!(plain1, "\r\n  5s · 11.4 tok/s (↑1 ↓57)\r\n\r\n");
 
     // 1m7s (↑5 ↓1.2k)
     let summary2 = format_turn_summary(Duration::from_secs(67), 5, 1200);
     let plain2 = strip_ansi(&summary2);
-    assert_eq!(plain2, "\r\n  1m7s (↑5 ↓1.2k)\r\n\r\n");
+    assert_eq!(plain2, "\r\n  1m7s · 17.9 tok/s (↑5 ↓1.2k)\r\n\r\n");
 
     // 1h2m3s (↑45k ↓120k)
     let summary3 = format_turn_summary(Duration::from_secs(3723), 45000, 120000);
     let plain3 = strip_ansi(&summary3);
-    assert_eq!(plain3, "\r\n  1h2m3s (↑45k ↓120k)\r\n\r\n");
+    assert_eq!(plain3, "\r\n  1h2m3s · 32.2 tok/s (↑45k ↓120k)\r\n\r\n");
 }
 
 // ===========================================================================
@@ -766,7 +766,7 @@ fn test_full_turn_lifecycle_in_memory() {
     assert!(plain_log.contains("├ Read src/agent/mesh.rs"));
     assert!(plain_log.contains("└ Edited src/agent/mesh.rs"));
     assert!(plain_log.contains("  I investigated and fixed the memory leak"));
-    assert!(plain_log.contains("  3s (↑120 ↓85)"));
+    assert!(plain_log.contains("  3s") && plain_log.contains("(↑120 ↓85)"));
 }
 
 // ===========================================================================
@@ -1327,8 +1327,8 @@ fn test_fx_image1_render_tool_tree_surrounded_by_blank_lines() {
     render_tool_tree_to(&mut buf, &items).expect("render_tool_tree_to should succeed");
     let plain = strip_ansi(&String::from_utf8_lossy(&buf));
     assert!(
-        plain.starts_with("\r\n● 1 tool call · 1 command\r\n└ Ran which browser-use || python3 -m site --user-base\r\n\r\n")
-            || plain.starts_with("\n● 1 tool call · 1 command\n└ Ran which browser-use || python3 -m site --user-base\n\n"),
+        plain.starts_with("\r\n  ● 1 tool call · 1 command\r\n  └ Ran which browser-use || python3 -m site --user-base\r\n\r\n")
+            || plain.starts_with("\n  ● 1 tool call · 1 command\n  └ Ran which browser-use || python3 -m site --user-base\n\n"),
         "Tool tree output must be surrounded by blank lines, got: {:?}",
         plain
     );
@@ -1404,7 +1404,7 @@ fn test_fx_image1_live_tool_and_turn_lifecycle_no_double_bar() {
     assert!(plain.contains("┃ find browser-use"));
     assert!(plain.contains("● 1 tool call · 1 command"));
     assert!(plain.contains("└ Ran which browser-use || python3 -m site --user-base"));
-    assert!(plain.contains("  1m10s (↑9 ↓641)"));
+    assert!(plain.contains("  1m10s") && plain.contains("(↑9 ↓641)"));
 }
 
 // ===========================================================================
@@ -2463,7 +2463,8 @@ fn test_tool_group_header_and_branches_4_calls_exact_fx_parity() {
     render_tool_tree_to(&mut buf, &items).expect("render_tool_tree_to must succeed");
     let raw_out = String::from_utf8_lossy(&buf);
     let plain_out = strip_ansi(&raw_out);
-    assert_eq!(plain_out.trim().replace("\r\n", "\n"), formatted.trim());
+    let unindented = plain_out.lines().map(|l| l.trim_start()).collect::<Vec<_>>().join("\n");
+    assert_eq!(unindented.trim(), formatted.trim());
     // Verify ANSI codes are present for bullet and connectors
     assert!(raw_out.contains("●"), "Should contain bullet in raw ANSI");
     assert!(
@@ -2541,8 +2542,10 @@ fn test_tool_group_header_and_branches_8_calls_exact_fx_parity() {
 
     let mut buf = Vec::new();
     render_tool_tree_to(&mut buf, &items).expect("render_tool_tree_to must succeed");
-    let plain_out = strip_ansi(&String::from_utf8_lossy(&buf));
-    assert_eq!(plain_out.trim().replace("\r\n", "\n"), formatted.trim());
+    let raw_out = String::from_utf8_lossy(&buf);
+    let plain_out = strip_ansi(&raw_out);
+    let unindented = plain_out.lines().map(|l| l.trim_start()).collect::<Vec<_>>().join("\n");
+    assert_eq!(unindented.trim(), formatted.trim());
 }
 
 #[test]
@@ -2882,7 +2885,7 @@ fn test_prompt_queue_streaming_persistence_lifecycle() {
 
     // 7. Turn completes: agent prints completed turn summary with a blank line before
     let summary = format_turn_summary(Duration::from_secs(86), 4, 1300);
-    assert_eq!(strip_ansi(&summary), "\r\n  1m26s (↑4 ↓1.3k)\r\n\r\n");
+    assert_eq!(strip_ansi(&summary), "\r\n  1m26s · 15.1 tok/s (↑4 ↓1.3k)\r\n\r\n");
 
     // Reset running status for turn completion
     prompt.set_running(false);
