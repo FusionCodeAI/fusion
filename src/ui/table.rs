@@ -112,8 +112,8 @@ pub fn visible_width(s: &str) -> usize {
     width
 }
 
-/// Returns true if character is zero-width (combining mark, format code, zero-width space).
-fn is_zero_width(c: char) -> bool {
+/// Returns true if character is zero-width (combining mark, format code, zero-width space, or Burmese diacritic).
+pub fn is_zero_width(c: char) -> bool {
     matches!(c,
         '\u{00AD}' // Soft hyphen
         | '\u{200B}'..='\u{200F}' // Zero width space, joiners, marks
@@ -125,11 +125,26 @@ fn is_zero_width(c: char) -> bool {
         | '\u{1DC0}'..='\u{1DFF}'
         | '\u{20D0}'..='\u{20FF}'
         | '\u{FE20}'..='\u{FE2F}'
+        // Burmese / Myanmar combining marks, vowels, killers, medials & tones
+        | '\u{102D}'..='\u{1030}' // Vowel signs i, ii, u, uu
+        | '\u{1032}' // Vowel sign ai
+        | '\u{1036}'..='\u{103A}' // Anusvara, dot below, visarga, virama, asat
+        | '\u{103B}'..='\u{103E}' // Medials ya, ra, wa, ha
+        | '\u{1058}'..='\u{1059}' // Mon vowel signs
+        | '\u{105E}'..='\u{1060}' // Mon signs
+        | '\u{1062}'..='\u{1064}' // Karen vowel signs
+        | '\u{1067}'..='\u{106D}' // Karen tone marks
+        | '\u{1071}'..='\u{1074}' // Shan vowel signs
+        | '\u{1082}'..='\u{108D}' // Shan & Palaung signs
+        | '\u{108F}' // Pao tone mark
+        | '\u{109A}'..='\u{109D}' // Khamti Shan signs
+        | '\u{A9E5}' // Shan tone mark
+        | '\u{AA7B}'..='\u{AA7D}' // Tai Laing tone marks
     )
 }
 
 /// Returns true if character has double-width display on monospace terminal.
-fn is_wide_char(c: char) -> bool {
+pub fn is_wide_char(c: char) -> bool {
     matches!(c,
         '\u{1100}'..='\u{115F}' // Hangul Jamo
         | '\u{2E80}'..='\u{303E}' // CJK Radicals, Kangxi, CJK Symbols

@@ -1260,8 +1260,8 @@ impl Prompt {
             } else {
                 clean_status.to_string()
             };
-            write!(out, "\r\x1b[2K  \x1b[2;37m{}\x1b[0m\r\n\r\n", display_status)?;
-            2
+            write!(out, "\r\x1b[2K\r\n\r\x1b[2K  \x1b[2;37m{}\x1b[0m\r\n\r\n", display_status)?;
+            3
         } else {
             0
         };
@@ -2059,21 +2059,7 @@ fn slash_matches(typed: &str, skills: &[SlashSuggestion]) -> Vec<SlashSuggestion
 /// Calculate visible character width by ignoring ANSI escape codes.
 /// Wide (CJK) characters count 2 columns via `unicode-width`.
 fn visible_width(s: &str) -> usize {
-    let mut in_escape = false;
-    let mut width = 0;
-    for c in s.chars() {
-        if c == '\x1b' {
-            in_escape = true;
-        } else if in_escape {
-            if c == 'm' || (c.is_ascii_alphabetic() && c != '[') {
-                in_escape = false;
-            }
-        } else {
-            let mut buf = [0u8; 4];
-            width += UnicodeWidthStr::width(c.encode_utf8(&mut buf));
-        }
-    }
-    width
+    crate::ui::table::visible_width(s)
 }
 
 /// Extract line ranges and cursor coordinates from buffer.
@@ -2095,7 +2081,8 @@ fn get_line_info(buffer: &[char], cursor_pos: usize) -> (usize, usize, Vec<(usiz
     for (line_idx, &(start, len)) in ranges.iter().enumerate() {
         if cursor_pos >= start && cursor_pos <= start + len {
             cur_line = line_idx;
-            cur_col = cursor_pos - start;
+            let slice: String = buffer[start..cursor_pos].iter().collect();
+            cur_col = crate::ui::table::visible_width(&slice);
             break;
         }
     }
@@ -2756,8 +2743,8 @@ mod tests {
             raw
         );
         assert_eq!(
-            last_cursor, 4,
-            "last_cursor_row should be 4 (2 running + 2 queue banner + 0 target_row)"
+            last_cursor, 5,
+            "last_cursor_row should be 5 (3 running + 2 queue banner + 0 target_row)"
         );
     }
 
@@ -2791,8 +2778,8 @@ mod tests {
             raw
         );
         assert_eq!(
-            last_cursor, 2,
-            "last_cursor_row should be 2 (2 running + 0 queue banner + 0 target_row)"
+            last_cursor, 3,
+            "last_cursor_row should be 3 (3 running + 0 queue banner + 0 target_row)"
         );
     }
 
@@ -2823,9 +2810,25 @@ mod tests {
             raw
         );
         assert_eq!(
-            last_cursor, 2,
-            "last_cursor_row should still be 2 (single unwrapped line + 1 blank line)"
+            last_cursor, 3,
+            "last_cursor_row should be 3 (line above + status line + line below)"
         );
+    }
+
+    #[test]
+    fn test_burmese_unicode_cursor_column_and_width() {
+        // "မင်္ဂလာပါ" has 9 Unicode code points and 7 visual columns on monospace terminal
+        // (မ:1, င:1, ်:0, ္:0, ဂ:1, လ:1, ာ:1, ပ:1, ာ:1 = 7 visual cols vs naive char count 9)
+        let text = "မင်္ဂလာပါ";
+        assert_eq!(crate::ui::table::visible_width(text), 7);
+
+        let buf: Vec<char> = text.chars().collect();
+        assert_eq!(buf.len(), 9);
+
+        // Cursor at character position 9 (end of word)
+        let (line, col, _) = get_line_info(&buf, 9);
+        assert_eq!(line, 0);
+        assert_eq!(col, 7, "Visual column must be 7 (not naive char count 9)");
     }
 
     #[test]
