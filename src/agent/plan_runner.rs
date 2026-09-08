@@ -135,6 +135,9 @@ pub struct PlanSummary {
     pub completed_stages: usize,
     /// Total wall-clock execution duration in milliseconds.
     pub wall_duration_ms: u64,
+    /// Total tokens consumed during plan execution.
+    #[serde(default)]
+    pub tokens_spent: u64,
     /// Task outputs keyed by task ID.
     pub task_results: HashMap<String, String>,
     /// Individual stage execution results.
@@ -144,7 +147,151 @@ pub struct PlanSummary {
 impl PlanSummary {
     /// Returns true if all tasks in the plan succeeded with zero failures.
     pub fn is_success(&self) -> bool {
-        self.failed_tasks == 0 && self.completed_tasks == self.total_tasks
+        self.failed_tasks == 0 && self.completed_tasks == self.total_tasks && self.total_tasks > 0
+    }
+
+    /// Constructs a `PlanSummary` snapshot directly from a `SubagentDag`.
+    pub fn from_dag(dag: &SubagentDag) -> Self {
+        let mut completed_tasks = 0;
+        let mut failed_tasks = 0;
+        let mut skipped_tasks = 0;
+        let mut task_results = HashMap::new();
+        let mut tokens_spent: u64 = 0;
+
+        for (id, task) in &dag.tasks {
+            match &task.status {
+                DagTaskStatus::Completed { output, .. } => {
+                    completed_tasks += 1;
+                    task_results.insert(id.clone(), output.clone());
+                    tokens_spent += crate::agent::tokens::estimate_text_tokens(&task.description) as u64;
+                    tokens_spent += crate::agent::tokens::estimate_text_tokens(output) as u64;
+                }
+                DagTaskStatus::Failed { .. } => {
+                    failed_tasks += 1;
+                }
+                DagTaskStatus::Skipped { .. } => {
+                    skipped_tasks += 1;
+                }
+                _ => {}
+            }
+        }
+
+        let (total_stages, completed_stages) = if dag.stages.is_empty() {
+            let mut dag_clone = dag.clone();
+            if dag_clone.compute_stages().is_ok() {
+                let total = dag_clone.stages.len();
+                let completed = dag_clone
+                    .stages
+                    .iter()
+                    .filter(|s| {
+                        s.status == StageStatus::Completed
+                            || (!s.task_ids.is_empty()
+                                && s.task_ids.iter().all(|tid| {
+                                    dag.tasks
+                                        .get(tid)
+                                        .map(|t| t.status.is_completed())
+                                        .unwrap_or(false)
+                                }))
+                    })
+                    .count();
+                (total, completed)
+            } else {
+                (0, 0)
+            }
+        } else {
+            let total = dag.stages.len();
+            let completed = dag
+                .stages
+                .iter()
+                .filter(|s| {
+                    s.status == StageStatus::Completed
+                        || (!s.task_ids.is_empty()
+                            && s.task_ids.iter().all(|tid| {
+                                dag.tasks
+                                    .get(tid)
+                                    .map(|t| t.status.is_completed())
+                                    .unwrap_or(false)
+                            }))
+                })
+                .count();
+            (total, completed)
+        };
+
+        PlanSummary {
+            dag_id: dag.id.clone(),
+            dag_name: dag.name.clone(),
+            goal: dag.goal.clone(),
+            overall_status: dag.overall_status(),
+            total_tasks: dag.task_count(),
+            completed_tasks,
+            failed_tasks,
+            skipped_tasks,
+            total_stages,
+            completed_stages,
+            wall_duration_ms: 0,
+            tokens_spent,
+            task_results,
+            stage_results: Vec::new(),
+        }
+    }
+
+    /// Formats the summary into a clean report showing stages executed,
+    /// subagent tasks run, tokens spent, and final status (`[✓] Completed in N stages`).
+    pub fn format_report(&self) -> String {
+        let mut out = String::new();
+        out.push_str(&format!("Plan Execution Report: {} (ID: {})\n", self.dag_name, self.dag_id));
+        out.push_str(&format!("Goal: {}\n", self.goal));
+        out.push_str(&"=".repeat(60));
+        out.push('\n');
+
+        let status_str = if self.is_success() {
+            format!("[✓] Completed in {} stages", self.total_stages)
+        } else {
+            match self.overall_status {
+                DagOverallStatus::Completed => {
+                    format!("[✓] Completed in {} stages", self.completed_stages)
+                }
+                DagOverallStatus::Failed => {
+                    format!("[✗] Failed ({} of {} stages completed)", self.completed_stages, self.total_stages)
+                }
+                DagOverallStatus::InProgress => {
+                    format!("[•] In Progress ({} of {} stages completed)", self.completed_stages, self.total_stages)
+                }
+                DagOverallStatus::PartiallyCompleted => {
+                    format!("[⏸] Partially Completed ({} of {} stages)", self.completed_stages, self.total_stages)
+                }
+                DagOverallStatus::Cancelled => "[✗] Cancelled".to_string(),
+                DagOverallStatus::NotStarted => {
+                    format!("[·] Ready ({} stages)", self.total_stages)
+                }
+            }
+        };
+
+        out.push_str(&format!("Status:              {}\n", status_str));
+        out.push_str(&format!("Stages Executed:     {}/{} completed\n", self.completed_stages, self.total_stages));
+        out.push_str(&format!("Subagent Tasks Run:  {} completed, {} failed, {} skipped ({} total)\n",
+            self.completed_tasks, self.failed_tasks, self.skipped_tasks, self.total_tasks));
+        out.push_str(&format!("Tokens Spent:        {}\n", self.tokens_spent));
+        if self.wall_duration_ms > 0 {
+            out.push_str(&format!("Duration:            {}ms\n", self.wall_duration_ms));
+        }
+
+        if !self.task_results.is_empty() {
+            out.push_str("\nTask Outputs:\n");
+            let mut task_ids: Vec<_> = self.task_results.keys().collect();
+            task_ids.sort();
+            for task_id in task_ids {
+                let output = &self.task_results[task_id];
+                let preview = if output.len() > 120 {
+                    format!("{}...", &output[..120])
+                } else {
+                    output.clone()
+                };
+                out.push_str(&format!("  • [{}]: {}\n", task_id, preview.trim()));
+            }
+        }
+
+        out
     }
 
     /// Formats the summary into a structured Markdown document.
@@ -163,10 +310,13 @@ impl PlanSummary {
             self.completed_stages, self.total_stages
         ));
         out.push_str(&format!(
+            "- **Tokens Spent:** {}\n",
+            self.tokens_spent
+        ));
+        out.push_str(&format!(
             "- **Wall Clock Time:** {}ms\n\n",
             self.wall_duration_ms
         ));
-
         if !self.task_results.is_empty() {
             out.push_str("## Task Results\n\n");
             let mut sorted_keys: Vec<_> = self.task_results.keys().collect();
@@ -376,6 +526,16 @@ impl PlanRunner {
             .filter(|s| s.status == StageStatus::Completed)
             .count();
 
+        let mut tokens_spent = self.manager.fleet_metrics().total_tokens;
+        if tokens_spent == 0 {
+            for task in self.dag.tasks.values() {
+                if let DagTaskStatus::Completed { ref output, .. } = task.status {
+                    tokens_spent += crate::agent::tokens::estimate_text_tokens(&task.description) as u64;
+                    tokens_spent += crate::agent::tokens::estimate_text_tokens(output) as u64;
+                }
+            }
+        }
+
         PlanSummary {
             dag_id: self.dag.id.clone(),
             dag_name: self.dag.name.clone(),
@@ -388,6 +548,7 @@ impl PlanRunner {
             total_stages: self.dag.stages.len(),
             completed_stages,
             wall_duration_ms: 0,
+            tokens_spent,
             task_results,
             stage_results: Vec::new(),
         }
@@ -595,6 +756,16 @@ impl PlanRunner {
             .count();
         let completed_stages = stage_results.iter().filter(|s| s.success).count();
 
+        let mut tokens_spent = self.manager.fleet_metrics().total_tokens;
+        if tokens_spent == 0 {
+            for task in self.dag.tasks.values() {
+                if let DagTaskStatus::Completed { ref output, .. } = task.status {
+                    tokens_spent += crate::agent::tokens::estimate_text_tokens(&task.description) as u64;
+                    tokens_spent += crate::agent::tokens::estimate_text_tokens(output) as u64;
+                }
+            }
+        }
+
         Ok(PlanSummary {
             dag_id: self.dag.id.clone(),
             dag_name: self.dag.name.clone(),
@@ -607,6 +778,7 @@ impl PlanRunner {
             total_stages,
             completed_stages,
             wall_duration_ms,
+            tokens_spent,
             task_results: all_outputs,
             stage_results,
         })

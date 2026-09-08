@@ -7,7 +7,10 @@ pub mod slash_plan;
 
 use fusion::agent::planner_dag::{DagTask, DagTaskPriority, SubagentDag};
 use fusion::agent::subagent::SubagentRole;
-use slash_plan::{handle_goal_command, handle_plan_command, StandardFeature};
+use slash_plan::{
+    execute_active_plan, format_execution_report, handle_goal_command, handle_plan_command,
+    StandardFeature,
+};
 
 // =========================================================================
 // 1. Tests for `handle_goal_command`
@@ -120,6 +123,17 @@ fn test_handle_plan_command_cancel_no_active_dag() {
     assert!(output.contains("No active plan to cancel"));
 }
 
+#[test]
+fn test_handle_plan_command_run_no_active_dag() {
+    for cmd in &["run", "execute", "start"] {
+        let output = handle_plan_command(&[cmd.to_string()], None);
+        assert_eq!(
+            output,
+            "No active plan to run. Use /goal <objective> first to create a plan."
+        );
+    }
+}
+
 // =========================================================================
 // 3. Tests for `handle_plan_command` with an active DAG
 // =========================================================================
@@ -166,6 +180,36 @@ fn test_handle_plan_command_cancel_active() {
     let output = handle_plan_command(&["cancel".to_string()], Some(&dag));
 
     assert!(output.contains("cancelled and reset"));
+}
+
+#[test]
+fn test_handle_plan_command_run_active() {
+    let (_, dag) = handle_goal_command("Implement rate limiter middleware");
+    for cmd in &["run", "execute", "start"] {
+        let output = handle_plan_command(&[cmd.to_string()], Some(&dag));
+        assert!(output.contains("Plan Execution Report:"));
+        assert!(output.contains(&dag.name));
+        assert!(output.contains("Status:"));
+        assert!(output.contains("Stages Executed:"));
+        assert!(output.contains("Subagent Tasks Run:"));
+        assert!(output.contains("Tokens Spent:"));
+    }
+}
+
+#[test]
+fn test_handle_plan_command_run_completed_dag() {
+    let (_, mut dag) = handle_goal_command("Implement rate limiter middleware");
+    // Compute stages and complete all tasks
+    dag.compute_stages().unwrap();
+    let task_ids: Vec<String> = dag.tasks.keys().cloned().collect();
+    for id in task_ids {
+        dag.mark_task_completed(&id, "Output for task".to_string(), 100);
+    }
+    let num_stages = dag.stages.len();
+
+    let output = handle_plan_command(&["run".to_string()], Some(&dag));
+    assert!(output.contains(&format!("[✓] Completed in {} stages", num_stages)));
+    assert!(output.contains(&format!("Stages Executed:     {}/{} completed", num_stages, num_stages)));
 }
 
 // =========================================================================
@@ -304,4 +348,39 @@ fn test_standard_feature_constant() {
             include_security_audit: true,
         }
     );
+}
+
+// =========================================================================
+// 6. Tests for `execute_active_plan` and `format_execution_report`
+// =========================================================================
+
+#[test]
+fn test_format_execution_report_structure() {
+    let (_, dag) = handle_goal_command("Implement rate limiter middleware");
+    let summary = fusion::agent::plan_runner::PlanSummary::from_dag(&dag);
+    let report = format_execution_report(&summary);
+
+    assert!(report.contains("Plan Execution Report:"));
+    assert!(report.contains(&dag.name));
+    assert!(report.contains("Goal:"));
+    assert!(report.contains("Status:"));
+    assert!(report.contains("Stages Executed:"));
+    assert!(report.contains("Subagent Tasks Run:"));
+    assert!(report.contains("Tokens Spent:"));
+}
+
+#[tokio::test]
+async fn test_execute_active_plan_empty_dag() {
+    let mut dag = SubagentDag::new("Empty Plan", "Do nothing");
+    let client = std::sync::Arc::new(fusion::provider::LlmClient::new());
+    let manager = fusion::agent::subagent::SubagentManager::new(
+        client,
+        fusion::config::Config::default(),
+        fusion::tools::ToolRegistry::new(),
+    );
+
+    let result = execute_active_plan(&mut dag, &manager).await;
+    assert!(result.is_err());
+    let err = result.unwrap_err();
+    assert_eq!(err, fusion::agent::plan_runner::PlanRunnerError::EmptyPlan);
 }

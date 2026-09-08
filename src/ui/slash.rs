@@ -126,6 +126,8 @@ pub enum SlashCommand {
     Plan { args: Vec<String> },
     /// Inspect active and recent subagent worker tasks: `/subagents` or `/workers`
     Subagents { args: Vec<String> },
+    /// View side-by-side git working tree diffs: `/diff [path]`
+    Diff { path: Option<String> },
     /// Unrecognized slash command.
     Unknown { name: String, args: Vec<String> },
 }
@@ -613,6 +615,14 @@ pub static COMMAND_PALETTE: &[CommandDescriptor] = &[
         description: "Inspect active background subagent workers and execution status",
         examples: &["/subagents", "/workers"],
     },
+    CommandDescriptor {
+        name: "/diff",
+        aliases: &["/d"],
+        syntax: "/diff [path]",
+        category: CommandCategory::Core,
+        description: "View side-by-side git diff of working tree changes",
+        examples: &["/diff", "/diff src/main.rs"],
+    },
 ];
 
 /// Returns all static command palette entries.
@@ -774,6 +784,10 @@ impl SlashCommand {
             },
             "/subagents" | "/subagent" | "/workers" | "/worker" => SlashCommand::Subagents {
                 args: args.to_vec(),
+            },
+            "/diff" | "/d" => {
+                let path = args.first().cloned();
+                SlashCommand::Diff { path }
             },
             _ => SlashCommand::Unknown {
                 name: tokens[0].clone(),
@@ -1201,6 +1215,10 @@ pub fn execute_slash_command(
             handle_subagents(args, runner);
             CommandResult::Continue
         }
+        SlashCommand::Diff { path } => {
+            handle_diff(path.as_deref(), runner);
+            CommandResult::Continue
+        }
         SlashCommand::Unknown { name, args } => {
             handle_unknown(name, args);
             CommandResult::Continue
@@ -1246,6 +1264,24 @@ fn handle_subagents(_args: &[String], runner: &mut AgentRunner) {
             println!("    \x1b[2;37mTask: {}\x1b[0m", info.task);
         }
         println!();
+    }
+}
+
+fn handle_diff(_path: Option<&str>, runner: &mut AgentRunner) {
+    let diff_result = crate::ui::diff_viewer::git_working_tree_diff(&runner.tool_ctx().cwd);
+    match diff_result {
+        Ok(diff_text) => {
+            if diff_text.trim().is_empty() {
+                println!("\x1b[1;32m✓ Working tree clean\x1b[0m — no uncommitted modifications.");
+            } else {
+                let term_width = crate::ui::table::get_terminal_width().max(60);
+                let rendered = crate::ui::diff_viewer::SideBySideDiffViewer::render_diff_terminal(&diff_text, term_width);
+                println!("{}", rendered);
+            }
+        }
+        Err(e) => {
+            println!("\x1b[1;31m✗ Failed to compute git diff:\x1b[0m {}", e);
+        }
     }
 }
 

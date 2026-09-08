@@ -17,6 +17,7 @@ pub mod metrics;
 pub mod plan;
 pub mod planner_dag;
 pub mod pricing_sync;
+pub mod context_injector;
 pub mod prompt_lib;
 pub mod prompts;
 pub mod pruner;

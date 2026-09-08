@@ -1,7 +1,11 @@
 //! Integration and unit tests for tool policy engine (`src/agent/tool_policy.rs`).
 
-#[path = "../src/agent/tool_policy.rs"]
-mod tool_policy;
+use fusion::agent::loop_runner::AgentRunner;
+use fusion::agent::tool_policy;
+use fusion::config::Config;
+use fusion::provider::types::ToolCall;
+use fusion::provider::LlmClient;
+use fusion::tools::{default_registry, ToolContext};
 
 use std::fs;
 use serde_json::json;
@@ -613,4 +617,178 @@ fn test_policy_error_formatting() {
 
     let config_err = PolicyError::Config("missing field".to_string());
     assert!(config_err.to_string().contains("missing field"));
+}
+
+// ============================================================================
+// 10. AgentRunner Policy Evaluation & Interception Tests
+// ============================================================================
+
+fn create_test_runner(cwd: Option<std::path::PathBuf>) -> AgentRunner {
+    let client = LlmClient::new();
+    let config = Config::default();
+    let tools = default_registry();
+    let tool_ctx = ToolContext {
+        cwd: cwd.unwrap_or_else(|| std::env::current_dir().unwrap_or_default()),
+        ..Default::default()
+    };
+    AgentRunner::new(client, config, tools, tool_ctx)
+}
+
+#[test]
+fn test_agent_runner_default_tool_policy_initialization() {
+    let runner = create_test_runner(None);
+
+    // Safe read-only tool allowed
+    let allow_dec = runner
+        .tool_policy()
+        .evaluate("read", &json!({ "path": "src/main.rs" }));
+    assert!(allow_dec.is_allow());
+
+    // Destructive bash command denied
+    let deny_dec = runner
+        .tool_policy()
+        .evaluate("bash", &json!({ "command": "rm -rf /" }));
+    assert!(deny_dec.is_deny());
+
+    // Sensitive file access requires confirmation (Ask)
+    let ask_dec = runner
+        .tool_policy()
+        .evaluate("read", &json!({ "path": ".env" }));
+    assert!(ask_dec.is_ask());
+}
+
+#[tokio::test]
+async fn test_agent_runner_execute_tool_deny_interception() {
+    let runner = create_test_runner(None);
+
+    let res = runner
+        .execute_tool("bash", json!({ "command": "rm -rf /" }))
+        .await;
+    assert!(res.is_err());
+    let err = res.unwrap_err();
+    assert!(
+        err.contains("Execution denied by policy:"),
+        "Expected denial message, got: {err}"
+    );
+    assert!(err.contains("Destructive root or home deletion prohibited"));
+}
+
+#[tokio::test]
+async fn test_agent_runner_execute_tool_ask_interception() {
+    let runner = create_test_runner(None);
+
+    let res = runner
+        .execute_tool("read", json!({ "path": ".env" }))
+        .await;
+    assert!(res.is_err());
+    let err = res.unwrap_err();
+    assert!(
+        err.contains("Policy warning") || err.contains("confirmation required"),
+        "Expected policy warning/confirmation message, got: {err}"
+    );
+    assert!(err.contains(".env"));
+}
+
+#[tokio::test]
+async fn test_agent_runner_execute_tool_allow_proceeds() {
+    let runner = create_test_runner(None);
+
+    let res = runner
+        .execute_tool("read", json!({ "path": "Cargo.toml" }))
+        .await;
+    assert!(res.is_ok(), "Expected safe read to succeed, got: {:?}", res);
+    let content = res.unwrap();
+    assert!(content.contains("fusion") || content.contains("[workspace]"));
+}
+
+#[tokio::test]
+async fn test_agent_runner_execute_tool_call_interception() {
+    let runner = create_test_runner(None);
+
+    let tc = ToolCall {
+        id: "call_destructive".into(),
+        name: "bash".into(),
+        arguments: r#"{"command": "rm -rf /"}"#.into(),
+    };
+
+    let res = runner.execute_tool_call(&tc).await;
+    assert!(res.is_err());
+    let err = res.unwrap_err();
+    assert!(err.contains("Execution denied by policy:"));
+}
+
+#[tokio::test]
+async fn test_agent_runner_with_custom_policy_interception() {
+    let custom_policy = ToolPolicyEngine::new().with_rule(PolicyRule {
+        tool: Some("bash".into()),
+        pattern: Some("git push.*--force".into()),
+        path_pattern: None,
+        action: RuleAction::Deny,
+        reason: Some("Force push is strictly prohibited".into()),
+    });
+
+    let runner = create_test_runner(None).with_tool_policy(custom_policy);
+
+    let res = runner
+        .execute_tool("bash", json!({ "command": "git push origin main --force" }))
+        .await;
+    assert!(res.is_err());
+    let err = res.unwrap_err();
+    assert!(err.contains("Execution denied by policy: Force push is strictly prohibited"));
+}
+
+#[tokio::test]
+async fn test_agent_runner_loads_policy_from_workspace_dir() {
+    let dir = tempdir().expect("tempdir");
+    let fusion_dir = dir.path().join(".fusion");
+    fs::create_dir_all(&fusion_dir).expect("create .fusion dir");
+
+    let policy_toml = r#"
+default_decision = "deny"
+
+[[rules]]
+name = "allow-read"
+tool = "read"
+action = "allow"
+"#;
+    fs::write(fusion_dir.join("policy.toml"), policy_toml).expect("write policy.toml");
+
+    let runner = create_test_runner(Some(dir.path().to_path_buf()));
+    assert!(runner.tool_policy().default_decision.is_deny());
+
+    // Arbitrary tool without allow rule should be denied by default_decision
+    let res = runner
+        .execute_tool("bash", json!({ "command": "echo hello" }))
+        .await;
+    assert!(res.is_err());
+    let err = res.unwrap_err();
+    assert!(err.contains("Execution denied by policy:"));
+
+    // Explicitly allowed tool in custom policy should proceed (or fail with regular IO error, not policy denial)
+    let res = runner
+        .execute_tool("read", json!({ "path": "non_existent.txt" }))
+        .await;
+    if let Err(err) = res {
+        assert!(
+            !err.contains("Execution denied by policy:"),
+            "Expected tool execution to be allowed by policy, got: {err}"
+        );
+    }
+}
+
+#[tokio::test]
+async fn test_agent_runner_execute_tool_with_ctx() {
+    let runner = create_test_runner(None);
+    let tool_ctx = ToolContext::default();
+
+    let res = runner
+        .execute_tool_with_ctx(
+            "bash",
+            json!({ "command": "rm -rf /" }),
+            &tool_ctx,
+        )
+        .await;
+    assert!(res.is_err());
+    let err = res.unwrap_err();
+    assert!(err.contains("Execution denied by policy:"));
 }

@@ -534,6 +534,15 @@ async fn test_run_autonomous_parallel_workflow() {
     assert!(markdown.contains("- **Tasks:** 5 completed, 0 failed"));
     assert!(markdown.contains("### Task `tester_e2e`"));
 
+    // Check clean formatted report
+    let report = summary.format_report();
+    assert!(report.contains("Plan Execution Report: Autonomous Parallel Workflow"));
+    assert!(report.contains("[✓] Completed in 3 stages"));
+    assert!(report.contains("Stages Executed:     3/3 completed"));
+    assert!(report.contains("Subagent Tasks Run:  5 completed, 0 failed, 0 skipped (5 total)"));
+    assert!(report.contains("Tokens Spent:"));
+    assert!(summary.tokens_spent > 0);
+
     // Check final ASCII progress
     let ascii = runner.render_progress_ascii();
     assert!(ascii.contains("[✓] scout_auth"));
@@ -583,4 +592,48 @@ async fn test_run_autonomous_fail_fast_on_error() {
     let ascii = runner.render_progress_ascii();
     assert!(ascii.contains("[✗] scout"));
     assert!(ascii.contains("[ ] coder"));
+}
+
+// ===========================================================================
+// Test 6: execute_active_plan Autonomous Execution Flow
+// ===========================================================================
+
+#[tokio::test]
+async fn test_execute_active_plan_flow() {
+    let server = MockLlmServer::start().await;
+    let client = server.client();
+    let config = server.config();
+    let tools = create_test_tools();
+    let manager = SubagentManager::new(client, config, tools).with_max_concurrent(4);
+
+    let mut dag = SubagentDag::new("Active Autonomous Run", "Test execute_active_plan integration");
+    let t1 = DagTask::new("research", "Research Auth", SubagentRole::Scout, "Investigate auth patterns");
+    let t2 = DagTask::new("implement", "Implement Auth", SubagentRole::Coder, "Write auth handler")
+        .with_dependency("research");
+    dag.add_task(t1).unwrap();
+    dag.add_task(t2).unwrap();
+
+    let summary = fusion::ui::slash_plan::execute_active_plan(&mut dag, &manager)
+        .await
+        .expect("execute_active_plan autonomous run");
+
+    assert!(summary.is_success());
+    assert_eq!(summary.total_tasks, 2);
+    assert_eq!(summary.completed_tasks, 2);
+    assert_eq!(summary.failed_tasks, 0);
+    assert_eq!(summary.total_stages, 2);
+    assert_eq!(summary.completed_stages, 2);
+    assert!(summary.tokens_spent > 0);
+
+    let report = summary.format_report();
+    assert!(report.contains("Plan Execution Report: Active Autonomous Run"));
+    assert!(report.contains("[✓] Completed in 2 stages"));
+    assert!(report.contains("Stages Executed:     2/2 completed"));
+    assert!(report.contains("Subagent Tasks Run:  2 completed"));
+    assert!(report.contains("Tokens Spent:"));
+
+    // Verify the in-place mutated DAG
+    assert_eq!(dag.overall_status(), DagOverallStatus::Completed);
+    assert!(dag.get_task("research").unwrap().status.is_completed());
+    assert!(dag.get_task("implement").unwrap().status.is_completed());
 }

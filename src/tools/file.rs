@@ -406,6 +406,551 @@ fn render_oversized_summary(
     Ok(output)
 }
 
+/// Parse inline selectors from a URL, respecting ports and paths.
+pub fn parse_url_selector(raw_url: &str) -> (String, PathSelector) {
+    let mut url = raw_url;
+    let mut selector = PathSelector::default();
+
+    if let Some(stripped) = url.strip_suffix(":raw") {
+        selector.raw = true;
+        selector.has_explicit_selector = true;
+        url = stripped;
+    } else if let Some(stripped) = url.strip_suffix(":defs") {
+        selector.defs = true;
+        selector.has_explicit_selector = true;
+        url = stripped;
+    }
+
+    (url.to_string(), selector)
+}
+
+/// Strips HTML `<script>`, `<style>`, `<nav>`, `<header>`, `<footer>` blocks
+/// (and comments, `<noscript>`, `<svg>`, `<template>`), discarding their tags and inner contents.
+pub fn strip_html_blocks(html: &str) -> String {
+    let skip_tag_names = [
+        "script", "style", "nav", "header", "footer", "noscript", "svg", "template",
+    ];
+    let mut result = String::with_capacity(html.len());
+    let mut chars = html.chars().peekable();
+
+    while let Some(ch) = chars.next() {
+        if ch == '<' {
+            // Check for HTML comment <!-- ... -->
+            if chars.peek() == Some(&'!') {
+                let mut lookahead = chars.clone();
+                lookahead.next(); // '!'
+                if lookahead.next() == Some('-') && lookahead.next() == Some('-') {
+                    chars.next(); // '!'
+                    chars.next(); // '-'
+                    chars.next(); // '-'
+                    while let Some(c) = chars.next() {
+                        if c == '-' {
+                            let mut la = chars.clone();
+                            if la.next() == Some('-') && la.next() == Some('>') {
+                                chars.next(); // '-'
+                                chars.next(); // '>'
+                                break;
+                            }
+                        }
+                    }
+                    continue;
+                }
+            }
+
+            // Read tag
+            let mut tag_buf = String::new();
+            let mut is_closing = false;
+            if chars.peek() == Some(&'/') {
+                is_closing = true;
+                chars.next();
+            }
+
+            let mut tag_name = String::new();
+            while let Some(&c) = chars.peek() {
+                if c.is_ascii_alphanumeric() || c == '-' || c == '_' {
+                    tag_name.push(chars.next().unwrap());
+                } else {
+                    break;
+                }
+            }
+
+            // Read remainder of tag until '>'
+            let mut is_self_closing = false;
+            while let Some(c) = chars.next() {
+                tag_buf.push(c);
+                if c == '>' {
+                    if tag_buf.trim_end_matches('>').trim_end().ends_with('/') {
+                        is_self_closing = true;
+                    }
+                    break;
+                }
+            }
+
+            let tag_lower = tag_name.to_ascii_lowercase();
+            if !is_closing && !is_self_closing && skip_tag_names.contains(&tag_lower.as_str()) {
+                // Skip everything until matching closing tag </tag_lower>
+                let mut depth = 1usize;
+                while depth > 0 && chars.peek().is_some() {
+                    if let Some(c) = chars.next() {
+                        if c == '<' {
+                            if chars.peek() == Some(&'!') {
+                                let mut lookahead = chars.clone();
+                                lookahead.next();
+                                if lookahead.next() == Some('-') && lookahead.next() == Some('-') {
+                                    chars.next();
+                                    chars.next();
+                                    chars.next();
+                                    while let Some(cc) = chars.next() {
+                                        if cc == '-' {
+                                            let mut la = chars.clone();
+                                            if la.next() == Some('-') && la.next() == Some('>') {
+                                                chars.next();
+                                                chars.next();
+                                                break;
+                                            }
+                                        }
+                                    }
+                                    continue;
+                                }
+                            }
+
+                            let mut inner_is_closing = false;
+                            if chars.peek() == Some(&'/') {
+                                inner_is_closing = true;
+                                chars.next();
+                            }
+                            let mut inner_tag_name = String::new();
+                            while let Some(&ic) = chars.peek() {
+                                if ic.is_ascii_alphanumeric() || ic == '-' || ic == '_' {
+                                    inner_tag_name.push(chars.next().unwrap());
+                                } else {
+                                    break;
+                                }
+                            }
+                            let mut inner_self_closing = false;
+                            let mut inner_buf = String::new();
+                            while let Some(ic) = chars.next() {
+                                inner_buf.push(ic);
+                                if ic == '>' {
+                                    if inner_buf.trim_end_matches('>').trim_end().ends_with('/') {
+                                        inner_self_closing = true;
+                                    }
+                                    break;
+                                }
+                            }
+
+                            if inner_tag_name.eq_ignore_ascii_case(&tag_lower) {
+                                if inner_is_closing {
+                                    depth = depth.saturating_sub(1);
+                                } else if !inner_self_closing {
+                                    depth += 1;
+                                }
+                            }
+                        }
+                    }
+                }
+                result.push('\n');
+                continue;
+            }
+
+            // Normal tag: emit back out
+            result.push('<');
+            if is_closing {
+                result.push('/');
+            }
+            result.push_str(&tag_name);
+            result.push_str(&tag_buf);
+        } else {
+            result.push(ch);
+        }
+    }
+
+    result
+}
+
+fn extract_attribute(tag: &str, attr_name: &str) -> Option<String> {
+    let lower_tag = tag.to_ascii_lowercase();
+    let lower_attr = attr_name.to_ascii_lowercase();
+
+    let mut search_from = 0;
+    while let Some(pos) = lower_tag[search_from..].find(&lower_attr) {
+        let abs_pos = search_from + pos;
+        let before_ok = abs_pos == 0
+            || tag.as_bytes()[abs_pos - 1].is_ascii_whitespace()
+            || tag.as_bytes()[abs_pos - 1] == b'<'
+            || tag.as_bytes()[abs_pos - 1] == b'/';
+        let after_pos = abs_pos + lower_attr.len();
+        let after_slice = tag[after_pos..].trim_start();
+
+        if before_ok && after_slice.starts_with('=') {
+            let val_slice = after_slice[1..].trim_start();
+            if let Some(quote) = val_slice.chars().next() {
+                if quote == '"' || quote == '\'' {
+                    let inside = &val_slice[1..];
+                    if let Some(end_quote) = inside.find(quote) {
+                        return Some(inside[..end_quote].to_string());
+                    }
+                } else {
+                    let end_pos = val_slice
+                        .find(|c: char| c.is_ascii_whitespace() || c == '>')
+                        .unwrap_or(val_slice.len());
+                    return Some(val_slice[..end_pos].to_string());
+                }
+            }
+        }
+        search_from = after_pos;
+    }
+    None
+}
+
+fn decode_entity_owned(entity: &str) -> Option<String> {
+    let s = match entity.to_ascii_lowercase().as_str() {
+        "amp" => Some("&"),
+        "lt" => Some("<"),
+        "gt" => Some(">"),
+        "quot" => Some("\""),
+        "apos" | "#39" => Some("'"),
+        "nbsp" => Some(" "),
+        "copy" => Some("©"),
+        "mdash" => Some("—"),
+        "ndash" => Some("–"),
+        "hellip" => Some("…"),
+        "bull" => Some("•"),
+        "trade" => Some("™"),
+        "reg" => Some("®"),
+        _ => None,
+    };
+    if let Some(decoded) = s {
+        return Some(decoded.to_string());
+    }
+
+    if let Some(num_str) = entity.strip_prefix('#') {
+        let code = if let Some(hex_str) = num_str.strip_prefix('x').or_else(|| num_str.strip_prefix('X')) {
+            u32::from_str_radix(hex_str, 16).ok()
+        } else {
+            num_str.parse::<u32>().ok()
+        };
+        if let Some(c) = code.and_then(char::from_u32) {
+            return Some(c.to_string());
+        }
+    }
+
+    None
+}
+
+struct HtmlToMarkdownParser<'a> {
+    input: &'a str,
+    output: String,
+    link_stack: Vec<Option<String>>,
+    list_depth: usize,
+    in_pre: bool,
+    in_code: bool,
+}
+
+impl<'a> HtmlToMarkdownParser<'a> {
+    fn new(input: &'a str) -> Self {
+        Self {
+            input,
+            output: String::with_capacity(input.len()),
+            link_stack: Vec::new(),
+            list_depth: 0,
+            in_pre: false,
+            in_code: false,
+        }
+    }
+
+    fn ensure_newline(&mut self) {
+        if !self.output.is_empty() && !self.output.ends_with('\n') {
+            self.output.push('\n');
+        }
+    }
+
+    fn ensure_blank_line(&mut self) {
+        if !self.output.is_empty() {
+            if !self.output.ends_with('\n') {
+                self.output.push_str("\n\n");
+            } else if !self.output.ends_with("\n\n") {
+                self.output.push('\n');
+            }
+        }
+    }
+
+    fn parse(&mut self) -> String {
+        let mut chars = self.input.chars().peekable();
+
+        while let Some(ch) = chars.next() {
+            if ch == '<' {
+                let mut tag_buf = String::new();
+                for c in chars.by_ref() {
+                    if c == '>' {
+                        break;
+                    }
+                    tag_buf.push(c);
+                }
+                self.handle_tag(&tag_buf);
+            } else if ch == '&' {
+                let mut entity = String::new();
+                let mut found_semicolon = false;
+                for _ in 0..12 {
+                    match chars.peek() {
+                        Some(';') => {
+                            chars.next();
+                            found_semicolon = true;
+                            break;
+                        }
+                        Some(&c) if c.is_ascii_alphanumeric() || c == '#' => {
+                            entity.push(chars.next().unwrap());
+                        }
+                        _ => break,
+                    }
+                }
+
+                if found_semicolon {
+                    if let Some(decoded) = decode_entity_owned(&entity) {
+                        self.output.push_str(&decoded);
+                        continue;
+                    }
+                }
+
+                self.output.push('&');
+                self.output.push_str(&entity);
+                if found_semicolon {
+                    self.output.push(';');
+                }
+            } else {
+                self.output.push(ch);
+            }
+        }
+
+        std::mem::take(&mut self.output)
+    }
+
+    fn handle_tag(&mut self, raw_tag: &str) {
+        let trimmed = raw_tag.trim();
+        if trimmed.is_empty() {
+            return;
+        }
+
+        let is_closing = trimmed.starts_with('/');
+        let tag_content = if is_closing { &trimmed[1..] } else { trimmed };
+
+        let tag_name = tag_content
+            .split_whitespace()
+            .next()
+            .unwrap_or("")
+            .trim_end_matches('/')
+            .to_ascii_lowercase();
+
+        match (tag_name.as_str(), is_closing) {
+            ("h1", false) => {
+                self.ensure_blank_line();
+                self.output.push_str("# ");
+            }
+            ("h1", true) => self.ensure_blank_line(),
+
+            ("h2", false) => {
+                self.ensure_blank_line();
+                self.output.push_str("## ");
+            }
+            ("h2", true) => self.ensure_blank_line(),
+
+            ("h3", false) => {
+                self.ensure_blank_line();
+                self.output.push_str("### ");
+            }
+            ("h3", true) => self.ensure_blank_line(),
+
+            ("h4", false) => {
+                self.ensure_blank_line();
+                self.output.push_str("#### ");
+            }
+            ("h4", true) => self.ensure_blank_line(),
+
+            ("h5", false) => {
+                self.ensure_blank_line();
+                self.output.push_str("##### ");
+            }
+            ("h5", true) => self.ensure_blank_line(),
+
+            ("h6", false) => {
+                self.ensure_blank_line();
+                self.output.push_str("###### ");
+            }
+            ("h6", true) => self.ensure_blank_line(),
+
+            ("p", false) => self.ensure_blank_line(),
+            ("p", true) => self.ensure_blank_line(),
+
+            ("br", _) => self.output.push('\n'),
+
+            ("hr", _) => {
+                self.ensure_blank_line();
+                self.output.push_str("---\n\n");
+            }
+
+            ("ul" | "ol", false) => {
+                self.ensure_newline();
+                self.list_depth += 1;
+            }
+            ("ul" | "ol", true) => {
+                self.list_depth = self.list_depth.saturating_sub(1);
+                self.ensure_newline();
+            }
+
+            ("li", false) => {
+                self.ensure_newline();
+                let indent = "  ".repeat(self.list_depth.saturating_sub(1));
+                self.output.push_str(&format!("{}- ", indent));
+            }
+            ("li", true) => self.ensure_newline(),
+
+            ("a", false) => {
+                let href = extract_attribute(tag_content, "href");
+                let valid_href = href.filter(|u| {
+                    let trimmed = u.trim();
+                    !trimmed.is_empty()
+                        && !trimmed.starts_with('#')
+                        && !trimmed.starts_with("javascript:")
+                });
+                if valid_href.is_some() {
+                    self.output.push('[');
+                }
+                self.link_stack.push(valid_href);
+            }
+            ("a", true) => {
+                if let Some(Some(href)) = self.link_stack.pop() {
+                    if self.output.ends_with('[') {
+                        self.output.pop();
+                        self.output.push_str(&href);
+                    } else {
+                        self.output.push_str(&format!("]({})", href));
+                    }
+                }
+            }
+
+            ("pre", false) => {
+                self.ensure_blank_line();
+                self.in_pre = true;
+                self.output.push_str("```\n");
+            }
+            ("pre", true) => {
+                self.ensure_newline();
+                self.output.push_str("```\n\n");
+                self.in_pre = false;
+            }
+
+            ("code", false) => {
+                if !self.in_pre {
+                    self.output.push('`');
+                    self.in_code = true;
+                }
+            }
+            ("code", true) => {
+                if !self.in_pre && self.in_code {
+                    self.output.push('`');
+                    self.in_code = false;
+                }
+            }
+
+            ("strong" | "b", false | true) => {
+                if !self.in_pre {
+                    self.output.push_str("**");
+                }
+            }
+            ("em" | "i", false | true) => {
+                if !self.in_pre {
+                    self.output.push('*');
+                }
+            }
+
+            ("blockquote", false) => {
+                self.ensure_blank_line();
+                self.output.push_str("> ");
+            }
+            ("blockquote", true) => self.ensure_blank_line(),
+
+            ("div" | "article" | "section" | "main" | "aside", _) => {
+                self.ensure_newline();
+            }
+
+            _ => {}
+        }
+    }
+}
+
+fn normalize_markdown(raw: &str) -> String {
+    let mut lines: Vec<String> = Vec::new();
+    let mut in_code_block = false;
+
+    for line in raw.lines() {
+        let trimmed_end = line.trim_end();
+        if trimmed_end.starts_with("```") {
+            in_code_block = !in_code_block;
+            lines.push(trimmed_end.to_string());
+            continue;
+        }
+
+        if in_code_block {
+            lines.push(line.to_string());
+        } else {
+            if trimmed_end.trim().is_empty() {
+                if lines.last().map(|l| !l.is_empty()).unwrap_or(false) {
+                    lines.push(String::new());
+                }
+            } else {
+                lines.push(trimmed_end.to_string());
+            }
+        }
+    }
+
+    while lines.first().map(|l| l.is_empty()).unwrap_or(false) {
+        lines.remove(0);
+    }
+    while lines.last().map(|l| l.is_empty()).unwrap_or(false) {
+        lines.pop();
+    }
+
+    lines.join("\n")
+}
+
+/// Converts an HTML string into clean Markdown, stripping script, style, nav, header,
+/// and footer blocks, and converting headings, paragraphs, line breaks, lists, and links.
+pub fn html_to_markdown(html: &str) -> String {
+    let clean_html = strip_html_blocks(html);
+    let mut parser = HtmlToMarkdownParser::new(&clean_html);
+    let raw = parser.parse();
+    normalize_markdown(&raw)
+}
+
+fn is_html_content(content: &str, content_type: Option<&str>) -> bool {
+    if let Some(ct) = content_type {
+        let ct_lower = ct.to_ascii_lowercase();
+        if ct_lower.contains("text/html")
+            || ct_lower.contains("application/xhtml+xml")
+            || ct_lower.contains("text/xml")
+        {
+            return true;
+        }
+        if ct_lower.contains("text/plain")
+            || ct_lower.contains("text/markdown")
+            || ct_lower.contains("application/json")
+        {
+            return false;
+        }
+    }
+
+    let lower = content.trim_start().to_ascii_lowercase();
+    lower.starts_with("<!doctype")
+        || lower.starts_with("<html")
+        || lower.contains("<body")
+        || (lower.contains("<p") && lower.contains("</p>"))
+        || (lower.contains("<div") && lower.contains("</div>"))
+        || lower.contains("<script")
+        || lower.contains("<style")
+        || lower.contains("<header")
+        || lower.contains("<nav")
+        || lower.contains("<footer")
+}
 // ---------------------------------------------------------------------------
 
 #[derive(Default, Debug, Clone)]
@@ -414,6 +959,58 @@ pub struct ReadFileTool;
 impl ReadFileTool {
     pub fn new() -> Self {
         Self
+    }
+
+    async fn read_url(&self, path: &str, args: &Value) -> anyhow::Result<String> {
+        let (clean_url, selector) = parse_url_selector(path);
+
+        const BROWSER_USER_AGENT: &str =
+            "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36";
+
+        let client = reqwest::Client::builder()
+            .use_rustls_tls()
+            .timeout(std::time::Duration::from_secs(15))
+            .user_agent(BROWSER_USER_AGENT)
+            .build()
+            .unwrap_or_else(|_| reqwest::Client::new());
+
+        let resp = client.get(&clean_url).send().await.map_err(|e| {
+            anyhow::anyhow!("Failed to read URL '{}': {e}", path)
+        })?;
+
+        let status = resp.status();
+        if status != reqwest::StatusCode::OK {
+            return Ok(format!("HTTP Error {}: Failed to read URL {}", status, path));
+        }
+
+        let content_type = resp
+            .headers()
+            .get(reqwest::header::CONTENT_TYPE)
+            .and_then(|v| v.to_str().ok())
+            .map(|s| s.to_string());
+
+        let body = resp.text().await.map_err(|e| {
+            anyhow::anyhow!("Failed to read response body from '{}': {e}", clean_url)
+        })?;
+
+        if selector.raw {
+            return Ok(body);
+        }
+
+        let content = if is_html_content(&body, content_type.as_deref()) {
+            html_to_markdown(&body)
+        } else {
+            body
+        };
+
+        if args.get("line_numbers") == Some(&Value::Bool(true)) {
+            let window = parse_read_window(args);
+            let lines: Vec<String> = content.lines().map(|s| s.to_string()).collect();
+            let total = lines.len();
+            Ok(format_read_output(&window, &lines, 1, total))
+        } else {
+            Ok(content)
+        }
     }
 }
 
@@ -460,6 +1057,10 @@ impl Tool for ReadFileTool {
             .or_else(|| args.get("file_path").and_then(|v| v.as_str()))
             .ok_or_else(|| anyhow::anyhow!("Missing required parameter: path"))?;
 
+        let trimmed_path = path_str.trim();
+        if trimmed_path.starts_with("http://") || trimmed_path.starts_with("https://") {
+            return self.read_url(trimmed_path, &args).await;
+        }
         let (clean_path, selector) = parse_path_selector(path_str);
         if clean_path.is_empty() {
             anyhow::bail!("Missing file path in: '{path_str}'");

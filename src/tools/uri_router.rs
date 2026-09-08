@@ -10,12 +10,23 @@ use std::path::{Path, PathBuf};
 
 use crate::agent::skills::SkillRegistry;
 
+/// Returns `true` if the raw path or URI begins with an HTTP or HTTPS scheme.
+pub fn is_http_url(raw_path: &str) -> bool {
+    let trimmed = raw_path.trim();
+    trimmed.starts_with("http://") || trimmed.starts_with("https://")
+}
+
 /// Resolves an internal URI (`skill://...` or `rule://...`) to a concrete filesystem `PathBuf`.
 ///
 /// Returns `Some(PathBuf)` if the URI matches a supported scheme and resolves to a path.
 /// Returns `None` if the scheme is unrecognized or no matching file/directory is found.
+/// HTTP and HTTPS URLs are recognized as external network URLs and pass through cleanly as `None`.
 pub fn resolve_internal_uri(raw_path: &str, workspace_root: Option<&Path>) -> Option<PathBuf> {
     let trimmed = raw_path.trim();
+
+    if is_http_url(trimmed) {
+        return None;
+    }
 
     if trimmed.starts_with("skill://") {
         resolve_skill_uri(trimmed, workspace_root)

@@ -82,6 +82,7 @@ pub struct AgentRunner {
     system_prompt: Option<String>,
     checkpoints: std::sync::Arc<std::sync::Mutex<crate::agent::undo::CheckpointManager>>,
     subagents: std::sync::Arc<crate::agent::subagent::SubagentManager>,
+    pub tool_policy: crate::agent::tool_policy::ToolPolicyEngine,
     max_turns: usize,
 }
 impl AgentRunner {
@@ -122,6 +123,7 @@ impl AgentRunner {
             )),
             subagents,
             system_prompt: None,
+            tool_policy: crate::agent::tool_policy::ToolPolicyEngine::load_from_dir(&tool_ctx.cwd),
             max_turns,
         }
     }
@@ -268,6 +270,81 @@ impl AgentRunner {
         &mut self.skills
     }
 
+    /// Returns a reference to the ToolPolicyEngine.
+    pub fn tool_policy(&self) -> &crate::agent::tool_policy::ToolPolicyEngine {
+        &self.tool_policy
+    }
+
+    /// Returns a mutable reference to the ToolPolicyEngine.
+    pub fn tool_policy_mut(&mut self) -> &mut crate::agent::tool_policy::ToolPolicyEngine {
+        &mut self.tool_policy
+    }
+
+    /// Sets a custom ToolPolicyEngine.
+    pub fn with_tool_policy(
+        mut self,
+        policy: crate::agent::tool_policy::ToolPolicyEngine,
+    ) -> Self {
+        self.tool_policy = policy;
+        self
+    }
+
+    /// Executes a tool call directly with policy enforcement.
+    ///
+    /// Evaluates `self.tool_policy.evaluate(name, &parsed_args)` before execution:
+    /// - If `PolicyDecision::Deny(reason)`:
+    ///   Returns `Err(format!("Execution denied by policy: {}", reason))`.
+    /// - If `PolicyDecision::Ask(reason)`:
+    ///   Prompts user confirmation or formats approval message. If non-interactive/automated
+    ///   without confirmation, returns policy warning.
+    /// - If `PolicyDecision::Allow`:
+    ///   Proceeds with tool execution via `self.tools.execute(name, parsed_args, &self.tool_ctx)`.
+    pub async fn execute_tool(
+        &self,
+        name: &str,
+        parsed_args: serde_json::Value,
+    ) -> Result<String, String> {
+        self.execute_tool_with_ctx(name, parsed_args, &self.tool_ctx)
+            .await
+    }
+
+    /// Executes a tool call with explicit ToolContext and policy enforcement.
+    pub async fn execute_tool_with_ctx(
+        &self,
+        name: &str,
+        parsed_args: serde_json::Value,
+        tool_ctx: &ToolContext,
+    ) -> Result<String, String> {
+        let decision = self.tool_policy.evaluate(name, &parsed_args);
+        match decision {
+            crate::agent::tool_policy::PolicyDecision::Deny(reason) => {
+                Err(format!("Execution denied by policy: {}", reason))
+            }
+            crate::agent::tool_policy::PolicyDecision::Ask(reason) => {
+                Err(format!(
+                    "Policy warning: confirmation required for '{}': {}. Execution skipped in non-interactive mode.",
+                    name, reason
+                ))
+            }
+            crate::agent::tool_policy::PolicyDecision::Allow => {
+                self.tools
+                    .execute(name, parsed_args, tool_ctx)
+                    .await
+                    .map_err(|e| e.to_string())
+            }
+        }
+    }
+
+    /// Executes a ToolCall with policy enforcement.
+    pub async fn execute_tool_call(
+        &self,
+        tc: &crate::provider::types::ToolCall,
+    ) -> Result<String, String> {
+        let parsed_args = serde_json::from_str::<serde_json::Value>(&tc.arguments)
+            .map_err(|e| format!("Invalid JSON arguments: {}", e))?;
+        self.execute_tool(&tc.name, parsed_args).await
+    }
+
     /// Default system prompt for Fusion coding assistant.
     pub fn default_system_prompt() -> &'static str {
         prompts::general_system_prompt()
@@ -382,8 +459,22 @@ impl AgentRunner {
         // Auto-save recovery state immediately before starting conversation turn
         let _ = self.recovery.on_turn_start(session, user_input, 1);
 
-        // Record user input
-        session.add_user_message(user_input);
+        // Auto-expand @file mentions (e.g. @src/main.rs) into embedded file context
+        let (expanded_input, mentioned_files) =
+            crate::agent::context_injector::expand_file_mentions(user_input, &self.tool_ctx.cwd);
+        if !mentioned_files.is_empty() {
+            let file_names: Vec<String> = mentioned_files
+                .iter()
+                .filter_map(|p| p.file_name().and_then(|n| n.to_str()).map(|s| s.to_string()))
+                .collect();
+            let _ = event_tx.send(AgentEvent::Status(format!(
+                "Auto-injected file context: {}",
+                file_names.join(", ")
+            )));
+        }
+
+        // Record user input with expanded file mentions
+        session.add_user_message(&expanded_input);
 
         // Advisor consultation phase (if enabled)
         let mut advisor_notes = String::new();
@@ -424,6 +515,11 @@ impl AgentRunner {
 
         let mut system_message_content = base_system_prompt.to_string();
 
+        // Repository context auto-injection (AGENTS.md / CLAUDE.md)
+        if let Some(repo_ctx) = crate::agent::context_injector::detect_and_load_repo_context(&self.tool_ctx.cwd) {
+            let _ = event_tx.send(AgentEvent::Status("Repository context auto-injected from workspace instructions".to_string()));
+            system_message_content.push_str(&repo_ctx);
+        }
         // Domain skills dynamic injection
         let relevant_matches = self
             .skills
@@ -660,6 +756,54 @@ impl AgentRunner {
                     args: parsed_args.clone(),
                 });
                 let _ = self.recovery.on_tool_start(&tc.name, &tc.id, &parsed_args);
+                // Evaluate tool policy before execution
+                let decision = self.tool_policy.evaluate(&tc.name, &parsed_args);
+                match decision {
+                    crate::agent::tool_policy::PolicyDecision::Deny(reason) => {
+                        let err_msg = format!("Execution denied by policy: {}", reason);
+                        let _ = event_tx.send(AgentEvent::ToolFinished {
+                            id: tc.id.clone(),
+                            name: tc.name.clone(),
+                            success: false,
+                            output: err_msg.clone(),
+                            duration: Duration::ZERO,
+                        });
+                        session.add_tool_result(&tc.id, &err_msg);
+                        let _ = self.recovery.on_tool_finish(
+                            &tc.name,
+                            &tc.id,
+                            &tc.arguments,
+                            false,
+                            &err_msg,
+                            Duration::ZERO,
+                        );
+                        continue;
+                    }
+                    crate::agent::tool_policy::PolicyDecision::Ask(reason) => {
+                        let warn_msg = format!(
+                            "Policy warning: confirmation required for '{}': {}. Execution skipped in non-interactive mode.",
+                            tc.name, reason
+                        );
+                        let _ = event_tx.send(AgentEvent::ToolFinished {
+                            id: tc.id.clone(),
+                            name: tc.name.clone(),
+                            success: false,
+                            output: warn_msg.clone(),
+                            duration: Duration::ZERO,
+                        });
+                        session.add_tool_result(&tc.id, &warn_msg);
+                        let _ = self.recovery.on_tool_finish(
+                            &tc.name,
+                            &tc.id,
+                            &tc.arguments,
+                            false,
+                            &warn_msg,
+                            Duration::ZERO,
+                        );
+                        continue;
+                    }
+                    crate::agent::tool_policy::PolicyDecision::Allow => {}
+                }
                 // Capture pre-tool file snapshots for reliable checkpoint undo
                 let checkpoint_id = match self.checkpoints.lock() {
                     Ok(mut mgr) => mgr

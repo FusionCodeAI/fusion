@@ -5,7 +5,9 @@
 //!   and returns a visual ASCII preview along with the generated DAG.
 //! - `/plan <subcommand>`: Manages and inspects the active plan (`status`, `stages`, `cancel`).
 
+use crate::agent::plan_runner::{PlanRunner, PlanRunnerError, PlanSummary};
 use crate::agent::planner_dag::{DecompositionStrategy, SubagentDag, TaskDecomposer};
+use crate::agent::subagent::SubagentManager;
 
 /// Alias constant for standard feature decomposition strategy.
 #[allow(non_upper_case_globals)]
@@ -41,6 +43,7 @@ pub fn handle_goal_command(goal_prompt: &str) -> (String, crate::agent::planner_
 /// Supported subcommands:
 /// - `"status"`: Displays the ASCII execution status / timeline tree of the active DAG plan.
 /// - `"stages"`: Lists all stages and their constituent task nodes with descriptions.
+/// - `"run"` / `"execute"` / `"start"`: Runs or inspects execution of the active plan.
 /// - `"cancel"`: Resets the active plan.
 pub fn handle_plan_command(args: &[String], current_dag: Option<&SubagentDag>) -> String {
     let subcommand = match args.first() {
@@ -62,6 +65,13 @@ pub fn handle_plan_command(args: &[String], current_dag: Option<&SubagentDag>) -
         "cancel" => match current_dag {
             Some(_) => "Active plan has been cancelled and reset.".to_string(),
             None => "No active plan to cancel.".to_string(),
+        },
+        "run" | "execute" | "start" => match current_dag {
+            Some(dag) => {
+                let summary = PlanSummary::from_dag(dag);
+                format_execution_report(&summary)
+            }
+            None => "No active plan to run. Use /goal <objective> first to create a plan.".to_string(),
         },
         "help" | "-h" | "--help" => format_plan_help(),
         other => format!(
@@ -143,6 +153,28 @@ fn format_plan_help() -> String {
     out.push_str("Subcommands:\n");
     out.push_str("  status  - Displays the ASCII execution status of the active DAG plan\n");
     out.push_str("  stages  - Lists all stages and their constituent task nodes with descriptions\n");
+    out.push_str("  run     - Executes the active plan autonomously (aliases: execute, start)\n");
     out.push_str("  cancel  - Resets the active plan\n");
     out
+}
+
+/// Executes the active DAG plan autonomously using the provided SubagentManager.
+///
+/// Instantiates `PlanRunner::new(dag, manager.clone())` and runs all stages sequentially
+/// via `run_autonomous().await`. Upon completion, updates `dag` in place with the final state
+/// and returns the resulting `PlanSummary`.
+pub async fn execute_active_plan(
+    dag: &mut SubagentDag,
+    manager: &SubagentManager,
+) -> Result<PlanSummary, PlanRunnerError> {
+    let mut runner = PlanRunner::new(dag.clone(), manager.clone());
+    let result = runner.run_autonomous().await;
+    *dag = runner.dag;
+    result
+}
+
+/// Formats a `PlanSummary` into a clean report showing stages executed,
+/// subagent tasks run, tokens spent, and final status (`[✓] Completed in N stages`).
+pub fn format_execution_report(summary: &PlanSummary) -> String {
+    summary.format_report()
 }
