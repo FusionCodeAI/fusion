@@ -626,7 +626,7 @@ pub fn render_tool_tree_to<W: std::io::Write>(
     };
     write!(
         out,
-        "\x1b[2;37m● {} {}{}\x1b[0m\r\n",
+        "  \x1b[2;37m● {} {}{}\x1b[0m\r\n",
         total, call_label, breakdown_str
     )?;
     for (i, item) in tool_batch.iter().enumerate() {
@@ -647,11 +647,11 @@ pub fn render_tool_tree_to<W: std::io::Write>(
         if item.failed {
             write!(
                 out,
-                "\x1b[2;37m{}\x1b[31m{}\x1b[0m\r\n",
+                "  \x1b[2;37m{}\x1b[31m{}\x1b[0m\r\n",
                 connector, display_label
             )?;
         } else {
-            write!(out, "\x1b[2;37m{}{}\x1b[0m\r\n", connector, display_label)?;
+            write!(out, "  \x1b[2;37m{}{}\x1b[0m\r\n", connector, display_label)?;
         }
     }
     write!(out, "\r\n")?;
@@ -756,7 +756,7 @@ pub async fn run_turn_ui(
                     *is_thinking = false;
                     *active_tool_label = None;
                     let mut out = stdout();
-                    let _ = write!(out, "\x1b[0m\r\n\x1b[2;37m───\x1b[0m\r\n\r\n\r\x1b[2K");
+                    let _ = write!(out, "\x1b[0m\r\n  \x1b[2;37m───\x1b[0m\r\n\r\n\r\x1b[2K");
                     let _ = out.flush();
                 }
                 if !tool_batch.is_empty() {
@@ -809,7 +809,7 @@ pub async fn run_turn_ui(
                 clear_prompt_frame(prompt);
                 if *is_thinking {
                     let mut out = stdout();
-                    let _ = write!(out, "\x1b[0m\r\n\x1b[2;37m───\x1b[0m\r\n\r\n");
+                    let _ = write!(out, "\x1b[0m\r\n  \x1b[2;37m───\x1b[0m\r\n\r\n");
                     let _ = out.flush();
                     *is_thinking = false;
                 }
@@ -834,7 +834,7 @@ pub async fn run_turn_ui(
                     String::new()
                 };
                 let status = format!(
-                    "\r\x1b[2K{}{} ({}{}) (↑{} ↓{})",
+                    "{}{} ({}{}) (↑{} ↓{})",
                     dot,
                     verb,
                     format_duration_compact(elapsed),
@@ -1022,7 +1022,7 @@ pub async fn run_turn_ui(
                     String::new()
                 };
                 let status = format!(
-                    "\r\x1b[2K{}{} ({}{}) (↑{} ↓{})",
+                    "{}{} ({}{}) (↑{} ↓{})",
                     dot,
                     verb,
                     format_duration_compact(elapsed),

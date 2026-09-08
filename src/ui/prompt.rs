@@ -1254,12 +1254,13 @@ impl Prompt {
 
         let running_lines = if let Some(status) = &self.running_status {
             let max_w = term_cols.saturating_sub(4);
+            let clean_status = status.trim_start_matches('\r').trim_start_matches("\x1b[2K");
             let display_status = if max_w > 0 {
-                truncate_fit(status, max_w)
+                truncate_fit(clean_status, max_w)
             } else {
-                status.clone()
+                clean_status.to_string()
             };
-            write!(out, "\x1b[2K  \x1b[2;37m{}\x1b[0m\r\n\r\n", display_status)?;
+            write!(out, "\r\x1b[2K  \x1b[2;37m{}\x1b[0m\r\n\r\n", display_status)?;
             2
         } else {
             0
@@ -1271,7 +1272,7 @@ impl Prompt {
             } else {
                 format!("{} queued messages · ↑ to edit", self.queued_count)
             };
-            write!(out, "\x1b[2;37m{}\x1b[0m\r\n\r\n", banner)?;
+            write!(out, "\r\x1b[2K  \x1b[2;37m{}\x1b[0m\r\n\r\n", banner)?;
             2
         } else {
             0
@@ -1799,7 +1800,7 @@ impl Prompt {
             } else {
                 status_body
             };
-            write!(out, "\x1b[2;37m{}\x1b[0m\r\n", status_text)?;
+            write!(out, "  \x1b[2;37m{}\x1b[0m\r\n", status_text)?;
             total_lines += 1;
 
             // Reposition cursor inside input box on active input row
