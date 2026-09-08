@@ -2463,7 +2463,11 @@ fn test_tool_group_header_and_branches_4_calls_exact_fx_parity() {
     render_tool_tree_to(&mut buf, &items).expect("render_tool_tree_to must succeed");
     let raw_out = String::from_utf8_lossy(&buf);
     let plain_out = strip_ansi(&raw_out);
-    let unindented = plain_out.lines().map(|l| l.trim_start()).collect::<Vec<_>>().join("\n");
+    let unindented = plain_out
+        .lines()
+        .map(|l| l.trim_start())
+        .collect::<Vec<_>>()
+        .join("\n");
     assert_eq!(unindented.trim(), formatted.trim());
     // Verify ANSI codes are present for bullet and connectors
     assert!(raw_out.contains("●"), "Should contain bullet in raw ANSI");
@@ -2544,7 +2548,11 @@ fn test_tool_group_header_and_branches_8_calls_exact_fx_parity() {
     render_tool_tree_to(&mut buf, &items).expect("render_tool_tree_to must succeed");
     let raw_out = String::from_utf8_lossy(&buf);
     let plain_out = strip_ansi(&raw_out);
-    let unindented = plain_out.lines().map(|l| l.trim_start()).collect::<Vec<_>>().join("\n");
+    let unindented = plain_out
+        .lines()
+        .map(|l| l.trim_start())
+        .collect::<Vec<_>>()
+        .join("\n");
     assert_eq!(unindented.trim(), formatted.trim());
 }
 
@@ -2885,7 +2893,10 @@ fn test_prompt_queue_streaming_persistence_lifecycle() {
 
     // 7. Turn completes: agent prints completed turn summary with a blank line before
     let summary = format_turn_summary(Duration::from_secs(86), 4, 1300);
-    assert_eq!(strip_ansi(&summary), "\r\n  1m26s · 15.1 tok/s (↑4 ↓1.3k)\r\n\r\n");
+    assert_eq!(
+        strip_ansi(&summary),
+        "\r\n  1m26s · 15.1 tok/s (↑4 ↓1.3k)\r\n\r\n"
+    );
 
     // Reset running status for turn completion
     prompt.set_running(false);
