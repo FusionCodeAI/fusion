@@ -875,8 +875,13 @@ impl Prompt {
                         self.render_current()?;
                         return Ok(None);
                     }
-                    self.clear_frame()?;
-                    return Ok(Some(PromptResult::Cancel));
+                    if !self.buffer.is_empty() {
+                        self.buffer.clear();
+                        self.cursor_pos = 0;
+                        self.render_current()?;
+                        return Ok(None);
+                    }
+                    return Ok(None);
                 }
 
                 if key.modifiers.contains(KeyModifiers::CONTROL)
@@ -3721,15 +3726,49 @@ mod tests {
         assert!(prompt.at_file_dismissed);
         assert_eq!(prompt.buffer_text(), "@main");
 
-        // Second Esc cancels prompt
+        // Second Esc clears the buffer without canceling or exiting
         let esc_event2 = Event::Key(crossterm::event::KeyEvent::new(
             KeyCode::Esc,
             KeyModifiers::NONE,
         ));
         let res2 = prompt
+            .handle_event(esc_event2.clone())
+            .expect("handle_event failed");
+        assert_eq!(res2, None);
+        assert_eq!(prompt.buffer_text(), "");
+
+        // Third Esc on empty buffer is a safe no-op (never quits)
+        let res3 = prompt
             .handle_event(esc_event2)
             .expect("handle_event failed");
-        assert_eq!(res2, Some(PromptResult::Cancel));
+        assert_eq!(res3, None);
+    }
+
+    #[test]
+    fn test_esc_never_exits_prompt() {
+        let mut prompt = Prompt::new();
+        prompt.buffer = "some input text".chars().collect();
+        prompt.cursor_pos = prompt.buffer.len();
+
+        let esc = Event::Key(crossterm::event::KeyEvent::new(KeyCode::Esc, KeyModifiers::NONE));
+
+        // Press 1: Clears text buffer
+        let res1 = prompt.handle_event(esc.clone()).unwrap();
+        assert_eq!(res1, None);
+        assert!(prompt.buffer.is_empty());
+
+        // Press 2: Empty buffer, remains in prompt
+        let res2 = prompt.handle_event(esc.clone()).unwrap();
+        assert_eq!(res2, None);
+
+        // Press 3: Still in prompt
+        let res3 = prompt.handle_event(esc.clone()).unwrap();
+        assert_eq!(res3, None);
+
+        // Ctrl+C produces Cancel
+        let ctrl_c = Event::Key(crossterm::event::KeyEvent::new(KeyCode::Char('c'), KeyModifiers::CONTROL));
+        let res_c = prompt.handle_event(ctrl_c).unwrap();
+        assert_eq!(res_c, Some(PromptResult::Cancel));
     }
 
     #[test]
