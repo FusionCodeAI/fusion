@@ -118,6 +118,8 @@ pub enum KeyResult {
     /// Clear screen requested (Ctrl+L).
     ClearScreen,
     /// Key event was ignored or had no effect.
+    /// Paste requested via Ctrl+V or paste key.
+    Paste,
     Noop,
 }
 
@@ -533,6 +535,11 @@ impl KeyHandler {
             self.kill_ring.push(text);
         }
     }
+    /// Get reference to the kill ring history.
+    pub fn kill_ring(&self) -> &[String] {
+        &self.kill_ring
+    }
+
 
     /// Primary entry point: process a keyboard event against current state.
     pub fn handle_key(&mut self, key: KeyEvent, state: &mut PromptState) -> KeyResult {
@@ -600,6 +607,9 @@ impl KeyHandler {
 
             // Cancel current turn (Ctrl+C)
             (KeyCode::Char('c'), KeyModifiers::CONTROL) => KeyResult::Cancel,
+            // Paste from clipboard or image (Ctrl+V)
+            (KeyCode::Char('v'), KeyModifiers::CONTROL) => KeyResult::Paste,
+
 
             // Exit on empty, or delete character under cursor (Ctrl+D)
             (KeyCode::Char('d'), KeyModifiers::CONTROL) => {
@@ -954,6 +964,9 @@ impl KeyHandler {
                 }
                 KeyResult::Continue
             }
+            // Ctrl+V: Paste from clipboard or image
+            (KeyCode::Char('v'), KeyModifiers::CONTROL) => KeyResult::Paste,
+
 
             // Alt+Y: Yank-pop (cycle kill ring if previous action was yank)
             (KeyCode::Char('y'), KeyModifiers::ALT) => {
@@ -1141,6 +1154,9 @@ impl KeyHandler {
 
             // Cancel (Ctrl+C)
             (KeyCode::Char('c'), KeyModifiers::CONTROL) => KeyResult::Cancel,
+            // Paste from clipboard or image (Ctrl+V)
+            (KeyCode::Char('v'), KeyModifiers::CONTROL) => KeyResult::Paste,
+
 
             // Exit on empty, or delete forward (Ctrl+D)
             (KeyCode::Char('d'), KeyModifiers::CONTROL) => {

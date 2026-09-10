@@ -184,6 +184,10 @@ pub enum SlashCommand {
     Review {
         path: Option<String>,
     },
+    /// Attach an image from the system clipboard or local file path: `/image [path]`
+    Image {
+        path: Option<String>,
+    },
     /// Unrecognized slash command.
     Unknown {
         name: String,
@@ -364,6 +368,14 @@ pub static COMMAND_PALETTE: &[CommandDescriptor] = &[
         category: CommandCategory::Core,
         description: "Clear terminal screen and flush active session message history",
         examples: &["/clear"],
+    },
+    CommandDescriptor {
+        name: "/image",
+        aliases: &["/img", "/paste-image"],
+        syntax: "/image [file-path]",
+        category: CommandCategory::Core,
+        description: "Attach an image from the system clipboard or local file path to the prompt",
+        examples: &["/image", "/image screenshot.png", "/image /path/to/ui.png"],
     },
     CommandDescriptor {
         name: "/file",
@@ -890,6 +902,10 @@ impl SlashCommand {
                 let path = args.first().cloned();
                 SlashCommand::Review { path }
             }
+            "/image" | "/img" | "/paste-image" => {
+                let path = args.first().cloned();
+                SlashCommand::Image { path }
+            }
             _ => SlashCommand::Unknown {
                 name: tokens[0].clone(),
                 args: args.to_vec(),
@@ -1333,6 +1349,10 @@ pub fn execute_slash_command(
             handle_review(path.as_deref(), runner);
             CommandResult::Continue
         }
+        SlashCommand::Image { path } => {
+            handle_image_command(path.as_deref());
+            CommandResult::Continue
+        }
         SlashCommand::Unknown { name, args } => {
             handle_unknown(name, args);
             CommandResult::Continue
@@ -1587,6 +1607,49 @@ fn handle_review(_path: Option<&str>, runner: &mut AgentRunner) {
         }
         Err(e) => {
             eprintln!("\x1b[1;31mReview error:\x1b[0m {e}\n");
+        }
+    }
+}
+
+fn handle_image_command(path: Option<&str>) {
+    if let Some(p) = path {
+        let p_buf = std::path::PathBuf::from(p);
+        match crate::ui::clipboard_image::load_and_cache_image_file(&p_buf) {
+            Ok(img) => {
+                println!(
+                    "\x1b[1;32m✓\x1b[0m Image verified and cached: {} ({}x{}, {} bytes)",
+                    img.path.display(),
+                    img.width,
+                    img.height,
+                    img.bytes_len
+                );
+                println!(
+                    "  Tag: \x1b[1;36m{}\x1b[0m (include this tag in your prompt)\n",
+                    crate::ui::clipboard_image::format_image_placeholder(1, img.width, img.height)
+                );
+            }
+            Err(e) => {
+                eprintln!("\x1b[1;31mError:\x1b[0m Failed to load image '{}': {}\n", p, e);
+            }
+        }
+    } else {
+        match crate::ui::clipboard_image::read_clipboard_image() {
+            Some(img) => {
+                println!(
+                    "\x1b[1;32m✓\x1b[0m Captured image from OS clipboard: {} ({}x{}, {} bytes)",
+                    img.path.display(),
+                    img.width,
+                    img.height,
+                    img.bytes_len
+                );
+                println!(
+                    "  Tag: \x1b[1;36m{}\x1b[0m (Use Ctrl+V or paste tag in your prompt)\n",
+                    crate::ui::clipboard_image::format_image_placeholder(1, img.width, img.height)
+                );
+            }
+            None => {
+                eprintln!("\x1b[1;33mNotice:\x1b[0m No image found in OS clipboard. Copy an image first or specify a path: /image <path>\n");
+            }
         }
     }
 }

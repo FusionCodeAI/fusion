@@ -485,6 +485,8 @@ pub enum KeyAction {
     Yank,
     /// Replace recently pasted text with earlier kill ring entry (`Alt+Y`).
     YankPop,
+    /// Paste from system clipboard or image (`Ctrl+V`).
+    Paste,
 
     // --- Undo / Redo ---
     /// Undo last edit (`Ctrl+_` / `Ctrl+Z` / `u`).
@@ -678,6 +680,7 @@ impl KeyAction {
                 KeyResult::Continue
             }
             KeyAction::YankPop => KeyResult::Continue,
+            KeyAction::Paste => KeyResult::Paste,
 
             KeyAction::Undo => {
                 handler.undo(state);
@@ -770,7 +773,8 @@ impl KeyAction {
             }
             "history_next" | "next_history" | "history_down" => Ok(KeyAction::HistoryNext),
 
-            "yank" | "paste" => Ok(KeyAction::Yank),
+            "yank" => Ok(KeyAction::Yank),
+            "paste" => Ok(KeyAction::Paste),
             "yank_pop" | "paste_pop" => Ok(KeyAction::YankPop),
 
             "undo" => Ok(KeyAction::Undo),
@@ -827,6 +831,7 @@ impl fmt::Display for KeyAction {
             KeyAction::HistoryNext => write!(f, "history_next"),
             KeyAction::Yank => write!(f, "yank"),
             KeyAction::YankPop => write!(f, "yank_pop"),
+            KeyAction::Paste => write!(f, "paste"),
             KeyAction::Undo => write!(f, "undo"),
             KeyAction::Redo => write!(f, "redo"),
             KeyAction::SwitchProfile(p) => write!(f, "switch_profile({})", p),
@@ -888,6 +893,7 @@ impl Serialize for KeyAction {
             KeyAction::YankPop => serializer.serialize_str("yank_pop"),
             KeyAction::Undo => serializer.serialize_str("undo"),
             KeyAction::Redo => serializer.serialize_str("redo"),
+            KeyAction::Paste => serializer.serialize_str("paste"),
             KeyAction::ToggleViMode => serializer.serialize_str("toggle_vi_mode"),
 
             // Structured object forms

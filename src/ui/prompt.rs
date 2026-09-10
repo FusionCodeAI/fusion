@@ -48,6 +48,16 @@ pub struct AtFileTrigger {
     pub query: String,
 }
 
+/// Represents an image attached to the pending prompt.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct PendingImageAttachment {
+    pub index: usize,
+    pub path: std::path::PathBuf,
+    pub width: u32,
+    pub height: u32,
+    pub tag: String,
+}
+
 pub struct Prompt {
     history: Vec<String>,
     history_idx: Option<usize>,
@@ -97,6 +107,8 @@ pub struct Prompt {
     pub at_file_selection: usize,
     /// Whether the @file autocomplete dropdown was dismissed via Esc.
     pub at_file_dismissed: bool,
+    /// Attached images pending turn submission.
+    pub pending_images: Vec<PendingImageAttachment>,
 }
 impl Default for Prompt {
     fn default() -> Self {
@@ -142,6 +154,7 @@ impl Prompt {
             file_cache_time: None,
             at_file_selection: 0,
             at_file_dismissed: false,
+            pending_images: Vec::new(),
         }
     }
 
@@ -319,6 +332,93 @@ impl Prompt {
     pub fn with_selected_effort(mut self, effort: Option<String>) -> Self {
         self.selected_effort = effort;
         self
+    }
+
+    /// like `[Image #1: 1280x720]` at the current cursor position.
+    pub fn attach_image(&mut self, path: std::path::PathBuf, width: u32, height: u32) {
+        let index = self.pending_images.len() + 1;
+        let tag = crate::ui::clipboard_image::format_image_placeholder(index, width, height);
+        for c in tag.chars() {
+            self.buffer.insert(self.cursor_pos, c);
+            self.cursor_pos += 1;
+        }
+        self.pending_images.push(PendingImageAttachment {
+            index,
+            path,
+            width,
+            height,
+            tag,
+        });
+    }
+
+    /// Reconcile attached images against current buffer text. If the user deleted the
+    /// `[Image #N: ...]` placeholder tag with Backspace, the image is automatically detached.
+    pub fn reconcile_attached_images(&self) -> Vec<PendingImageAttachment> {
+        let current_text: String = self.buffer.iter().collect();
+        self.pending_images
+            .iter()
+            .filter(|img| current_text.contains(&img.tag))
+            .cloned()
+            .collect()
+    }
+
+    /// Handle paste action (e.g. from Ctrl+V or explicit paste key):
+    /// 1. First check if system clipboard contains an image (screenshot).
+    /// 2. If no image, read clipboard text and insert it (or check if text is an image path).
+    /// 3. If clipboard text is unavailable, fall back to internal kill ring.
+    pub fn handle_paste_action(&mut self) -> std::io::Result<()> {
+        self.key_handler.snapshot_undo(&self.buffer, self.cursor_pos);
+        // 1. Check for image in system clipboard
+        if let Some(pasted) = crate::ui::clipboard_image::read_clipboard_image() {
+            self.attach_image(pasted.path, pasted.width, pasted.height);
+            return Ok(());
+        }
+
+        // 2. Check for text in system clipboard
+        #[cfg(not(target_arch = "wasm32"))]
+        {
+            if let Ok(mut clipboard) = arboard::Clipboard::new() {
+                if let Ok(text) = clipboard.get_text() {
+                    if !text.is_empty() {
+                        let trimmed = text.trim();
+                        let path_cand = std::path::Path::new(trimmed);
+                        let ext = path_cand
+                            .extension()
+                            .and_then(|e| e.to_str())
+                            .unwrap_or("")
+                            .to_lowercase();
+                        if matches!(ext.as_str(), "png" | "jpg" | "jpeg" | "webp" | "gif" | "bmp")
+                            && path_cand.exists()
+                        {
+                            if let Ok(img) =
+                                crate::ui::clipboard_image::load_and_cache_image_file(path_cand)
+                            {
+                                self.attach_image(img.path, img.width, img.height);
+                                return Ok(());
+                            }
+                        }
+
+                        let normalized = text.replace("\r\n", "\n").replace('\r', "\n");
+                        for c in normalized.chars() {
+                            self.buffer.insert(self.cursor_pos, c);
+                            self.cursor_pos += 1;
+                        }
+                        return Ok(());
+                    }
+                }
+            }
+        }
+
+        // 3. Fallback to kill_ring
+        if let Some(text) = self.key_handler.kill_ring().last() {
+            let text = text.clone();
+            for c in text.chars() {
+                self.buffer.insert(self.cursor_pos, c);
+                self.cursor_pos += 1;
+            }
+        }
+
+        Ok(())
     }
 
     /// Set selected reasoning effort.
@@ -1065,6 +1165,12 @@ impl Prompt {
                         self.render_current()?;
                         Ok(None)
                     }
+                    KeyResult::Paste => {
+                        self.handle_paste_action()?;
+                        self.at_file_dismissed = false;
+                        self.render_current()?;
+                        Ok(None)
+                    }
                     KeyResult::Submit(text) => {
                         let trimmed = text.trim();
                         if trimmed.is_empty() {
@@ -1115,6 +1221,31 @@ impl Prompt {
             Event::Paste(text) => {
                 self.key_handler
                     .snapshot_undo(&self.buffer, self.cursor_pos);
+                if text.trim().is_empty() {
+                    if let Some(pasted) = crate::ui::clipboard_image::read_clipboard_image() {
+                        self.attach_image(pasted.path, pasted.width, pasted.height);
+                        self.render_current()?;
+                        return Ok(None);
+                    }
+                }
+                let trimmed = text.trim();
+                let path_cand = std::path::Path::new(trimmed);
+                let ext = path_cand
+                    .extension()
+                    .and_then(|e| e.to_str())
+                    .unwrap_or("")
+                    .to_lowercase();
+                if matches!(ext.as_str(), "png" | "jpg" | "jpeg" | "webp" | "gif" | "bmp")
+                    && path_cand.exists()
+                {
+                    if let Ok(img) =
+                        crate::ui::clipboard_image::load_and_cache_image_file(path_cand)
+                    {
+                        self.attach_image(img.path, img.width, img.height);
+                        self.render_current()?;
+                        return Ok(None);
+                    }
+                }
                 let normalized = text.replace("\r\n", "\n").replace('\r', "\n");
                 for c in normalized.chars() {
                     self.buffer.insert(self.cursor_pos, c);
@@ -3278,5 +3409,37 @@ mod tests {
             .handle_event(esc_event2)
             .expect("handle_event failed");
         assert_eq!(res2, Some(PromptResult::Cancel));
+    }
+
+    #[test]
+    fn test_prompt_attach_image() {
+        let mut prompt = Prompt::new();
+        prompt.buffer = "Look at this ".chars().collect();
+        prompt.cursor_pos = prompt.buffer.len();
+
+        let path = std::path::PathBuf::from(".fusion/cache/images/test.png");
+        prompt.attach_image(path, 800, 600);
+
+        let text: String = prompt.buffer.iter().collect();
+        assert_eq!(text, "Look at this [Image #1: 800x600]");
+        assert_eq!(prompt.pending_images.len(), 1);
+        assert_eq!(prompt.pending_images[0].width, 800);
+        assert_eq!(prompt.pending_images[0].height, 600);
+    }
+
+    #[test]
+    fn test_prompt_reconcile_attached_images() {
+        let mut prompt = Prompt::new();
+        let path = std::path::PathBuf::from(".fusion/cache/images/test.png");
+        prompt.attach_image(path, 800, 600);
+
+        // If placeholder tag is present, it reconciles
+        let remaining = prompt.reconcile_attached_images();
+        assert_eq!(remaining.len(), 1);
+
+        // If user deleted the placeholder tag with Backspace, it reconciles to empty
+        prompt.buffer.clear();
+        let remaining_after_delete = prompt.reconcile_attached_images();
+        assert!(remaining_after_delete.is_empty());
     }
 }
