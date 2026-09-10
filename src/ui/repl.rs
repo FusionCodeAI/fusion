@@ -1444,6 +1444,12 @@ pub async fn run_repl_with_session(
             }
         }
         prompt.pending_images.clear();
+        // Reconcile and expand collapsed pasted text
+        let active_pastes = prompt.reconcile_attached_pastes();
+        let expanded_prompt =
+            crate::ui::prompt::expand_pasted_text_placeholders(trimmed, &active_pastes);
+        prompt.pending_pastes.clear();
+
 
         if !image_attachments.is_empty() {
             println!(
@@ -1455,7 +1461,7 @@ pub async fn run_repl_with_session(
 
         let turn_start = Instant::now();
         // Execute turn with live streaming and capture any queued prompt
-        match run_turn_ui(&runner, &mut session, trimmed, image_attachments, &mut prompt).await {
+        match run_turn_ui(&runner, &mut session, &expanded_prompt, image_attachments, &mut prompt).await {
             Ok((_content, queued)) => {
                 prompt_queue.extend(queued);
                 let turn_elapsed = turn_start.elapsed();

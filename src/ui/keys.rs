@@ -195,9 +195,15 @@ impl<'a> PromptState<'a> {
         }
     }
 
-    /// Checks if a tag text is an image placeholder (`[Image #...]` or `[Image ...]`).
+    /// Checks if a tag text is a placeholder (`[Image ...]` or `[Pasted text ...]`).
     pub fn is_image_tag_text(tag: &str) -> bool {
-        tag.starts_with("[Image #") || tag.starts_with("[Image ") || tag.starts_with("[Image#")
+        tag.starts_with("[Image #")
+            || tag.starts_with("[Image ")
+            || tag.starts_with("[Image#")
+            || tag.starts_with("[Pasted text #")
+            || tag.starts_with("[Pasted text ")
+            || tag.starts_with("[Pasted text#")
+            || tag.starts_with("[Pasted ")
     }
 
     /// Finds an image placeholder tag touching or preceding the cursor.
@@ -2527,5 +2533,20 @@ mod tests {
         handler.handle_key(KeyEvent::new(KeyCode::Delete, KeyModifiers::NONE), &mut st);
         assert_eq!(st.text(), " please analyze");
         assert_eq!(*st.cursor_pos, 0);
+    }
+
+    #[test]
+    fn test_atomic_pasted_text_placeholder_backspace() {
+        let mut handler = KeyHandler::new(KeybindingProfile::Default);
+        let mut buf: Vec<char> = "Analyze this [Pasted text #1, 28 lines]".chars().collect();
+        let mut cur = buf.len(); // at the end, right after ']'
+        let hist = Vec::new();
+        let mut hist_idx = None;
+        let mut saved = String::new();
+
+        let mut st = make_test_state(&mut buf, &mut cur, &hist, &mut hist_idx, &mut saved);
+        handler.handle_key(KeyEvent::new(KeyCode::Backspace, KeyModifiers::NONE), &mut st);
+        assert_eq!(st.text(), "Analyze this ");
+        assert_eq!(*st.cursor_pos, 13);
     }
 }

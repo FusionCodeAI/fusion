@@ -58,6 +58,16 @@ pub struct PendingImageAttachment {
     pub tag: String,
 }
 
+/// Represents a large block of pasted text collapsed into an inline placeholder.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct PendingPastedText {
+    pub index: usize,
+    pub line_count: usize,
+    pub char_count: usize,
+    pub content: String,
+    pub tag: String,
+}
+
 pub struct Prompt {
     history: Vec<String>,
     history_idx: Option<usize>,
@@ -109,6 +119,8 @@ pub struct Prompt {
     pub at_file_dismissed: bool,
     /// Attached images pending turn submission.
     pub pending_images: Vec<PendingImageAttachment>,
+    /// Attached large text pastes pending turn submission.
+    pub pending_pastes: Vec<PendingPastedText>,
 }
 impl Default for Prompt {
     fn default() -> Self {
@@ -155,6 +167,7 @@ impl Prompt {
             at_file_selection: 0,
             at_file_dismissed: false,
             pending_images: Vec::new(),
+            pending_pastes: Vec::new(),
         }
     }
 
@@ -367,6 +380,49 @@ impl Prompt {
             .collect()
     }
 
+    /// Paste text into the prompt buffer, collapsing multi-line blocks
+    /// (>= 4 lines) into a clean placeholder like `[Pasted text #1, 28 lines]`.
+    pub fn paste_text(&mut self, text: &str) {
+        let normalized = text.replace("\r\n", "\n").replace('\r', "\n");
+        let line_count = normalized.lines().count();
+
+        if line_count >= 4 || (line_count >= 3 && normalized.len() > 180) {
+            let index = self.pending_pastes.len() + 1;
+            let tag = format!("[Pasted text #{}, {} lines]", index, line_count);
+            for c in tag.chars() {
+                self.buffer.insert(self.cursor_pos, c);
+                self.cursor_pos += 1;
+            }
+            self.pending_pastes.push(PendingPastedText {
+                index,
+                line_count,
+                char_count: normalized.chars().count(),
+                content: normalized,
+                tag,
+            });
+        } else {
+            for c in normalized.chars() {
+                self.buffer.insert(self.cursor_pos, c);
+                self.cursor_pos += 1;
+            }
+        }
+    }
+
+    /// Reconciles attached pasted text against current buffer content.
+    pub fn reconcile_attached_pastes(&self) -> Vec<PendingPastedText> {
+        let current_text: String = self.buffer.iter().collect();
+        self.pending_pastes
+            .iter()
+            .filter(|p| {
+                current_text.contains(&p.tag)
+                    || current_text.contains(&format!("[Pasted text #{},", p.index))
+                    || current_text.contains(&format!("[Pasted text #{}", p.index))
+                    || current_text.contains(&format!("[Pasted text {}", p.index))
+            })
+            .cloned()
+            .collect()
+    }
+
     /// Handle paste action (e.g. from Ctrl+V or explicit paste key):
     /// 1. First check if system clipboard contains an image (screenshot).
     /// 2. If no image, read clipboard text and insert it (or check if text is an image path).
@@ -403,11 +459,7 @@ impl Prompt {
                             }
                         }
 
-                        let normalized = text.replace("\r\n", "\n").replace('\r', "\n");
-                        for c in normalized.chars() {
-                            self.buffer.insert(self.cursor_pos, c);
-                            self.cursor_pos += 1;
-                        }
+                        self.paste_text(&text);
                         return Ok(());
                     }
                 }
@@ -417,10 +469,7 @@ impl Prompt {
         // 3. Fallback to kill_ring
         if let Some(text) = self.key_handler.kill_ring().last() {
             let text = text.clone();
-            for c in text.chars() {
-                self.buffer.insert(self.cursor_pos, c);
-                self.cursor_pos += 1;
-            }
+            self.paste_text(&text);
         }
 
         Ok(())
@@ -1270,11 +1319,7 @@ impl Prompt {
                     self.render_current()?;
                     return Ok(None);
                 }
-                let normalized = text.replace("\r\n", "\n").replace('\r', "\n");
-                for c in normalized.chars() {
-                    self.buffer.insert(self.cursor_pos, c);
-                    self.cursor_pos += 1;
-                }
+                self.paste_text(&text);
                 self.render_current()?;
                 Ok(None)
             }
@@ -2029,33 +2074,69 @@ impl Prompt {
     }
 }
 
-/// Highlights any `[Image #...]` placeholder tags within a rendered line with bold cyan styling.
+/// Highlights any `[Image #...]` or `[Pasted text #...]` placeholder tags within a rendered line with bold cyan styling.
 pub fn format_prompt_line_with_colored_placeholders(line: &str) -> String {
-    if !line.contains("[Image") {
+    if !line.contains("[Image") && !line.contains("[Pasted text") {
         return line.to_string();
     }
 
     let mut result = String::with_capacity(line.len() + 32);
     let mut remainder = line;
 
-    while let Some(start) = remainder.find("[Image") {
-        result.push_str(&remainder[..start]);
-        let after_start = &remainder[start..];
-        if let Some(end) = after_start.find(']') {
-            let tag = &after_start[..=end];
-            if tag.starts_with("[Image ") || tag.starts_with("[Image#") {
+    while !remainder.is_empty() {
+        let next_image = remainder.find("[Image");
+        let next_paste = remainder.find("[Pasted text");
+
+        let next_match = match (next_image, next_paste) {
+            (Some(i), Some(p)) => Some((i.min(p), if i < p { "[Image" } else { "[Pasted text" })),
+            (Some(i), None) => Some((i, "[Image")),
+            (None, Some(p)) => Some((p, "[Pasted text")),
+            (None, None) => None,
+        };
+
+        if let Some((start, _prefix)) = next_match {
+            result.push_str(&remainder[..start]);
+            let after_start = &remainder[start..];
+            if let Some(end) = after_start.find(']') {
+                let tag = &after_start[..=end];
                 result.push_str("\x1b[1;36m");
                 result.push_str(tag);
                 result.push_str("\x1b[0m");
                 remainder = &after_start[end + 1..];
                 continue;
+            } else {
+                result.push_str(after_start);
+                remainder = "";
+                break;
+            }
+        } else {
+            result.push_str(remainder);
+            break;
+        }
+    }
+    result
+}
+
+/// Expands any `[Pasted text #N, ...]` placeholders in a user prompt into their full content.
+pub fn expand_pasted_text_placeholders(
+    prompt_text: &str,
+    pastes: &[PendingPastedText],
+) -> String {
+    let mut expanded = prompt_text.to_string();
+    for p in pastes {
+        if expanded.contains(&p.tag) {
+            expanded = expanded.replace(&p.tag, &p.content);
+        } else {
+            let alt_prefix = format!("[Pasted text #{}", p.index);
+            if let Some(start) = expanded.find(&alt_prefix) {
+                if let Some(close_rel) = expanded[start..].find(']') {
+                    let full_tag = &expanded[start..=start + close_rel];
+                    expanded = expanded.replace(full_tag, &p.content);
+                }
             }
         }
-        result.push_str(&remainder[..start + 6]);
-        remainder = &remainder[start + 6..];
     }
-    result.push_str(remainder);
-    result
+    expanded
 }
 
 /// Check if a character can be part of an `@file` path query.
@@ -3687,5 +3768,36 @@ mod tests {
         let formatted = format_prompt_line_with_colored_placeholders(line);
         assert!(formatted.contains("\x1b[1;36m[Image 1]\x1b[0m"));
         assert!(formatted.contains("\x1b[1;36m[Image #2]\x1b[0m"));
+    }
+
+    #[test]
+    fn test_paste_text_collapsing() {
+        let mut prompt = Prompt::new();
+        let long_paste = "line 1\nline 2\nline 3\nline 4\nline 5\nline 6";
+        prompt.paste_text(long_paste);
+
+        let text: String = prompt.buffer.iter().collect();
+        assert_eq!(text, "[Pasted text #1, 6 lines]");
+        assert_eq!(prompt.pending_pastes.len(), 1);
+        assert_eq!(prompt.pending_pastes[0].line_count, 6);
+
+        // Highlight check
+        let formatted = format_prompt_line_with_colored_placeholders(&text);
+        assert!(formatted.contains("\x1b[1;36m[Pasted text #1, 6 lines]\x1b[0m"));
+
+        // Expansion check
+        let expanded = expand_pasted_text_placeholders(&text, &prompt.pending_pastes);
+        assert_eq!(expanded, long_paste);
+    }
+
+    #[test]
+    fn test_short_paste_not_collapsed() {
+        let mut prompt = Prompt::new();
+        let short_paste = "cargo build --bin fusion";
+        prompt.paste_text(short_paste);
+
+        let text: String = prompt.buffer.iter().collect();
+        assert_eq!(text, "cargo build --bin fusion");
+        assert!(prompt.pending_pastes.is_empty());
     }
 }
