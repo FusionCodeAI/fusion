@@ -1189,7 +1189,8 @@ impl Prompt {
                             let mut out = stdout();
                             let lines: Vec<&str> = text.split('\n').collect();
                             for line in &lines {
-                                let _ = write!(out, "\x1b[1m┃ {}\x1b[0m\r\n", line);
+                                let formatted = format_prompt_line_with_colored_placeholders(line);
+                                let _ = write!(out, "\x1b[1m┃ {}\x1b[0m\r\n", formatted);
                             }
                             let _ = write!(out, "\r\n");
                             let _ = out.flush();
@@ -1456,7 +1457,8 @@ impl Prompt {
                     }
                 }
             } else {
-                write!(out, "{}", line)?;
+                let formatted = format_prompt_line_with_colored_placeholders(line);
+                write!(out, "{}", formatted)?;
             }
             write!(out, "\r\n")?;
             total_lines += 1;
@@ -1972,6 +1974,11 @@ impl Prompt {
         Ok(())
     }
 
+    /// Highlight any `[Image #...]` placeholder tags with bold cyan color.
+    pub fn format_with_colored_placeholders(line: &str) -> String {
+        format_prompt_line_with_colored_placeholders(line)
+    }
+
     /// Render a submitted user input prompt to a generic writer.
     pub fn render_submitted_prompt_to<W: std::io::Write>(
         out: &mut W,
@@ -1979,7 +1986,8 @@ impl Prompt {
     ) -> std::io::Result<()> {
         let lines: Vec<&str> = text.split('\n').collect();
         for line in &lines {
-            write!(out, "\x1b[1m┃ {}\x1b[0m\r\n", line)?;
+            let formatted = format_prompt_line_with_colored_placeholders(line);
+            write!(out, "\x1b[1m┃ {}\x1b[0m\r\n", formatted)?;
         }
         write!(out, "\r\n")?;
         out.flush()?;
@@ -1990,6 +1998,35 @@ impl Prompt {
     pub fn render_submitted_prompt(text: &str) {
         let _ = Self::render_submitted_prompt_to(&mut stdout(), text);
     }
+}
+
+/// Highlights any `[Image #...]` placeholder tags within a rendered line with bold cyan styling.
+pub fn format_prompt_line_with_colored_placeholders(line: &str) -> String {
+    if !line.contains("[Image #") {
+        return line.to_string();
+    }
+
+    let mut result = String::with_capacity(line.len() + 32);
+    let mut remainder = line;
+
+    while let Some(start) = remainder.find("[Image #") {
+        result.push_str(&remainder[..start]);
+        let after_start = &remainder[start..];
+        if let Some(end) = after_start.find(']') {
+            let tag = &after_start[..=end];
+            // Format tag in bold cyan (\x1b[1;36m...\x1b[0m)
+            result.push_str("\x1b[1;36m");
+            result.push_str(tag);
+            result.push_str("\x1b[0m");
+            remainder = &after_start[end + 1..];
+        } else {
+            result.push_str(after_start);
+            remainder = "";
+            break;
+        }
+    }
+    result.push_str(remainder);
+    result
 }
 
 /// Check if a character can be part of an `@file` path query.
@@ -3452,5 +3489,19 @@ mod tests {
         prompt.buffer.clear();
         let remaining_after_delete = prompt.reconcile_attached_images();
         assert!(remaining_after_delete.is_empty());
+    }
+
+    #[test]
+    fn test_format_prompt_line_with_colored_placeholders() {
+        let line = "Explain [Image #1, 1568x1037] and [Image #2, 800x600] please";
+        let formatted = format_prompt_line_with_colored_placeholders(line);
+        assert!(formatted.contains("\x1b[1;36m[Image #1, 1568x1037]\x1b[0m"));
+        assert!(formatted.contains("\x1b[1;36m[Image #2, 800x600]\x1b[0m"));
+        assert!(formatted.starts_with("Explain "));
+        assert!(formatted.ends_with(" please"));
+
+        // Regular line without image tags is unchanged
+        let plain = "Hello world";
+        assert_eq!(format_prompt_line_with_colored_placeholders(plain), "Hello world");
     }
 }

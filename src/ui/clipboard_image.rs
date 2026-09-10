@@ -13,6 +13,29 @@ pub struct PastedImage {
     pub media_type: String,
 }
 
+/// Standard optimal maximum dimension for multimodal LLM vision (Anthropic / OpenAI).
+pub const MAX_IMAGE_DIMENSION: u32 = 1568;
+
+/// Calculates new dimensions constrained to `max_dimension` while preserving aspect ratio.
+pub fn clamp_dimensions(width: u32, height: u32, max_dimension: u32) -> (u32, u32) {
+    if width == 0 || height == 0 {
+        return (width, height);
+    }
+    if width <= max_dimension && height <= max_dimension {
+        return (width, height);
+    }
+
+    if width >= height {
+        let new_w = max_dimension;
+        let new_h = ((height as f64) * (max_dimension as f64) / (width as f64)).round() as u32;
+        (new_w, new_h.max(1))
+    } else {
+        let new_h = max_dimension;
+        let new_w = ((width as f64) * (max_dimension as f64) / (height as f64)).round() as u32;
+        (new_w.max(1), new_h)
+    }
+}
+
 /// Encodes raw RGBA8 pixels into compressed PNG bytes.
 pub fn encode_rgba_png(width: u32, height: u32, rgba_data: &[u8]) -> anyhow::Result<Vec<u8>> {
     let expected_len = (width as usize) * (height as usize) * 4;
@@ -29,6 +52,18 @@ pub fn encode_rgba_png(width: u32, height: u32, rgba_data: &[u8]) -> anyhow::Res
     let img_buf = image::RgbaImage::from_raw(width, height, rgba_data.to_vec())
         .ok_or_else(|| anyhow::anyhow!("Invalid RGBA image buffer dimensions"))?;
 
+    let (target_w, target_h) = clamp_dimensions(width, height, MAX_IMAGE_DIMENSION);
+    let final_buf = if (target_w, target_h) != (width, height) {
+        image::imageops::resize(
+            &img_buf,
+            target_w,
+            target_h,
+            image::imageops::FilterType::Triangle,
+        )
+    } else {
+        img_buf
+    };
+
     let mut png_bytes = Vec::new();
     let encoder = image::codecs::png::PngEncoder::new_with_quality(
         &mut png_bytes,
@@ -37,9 +72,9 @@ pub fn encode_rgba_png(width: u32, height: u32, rgba_data: &[u8]) -> anyhow::Res
     );
     image::ImageEncoder::write_image(
         encoder,
-        img_buf.as_raw(),
-        width,
-        height,
+        final_buf.as_raw(),
+        target_w,
+        target_h,
         image::ExtendedColorType::Rgba8,
     )?;
     Ok(png_bytes)
@@ -64,13 +99,14 @@ pub fn read_clipboard_image() -> Option<PastedImage> {
     {
         let mut clipboard = arboard::Clipboard::new().ok()?;
         let img = clipboard.get_image().ok()?;
-        let width = img.width as u32;
-        let height = img.height as u32;
-        if width == 0 || height == 0 {
+        let raw_w = img.width as u32;
+        let raw_h = img.height as u32;
+        if raw_w == 0 || raw_h == 0 {
             return None;
         }
 
-        let png_bytes = encode_rgba_png(width, height, &img.bytes).ok()?;
+        let png_bytes = encode_rgba_png(raw_w, raw_h, &img.bytes).ok()?;
+        let (width, height) = clamp_dimensions(raw_w, raw_h, MAX_IMAGE_DIMENSION);
 
         let now = SystemTime::now()
             .duration_since(UNIX_EPOCH)
@@ -120,10 +156,11 @@ pub fn load_and_cache_image_file(source_path: &Path) -> anyhow::Result<PastedIma
     }
     .to_string();
 
+    let (target_w, target_h) = clamp_dimensions(width, height, MAX_IMAGE_DIMENSION);
     Ok(PastedImage {
         path: source_path.to_path_buf(),
-        width,
-        height,
+        width: target_w,
+        height: target_h,
         bytes_len: bytes.len(),
         media_type,
     })
@@ -148,21 +185,46 @@ pub fn create_image_attachment_from_file(
     .to_string();
 
     use base64::Engine;
-    let base64_data = base64::engine::general_purpose::STANDARD.encode(&bytes);
-
-    let (width, height) = if let Ok(img) = image::load_from_memory(&bytes) {
-        (Some(img.width()), Some(img.height()))
+    if let Ok(img) = image::load_from_memory(&bytes) {
+        let (orig_w, orig_h) = (img.width(), img.height());
+        let (target_w, target_h) = clamp_dimensions(orig_w, orig_h, MAX_IMAGE_DIMENSION);
+        let final_bytes = if (target_w, target_h) != (orig_w, orig_h) {
+            let resized = img.resize(target_w, target_h, image::imageops::FilterType::Triangle);
+            let mut out_bytes = Vec::new();
+            let encoder = image::codecs::png::PngEncoder::new_with_quality(
+                &mut out_bytes,
+                image::codecs::png::CompressionType::Fast,
+                image::codecs::png::FilterType::NoFilter,
+            );
+            image::ImageEncoder::write_image(
+                encoder,
+                resized.to_rgba8().as_raw(),
+                target_w,
+                target_h,
+                image::ExtendedColorType::Rgba8,
+            )?;
+            out_bytes
+        } else {
+            bytes
+        };
+        let base64_data = base64::engine::general_purpose::STANDARD.encode(&final_bytes);
+        Ok(crate::provider::types::ImageAttachment {
+            media_type,
+            data: base64_data,
+            path: Some(path.to_string_lossy().to_string()),
+            width: Some(target_w),
+            height: Some(target_h),
+        })
     } else {
-        (None, None)
-    };
-
-    Ok(crate::provider::types::ImageAttachment {
-        media_type,
-        data: base64_data,
-        path: Some(path.to_string_lossy().to_string()),
-        width,
-        height,
-    })
+        let base64_data = base64::engine::general_purpose::STANDARD.encode(&bytes);
+        Ok(crate::provider::types::ImageAttachment {
+            media_type,
+            data: base64_data,
+            path: Some(path.to_string_lossy().to_string()),
+            width: None,
+            height: None,
+        })
+    }
 }
 
 #[cfg(test)]
@@ -178,6 +240,20 @@ mod tests {
         let png_bytes = encode_rgba_png(2, 2, &rgba_data).expect("must encode png");
         assert!(!png_bytes.is_empty());
         assert_eq!(&png_bytes[0..8], b"\x89PNG\r\n\x1a\n");
+    }
+
+    #[test]
+    fn test_clamp_dimensions_retina() {
+        let (w, h) = clamp_dimensions(3212, 2124, 1568);
+        assert_eq!(w, 1568);
+        assert_eq!(h, 1037);
+    }
+
+    #[test]
+    fn test_clamp_dimensions_small() {
+        let (w, h) = clamp_dimensions(800, 600, 1568);
+        assert_eq!(w, 800);
+        assert_eq!(h, 600);
     }
 
     #[test]

@@ -193,9 +193,84 @@ impl<'a> PromptState<'a> {
         }
     }
 
-    /// Remove character under cursor if within bounds.
+    /// Finds an image placeholder tag touching or preceding the cursor.
+    /// Returns `Some((start_idx, end_idx))` if found.
+    pub fn find_image_placeholder_before_cursor(&self) -> Option<(usize, usize)> {
+        let pos = *self.cursor_pos;
+        if pos == 0 || self.buffer.is_empty() {
+            return None;
+        }
+
+        // Case 1: Cursor is directly at the end of tag (e.g. immediately after ']')
+        if pos > 0 && self.buffer[pos - 1] == ']' {
+            if let Some(open) = self.buffer[..pos - 1].iter().rposition(|&c| c == '[') {
+                let tag: String = self.buffer[open..pos].iter().collect();
+                if tag.starts_with("[Image #") {
+                    return Some((open, pos));
+                }
+            }
+        }
+
+        // Case 2: Cursor is strictly inside tag brackets
+        if let Some(open) = self.buffer[..pos].iter().rposition(|&c| c == '[') {
+            if let Some(close_rel) = self.buffer[open..].iter().position(|&c| c == ']') {
+                let close = open + close_rel + 1;
+                if pos <= close {
+                    let tag: String = self.buffer[open..close].iter().collect();
+                    if tag.starts_with("[Image #") {
+                        return Some((open, close));
+                    }
+                }
+            }
+        }
+
+        None
+    }
+
+    /// Finds an image placeholder tag at or containing the cursor.
+    /// Returns `Some((start_idx, end_idx))` if found.
+    pub fn find_image_placeholder_at_cursor(&self) -> Option<(usize, usize)> {
+        let pos = *self.cursor_pos;
+        if pos >= self.buffer.len() {
+            return None;
+        }
+
+        // Case 1: Cursor is on the opening bracket '['
+        if self.buffer[pos] == '[' {
+            if let Some(close_rel) = self.buffer[pos..].iter().position(|&c| c == ']') {
+                let close = pos + close_rel + 1;
+                let tag: String = self.buffer[pos..close].iter().collect();
+                if tag.starts_with("[Image #") {
+                    return Some((pos, close));
+                }
+            }
+        }
+
+        // Case 2: Cursor is inside tag brackets
+        if let Some(open) = self.buffer[..pos].iter().rposition(|&c| c == '[') {
+            if let Some(close_rel) = self.buffer[open..].iter().position(|&c| c == ']') {
+                let close = open + close_rel + 1;
+                if pos < close {
+                    let tag: String = self.buffer[open..close].iter().collect();
+                    if tag.starts_with("[Image #") {
+                        return Some((open, close));
+                    }
+                }
+            }
+        }
+
+        None
+    }
+
+    /// Remove character under cursor if within bounds, atomically cutting any image tag.
     pub fn remove_char_at_cursor(&mut self) -> Option<char> {
         self.clamp_cursor();
+        if let Some((start, end)) = self.find_image_placeholder_at_cursor() {
+            self.buffer.drain(start..end);
+            *self.cursor_pos = start;
+            return Some('[');
+        }
+
         if *self.cursor_pos < self.buffer.len() {
             Some(self.buffer.remove(*self.cursor_pos))
         } else {
@@ -203,9 +278,15 @@ impl<'a> PromptState<'a> {
         }
     }
 
-    /// Remove character immediately before cursor and decrement cursor.
+    /// Remove character immediately before cursor, atomically cutting any image tag.
     pub fn remove_char_before_cursor(&mut self) -> Option<char> {
         self.clamp_cursor();
+        if let Some((start, end)) = self.find_image_placeholder_before_cursor() {
+            self.buffer.drain(start..end);
+            *self.cursor_pos = start;
+            return Some(']');
+        }
+
         if *self.cursor_pos > 0 {
             *self.cursor_pos -= 1;
             Some(self.buffer.remove(*self.cursor_pos))
@@ -2397,5 +2478,37 @@ mod tests {
             &mut st,
         );
         assert_eq!(res, KeyResult::Submit("hello".to_string()));
+    }
+
+    #[test]
+    fn test_atomic_image_placeholder_backspace() {
+        let mut handler = KeyHandler::new(KeybindingProfile::Default);
+        let mut buf: Vec<char> = "Describe [Image #1, 1568x1037]".chars().collect();
+        let mut cur = buf.len(); // at the end, right after ']'
+        let hist = Vec::new();
+        let mut hist_idx = None;
+        let mut saved = String::new();
+
+        let mut st = make_test_state(&mut buf, &mut cur, &hist, &mut hist_idx, &mut saved);
+        // Backspace cuts the entire [Image #1, 1568x1037] tag in one keystroke!
+        handler.handle_key(KeyEvent::new(KeyCode::Backspace, KeyModifiers::NONE), &mut st);
+        assert_eq!(st.text(), "Describe ");
+        assert_eq!(*st.cursor_pos, 9);
+    }
+
+    #[test]
+    fn test_atomic_image_placeholder_delete() {
+        let mut handler = KeyHandler::new(KeybindingProfile::Default);
+        let mut buf: Vec<char> = "[Image #1, 1568x1037] please analyze".chars().collect();
+        let mut cur = 0; // at the start, on '['
+        let hist = Vec::new();
+        let mut hist_idx = None;
+        let mut saved = String::new();
+
+        let mut st = make_test_state(&mut buf, &mut cur, &hist, &mut hist_idx, &mut saved);
+        // Delete cuts the entire [Image #1, 1568x1037] tag in one keystroke!
+        handler.handle_key(KeyEvent::new(KeyCode::Delete, KeyModifiers::NONE), &mut st);
+        assert_eq!(st.text(), " please analyze");
+        assert_eq!(*st.cursor_pos, 0);
     }
 }
