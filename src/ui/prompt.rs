@@ -1176,6 +1176,14 @@ impl Prompt {
                         self.render_current()?;
                         Ok(None)
                     }
+                    KeyResult::Reload => {
+                        if crate::agent::updater::has_staged_update() {
+                            self.clear_frame()?;
+                            println!("\x1b[1;36mReloading Fusion with staged update...\x1b[0m\r\n");
+                            crate::agent::updater::reload_process();
+                        }
+                        Ok(None)
+                    }
                     KeyResult::Submit(text) => {
                         let trimmed = text.trim();
                         if trimmed.is_empty() {
@@ -1186,10 +1194,14 @@ impl Prompt {
                             && self.running_status.is_none()
                             && self.queued_count == 0
                         {
+                            let (term_cols, _) = terminal::size()
+                                .map(|(w, h)| (w as usize, h as usize))
+                                .unwrap_or((80, 24));
+                            let buf_chars: Vec<char> = text.chars().collect();
+                            let (v_lines, _, _) = wrap_prompt_lines(&buf_chars, 0, term_cols, 0);
                             let mut out = stdout();
-                            let lines: Vec<&str> = text.split('\n').collect();
-                            for line in &lines {
-                                let formatted = format_prompt_line_with_colored_placeholders(line);
+                            for line in &v_lines {
+                                let formatted = format_prompt_line_with_colored_placeholders(&line.text);
                                 let _ = write!(out, "\x1b[1m┃ {}\x1b[0m\r\n", formatted);
                             }
                             let _ = write!(out, "\r\n");
@@ -1320,11 +1332,15 @@ impl Prompt {
         last_cursor_row: &mut usize,
     ) -> std::io::Result<()> {
         let text: String = buffer.iter().collect();
+        let (term_cols, term_rows) = terminal::size()
+            .map(|(w, h)| (w as usize, h as usize))
+            .unwrap_or((80, 24));
+        let max_up = term_rows.saturating_sub(1).min(50);
+        let chip_w = self.skill_chip_width();
+
+        let (visual_lines, target_row, target_col) =
+            wrap_prompt_lines(buffer, cursor_pos, term_cols, chip_w);
         let lines: Vec<&str> = text.split('\n').collect();
-
-        // Compute cursor row & column
-        let (target_row, target_col, _) = get_line_info(buffer, cursor_pos);
-
         // Filter models if model picker is active
         let mut filtered_models = Vec::new();
         if self.model_picker_active && !self.models.is_empty() {
@@ -1373,10 +1389,6 @@ impl Prompt {
             Vec::new()
         };
 
-        let (term_cols, term_rows) = terminal::size()
-            .map(|(w, h)| (w as usize, h as usize))
-            .unwrap_or((80, 24));
-        let max_up = term_rows.saturating_sub(1).min(50);
 
         // Clear previous frame using exact relative cursor movement
         // Guard against out-of-bounds relative cursor jumps that erase streamed terminal content
@@ -1432,15 +1444,15 @@ impl Prompt {
         let header_lines = running_lines + queue_banner_lines;
         total_lines += header_lines;
         // 1. Input lines with clean vertical rail symbol (┃ )
-        for (idx, line) in lines.iter().enumerate() {
-            let prefix = if idx == 0 {
+        for (v_idx, v_line) in visual_lines.iter().enumerate() {
+            let prefix = if v_idx == 0 {
                 &self.prompt_symbol
             } else {
                 &self.multiline_symbol
             };
 
             write!(out, "{}", prefix)?;
-            if idx == 0 {
+            if v_idx == 0 {
                 // Active skill chip prefix (fx-style): skill name · source
                 if let Some((skill_name, source)) = &self.active_skill {
                     write!(
@@ -1450,14 +1462,14 @@ impl Prompt {
                     )?;
                 }
             }
-            if idx == 0 && line.is_empty() && lines.len() == 1 && !self.is_running {
+            if v_idx == 0 && v_line.text.is_empty() && visual_lines.len() == 1 && !self.is_running {
                 if let Some(ph) = &self.placeholder {
                     if !ph.is_empty() {
                         write!(out, "\x1b[2;37m{}\x1b[0m", ph)?;
                     }
                 }
             } else {
-                let formatted = format_prompt_line_with_colored_placeholders(line);
+                let formatted = format_prompt_line_with_colored_placeholders(&v_line.text);
                 write!(out, "{}", formatted)?;
             }
             write!(out, "\r\n")?;
@@ -1898,8 +1910,7 @@ impl Prompt {
                 "\x1b[2;37m↑↓ Navigate     Tab/Enter Insert     Esc Close\x1b[0m"
             )?;
             total_lines += 1;
-
-            let lines_up = ((lines.len() - 1 - target_row) + visible_count + 5).min(max_up);
+            let lines_up = ((visual_lines.len() - 1 - target_row) + visible_count + 5).min(max_up);
             execute!(out, cursor::MoveUp(lines_up as u16))?;
             let prefix = if target_row == 0 {
                 &self.prompt_symbol
@@ -1945,11 +1956,26 @@ impl Prompt {
             } else {
                 status_body
             };
-            write!(out, "  \x1b[2;37m{}\x1b[0m\r\n", status_text)?;
+            let right_text = if crate::agent::updater::has_staged_update() {
+                "update ready: ctrl+g to reload"
+            } else {
+                ""
+            };
+
+            if !right_text.is_empty() && term_cols > status_text.len() + right_text.len() + 6 {
+                let gap = term_cols.saturating_sub(status_text.len() + right_text.len() + 4);
+                write!(
+                    out,
+                    "  \x1b[2;37m{}\x1b[0m{:gap$}\x1b[2;37m{}\x1b[0m\r\n",
+                    status_text, "", right_text
+                )?;
+            } else {
+                write!(out, "  \x1b[2;37m{}\x1b[0m\r\n", status_text)?;
+            }
             total_lines += 1;
 
             // Reposition cursor inside input box on active input row
-            let lines_up = ((lines.len() - 1 - target_row) + 3).min(max_up);
+            let lines_up = ((visual_lines.len() - 1 - target_row) + 3).min(max_up);
             execute!(out, cursor::MoveUp(lines_up as u16))?;
 
             let prefix = if target_row == 0 {
@@ -1978,15 +2004,18 @@ impl Prompt {
     pub fn format_with_colored_placeholders(line: &str) -> String {
         format_prompt_line_with_colored_placeholders(line)
     }
-
     /// Render a submitted user input prompt to a generic writer.
     pub fn render_submitted_prompt_to<W: std::io::Write>(
         out: &mut W,
         text: &str,
     ) -> std::io::Result<()> {
-        let lines: Vec<&str> = text.split('\n').collect();
-        for line in &lines {
-            let formatted = format_prompt_line_with_colored_placeholders(line);
+        let (term_cols, _) = terminal::size()
+            .map(|(w, h)| (w as usize, h as usize))
+            .unwrap_or((80, 24));
+        let buf_chars: Vec<char> = text.chars().collect();
+        let (v_lines, _, _) = wrap_prompt_lines(&buf_chars, 0, term_cols, 0);
+        for line in &v_lines {
+            let formatted = format_prompt_line_with_colored_placeholders(&line.text);
             write!(out, "\x1b[1m┃ {}\x1b[0m\r\n", formatted)?;
         }
         write!(out, "\r\n")?;
@@ -2002,28 +2031,28 @@ impl Prompt {
 
 /// Highlights any `[Image #...]` placeholder tags within a rendered line with bold cyan styling.
 pub fn format_prompt_line_with_colored_placeholders(line: &str) -> String {
-    if !line.contains("[Image #") {
+    if !line.contains("[Image") {
         return line.to_string();
     }
 
     let mut result = String::with_capacity(line.len() + 32);
     let mut remainder = line;
 
-    while let Some(start) = remainder.find("[Image #") {
+    while let Some(start) = remainder.find("[Image") {
         result.push_str(&remainder[..start]);
         let after_start = &remainder[start..];
         if let Some(end) = after_start.find(']') {
             let tag = &after_start[..=end];
-            // Format tag in bold cyan (\x1b[1;36m...\x1b[0m)
-            result.push_str("\x1b[1;36m");
-            result.push_str(tag);
-            result.push_str("\x1b[0m");
-            remainder = &after_start[end + 1..];
-        } else {
-            result.push_str(after_start);
-            remainder = "";
-            break;
+            if tag.starts_with("[Image ") || tag.starts_with("[Image#") {
+                result.push_str("\x1b[1;36m");
+                result.push_str(tag);
+                result.push_str("\x1b[0m");
+                remainder = &after_start[end + 1..];
+                continue;
+            }
         }
+        result.push_str(&remainder[..start + 6]);
+        remainder = &remainder[start + 6..];
     }
     result.push_str(remainder);
     result
@@ -2242,6 +2271,141 @@ fn slash_matches(typed: &str, skills: &[SlashSuggestion]) -> Vec<SlashSuggestion
     cmd_results.truncate(cmd_limit);
     cmd_results.extend(skill_results.into_iter().take(3));
     cmd_results
+}
+
+/// A visual line displayed in the prompt after soft-wrapping at terminal boundaries.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct VisualLine {
+    pub text: String,
+    pub is_logical_start: bool,
+    pub char_start: usize,
+    pub char_end: usize,
+}
+
+/// Breaks the prompt buffer into visual lines wrapped to `term_cols`,
+/// and computes the cursor's visual row and visual column.
+pub fn wrap_prompt_lines(
+    buffer: &[char],
+    cursor_pos: usize,
+    term_cols: usize,
+    chip_w: usize,
+) -> (Vec<VisualLine>, usize, usize) {
+    if buffer.is_empty() {
+        return (
+            vec![VisualLine {
+                text: String::new(),
+                is_logical_start: true,
+                char_start: 0,
+                char_end: 0,
+            }],
+            0,
+            0,
+        );
+    }
+
+    let mut visual_lines = Vec::new();
+    let mut logical_start = 0;
+    let mut cur_char_idx = 0;
+
+    while cur_char_idx <= buffer.len() {
+        if cur_char_idx == buffer.len() || buffer[cur_char_idx] == '\n' {
+            let logical_slice = &buffer[logical_start..cur_char_idx];
+            let is_first_logical = visual_lines.is_empty();
+
+            if logical_slice.is_empty() {
+                visual_lines.push(VisualLine {
+                    text: String::new(),
+                    is_logical_start: true,
+                    char_start: logical_start,
+                    char_end: cur_char_idx,
+                });
+            } else {
+                let mut seg_start = 0;
+                let mut is_first_visual_of_logical = true;
+
+                while seg_start < logical_slice.len() {
+                    let max_w = if is_first_logical && is_first_visual_of_logical {
+                        term_cols.saturating_sub(2 + chip_w).max(15)
+                    } else {
+                        term_cols.saturating_sub(2).max(15)
+                    };
+
+                    let mut seg_end = seg_start;
+                    let mut current_w = 0;
+                    let mut last_space_idx = None;
+
+                    while seg_end < logical_slice.len() {
+                        let c = logical_slice[seg_end];
+                        let c_w = unicode_width::UnicodeWidthChar::width(c).unwrap_or(1);
+                        if current_w + c_w > max_w && seg_end > seg_start {
+                            break;
+                        }
+                        if c == ' ' {
+                            last_space_idx = Some(seg_end);
+                        }
+                        current_w += c_w;
+                        seg_end += 1;
+                    }
+
+                    let actual_end = if seg_end < logical_slice.len() {
+                        if let Some(space_idx) = last_space_idx {
+                            if space_idx > seg_start {
+                                space_idx + 1
+                            } else {
+                                seg_end
+                            }
+                        } else {
+                            seg_end
+                        }
+                    } else {
+                        seg_end
+                    };
+
+                    let line_chars = &logical_slice[seg_start..actual_end];
+                    let line_str: String = line_chars.iter().collect();
+
+                    visual_lines.push(VisualLine {
+                        text: line_str,
+                        is_logical_start: is_first_visual_of_logical,
+                        char_start: logical_start + seg_start,
+                        char_end: logical_start + actual_end,
+                    });
+
+                    is_first_visual_of_logical = false;
+                    seg_start = actual_end;
+                }
+            }
+
+            logical_start = cur_char_idx + 1;
+        }
+        cur_char_idx += 1;
+    }
+
+    if visual_lines.is_empty() {
+        visual_lines.push(VisualLine {
+            text: String::new(),
+            is_logical_start: true,
+            char_start: 0,
+            char_end: 0,
+        });
+    }
+
+    // Determine visual cursor row & column
+    let mut target_row = 0;
+    let mut target_col = 0;
+    for (v_idx, v_line) in visual_lines.iter().enumerate() {
+        if cursor_pos >= v_line.char_start
+            && (cursor_pos <= v_line.char_end || v_idx == visual_lines.len() - 1)
+        {
+            target_row = v_idx;
+            let clamped_cur = cursor_pos.min(v_line.char_end);
+            let sub_slice: String = buffer[v_line.char_start..clamped_cur].iter().collect();
+            target_col = crate::ui::table::visible_width(&sub_slice);
+            break;
+        }
+    }
+
+    (visual_lines, target_row, target_col)
 }
 
 /// Calculate visible character width by ignoring ANSI escape codes.
@@ -3503,5 +3667,25 @@ mod tests {
         // Regular line without image tags is unchanged
         let plain = "Hello world";
         assert_eq!(format_prompt_line_with_colored_placeholders(plain), "Hello world");
+    }
+
+    #[test]
+    fn test_wrap_prompt_lines_multiline() {
+        let text = "[Image 1] hi sucker what will yo do mother fucking kdjfoawejfowa roawjrowjrowe roeq jroejorjawor joewjroew roewjorjw orjowejrjoewroewjorewroewjroewjorweo";
+        let buf: Vec<char> = text.chars().collect();
+        let term_cols = 80;
+        let (visual_lines, target_row, target_col) = wrap_prompt_lines(&buf, buf.len(), term_cols, 0);
+        assert!(visual_lines.len() >= 2, "Long line must wrap into at least 2 visual lines");
+        assert_eq!(target_row, visual_lines.len() - 1, "Cursor at end must be on the last visual row");
+        assert!(target_col > 0, "Cursor col must be positive on last line");
+        assert!(visual_lines[0].text.starts_with("[Image 1]"));
+    }
+
+    #[test]
+    fn test_format_image_1_bracket_without_hash() {
+        let line = "Look at [Image 1] and [Image #2] right now";
+        let formatted = format_prompt_line_with_colored_placeholders(line);
+        assert!(formatted.contains("\x1b[1;36m[Image 1]\x1b[0m"));
+        assert!(formatted.contains("\x1b[1;36m[Image #2]\x1b[0m"));
     }
 }

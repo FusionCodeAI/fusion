@@ -706,6 +706,37 @@ pub fn staged_update_notice() -> Option<String> {
     None
 }
 
+/// Returns true if an update is staged and ready to apply.
+pub fn has_staged_update() -> bool {
+    let state = load_state();
+    state.status == UpdateStatus::ReadyToApply || pending_binary_path().exists()
+}
+
+/// Applies any staged update and reloads the Fusion CLI process in-place.
+pub fn reload_process() -> ! {
+    let _ = apply_staged_update();
+    let current_exe = std::env::current_exe().unwrap_or_else(|_| PathBuf::from(executable_name()));
+    let args: Vec<String> = std::env::args().collect();
+
+    #[cfg(unix)]
+    {
+        use std::os::unix::process::CommandExt;
+        let err = std::process::Command::new(&current_exe)
+            .args(&args[1..])
+            .exec();
+        eprintln!("Failed to reload process: {}", err);
+        std::process::exit(1);
+    }
+
+    #[cfg(windows)]
+    {
+        let _ = std::process::Command::new(&current_exe)
+            .args(&args[1..])
+            .spawn();
+        std::process::exit(0);
+    }
+}
+
 /// Spawns a background Tokio task that checks for and stages updates without delaying the prompt.
 pub fn spawn_background_update_check(force: bool) {
     tokio::spawn(async move {

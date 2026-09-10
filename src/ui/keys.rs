@@ -121,6 +121,8 @@ pub enum KeyResult {
     /// Paste requested via Ctrl+V or paste key.
     Paste,
     Noop,
+    /// Reload process requested (Ctrl+G when update ready).
+    Reload,
 }
 
 /// Mutable view of the editor state during an active prompt session.
@@ -193,6 +195,11 @@ impl<'a> PromptState<'a> {
         }
     }
 
+    /// Checks if a tag text is an image placeholder (`[Image #...]` or `[Image ...]`).
+    pub fn is_image_tag_text(tag: &str) -> bool {
+        tag.starts_with("[Image #") || tag.starts_with("[Image ") || tag.starts_with("[Image#")
+    }
+
     /// Finds an image placeholder tag touching or preceding the cursor.
     /// Returns `Some((start_idx, end_idx))` if found.
     pub fn find_image_placeholder_before_cursor(&self) -> Option<(usize, usize)> {
@@ -205,7 +212,7 @@ impl<'a> PromptState<'a> {
         if pos > 0 && self.buffer[pos - 1] == ']' {
             if let Some(open) = self.buffer[..pos - 1].iter().rposition(|&c| c == '[') {
                 let tag: String = self.buffer[open..pos].iter().collect();
-                if tag.starts_with("[Image #") {
+                if Self::is_image_tag_text(&tag) {
                     return Some((open, pos));
                 }
             }
@@ -217,7 +224,7 @@ impl<'a> PromptState<'a> {
                 let close = open + close_rel + 1;
                 if pos <= close {
                     let tag: String = self.buffer[open..close].iter().collect();
-                    if tag.starts_with("[Image #") {
+                    if Self::is_image_tag_text(&tag) {
                         return Some((open, close));
                     }
                 }
@@ -240,7 +247,7 @@ impl<'a> PromptState<'a> {
             if let Some(close_rel) = self.buffer[pos..].iter().position(|&c| c == ']') {
                 let close = pos + close_rel + 1;
                 let tag: String = self.buffer[pos..close].iter().collect();
-                if tag.starts_with("[Image #") {
+                if Self::is_image_tag_text(&tag) {
                     return Some((pos, close));
                 }
             }
@@ -252,7 +259,7 @@ impl<'a> PromptState<'a> {
                 let close = open + close_rel + 1;
                 if pos < close {
                     let tag: String = self.buffer[open..close].iter().collect();
-                    if tag.starts_with("[Image #") {
+                    if Self::is_image_tag_text(&tag) {
                         return Some((open, close));
                     }
                 }
@@ -622,6 +629,7 @@ impl KeyHandler {
     }
 
 
+
     /// Primary entry point: process a keyboard event against current state.
     pub fn handle_key(&mut self, key: KeyEvent, state: &mut PromptState) -> KeyResult {
         // Ignore Release events on platforms reporting them
@@ -696,6 +704,9 @@ impl KeyHandler {
             {
                 KeyResult::Paste
             }
+            // Ctrl+G: Reload process if update is ready
+            (KeyCode::Char('g'), KeyModifiers::CONTROL) => KeyResult::Reload,
+
 
             // Exit on empty, or delete character under cursor (Ctrl+D)
             (KeyCode::Char('d'), KeyModifiers::CONTROL) => {
@@ -983,6 +994,9 @@ impl KeyHandler {
                 KeyResult::Continue
             }
 
+            // Ctrl+G: Reload process if update is ready
+            (KeyCode::Char('g'), KeyModifiers::CONTROL) => KeyResult::Reload,
+
             // Backspace / Ctrl+H: Delete character backward
             (KeyCode::Backspace, _) | (KeyCode::Char('h'), KeyModifiers::CONTROL) => {
                 if *state.cursor_pos > 0 {
@@ -1181,6 +1195,9 @@ impl KeyHandler {
                 state.insert_str("  ");
                 KeyResult::Continue
             }
+            // Ctrl+G: Reload process if update is ready
+            (KeyCode::Char('g'), KeyModifiers::CONTROL) => KeyResult::Reload,
+
 
             // Printable character
             (KeyCode::Char(c), KeyModifiers::NONE | KeyModifiers::SHIFT) => {
