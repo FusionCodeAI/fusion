@@ -22,7 +22,9 @@ fn test_loop_runner_message_with_image() {
 
 #[test]
 fn test_encode_and_attach_roundtrip() {
-    let rgba_data = vec![255, 0, 0, 255, 0, 255, 0, 255, 0, 0, 255, 255, 255, 255, 255, 255];
+    let rgba_data = vec![
+        255, 0, 0, 255, 0, 255, 0, 255, 0, 0, 255, 255, 255, 255, 255, 255,
+    ];
     let png_bytes = fusion::ui::clipboard_image::encode_rgba_png(2, 2, &rgba_data)
         .expect("must encode valid PNG");
     assert!(!png_bytes.is_empty());

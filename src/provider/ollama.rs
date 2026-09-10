@@ -1142,9 +1142,10 @@ pub fn to_ollama_message(msg: &Message) -> OllamaMessage {
             .collect()
     });
 
-    let images = msg.images.as_ref().map(|imgs| {
-        imgs.iter().map(|img| img.data.clone()).collect()
-    });
+    let images = msg
+        .images
+        .as_ref()
+        .map(|imgs| imgs.iter().map(|img| img.data.clone()).collect());
 
     OllamaMessage {
         role,

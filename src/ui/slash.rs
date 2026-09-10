@@ -1629,7 +1629,10 @@ fn handle_image_command(path: Option<&str>) {
                 );
             }
             Err(e) => {
-                eprintln!("\x1b[1;31mError:\x1b[0m Failed to load image '{}': {}\n", p, e);
+                eprintln!(
+                    "\x1b[1;31mError:\x1b[0m Failed to load image '{}': {}\n",
+                    p, e
+                );
             }
         }
     } else {

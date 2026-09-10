@@ -634,8 +634,6 @@ impl KeyHandler {
         &self.kill_ring
     }
 
-
-
     /// Primary entry point: process a keyboard event against current state.
     pub fn handle_key(&mut self, key: KeyEvent, state: &mut PromptState) -> KeyResult {
         // Ignore Release events on platforms reporting them
@@ -712,7 +710,6 @@ impl KeyHandler {
             }
             // Ctrl+G: Reload process if update is ready
             (KeyCode::Char('g'), KeyModifiers::CONTROL) => KeyResult::Reload,
-
 
             // Exit on empty, or delete character under cursor (Ctrl+D)
             (KeyCode::Char('d'), KeyModifiers::CONTROL) => {
@@ -1203,7 +1200,6 @@ impl KeyHandler {
             }
             // Ctrl+G: Reload process if update is ready
             (KeyCode::Char('g'), KeyModifiers::CONTROL) => KeyResult::Reload,
-
 
             // Printable character
             (KeyCode::Char(c), KeyModifiers::NONE | KeyModifiers::SHIFT) => {
@@ -2514,7 +2510,10 @@ mod tests {
 
         let mut st = make_test_state(&mut buf, &mut cur, &hist, &mut hist_idx, &mut saved);
         // Backspace cuts the entire [Image #1, 1568x1037] tag in one keystroke!
-        handler.handle_key(KeyEvent::new(KeyCode::Backspace, KeyModifiers::NONE), &mut st);
+        handler.handle_key(
+            KeyEvent::new(KeyCode::Backspace, KeyModifiers::NONE),
+            &mut st,
+        );
         assert_eq!(st.text(), "Describe ");
         assert_eq!(*st.cursor_pos, 9);
     }
@@ -2545,7 +2544,10 @@ mod tests {
         let mut saved = String::new();
 
         let mut st = make_test_state(&mut buf, &mut cur, &hist, &mut hist_idx, &mut saved);
-        handler.handle_key(KeyEvent::new(KeyCode::Backspace, KeyModifiers::NONE), &mut st);
+        handler.handle_key(
+            KeyEvent::new(KeyCode::Backspace, KeyModifiers::NONE),
+            &mut st,
+        );
         assert_eq!(st.text(), "Analyze this ");
         assert_eq!(*st.cursor_pos, 13);
     }

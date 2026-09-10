@@ -1288,9 +1288,10 @@ mod tests {
             width: Some(1),
             height: Some(1),
         };
-        let messages = vec![
-            Message::user_with_images("What is in this screenshot?", vec![img]),
-        ];
+        let messages = vec![Message::user_with_images(
+            "What is in this screenshot?",
+            vec![img],
+        )];
         let payload = build_openai_payload("gpt-4o", None, None, &messages, &[]);
         let msgs = payload["messages"].as_array().unwrap();
         assert_eq!(msgs.len(), 1);
@@ -1300,7 +1301,10 @@ mod tests {
         assert_eq!(content[0]["type"], "text");
         assert_eq!(content[0]["text"], "What is in this screenshot?");
         assert_eq!(content[1]["type"], "image_url");
-        assert!(content[1]["image_url"]["url"].as_str().unwrap().starts_with("data:image/png;base64,"));
+        assert!(content[1]["image_url"]["url"]
+            .as_str()
+            .unwrap()
+            .starts_with("data:image/png;base64,"));
     }
 
     #[test]
@@ -1313,9 +1317,10 @@ mod tests {
             width: Some(1),
             height: Some(1),
         };
-        let messages = vec![
-            Message::user_with_images("Describe this screenshot", vec![img]),
-        ];
+        let messages = vec![Message::user_with_images(
+            "Describe this screenshot",
+            vec![img],
+        )];
         let payload = build_anthropic_payload("claude-3-7-sonnet", None, None, &messages, &[]);
         let msgs = payload["messages"].as_array().unwrap();
         assert_eq!(msgs.len(), 1);

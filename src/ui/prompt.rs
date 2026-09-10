@@ -428,7 +428,8 @@ impl Prompt {
     /// 2. If no image, read clipboard text and insert it (or check if text is an image path).
     /// 3. If clipboard text is unavailable, fall back to internal kill ring.
     pub fn handle_paste_action(&mut self) -> std::io::Result<()> {
-        self.key_handler.snapshot_undo(&self.buffer, self.cursor_pos);
+        self.key_handler
+            .snapshot_undo(&self.buffer, self.cursor_pos);
         // 1. Check for image in system clipboard
         if let Some(pasted) = crate::ui::clipboard_image::read_clipboard_image() {
             self.attach_image(pasted.path, pasted.width, pasted.height);
@@ -448,8 +449,10 @@ impl Prompt {
                             .and_then(|e| e.to_str())
                             .unwrap_or("")
                             .to_lowercase();
-                        if matches!(ext.as_str(), "png" | "jpg" | "jpeg" | "webp" | "gif" | "bmp")
-                            && path_cand.exists()
+                        if matches!(
+                            ext.as_str(),
+                            "png" | "jpg" | "jpeg" | "webp" | "gif" | "bmp"
+                        ) && path_cand.exists()
                         {
                             if let Ok(img) =
                                 crate::ui::clipboard_image::load_and_cache_image_file(path_cand)
@@ -1255,7 +1258,8 @@ impl Prompt {
                             let (v_lines, _, _) = wrap_prompt_lines(&buf_chars, 0, term_cols, 0);
                             let mut out = stdout();
                             for line in &v_lines {
-                                let formatted = format_prompt_line_with_colored_placeholders(&line.text);
+                                let formatted =
+                                    format_prompt_line_with_colored_placeholders(&line.text);
                                 let _ = write!(out, "\x1b[1m┃ {}\x1b[0m\r\n", formatted);
                             }
                             let _ = write!(out, "\r\n");
@@ -1307,8 +1311,10 @@ impl Prompt {
                     .and_then(|e| e.to_str())
                     .unwrap_or("")
                     .to_lowercase();
-                if matches!(ext.as_str(), "png" | "jpg" | "jpeg" | "webp" | "gif" | "bmp")
-                    && path_cand.exists()
+                if matches!(
+                    ext.as_str(),
+                    "png" | "jpg" | "jpeg" | "webp" | "gif" | "bmp"
+                ) && path_cand.exists()
                 {
                     if let Ok(img) =
                         crate::ui::clipboard_image::load_and_cache_image_file(path_cand)
@@ -1438,7 +1444,6 @@ impl Prompt {
         } else {
             Vec::new()
         };
-
 
         // Clear previous frame using exact relative cursor movement
         // Guard against out-of-bounds relative cursor jumps that erase streamed terminal content
@@ -2124,10 +2129,7 @@ pub fn format_prompt_line_with_colored_placeholders(line: &str) -> String {
 }
 
 /// Expands any `[Pasted text #N, ...]` placeholders in a user prompt into their full content.
-pub fn expand_pasted_text_placeholders(
-    prompt_text: &str,
-    pastes: &[PendingPastedText],
-) -> String {
+pub fn expand_pasted_text_placeholders(prompt_text: &str, pastes: &[PendingPastedText]) -> String {
     let mut expanded = prompt_text.to_string();
     for p in pastes {
         if expanded.contains(&p.tag) {
@@ -2445,9 +2447,13 @@ pub fn wrap_prompt_lines(
                             let open_idx = seg_start + open_rel;
                             let has_close = sub_chars[open_rel..].iter().any(|&c| c == ']');
                             if !has_close {
-                                let tag_prefix: String =
-                                    logical_slice[open_idx..seg_end.min(open_idx + 8)].iter().collect();
-                                if tag_prefix.starts_with("[Image") || tag_prefix.starts_with("[Pasted") {
+                                let tag_prefix: String = logical_slice
+                                    [open_idx..seg_end.min(open_idx + 8)]
+                                    .iter()
+                                    .collect();
+                                if tag_prefix.starts_with("[Image")
+                                    || tag_prefix.starts_with("[Pasted")
+                                {
                                     if open_idx > seg_start {
                                         tag_break = Some(open_idx);
                                     }
@@ -2467,7 +2473,8 @@ pub fn wrap_prompt_lines(
                             if let Some(close_idx) = last_tag_close_idx {
                                 if close_idx >= seg_start {
                                     let candidate = close_idx + 1;
-                                    boundary = Some(boundary.map_or(candidate, |b| b.max(candidate)));
+                                    boundary =
+                                        Some(boundary.map_or(candidate, |b| b.max(candidate)));
                                 }
                             }
                             boundary.unwrap_or(seg_end)
@@ -3750,7 +3757,10 @@ mod tests {
         prompt.buffer = "some input text".chars().collect();
         prompt.cursor_pos = prompt.buffer.len();
 
-        let esc = Event::Key(crossterm::event::KeyEvent::new(KeyCode::Esc, KeyModifiers::NONE));
+        let esc = Event::Key(crossterm::event::KeyEvent::new(
+            KeyCode::Esc,
+            KeyModifiers::NONE,
+        ));
 
         // Press 1: Clears text buffer
         let res1 = prompt.handle_event(esc.clone()).unwrap();
@@ -3766,7 +3776,10 @@ mod tests {
         assert_eq!(res3, None);
 
         // Ctrl+C produces Cancel
-        let ctrl_c = Event::Key(crossterm::event::KeyEvent::new(KeyCode::Char('c'), KeyModifiers::CONTROL));
+        let ctrl_c = Event::Key(crossterm::event::KeyEvent::new(
+            KeyCode::Char('c'),
+            KeyModifiers::CONTROL,
+        ));
         let res_c = prompt.handle_event(ctrl_c).unwrap();
         assert_eq!(res_c, Some(PromptResult::Cancel));
     }
@@ -3813,7 +3826,10 @@ mod tests {
 
         // Regular line without image tags is unchanged
         let plain = "Hello world";
-        assert_eq!(format_prompt_line_with_colored_placeholders(plain), "Hello world");
+        assert_eq!(
+            format_prompt_line_with_colored_placeholders(plain),
+            "Hello world"
+        );
     }
 
     #[test]
@@ -3821,9 +3837,17 @@ mod tests {
         let text = "[Image 1] hi sucker what will yo do mother fucking kdjfoawejfowa roawjrowjrowe roeq jroejorjawor joewjroew roewjorjw orjowejrjoewroewjorewroewjroewjorweo";
         let buf: Vec<char> = text.chars().collect();
         let term_cols = 80;
-        let (visual_lines, target_row, target_col) = wrap_prompt_lines(&buf, buf.len(), term_cols, 0);
-        assert!(visual_lines.len() >= 2, "Long line must wrap into at least 2 visual lines");
-        assert_eq!(target_row, visual_lines.len() - 1, "Cursor at end must be on the last visual row");
+        let (visual_lines, target_row, target_col) =
+            wrap_prompt_lines(&buf, buf.len(), term_cols, 0);
+        assert!(
+            visual_lines.len() >= 2,
+            "Long line must wrap into at least 2 visual lines"
+        );
+        assert_eq!(
+            target_row,
+            visual_lines.len() - 1,
+            "Cursor at end must be on the last visual row"
+        );
         assert!(target_col > 0, "Cursor col must be positive on last line");
         assert!(visual_lines[0].text.starts_with("[Image 1]"));
     }

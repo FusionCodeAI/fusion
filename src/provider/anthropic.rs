@@ -1230,8 +1230,12 @@ mod tests {
         match &anthropic_msgs[0].content {
             AnthropicContent::Blocks(blocks) => {
                 assert_eq!(blocks.len(), 2);
-                assert!(matches!(&blocks[0], AnthropicContentBlock::Text { text, .. } if text == "What is this?"));
-                assert!(matches!(&blocks[1], AnthropicContentBlock::Image { source } if source.media_type == "image/png" && source.data == "aGVsbG8="));
+                assert!(
+                    matches!(&blocks[0], AnthropicContentBlock::Text { text, .. } if text == "What is this?")
+                );
+                assert!(
+                    matches!(&blocks[1], AnthropicContentBlock::Image { source } if source.media_type == "image/png" && source.data == "aGVsbG8=")
+                );
             }
             _ => panic!("Expected AnthropicContent::Blocks"),
         }

@@ -40,10 +40,9 @@ use fusion::tools::bash::BashTool;
 use fusion::tools::default_registry;
 use fusion::tools::edit::{
     apply_exact_edit, compute_diff_stats, generate_colorized_diff, generate_unified_diff,
+    EditFileTool,
 };
-use fusion::tools::file::ReadFileTool;
-use fusion::tools::glob::GlobTool;
-use fusion::tools::grep::GrepTool;
+use fusion::tools::file::{ReadFileTool, WriteFileTool};
 use fusion::tools::grep_filter::{
     FileTypeRegistry, FilterableGrepEngine, GrepOptions, PathFilterBuilder,
 };
@@ -817,7 +816,7 @@ fn bench_rendering_throughput(c: &mut Criterion) {
 
     group.bench_function("ansi_processing/truncate_ansi_width", |b| {
         b.iter(|| {
-            let truncated = truncate_ansi(black_box(ansi_sample), black_box(25));
+            let truncated = truncate_ansi(black_box(ansi_sample), black_box(25), "…");
             black_box(truncated);
         });
     });
@@ -924,7 +923,7 @@ fn bench_rendering_throughput(c: &mut Criterion) {
 
     group.bench_function("frame_rendering/markdown_table_formatter", |b| {
         b.iter(|| {
-            let formatted = render_markdown_table(black_box(markdown_table_src), black_box(80));
+            let formatted = render_markdown_table(black_box(markdown_table_src));
             black_box(formatted);
         });
     });
@@ -1497,12 +1496,7 @@ fn bench_subagent_mesh(c: &mut Criterion) {
             // Spawn async responder loop
             let responder_future = async {
                 if let Some(envelope) = responder.recv_query().await {
-                    let response = PeerResponse::success(
-                        envelope.query.query_id.clone(),
-                        "responder-agent",
-                        "Review approved: lock safety verified.",
-                    );
-                    let _ = envelope.reply.send(response);
+                    let _ = envelope.respond("Review approved: lock safety verified.");
                 }
             };
 

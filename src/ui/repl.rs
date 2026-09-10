@@ -1393,7 +1393,10 @@ pub async fn run_repl_with_session(
                         prompt.attach_image(img.path, img.width, img.height);
                     }
                     Err(e) => {
-                        eprintln!("\x1b[1;31mError:\x1b[0m Failed to load image '{}': {}\r\n", p, e);
+                        eprintln!(
+                            "\x1b[1;31mError:\x1b[0m Failed to load image '{}': {}\r\n",
+                            p, e
+                        );
                     }
                 }
             } else {
@@ -1439,7 +1442,9 @@ pub async fn run_repl_with_session(
         let active_images = prompt.reconcile_attached_images();
         let mut image_attachments = Vec::new();
         for img in &active_images {
-            if let Ok(att) = crate::ui::clipboard_image::create_image_attachment_from_file(&img.path) {
+            if let Ok(att) =
+                crate::ui::clipboard_image::create_image_attachment_from_file(&img.path)
+            {
                 image_attachments.push(att);
             }
         }
@@ -1450,18 +1455,29 @@ pub async fn run_repl_with_session(
             crate::ui::prompt::expand_pasted_text_placeholders(trimmed, &active_pastes);
         prompt.pending_pastes.clear();
 
-
         if !image_attachments.is_empty() {
             println!(
                 "\x1b[1;36m📷 Attached {} image{} to turn\x1b[0m\r\n",
                 image_attachments.len(),
-                if image_attachments.len() == 1 { "" } else { "s" }
+                if image_attachments.len() == 1 {
+                    ""
+                } else {
+                    "s"
+                }
             );
         }
 
         let turn_start = Instant::now();
         // Execute turn with live streaming and capture any queued prompt
-        match run_turn_ui(&runner, &mut session, &expanded_prompt, image_attachments, &mut prompt).await {
+        match run_turn_ui(
+            &runner,
+            &mut session,
+            &expanded_prompt,
+            image_attachments,
+            &mut prompt,
+        )
+        .await
+        {
             Ok((_content, queued)) => {
                 prompt_queue.extend(queued);
                 let turn_elapsed = turn_start.elapsed();

@@ -88,7 +88,11 @@ impl Message {
         Self {
             role: Role::User,
             content: content.into(),
-            images: if images.is_empty() { None } else { Some(images) },
+            images: if images.is_empty() {
+                None
+            } else {
+                Some(images)
+            },
             name: None,
             tool_calls: None,
             tool_call_id: None,
