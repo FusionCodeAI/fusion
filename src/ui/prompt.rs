@@ -437,7 +437,7 @@ impl Prompt {
         }
 
         // 2. Check for text in system clipboard
-        #[cfg(not(target_arch = "wasm32"))]
+        #[cfg(all(not(target_arch = "wasm32"), not(target_os = "android")))]
         {
             if let Ok(mut clipboard) = arboard::Clipboard::new() {
                 if let Ok(text) = clipboard.get_text() {
@@ -465,6 +465,15 @@ impl Prompt {
                         self.paste_text(&text);
                         return Ok(());
                     }
+                }
+            }
+        }
+        #[cfg(target_os = "android")]
+        {
+            if let Ok(text) = crate::ui::termux::get_clipboard() {
+                if !text.is_empty() {
+                    self.paste_text(&text);
+                    return Ok(());
                 }
             }
         }

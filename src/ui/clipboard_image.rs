@@ -95,7 +95,7 @@ pub fn get_image_cache_dir() -> PathBuf {
 /// Queries the OS clipboard for image data. If an image is found,
 /// it is encoded as a PNG and saved to the local image cache.
 pub fn read_clipboard_image() -> Option<PastedImage> {
-    #[cfg(not(target_arch = "wasm32"))]
+    #[cfg(all(not(target_arch = "wasm32"), not(target_os = "android")))]
     {
         let mut clipboard = arboard::Clipboard::new().ok()?;
         let img = clipboard.get_image().ok()?;
@@ -126,7 +126,7 @@ pub fn read_clipboard_image() -> Option<PastedImage> {
             media_type: "image/png".to_string(),
         })
     }
-    #[cfg(target_arch = "wasm32")]
+    #[cfg(any(target_arch = "wasm32", target_os = "android"))]
     {
         None
     }
