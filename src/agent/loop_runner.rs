@@ -451,6 +451,18 @@ impl AgentRunner {
         user_input: &str,
         event_tx: UnboundedSender<AgentEvent>,
     ) -> anyhow::Result<String> {
+        self.run_turn_stream_with_images(session, user_input, Vec::new(), event_tx)
+            .await
+    }
+
+    /// Executes a full conversation turn with optional multimodal image attachments.
+    pub async fn run_turn_stream_with_images(
+        &self,
+        session: &mut Session,
+        user_input: &str,
+        images: Vec<crate::provider::types::ImageAttachment>,
+        event_tx: UnboundedSender<AgentEvent>,
+    ) -> anyhow::Result<String> {
         let turn_start = Instant::now();
 
         // Auto-save recovery state immediately before starting conversation turn
@@ -475,7 +487,12 @@ impl AgentRunner {
         }
 
         // Record user input with expanded file mentions
-        session.add_user_message(&expanded_input);
+        // Record user input with expanded file mentions and image attachments
+        if images.is_empty() {
+            session.add_user_message(&expanded_input);
+        } else {
+            session.add_user_message_with_images(&expanded_input, images);
+        }
 
         // Advisor consultation phase (if enabled)
         let mut advisor_notes = String::new();

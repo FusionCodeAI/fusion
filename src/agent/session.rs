@@ -337,6 +337,15 @@ impl Session {
         self.add_message(Message::user(content));
     }
 
+    /// Adds a user message with optional image attachments.
+    pub fn add_user_message_with_images(
+        &mut self,
+        content: impl Into<String>,
+        images: Vec<crate::provider::types::ImageAttachment>,
+    ) {
+        self.add_message(Message::user_with_images(content, images));
+    }
+
     /// Adds an assistant response message.
     pub fn add_assistant_message(&mut self, content: impl Into<String>) {
         self.add_message(Message::assistant(content));

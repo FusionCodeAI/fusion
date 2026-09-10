@@ -752,6 +752,7 @@ pub async fn run_turn_ui(
     runner: &AgentRunner,
     session: &mut Session,
     user_input: &str,
+    images: Vec<crate::provider::types::ImageAttachment>,
     prompt: &mut Prompt,
 ) -> anyhow::Result<(String, VecDeque<String>)> {
     let start_time = Instant::now();
@@ -764,7 +765,7 @@ pub async fn run_turn_ui(
     let mut md = MarkdownRenderer::new().with_indent(2);
 
     let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel();
-    let runner_task = runner.run_turn_stream(session, user_input, tx);
+    let runner_task = runner.run_turn_stream_with_images(session, user_input, images, tx);
     tokio::pin!(runner_task);
 
     // Enter raw mode to allow interactive typing, slash suggestions, and Esc cancel
@@ -1401,9 +1402,27 @@ pub async fn run_repl_with_session(
             continue;
         }
 
+        // Reconcile and load attached images from prompt
+        let active_images = prompt.reconcile_attached_images();
+        let mut image_attachments = Vec::new();
+        for img in &active_images {
+            if let Ok(att) = crate::ui::clipboard_image::create_image_attachment_from_file(&img.path) {
+                image_attachments.push(att);
+            }
+        }
+        prompt.pending_images.clear();
+
+        if !image_attachments.is_empty() {
+            println!(
+                "\x1b[1;36m📷 Attached {} image{} to turn\x1b[0m\r\n",
+                image_attachments.len(),
+                if image_attachments.len() == 1 { "" } else { "s" }
+            );
+        }
+
         let turn_start = Instant::now();
         // Execute turn with live streaming and capture any queued prompt
-        match run_turn_ui(&runner, &mut session, trimmed, &mut prompt).await {
+        match run_turn_ui(&runner, &mut session, trimmed, image_attachments, &mut prompt).await {
             Ok((_content, queued)) => {
                 prompt_queue.extend(queued);
                 let turn_elapsed = turn_start.elapsed();

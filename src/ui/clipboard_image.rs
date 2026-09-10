@@ -125,6 +125,42 @@ pub fn load_and_cache_image_file(source_path: &Path) -> anyhow::Result<PastedIma
     })
 }
 
+/// Reads an image file from disk and constructs an `ImageAttachment` with base64 data.
+pub fn create_image_attachment_from_file(
+    path: &Path,
+) -> anyhow::Result<crate::provider::types::ImageAttachment> {
+    let bytes = fs::read(path)?;
+    let ext = path
+        .extension()
+        .and_then(|e| e.to_str())
+        .unwrap_or("png")
+        .to_lowercase();
+    let media_type = match ext.as_str() {
+        "jpg" | "jpeg" => "image/jpeg",
+        "webp" => "image/webp",
+        "gif" => "image/gif",
+        _ => "image/png",
+    }
+    .to_string();
+
+    use base64::Engine;
+    let base64_data = base64::engine::general_purpose::STANDARD.encode(&bytes);
+
+    let (width, height) = if let Ok(img) = image::load_from_memory(&bytes) {
+        (Some(img.width()), Some(img.height()))
+    } else {
+        (None, None)
+    };
+
+    Ok(crate::provider::types::ImageAttachment {
+        media_type,
+        data: base64_data,
+        path: Some(path.to_string_lossy().to_string()),
+        width,
+        height,
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
