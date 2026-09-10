@@ -679,6 +679,7 @@ pub fn resume_session_from_recovery(
                 session.messages.push(Message {
                     role: Role::Assistant,
                     content: assistant_text,
+                    images: None,
                     name: None,
                     tool_calls: Some(tool_calls),
                     tool_call_id: None,
@@ -688,6 +689,7 @@ pub fn resume_session_from_recovery(
                     session.messages.push(Message {
                         role: Role::Tool,
                         content: tool.output_preview.clone(),
+                        images: None,
                         name: Some(tool.tool_name.clone()),
                         tool_calls: None,
                         tool_call_id: Some(tool.call_id.clone()),

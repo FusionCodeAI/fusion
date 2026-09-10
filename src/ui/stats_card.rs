@@ -1813,6 +1813,7 @@ mod tests {
         messages.push(Message {
             role: Role::Assistant,
             content: "I will check the directory and git status.".to_string(),
+            images: None,
             name: None,
             tool_calls: Some(vec![
                 ToolCall {
@@ -1840,6 +1841,7 @@ mod tests {
         messages.push(Message {
             role: Role::Assistant,
             content: "Searching...".to_string(),
+            images: None,
             name: None,
             tool_calls: Some(vec![
                 ToolCall {

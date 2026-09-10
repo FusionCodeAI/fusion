@@ -926,6 +926,7 @@ pub fn measure_memory_footprint_metrics() -> Vec<BenchmarkMetric> {
         session_10.messages.push(Message {
             role: Role::User,
             content: format!("Turn {i}: Implement helper function for parsing benchmark stats."),
+            images: None,
             tool_calls: None,
             tool_call_id: None,
         });
@@ -934,6 +935,7 @@ pub fn measure_memory_footprint_metrics() -> Vec<BenchmarkMetric> {
             content: format!(
                 "Here is the implementation for turn {i}:\n```rust\npub fn helper_{i}() {{}}\n```"
             ),
+            images: None,
             tool_calls: Some(vec![ToolCall {
                 id: format!("call_{i}"),
                 name: "write".to_string(),
@@ -970,6 +972,7 @@ pub fn measure_memory_footprint_metrics() -> Vec<BenchmarkMetric> {
             content: format!(
                 "Task {i}: Refactor module and execute tests with multi-agent coordination."
             ),
+            images: None,
             tool_calls: None,
             tool_call_id: None,
         });
@@ -978,6 +981,7 @@ pub fn measure_memory_footprint_metrics() -> Vec<BenchmarkMetric> {
             content: format!(
                 "Task {i} analysis complete. Running subagent loop with advisor critique."
             ),
+            images: None,
             tool_calls: Some(vec![ToolCall {
                 id: format!("call_multi_{i}"),
                 name: "bash".to_string(),
@@ -2193,12 +2197,14 @@ fn main() {
                 s.messages.push(Message {
                     role: Role::User,
                     content: format!("Turn {i}: Process prompt"),
+                    images: None,
                     tool_calls: None,
                     tool_call_id: None,
                 });
                 s.messages.push(Message {
                     role: Role::Assistant,
                     content: format!("Response for turn {i}"),
+                    images: None,
                     tool_calls: None,
                     tool_call_id: None,
                 });
@@ -2221,12 +2227,14 @@ fn main() {
                 s.messages.push(Message {
                     role: Role::User,
                     content: format!("Turn {i}: Process multi-agent task"),
+                    images: None,
                     tool_calls: None,
                     tool_call_id: None,
                 });
                 s.messages.push(Message {
                     role: Role::Assistant,
                     content: format!("Assistant output for turn {i}"),
+                    images: None,
                     tool_calls: Some(vec![ToolCall {
                         id: format!("call_{i}"),
                         name: "bash".to_string(),
@@ -2252,12 +2260,14 @@ fn main() {
             s.messages.push(Message {
                 role: Role::User,
                 content: format!("User prompt {i} with payload"),
+                images: None,
                 tool_calls: None,
                 tool_call_id: None,
             });
             s.messages.push(Message {
                 role: Role::Assistant,
                 content: format!("Assistant answer {i}"),
+                images: None,
                 tool_calls: Some(vec![ToolCall {
                     id: format!("call_{i}"),
                     name: "edit".to_string(),

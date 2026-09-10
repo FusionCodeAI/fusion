@@ -34,10 +34,24 @@ impl PartialEq for ToolCall {
 }
 impl Eq for ToolCall {}
 
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ImageAttachment {
+    pub media_type: String,
+    pub data: String, // base64 encoded
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub path: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub width: Option<u32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub height: Option<u32>,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Message {
     pub role: Role,
     pub content: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub images: Option<Vec<ImageAttachment>>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub name: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -50,6 +64,7 @@ impl PartialEq for Message {
     fn eq(&self, other: &Self) -> bool {
         self.role == other.role
             && self.content == other.content
+            && self.images == other.images
             && self.name == other.name
             && self.tool_calls == other.tool_calls
             && self.tool_call_id == other.tool_call_id
@@ -62,6 +77,18 @@ impl Message {
         Self {
             role: Role::System,
             content: content.into(),
+            images: None,
+            name: None,
+            tool_calls: None,
+            tool_call_id: None,
+        }
+    }
+
+    pub fn user_with_images(content: impl Into<String>, images: Vec<ImageAttachment>) -> Self {
+        Self {
+            role: Role::User,
+            content: content.into(),
+            images: if images.is_empty() { None } else { Some(images) },
             name: None,
             tool_calls: None,
             tool_call_id: None,
@@ -72,6 +99,7 @@ impl Message {
         Self {
             role: Role::User,
             content: content.into(),
+            images: None,
             name: None,
             tool_calls: None,
             tool_call_id: None,
@@ -82,6 +110,7 @@ impl Message {
         Self {
             role: Role::Assistant,
             content: content.into(),
+            images: None,
             name: None,
             tool_calls: None,
             tool_call_id: None,
@@ -92,6 +121,7 @@ impl Message {
         Self {
             role: Role::Assistant,
             content: content.into(),
+            images: None,
             name: None,
             tool_calls: Some(tool_calls),
             tool_call_id: None,
@@ -102,6 +132,7 @@ impl Message {
         Self {
             role: Role::Tool,
             content: content.into(),
+            images: None,
             name: None,
             tool_calls: None,
             tool_call_id: Some(tool_call_id.into()),
@@ -195,5 +226,32 @@ mod tests {
         assert_eq!(dedup.feed("Thinking..."), "Thinking...");
         assert_eq!(dedup.feed("Thinking..."), "");
         assert_eq!(dedup.feed("Thinking... Done"), " Done");
+    }
+
+    #[test]
+    fn test_message_with_image_attachments_serialization() {
+        let attachment = ImageAttachment {
+            media_type: "image/png".to_string(),
+            data: "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=".to_string(),
+            path: Some(".fusion/cache/images/clip_1.png".to_string()),
+            width: Some(1),
+            height: Some(1),
+        };
+        let msg = Message::user_with_images("Explain this image", vec![attachment.clone()]);
+        let json = serde_json::to_string(&msg).expect("must serialize");
+        assert!(json.contains("Explain this image"));
+        assert!(json.contains("image/png"));
+
+        let deserialized: Message = serde_json::from_str(&json).expect("must deserialize");
+        assert_eq!(deserialized.content, "Explain this image");
+        assert!(deserialized.images.is_some());
+        assert_eq!(deserialized.images.unwrap()[0].width, Some(1));
+    }
+
+    #[test]
+    fn test_message_without_images_omits_field() {
+        let msg = Message::user("plain text prompt");
+        let json = serde_json::to_string(&msg).expect("must serialize");
+        assert!(!json.contains("\"images\""));
     }
 }
