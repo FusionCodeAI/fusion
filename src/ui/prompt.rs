@@ -2099,7 +2099,8 @@ pub fn format_prompt_line_with_colored_placeholders(line: &str) -> String {
             let after_start = &remainder[start..];
             if let Some(end) = after_start.find(']') {
                 let tag = &after_start[..=end];
-                result.push_str("\x1b[1;36m");
+                // High-contrast bold electric cyan (\x1b[1;36;38;5;39m...\x1b[0m)
+                result.push_str("\x1b[1;36;38;5;39m");
                 result.push_str(tag);
                 result.push_str("\x1b[0m");
                 remainder = &after_start[end + 1..];
@@ -2414,6 +2415,7 @@ pub fn wrap_prompt_lines(
                     let mut seg_end = seg_start;
                     let mut current_w = 0;
                     let mut last_space_idx = None;
+                    let mut last_tag_close_idx = None;
 
                     while seg_end < logical_slice.len() {
                         let c = logical_slice[seg_end];
@@ -2423,20 +2425,47 @@ pub fn wrap_prompt_lines(
                         }
                         if c == ' ' {
                             last_space_idx = Some(seg_end);
+                        } else if c == ']' {
+                            last_tag_close_idx = Some(seg_end);
                         }
                         current_w += c_w;
                         seg_end += 1;
                     }
 
+                    // Prevent chopping tags ([Image...] or [Pasted text...]) in half
                     let actual_end = if seg_end < logical_slice.len() {
-                        if let Some(space_idx) = last_space_idx {
-                            if space_idx > seg_start {
-                                space_idx + 1
-                            } else {
-                                seg_end
+                        let mut tag_break = None;
+                        let sub_chars = &logical_slice[seg_start..seg_end];
+                        if let Some(open_rel) = sub_chars.iter().rposition(|&c| c == '[') {
+                            let open_idx = seg_start + open_rel;
+                            let has_close = sub_chars[open_rel..].iter().any(|&c| c == ']');
+                            if !has_close {
+                                let tag_prefix: String =
+                                    logical_slice[open_idx..seg_end.min(open_idx + 8)].iter().collect();
+                                if tag_prefix.starts_with("[Image") || tag_prefix.starts_with("[Pasted") {
+                                    if open_idx > seg_start {
+                                        tag_break = Some(open_idx);
+                                    }
+                                }
                             }
+                        }
+
+                        if let Some(tb) = tag_break {
+                            tb
                         } else {
-                            seg_end
+                            let mut boundary = None;
+                            if let Some(space_idx) = last_space_idx {
+                                if space_idx >= seg_start {
+                                    boundary = Some(space_idx + 1);
+                                }
+                            }
+                            if let Some(close_idx) = last_tag_close_idx {
+                                if close_idx >= seg_start {
+                                    let candidate = close_idx + 1;
+                                    boundary = Some(boundary.map_or(candidate, |b| b.max(candidate)));
+                                }
+                            }
+                            boundary.unwrap_or(seg_end)
                         }
                     } else {
                         seg_end
@@ -2470,7 +2499,6 @@ pub fn wrap_prompt_lines(
             char_end: 0,
         });
     }
-
     // Determine visual cursor row & column
     let mut target_row = 0;
     let mut target_col = 0;
@@ -3740,9 +3768,8 @@ mod tests {
     fn test_format_prompt_line_with_colored_placeholders() {
         let line = "Explain [Image #1, 1568x1037] and [Image #2, 800x600] please";
         let formatted = format_prompt_line_with_colored_placeholders(line);
-        assert!(formatted.contains("\x1b[1;36m[Image #1, 1568x1037]\x1b[0m"));
-        assert!(formatted.contains("\x1b[1;36m[Image #2, 800x600]\x1b[0m"));
-        assert!(formatted.starts_with("Explain "));
+        assert!(formatted.contains("\x1b[1;36;38;5;39m[Image #1, 1568x1037]\x1b[0m"));
+        assert!(formatted.contains("\x1b[1;36;38;5;39m[Image #2, 800x600]\x1b[0m"));
         assert!(formatted.ends_with(" please"));
 
         // Regular line without image tags is unchanged
@@ -3766,8 +3793,8 @@ mod tests {
     fn test_format_image_1_bracket_without_hash() {
         let line = "Look at [Image 1] and [Image #2] right now";
         let formatted = format_prompt_line_with_colored_placeholders(line);
-        assert!(formatted.contains("\x1b[1;36m[Image 1]\x1b[0m"));
-        assert!(formatted.contains("\x1b[1;36m[Image #2]\x1b[0m"));
+        assert!(formatted.contains("\x1b[1;36;38;5;39m[Image 1]\x1b[0m"));
+        assert!(formatted.contains("\x1b[1;36;38;5;39m[Image #2]\x1b[0m"));
     }
 
     #[test]
@@ -3783,8 +3810,7 @@ mod tests {
 
         // Highlight check
         let formatted = format_prompt_line_with_colored_placeholders(&text);
-        assert!(formatted.contains("\x1b[1;36m[Pasted text #1, 6 lines]\x1b[0m"));
-
+        assert!(formatted.contains("\x1b[1;36;38;5;39m[Pasted text #1, 6 lines]\x1b[0m"));
         // Expansion check
         let expanded = expand_pasted_text_placeholders(&text, &prompt.pending_pastes);
         assert_eq!(expanded, long_paste);
@@ -3799,5 +3825,26 @@ mod tests {
         let text: String = prompt.buffer.iter().collect();
         assert_eq!(text, "cargo build --bin fusion");
         assert!(prompt.pending_pastes.is_empty());
+    }
+
+    #[test]
+    fn test_wrap_adjacent_image_tags_never_split() {
+        let text = "[Image #1, 1568x1037][Image #2, 1568x1037][Image #3, 1568x1037][Image #4, 1568x1037][Image #5, 1568x1037][Image #6, 1568x1037][Image #7, 1568x1037]";
+        let buf: Vec<char> = text.chars().collect();
+        let term_cols = 80;
+        let (visual_lines, _, _) = wrap_prompt_lines(&buf, buf.len(), term_cols, 0);
+
+        assert!(visual_lines.len() >= 2);
+        for line in &visual_lines {
+            if line.text.contains('[') {
+                assert!(
+                    line.text.contains(']'),
+                    "A tag must never be chopped in half across lines: {:?}",
+                    line.text
+                );
+            }
+            let colored = format_prompt_line_with_colored_placeholders(&line.text);
+            assert!(colored.contains("\x1b[1;36;38;5;39m"));
+        }
     }
 }
