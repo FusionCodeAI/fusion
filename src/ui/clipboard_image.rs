@@ -1,0 +1,155 @@
+//! System clipboard image extraction, caching, and placeholder formatting for Fusion CLI.
+
+use std::fs;
+use std::path::{Path, PathBuf};
+use std::time::{SystemTime, UNIX_EPOCH};
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct PastedImage {
+    pub path: PathBuf,
+    pub width: u32,
+    pub height: u32,
+    pub bytes_len: usize,
+    pub media_type: String,
+}
+
+/// Encodes raw RGBA8 pixels into compressed PNG bytes.
+pub fn encode_rgba_png(width: u32, height: u32, rgba_data: &[u8]) -> anyhow::Result<Vec<u8>> {
+    let expected_len = (width as usize) * (height as usize) * 4;
+    if rgba_data.len() != expected_len {
+        anyhow::bail!(
+            "RGBA buffer length mismatch: got {} bytes, expected {} ({}x{}x4)",
+            rgba_data.len(),
+            expected_len,
+            width,
+            height
+        );
+    }
+
+    let img_buf = image::RgbaImage::from_raw(width, height, rgba_data.to_vec())
+        .ok_or_else(|| anyhow::anyhow!("Invalid RGBA image buffer dimensions"))?;
+
+    let mut png_bytes = Vec::new();
+    let encoder = image::codecs::png::PngEncoder::new(&mut png_bytes);
+    image::ImageEncoder::write_image(
+        encoder,
+        img_buf.as_raw(),
+        width,
+        height,
+        image::ExtendedColorType::Rgba8,
+    )?;
+    Ok(png_bytes)
+}
+
+/// Formats the inline text placeholder for an attached image.
+pub fn format_image_placeholder(index: usize, width: u32, height: u32) -> String {
+    format!("[Image #{}: {}x{}]", index, width, height)
+}
+
+/// Returns the cache directory for pasted images (`.fusion/cache/images/`).
+pub fn get_image_cache_dir() -> PathBuf {
+    let dir = PathBuf::from(".fusion/cache/images");
+    let _ = fs::create_dir_all(&dir);
+    dir
+}
+
+/// Queries the OS clipboard for image data. If an image is found,
+/// it is encoded as a PNG and saved to the local image cache.
+pub fn read_clipboard_image() -> Option<PastedImage> {
+    #[cfg(not(target_arch = "wasm32"))]
+    {
+        let mut clipboard = arboard::Clipboard::new().ok()?;
+        let img = clipboard.get_image().ok()?;
+        let width = img.width as u32;
+        let height = img.height as u32;
+        if width == 0 || height == 0 {
+            return None;
+        }
+
+        let png_bytes = encode_rgba_png(width, height, &img.bytes).ok()?;
+
+        let now = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_millis();
+        let cache_dir = get_image_cache_dir();
+        let filename = format!("clip_{}_{}x{}.png", now, width, height);
+        let path = cache_dir.join(filename);
+
+        fs::write(&path, &png_bytes).ok()?;
+
+        Some(PastedImage {
+            path,
+            width,
+            height,
+            bytes_len: png_bytes.len(),
+            media_type: "image/png".to_string(),
+        })
+    }
+    #[cfg(target_arch = "wasm32")]
+    {
+        None
+    }
+}
+
+/// Loads an existing image file from disk and returns its metadata as a `PastedImage`.
+pub fn load_and_cache_image_file(source_path: &Path) -> anyhow::Result<PastedImage> {
+    if !source_path.exists() {
+        anyhow::bail!("Image file not found: {}", source_path.display());
+    }
+
+    let bytes = fs::read(source_path)?;
+    let img = image::load_from_memory(&bytes)?;
+    let width = img.width();
+    let height = img.height();
+
+    let ext = source_path
+        .extension()
+        .and_then(|e| e.to_str())
+        .unwrap_or("png")
+        .to_lowercase();
+    let media_type = match ext.as_str() {
+        "jpg" | "jpeg" => "image/jpeg",
+        "webp" => "image/webp",
+        "gif" => "image/gif",
+        _ => "image/png",
+    }
+    .to_string();
+
+    Ok(PastedImage {
+        path: source_path.to_path_buf(),
+        width,
+        height,
+        bytes_len: bytes.len(),
+        media_type,
+    })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_encode_rgba_to_png() {
+        // 2x2 RGBA test image: red, green, blue, white
+        let rgba_data = vec![
+            255, 0, 0, 255, 0, 255, 0, 255, 0, 0, 255, 255, 255, 255, 255, 255,
+        ];
+        let png_bytes = encode_rgba_png(2, 2, &rgba_data).expect("must encode png");
+        assert!(!png_bytes.is_empty());
+        assert_eq!(&png_bytes[0..8], b"\x89PNG\r\n\x1a\n");
+    }
+
+    #[test]
+    fn test_format_placeholder() {
+        let placeholder = format_image_placeholder(1, 1920, 1080);
+        assert_eq!(placeholder, "[Image #1: 1920x1080]");
+    }
+
+    #[test]
+    fn test_encode_rgba_invalid_dimensions() {
+        let rgba_data = vec![255, 0, 0, 255]; // Only 1 pixel
+        let res = encode_rgba_png(2, 2, &rgba_data); // Expects 4 pixels
+        assert!(res.is_err());
+    }
+}

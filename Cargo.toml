@@ -431,6 +431,8 @@ zip = { version = "2.2", default-features = false, features = ["deflate"] }
 sha2 = "0.10"
 unicode-width = "0.2"
 
+arboard = { workspace = true }
+image = { workspace = true }
 # File system, Search & Diffs
 ignore = "0.4.22"
 globset = "0.4.15"

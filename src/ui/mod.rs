@@ -3,6 +3,7 @@ pub mod banner;
 pub mod bench_cmd;
 pub mod bench_runner;
 pub mod budget;
+pub mod clipboard_image;
 pub mod colors;
 pub mod context_view;
 pub mod context_warning;
