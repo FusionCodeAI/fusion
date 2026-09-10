@@ -357,7 +357,12 @@ impl Prompt {
         let current_text: String = self.buffer.iter().collect();
         self.pending_images
             .iter()
-            .filter(|img| current_text.contains(&img.tag))
+            .filter(|img| {
+                current_text.contains(&img.tag)
+                    || current_text.contains(&format!("[Image #{},", img.index))
+                    || current_text.contains(&format!("[Image #{}:", img.index))
+                    || current_text.contains(&format!("[Image #{}", img.index))
+            })
             .cloned()
             .collect()
     }
@@ -1245,6 +1250,12 @@ impl Prompt {
                         self.render_current()?;
                         return Ok(None);
                     }
+                }
+                // If system clipboard has an image right now, attach it
+                if let Some(pasted) = crate::ui::clipboard_image::read_clipboard_image() {
+                    self.attach_image(pasted.path, pasted.width, pasted.height);
+                    self.render_current()?;
+                    return Ok(None);
                 }
                 let normalized = text.replace("\r\n", "\n").replace('\r', "\n");
                 for c in normalized.chars() {
@@ -2267,15 +2278,15 @@ pub struct RawModeGuard;
 impl RawModeGuard {
     pub fn enter() -> std::io::Result<Self> {
         terminal::enable_raw_mode()?;
-        let _ = execute!(stdout(), cursor::Show);
+        let _ = execute!(stdout(), cursor::Show, event::EnableBracketedPaste);
         Ok(Self)
     }
 }
 
 impl Drop for RawModeGuard {
     fn drop(&mut self) {
+        let _ = execute!(stdout(), event::DisableBracketedPaste, cursor::Show);
         let _ = terminal::disable_raw_mode();
-        let _ = execute!(stdout(), cursor::Show);
     }
 }
 
@@ -3421,7 +3432,7 @@ mod tests {
         prompt.attach_image(path, 800, 600);
 
         let text: String = prompt.buffer.iter().collect();
-        assert_eq!(text, "Look at this [Image #1: 800x600]");
+        assert_eq!(text, "Look at this [Image #1, 800x600]");
         assert_eq!(prompt.pending_images.len(), 1);
         assert_eq!(prompt.pending_images[0].width, 800);
         assert_eq!(prompt.pending_images[0].height, 600);

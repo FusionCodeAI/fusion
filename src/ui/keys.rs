@@ -607,9 +607,14 @@ impl KeyHandler {
 
             // Cancel current turn (Ctrl+C)
             (KeyCode::Char('c'), KeyModifiers::CONTROL) => KeyResult::Cancel,
-            // Paste from clipboard or image (Ctrl+V)
-            (KeyCode::Char('v'), KeyModifiers::CONTROL) => KeyResult::Paste,
-
+            // Paste from clipboard or image (Ctrl+V, Cmd+V, Alt+V)
+            (KeyCode::Char('v') | KeyCode::Char('V'), mods)
+                if mods.contains(KeyModifiers::CONTROL)
+                    || mods.contains(KeyModifiers::SUPER)
+                    || mods.contains(KeyModifiers::ALT) =>
+            {
+                KeyResult::Paste
+            }
 
             // Exit on empty, or delete character under cursor (Ctrl+D)
             (KeyCode::Char('d'), KeyModifiers::CONTROL) => {
@@ -964,9 +969,15 @@ impl KeyHandler {
                 }
                 KeyResult::Continue
             }
-            // Ctrl+V: Paste from clipboard or image
-            (KeyCode::Char('v'), KeyModifiers::CONTROL) => KeyResult::Paste,
 
+            // Ctrl+V / Cmd+V / Alt+V: Paste from clipboard or image
+            (KeyCode::Char('v') | KeyCode::Char('V'), mods)
+                if mods.contains(KeyModifiers::CONTROL)
+                    || mods.contains(KeyModifiers::SUPER)
+                    || mods.contains(KeyModifiers::ALT) =>
+            {
+                KeyResult::Paste
+            }
 
             // Alt+Y: Yank-pop (cycle kill ring if previous action was yank)
             (KeyCode::Char('y'), KeyModifiers::ALT) => {
@@ -1154,9 +1165,15 @@ impl KeyHandler {
 
             // Cancel (Ctrl+C)
             (KeyCode::Char('c'), KeyModifiers::CONTROL) => KeyResult::Cancel,
-            // Paste from clipboard or image (Ctrl+V)
-            (KeyCode::Char('v'), KeyModifiers::CONTROL) => KeyResult::Paste,
 
+            // Paste from clipboard or image (Ctrl+V, Cmd+V, Alt+V)
+            (KeyCode::Char('v') | KeyCode::Char('V'), mods)
+                if mods.contains(KeyModifiers::CONTROL)
+                    || mods.contains(KeyModifiers::SUPER)
+                    || mods.contains(KeyModifiers::ALT) =>
+            {
+                KeyResult::Paste
+            }
 
             // Exit on empty, or delete forward (Ctrl+D)
             (KeyCode::Char('d'), KeyModifiers::CONTROL) => {

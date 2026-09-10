@@ -30,7 +30,11 @@ pub fn encode_rgba_png(width: u32, height: u32, rgba_data: &[u8]) -> anyhow::Res
         .ok_or_else(|| anyhow::anyhow!("Invalid RGBA image buffer dimensions"))?;
 
     let mut png_bytes = Vec::new();
-    let encoder = image::codecs::png::PngEncoder::new(&mut png_bytes);
+    let encoder = image::codecs::png::PngEncoder::new_with_quality(
+        &mut png_bytes,
+        image::codecs::png::CompressionType::Fast,
+        image::codecs::png::FilterType::NoFilter,
+    );
     image::ImageEncoder::write_image(
         encoder,
         img_buf.as_raw(),
@@ -43,7 +47,7 @@ pub fn encode_rgba_png(width: u32, height: u32, rgba_data: &[u8]) -> anyhow::Res
 
 /// Formats the inline text placeholder for an attached image.
 pub fn format_image_placeholder(index: usize, width: u32, height: u32) -> String {
-    format!("[Image #{}: {}x{}]", index, width, height)
+    format!("[Image #{}, {}x{}]", index, width, height)
 }
 
 /// Returns the cache directory for pasted images (`.fusion/cache/images/`).
@@ -179,9 +183,8 @@ mod tests {
     #[test]
     fn test_format_placeholder() {
         let placeholder = format_image_placeholder(1, 1920, 1080);
-        assert_eq!(placeholder, "[Image #1: 1920x1080]");
+        assert_eq!(placeholder, "[Image #1, 1920x1080]");
     }
-
     #[test]
     fn test_encode_rgba_invalid_dimensions() {
         let rgba_data = vec![255, 0, 0, 255]; // Only 1 pixel

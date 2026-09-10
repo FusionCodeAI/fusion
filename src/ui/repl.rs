@@ -1377,6 +1377,39 @@ pub async fn run_repl_with_session(
             }
         }
 
+        // Direct /image command inside prompt: attach image into prompt buffer
+        if trimmed == "/image"
+            || trimmed.starts_with("/image ")
+            || trimmed == "/img"
+            || trimmed.starts_with("/img ")
+            || trimmed == "/paste-image"
+            || trimmed.starts_with("/paste-image ")
+        {
+            let arg = trimmed.split_whitespace().nth(1);
+            if let Some(p) = arg {
+                let p_buf = std::path::PathBuf::from(p);
+                match crate::ui::clipboard_image::load_and_cache_image_file(&p_buf) {
+                    Ok(img) => {
+                        prompt.attach_image(img.path, img.width, img.height);
+                    }
+                    Err(e) => {
+                        eprintln!("\x1b[1;31mError:\x1b[0m Failed to load image '{}': {}\r\n", p, e);
+                    }
+                }
+            } else {
+                match crate::ui::clipboard_image::read_clipboard_image() {
+                    Some(img) => {
+                        prompt.attach_image(img.path, img.width, img.height);
+                    }
+                    None => {
+                        eprintln!("\x1b[1;33mNotice:\x1b[0m No image found in OS clipboard. Copy an image first or specify a path: /image <path>\r\n");
+                    }
+                }
+            }
+            clear_prompt_frame(&mut prompt);
+            continue;
+        }
+
         // Handle slash commands
         if trimmed.starts_with('/') {
             if handle_command(trimmed, &mut runner, &mut session) {
