@@ -562,6 +562,29 @@ impl OpenRouterClient {
         // Format messages
         let mut messages_json = Vec::new();
         for msg in messages {
+            let content_val = if msg.role == Role::User
+                && msg.images.as_ref().map_or(false, |imgs| !imgs.is_empty())
+            {
+                let mut parts = Vec::new();
+                if !msg.content.trim().is_empty() {
+                    parts.push(json!({
+                        "type": "text",
+                        "text": msg.content
+                    }));
+                }
+                for img in msg.images.as_ref().unwrap() {
+                    parts.push(json!({
+                        "type": "image_url",
+                        "image_url": {
+                            "url": format!("data:{};base64,{}", img.media_type, img.data)
+                        }
+                    }));
+                }
+                json!(parts)
+            } else {
+                json!(msg.content)
+            };
+
             let mut item = json!({
                 "role": match msg.role {
                     Role::System => "system",
@@ -569,9 +592,8 @@ impl OpenRouterClient {
                     Role::Assistant => "assistant",
                     Role::Tool => "tool",
                 },
-                "content": msg.content,
+                "content": content_val,
             });
-
             if let Some(name) = &msg.name {
                 item["name"] = json!(name);
             }

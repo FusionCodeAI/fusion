@@ -830,10 +830,33 @@ pub fn convert_messages_to_anthropic(
                 continue;
             }
             Role::User => {
-                anthropic_messages.push(AnthropicMessage {
-                    role: AnthropicRole::User,
-                    content: AnthropicContent::Text(msg.content.clone()),
-                });
+                if let Some(images) = &msg.images {
+                    let mut blocks = Vec::new();
+                    if !msg.content.is_empty() {
+                        blocks.push(AnthropicContentBlock::Text {
+                            text: msg.content.clone(),
+                            cache_control: None,
+                        });
+                    }
+                    for img in images {
+                        blocks.push(AnthropicContentBlock::Image {
+                            source: AnthropicImageSource {
+                                source_type: "base64".to_string(),
+                                media_type: img.media_type.clone(),
+                                data: img.data.clone(),
+                            },
+                        });
+                    }
+                    anthropic_messages.push(AnthropicMessage {
+                        role: AnthropicRole::User,
+                        content: AnthropicContent::Blocks(blocks),
+                    });
+                } else {
+                    anthropic_messages.push(AnthropicMessage {
+                        role: AnthropicRole::User,
+                        content: AnthropicContent::Text(msg.content.clone()),
+                    });
+                }
             }
             Role::Assistant => {
                 if let Some(tool_calls) = &msg.tool_calls {
@@ -1189,5 +1212,28 @@ mod tests {
             acc.get_thinking(),
             Some("Let's analyze the problem...".to_string())
         );
+    }
+
+    #[test]
+    fn test_anthropic_payload_with_image_blocks() {
+        use crate::provider::types::ImageAttachment;
+        let img = ImageAttachment {
+            media_type: "image/png".to_string(),
+            data: "aGVsbG8=".to_string(),
+            path: None,
+            width: Some(10),
+            height: Some(10),
+        };
+        let msg = Message::user_with_images("What is this?", vec![img]);
+        let (_sys, anthropic_msgs) = convert_messages_to_anthropic(&[msg]);
+        assert_eq!(anthropic_msgs.len(), 1);
+        match &anthropic_msgs[0].content {
+            AnthropicContent::Blocks(blocks) => {
+                assert_eq!(blocks.len(), 2);
+                assert!(matches!(&blocks[0], AnthropicContentBlock::Text { text, .. } if text == "What is this?"));
+                assert!(matches!(&blocks[1], AnthropicContentBlock::Image { source } if source.media_type == "image/png" && source.data == "aGVsbG8="));
+            }
+            _ => panic!("Expected AnthropicContent::Blocks"),
+        }
     }
 }

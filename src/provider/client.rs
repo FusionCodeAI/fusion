@@ -828,6 +828,28 @@ pub fn build_openai_payload(
                 "role": "assistant",
                 "content": content,
             })
+        } else if msg.role == Role::User
+            && msg.images.as_ref().map_or(false, |imgs| !imgs.is_empty())
+        {
+            let mut parts = Vec::new();
+            if !msg.content.trim().is_empty() {
+                parts.push(json!({
+                    "type": "text",
+                    "text": msg.content
+                }));
+            }
+            for img in msg.images.as_ref().unwrap() {
+                parts.push(json!({
+                    "type": "image_url",
+                    "image_url": {
+                        "url": format!("data:{};base64,{}", img.media_type, img.data)
+                    }
+                }));
+            }
+            json!({
+                "role": "user",
+                "content": parts,
+            })
         } else {
             let content = if msg.content.trim().is_empty() {
                 if msg.role == Role::Assistant {
@@ -947,15 +969,39 @@ pub fn build_anthropic_payload(
                 continue;
             }
             Role::User => {
-                let content = if msg.content.trim().is_empty() {
-                    "(empty message)".to_string()
+                if let Some(images) = &msg.images {
+                    let mut blocks = Vec::new();
+                    if !msg.content.trim().is_empty() {
+                        blocks.push(json!({
+                            "type": "text",
+                            "text": msg.content,
+                        }));
+                    }
+                    for img in images {
+                        blocks.push(json!({
+                            "type": "image",
+                            "source": {
+                                "type": "base64",
+                                "media_type": img.media_type,
+                                "data": img.data,
+                            }
+                        }));
+                    }
+                    anthropic_messages.push(json!({
+                        "role": "user",
+                        "content": blocks,
+                    }));
                 } else {
-                    msg.content.clone()
-                };
-                anthropic_messages.push(json!({
-                    "role": "user",
-                    "content": content,
-                }));
+                    let content = if msg.content.trim().is_empty() {
+                        "(empty message)".to_string()
+                    } else {
+                        msg.content.clone()
+                    };
+                    anthropic_messages.push(json!({
+                        "role": "user",
+                        "content": content,
+                    }));
+                }
             }
             Role::Assistant => {
                 if let Some(tool_calls) = &msg.tool_calls {
@@ -1230,6 +1276,57 @@ mod tests {
         let tools_out = payload["tools"].as_array().unwrap();
         assert_eq!(tools_out[0]["name"], "read");
         assert_eq!(tools_out[0]["input_schema"]["type"], "object");
+    }
+
+    #[test]
+    fn test_build_openai_payload_with_images() {
+        use crate::provider::types::ImageAttachment;
+        let img = ImageAttachment {
+            media_type: "image/png".to_string(),
+            data: "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=".to_string(),
+            path: None,
+            width: Some(1),
+            height: Some(1),
+        };
+        let messages = vec![
+            Message::user_with_images("What is in this screenshot?", vec![img]),
+        ];
+        let payload = build_openai_payload("gpt-4o", None, None, &messages, &[]);
+        let msgs = payload["messages"].as_array().unwrap();
+        assert_eq!(msgs.len(), 1);
+        assert_eq!(msgs[0]["role"], "user");
+        let content = msgs[0]["content"].as_array().unwrap();
+        assert_eq!(content.len(), 2);
+        assert_eq!(content[0]["type"], "text");
+        assert_eq!(content[0]["text"], "What is in this screenshot?");
+        assert_eq!(content[1]["type"], "image_url");
+        assert!(content[1]["image_url"]["url"].as_str().unwrap().starts_with("data:image/png;base64,"));
+    }
+
+    #[test]
+    fn test_build_anthropic_payload_with_images() {
+        use crate::provider::types::ImageAttachment;
+        let img = ImageAttachment {
+            media_type: "image/png".to_string(),
+            data: "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=".to_string(),
+            path: None,
+            width: Some(1),
+            height: Some(1),
+        };
+        let messages = vec![
+            Message::user_with_images("Describe this screenshot", vec![img]),
+        ];
+        let payload = build_anthropic_payload("claude-3-7-sonnet", None, None, &messages, &[]);
+        let msgs = payload["messages"].as_array().unwrap();
+        assert_eq!(msgs.len(), 1);
+        assert_eq!(msgs[0]["role"], "user");
+        let content = msgs[0]["content"].as_array().unwrap();
+        assert_eq!(content.len(), 2);
+        assert_eq!(content[0]["type"], "text");
+        assert_eq!(content[0]["text"], "Describe this screenshot");
+        assert_eq!(content[1]["type"], "image");
+        assert_eq!(content[1]["source"]["type"], "base64");
+        assert_eq!(content[1]["source"]["media_type"], "image/png");
     }
 
     #[tokio::test]
