@@ -157,10 +157,10 @@ fn test_prompt_render_multiline_input() {
 fn test_prompt_model_labels_formatting() {
     assert_eq!(
         format_model_label("deepseek-v4-flash-0731"),
-        "DeepSeek 4 0731 Flash"
+        "DeepSeek V4 Flash"
     );
-    assert_eq!(format_model_label("flash"), "DeepSeek 4 0731 Flash");
-    assert_eq!(format_model_label("v4"), "DeepSeek 4 0731 Flash");
+    assert_eq!(format_model_label("flash"), "DeepSeek V4 Flash");
+    assert_eq!(format_model_label("v4"), "DeepSeek V4 Flash");
     assert_eq!(format_model_label("MiniMaxAI/MiniMax-M2.7"), "MiniMax M2.7");
     assert_eq!(format_model_label("minimax"), "MiniMax M2.7");
     assert_eq!(format_model_label("openai/gpt-4o"), "gpt-4o");

@@ -74,7 +74,7 @@ pub fn format_tokens_compact(tokens: u64) -> String {
 pub fn format_model_label(model: &str) -> &str {
     match model {
         "deepseek-v4-flash-0731" | "deepseek-ai/DeepSeek-V4-Flash-0731" | "flash" | "v4" => {
-            "DeepSeek 4 0731 Flash"
+            "DeepSeek V4 Flash"
         }
         "deepseek-v4-flash-0731-fast" | "deepseek-ai/DeepSeek-V4-Flash-0731-Fast" => {
             "DeepSeek 4 0731 Flash Fast"
