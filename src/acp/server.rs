@@ -506,16 +506,28 @@ impl AcpServer {
         let cfg = self.config.read().await;
         let models = vec![
             ModelInfo {
-                id: "deepseek-ai/DeepSeek-V4-Flash-0731".to_string(),
-                name: "DeepSeek V4 Flash".to_string(),
+                id: "deepseek-v4-flash-0731".to_string(),
+                name: "DeepSeek 4 0731 Flash".to_string(),
                 provider: "fusion".to_string(),
-                is_default: cfg.default_model == "deepseek-ai/DeepSeek-V4-Flash-0731",
+                is_default: cfg.default_model == "deepseek-v4-flash-0731",
             },
             ModelInfo {
-                id: "MiniMaxAI/MiniMax-M2.7".to_string(),
+                id: "deepseek-v4-flash-0731-fast".to_string(),
+                name: "DeepSeek 4 0731 Flash Fast".to_string(),
+                provider: "fusion".to_string(),
+                is_default: cfg.default_model == "deepseek-v4-flash-0731-fast",
+            },
+            ModelInfo {
+                id: "glm-5.3-flash".to_string(),
+                name: "GLM 5.3 Flash".to_string(),
+                provider: "fusion".to_string(),
+                is_default: cfg.default_model == "glm-5.3-flash",
+            },
+            ModelInfo {
+                id: "minimax-m2.7".to_string(),
                 name: "MiniMax M2.7".to_string(),
                 provider: "fusion".to_string(),
-                is_default: cfg.default_model == "MiniMaxAI/MiniMax-M2.7",
+                is_default: cfg.default_model == "minimax-m2.7",
             },
         ];
 
@@ -526,14 +538,24 @@ impl AcpServer {
     pub fn build_model_config_options(&self, active_model: &str) -> Vec<SessionConfigOption> {
         let mut options = vec![
             SessionConfigSelectOption {
-                value: "deepseek-ai/DeepSeek-V4-Flash-0731".to_string(),
-                name: "DeepSeek V4 Flash".to_string(),
+                value: "deepseek-v4-flash-0731".to_string(),
+                name: "DeepSeek 4 0731 Flash".to_string(),
                 description: Some("Fusion Gateway Flagship (1M context · fast)".to_string()),
             },
             SessionConfigSelectOption {
-                value: "MiniMaxAI/MiniMax-M2.7".to_string(),
+                value: "deepseek-v4-flash-0731-fast".to_string(),
+                name: "DeepSeek 4 0731 Flash Fast".to_string(),
+                description: Some("Fusion Gateway Ultra-Low Latency (1M context · fast)".to_string()),
+            },
+            SessionConfigSelectOption {
+                value: "glm-5.3-flash".to_string(),
+                name: "GLM 5.3 Flash".to_string(),
+                description: Some("Fusion Gateway GLM (1M context · fast)".to_string()),
+            },
+            SessionConfigSelectOption {
+                value: "minimax-m2.7".to_string(),
                 name: "MiniMax M2.7".to_string(),
-                description: Some("Fusion Gateway (200k context)".to_string()),
+                description: Some("Fusion Gateway (200k context · reasoning)".to_string()),
             },
         ];
 

@@ -231,11 +231,13 @@ pub fn render_backend_usage_fx(report: &BackendUsageReport) -> String {
         plan_name_trimmed.to_string()
     };
 
-    let plan_display = if report.is_payg
+    let plan_display = if report.auth_type.as_deref() == Some("cli_session") {
+        format!("{} [CLI Sub Mode]", plan_str)
+    } else if report.is_payg
         && !plan_str.to_lowercase().contains("payg")
         && !plan_str.to_lowercase().contains("pay as you go")
     {
-        format!("{} [PAYG]", plan_str)
+        format!("{} [PAYG Mode]", plan_str)
     } else {
         plan_str
     };
@@ -561,6 +563,8 @@ mod tests {
             cache_savings_usd_this_month: 0.42,
             cache_savings_by_model: models,
             is_payg: false,
+            auth_type: None,
+            mode: None,
         };
 
         let rendered = render_backend_usage_fx(&report);
@@ -601,6 +605,8 @@ mod tests {
             cache_savings_usd_this_month: 0.15,
             cache_savings_by_model: HashMap::new(),
             is_payg: true,
+            auth_type: None,
+            mode: None,
         };
 
         let rendered = render_backend_usage_fx(&report);

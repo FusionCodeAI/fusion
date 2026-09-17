@@ -953,67 +953,55 @@ impl CatalogFetcher {
     /// `https://api.fusioncode.app/v1`.
     pub async fn fetch_fusion(
         &self,
-        base_url: Option<&str>,
+        _base_url: Option<&str>,
         _api_key: Option<&str>,
     ) -> Result<Vec<CatalogModel>, String> {
-        let base = base_url
-            .unwrap_or(DEFAULT_FUSION_BASE_URL)
-            .trim_end_matches('/');
-        let url = if base.ends_with("/models") {
-            base.to_string()
-        } else if base.ends_with("/v1") {
-            format!("{}/models", base)
-        } else {
-            format!("{}/v1/models", base)
-        };
-
-        // The Fusion API is keyless but Cloudflare's edge blocks clients
-        // without a browser User-Agent (error 1010). Send a real UA.
-        let resp = self
-            .client
-            .get(&url)
-            .header(
-                reqwest::header::USER_AGENT,
-                "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36",
-            )
-            .header(reqwest::header::ACCEPT, "application/json")
-            .send()
-            .await
-            .map_err(|e| format!("Fusion API request failed: {}", e))?;
-
-        if !resp.status().is_success() {
-            return Err(format!("Fusion API HTTP error: {}", resp.status()));
-        }
-
-        let body: serde_json::Value = resp
-            .json()
-            .await
-            .map_err(|e| format!("Fusion API JSON decode error: {}", e))?;
-
+        // Curated main models for Fusion Gateway (clean IDs without org prefix)
         let mut list = Vec::new();
-        if let Some(arr) = body.get("data").and_then(|d| d.as_array()) {
-            for item in arr {
-                if let Some(id) = item.get("id").and_then(|i| i.as_str()) {
-                    let display_name = item
-                        .get("display_name")
-                        .or_else(|| item.get("name"))
-                        .and_then(|n| n.as_str())
-                        .unwrap_or(id);
-                    let mut model = CatalogModel::new(id, display_name, "fusion");
-                    // Surface context length + pricing from the Fusion payload.
-                    if let Some(ctx) = item.get("context_length").and_then(|c| c.as_u64()) {
-                        model.context_window = Some(ctx);
-                    }
-                    if let Some(pr) = item.get("pricing").and_then(|p| p.as_object()) {
-                        model.input_cost_per_m = pr.get("input").and_then(|v| v.as_f64());
-                        model.output_cost_per_m = pr.get("output").and_then(|v| v.as_f64());
-                    }
-                    enrich_model_metadata(&mut model);
-                    list.push(model);
-                }
-            }
-        }
-
+        list.push(
+            CatalogModel::new(
+                "deepseek-v4-flash-0731",
+                "DeepSeek 4 0731 Flash",
+                "fusion",
+            )
+            .with_context(1_048_576)
+            .with_max_output(8_192)
+            .with_badges(["Fast", "Default", "OpenRouter"])
+            .with_description("Fusion gateway high-speed 1M context DeepSeek 4 0731 Flash model"),
+        );
+        list.push(
+            CatalogModel::new(
+                "deepseek-v4-flash-0731-fast",
+                "DeepSeek 4 0731 Flash Fast",
+                "fusion",
+            )
+            .with_context(1_048_576)
+            .with_max_output(8_192)
+            .with_badges(["Fast", "Speed"])
+            .with_description("Fusion gateway ultra-low latency DeepSeek 4 0731 Flash Fast model"),
+        );
+        list.push(
+            CatalogModel::new(
+                "glm-5.3-flash",
+                "GLM 5.3 Flash",
+                "fusion",
+            )
+            .with_context(1_048_576)
+            .with_max_output(8_192)
+            .with_badges(["Fast", "OpenRouter"])
+            .with_description("Fusion gateway GLM 5.3 Flash 1M context model"),
+        );
+        list.push(
+            CatalogModel::new(
+                "minimax-m2.7",
+                "MiniMax M2.7",
+                "fusion",
+            )
+            .with_context(204_800)
+            .with_max_output(8_192)
+            .with_badges(["Reasoning"])
+            .with_description("MiniMax M2.7 frontier coding and reasoning model"),
+        );
         Ok(list)
     }
 
@@ -1532,6 +1520,18 @@ pub fn enrich_model_metadata(model: &mut CatalogModel) {
 fn format_display_name(id: &str) -> String {
     let clean = id.trim();
     match clean {
+        "deepseek-v4-flash-0731" | "deepseek-ai/deepseek-v4-flash-0731" => {
+            "DeepSeek 4 0731 Flash".to_string()
+        }
+        "deepseek-v4-flash-0731-fast" | "deepseek-ai/deepseek-v4-flash-0731-fast" => {
+            "DeepSeek 4 0731 Flash Fast".to_string()
+        }
+        "glm-5.3-flash" | "zai-org/glm-5.3-flash" | "thudm/glm-5.3-flash" => {
+            "GLM 5.3 Flash".to_string()
+        }
+        "minimax-m2.7" | "minimaxai/minimax-m2.7" | "MiniMaxAI/MiniMax-M2.7" => {
+            "MiniMax M2.7".to_string()
+        }
         "deepseek-chat" => "DeepSeek V3".to_string(),
         "deepseek-reasoner" => "DeepSeek R1".to_string(),
         "gpt-4o" => "GPT-4o".to_string(),
@@ -1592,25 +1592,51 @@ pub fn static_model_list() -> Vec<CatalogModel> {
     list.extend(crate::provider::local_daemon::default_local_models());
 
     // Fusion Gateway
+    // Fusion Gateway Main Models (No org prefix in CLI)
     list.push(
         CatalogModel::new(
-            "deepseek-ai/DeepSeek-V4-Flash-0731",
-            "DeepSeek V4 Flash",
+            "deepseek-v4-flash-0731",
+            "DeepSeek 4 0731 Flash",
             "fusion",
         )
         .with_context(1_048_576)
         .with_max_output(8_192)
-        .with_badges(["Fast", "Default"])
-        .with_description("Fusion gateway high-speed 1M context flash model"),
+        .with_badges(["Fast", "Default", "OpenRouter"])
+        .with_description("Fusion gateway high-speed 1M context DeepSeek 4 0731 Flash model"),
     );
     list.push(
-        CatalogModel::new("MiniMaxAI/MiniMax-M2.7", "MiniMax M2.7", "fusion")
-            .with_context(204_800)
-            .with_max_output(8_192)
-            .with_badges(["Reasoning"])
-            .with_description("MiniMax M2.7 frontier coding and reasoning model"),
+        CatalogModel::new(
+            "deepseek-v4-flash-0731-fast",
+            "DeepSeek 4 0731 Flash Fast",
+            "fusion",
+        )
+        .with_context(1_048_576)
+        .with_max_output(8_192)
+        .with_badges(["Fast", "Speed"])
+        .with_description("Fusion gateway ultra-low latency DeepSeek 4 0731 Flash Fast model"),
     );
-
+    list.push(
+        CatalogModel::new(
+            "glm-5.3-flash",
+            "GLM 5.3 Flash",
+            "fusion",
+        )
+        .with_context(1_048_576)
+        .with_max_output(8_192)
+        .with_badges(["Fast", "OpenRouter"])
+        .with_description("Fusion gateway GLM 5.3 Flash 1M context model"),
+    );
+    list.push(
+        CatalogModel::new(
+            "minimax-m2.7",
+            "MiniMax M2.7",
+            "fusion",
+        )
+        .with_context(204_800)
+        .with_max_output(8_192)
+        .with_badges(["Reasoning"])
+        .with_description("MiniMax M2.7 frontier coding and reasoning model"),
+    );
     list
 }
 

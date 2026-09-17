@@ -49,24 +49,40 @@ pub const MODEL_SHORTHANDS: &[(&str, &str, &str)] = &[
     ("sonnet-4.5", "antigravity", "claude-sonnet-4-5"),
     ("gemini-3.8", "antigravity", "gemini-3.8-flash-high"),
     ("antigravity", "antigravity", "claude-opus-4-6"),
-    // Fusion Gateway models
-    ("minimax", "fusion", "MiniMaxAI/MiniMax-M2.7"),
-    ("minimax-m2.7", "fusion", "MiniMaxAI/MiniMax-M2.7"),
-    ("minimax-m2", "fusion", "MiniMaxAI/MiniMax-M2.7"),
-    (
-        "deepseek-v4",
-        "fusion",
-        "deepseek-ai/DeepSeek-V4-Flash-0731",
-    ),
-    ("flash", "fusion", "deepseek-ai/DeepSeek-V4-Flash-0731"),
-    ("v4", "fusion", "deepseek-ai/DeepSeek-V4-Flash-0731"),
-    ("fusion", "fusion", "deepseek-ai/DeepSeek-V4-Flash-0731"),
-    (
-        "fusion-default",
-        "fusion",
-        "deepseek-ai/DeepSeek-V4-Flash-0731",
-    ),
-    ("default", "fusion", "deepseek-ai/DeepSeek-V4-Flash-0731"),
+    // Fusion Gateway main models (clean, no org prefixes)
+    ("deepseek-v4-flash-0731", "fusion", "deepseek-v4-flash-0731"),
+    ("deepseek-4-0731-flash", "fusion", "deepseek-v4-flash-0731"),
+    ("deepseek-4-flash", "fusion", "deepseek-v4-flash-0731"),
+    ("0731-flash", "fusion", "deepseek-v4-flash-0731"),
+    ("deepseek-v4-flash", "fusion", "deepseek-v4-flash-0731"),
+    ("deepseek-v4", "fusion", "deepseek-v4-flash-0731"),
+    ("flash", "fusion", "deepseek-v4-flash-0731"),
+    ("v4", "fusion", "deepseek-v4-flash-0731"),
+    ("fusion", "fusion", "deepseek-v4-flash-0731"),
+    ("fusion-default", "fusion", "deepseek-v4-flash-0731"),
+    ("default", "fusion", "deepseek-v4-flash-0731"),
+    ("deepseek-ai/deepseek-v4-flash-0731", "fusion", "deepseek-v4-flash-0731"),
+    ("deepseek-ai/DeepSeek-V4-Flash-0731", "fusion", "deepseek-v4-flash-0731"),
+    // DeepSeek 4 Flash Fast
+    ("deepseek-v4-flash-0731-fast", "fusion", "deepseek-v4-flash-0731-fast"),
+    ("0731-flash-fast", "fusion", "deepseek-v4-flash-0731-fast"),
+    ("flash-fast", "fusion", "deepseek-v4-flash-0731-fast"),
+    ("deepseek-ai/deepseek-v4-flash-0731-fast", "fusion", "deepseek-v4-flash-0731-fast"),
+    ("deepseek-ai/DeepSeek-V4-Flash-0731-Fast", "fusion", "deepseek-v4-flash-0731-fast"),
+    // GLM 5.3 Flash
+    ("glm-5.3-flash", "fusion", "glm-5.3-flash"),
+    ("glm-5.3", "fusion", "glm-5.3-flash"),
+    ("glm", "fusion", "glm-5.3-flash"),
+    ("zai-org/glm-5.3-flash", "fusion", "glm-5.3-flash"),
+    ("zai-org/GLM-5.3-Flash", "fusion", "glm-5.3-flash"),
+    ("thudm/glm-5.3-flash", "fusion", "glm-5.3-flash"),
+    ("THUDM/glm-5.3-flash", "fusion", "glm-5.3-flash"),
+    // MiniMax M2.7
+    ("minimax-m2.7", "fusion", "minimax-m2.7"),
+    ("minimax", "fusion", "minimax-m2.7"),
+    ("minimax-m2", "fusion", "minimax-m2.7"),
+    ("minimaxai/minimax-m2.7", "fusion", "minimax-m2.7"),
+    ("MiniMaxAI/MiniMax-M2.7", "fusion", "minimax-m2.7"),
     // DeepSeek
     ("deepseek", "deepseek", "deepseek-chat"),
     ("deepseek-chat", "deepseek", "deepseek-chat"),
@@ -436,7 +452,7 @@ fn default_provider_name() -> String {
 }
 
 fn default_model_name() -> String {
-    "deepseek-ai/DeepSeek-V4-Flash-0731".to_string()
+    "deepseek-v4-flash-0731".to_string()
 }
 
 fn default_true() -> bool {
@@ -986,7 +1002,14 @@ impl Config {
         if lower.starts_with("minimax") || lower.contains("minimax") {
             return Some("fusion");
         }
-        if lower == "deepseek-ai/deepseek-v4-flash-0731" || lower.starts_with("deepseek-ai/") {
+        if lower.starts_with("glm") || lower.contains("glm") {
+            return Some("fusion");
+        }
+        if lower.starts_with("deepseek-v4")
+            || lower.contains("0731")
+            || lower == "deepseek-ai/deepseek-v4-flash-0731"
+            || lower.starts_with("deepseek-ai/")
+        {
             return Some("fusion");
         }
 

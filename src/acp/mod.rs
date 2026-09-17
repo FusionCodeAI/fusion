@@ -207,15 +207,15 @@ mod tests {
         assert_eq!(model_opt.category, Some(SessionConfigOptionCategory::Model));
         match &model_opt.kind {
             SessionConfigKind::Select(sel) => {
-                assert_eq!(sel.current_value, "deepseek-ai/DeepSeek-V4-Flash-0731");
+                assert_eq!(sel.current_value, "deepseek-v4-flash-0731");
                 assert!(sel
                     .options
                     .iter()
-                    .any(|o| o.value == "deepseek-ai/DeepSeek-V4-Flash-0731"));
+                    .any(|o| o.value == "deepseek-v4-flash-0731"));
                 assert!(sel
                     .options
                     .iter()
-                    .any(|o| o.value == "MiniMaxAI/MiniMax-M2.7"));
+                    .any(|o| o.value == "minimax-m2.7"));
             }
         }
 

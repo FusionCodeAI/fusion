@@ -1618,16 +1618,34 @@ pub fn default_models() -> Vec<ModelEntry> {
         ),
         // Fusion Gateway
         ModelEntry::with_tokens(
-            "deepseek-ai/DeepSeek-V4-Flash-0731",
+            "deepseek-v4-flash-0731",
             "fusion",
             1_048_576,
             8_192,
-            vec!["Fast", "Default", "1M context"],
+            vec!["Fast", "Default", "1M context", "OpenRouter"],
         )
         .with_speed("Ultra-Fast")
-        .with_description("Fusion gateway high-speed 1M context flash model"),
+        .with_description("Fusion gateway high-speed 1M context DeepSeek 4 0731 Flash model"),
         ModelEntry::with_tokens(
-            "MiniMaxAI/MiniMax-M2.7",
+            "deepseek-v4-flash-0731-fast",
+            "fusion",
+            1_048_576,
+            8_192,
+            vec!["Fast", "Speed", "1M context"],
+        )
+        .with_speed("Ultra-Fast")
+        .with_description("Fusion gateway ultra-low latency DeepSeek 4 0731 Flash Fast model"),
+        ModelEntry::with_tokens(
+            "glm-5.3-flash",
+            "fusion",
+            1_048_576,
+            8_192,
+            vec!["Fast", "1M context", "OpenRouter"],
+        )
+        .with_speed("Ultra-Fast")
+        .with_description("Fusion gateway GLM 5.3 Flash 1M context model"),
+        ModelEntry::with_tokens(
+            "minimax-m2.7",
             "fusion",
             204_800,
             8_192,
@@ -1751,10 +1769,11 @@ mod tests {
     fn test_default_models_catalog() {
         let models = default_models();
         assert!(!models.is_empty());
-        assert!(models.iter().any(|m| m.id == "MiniMaxAI/MiniMax-M2.7"));
+        assert!(models.iter().any(|m| m.id == "minimax-m2.7"));
         assert!(models
             .iter()
-            .any(|m| m.id == "deepseek-ai/DeepSeek-V4-Flash-0731"));
+            .any(|m| m.id == "deepseek-v4-flash-0731"));
+        assert!(models.iter().any(|m| m.id == "glm-5.3-flash"));
         assert!(models.iter().any(|m| m.id == "claude-opus-4-6"));
         assert!(models.iter().any(|m| m.id == "claude-sonnet-4-6"));
         assert!(models.iter().any(|m| m.id == "gemini-3.8-flash-high"));

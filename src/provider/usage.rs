@@ -74,6 +74,8 @@ pub struct BackendUsageReport {
     #[serde(deserialize_with = "deserialize_cache_savings_by_model")]
     pub cache_savings_by_model: HashMap<String, ModelCacheSavings>,
     pub is_payg: bool,
+    pub auth_type: Option<String>,
+    pub mode: Option<String>,
 }
 impl BackendUsageReport {
     /// Percentage of monthly limit consumed (0.0 - 100.0+).

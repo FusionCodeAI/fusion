@@ -3092,9 +3092,11 @@ fn print_model_info(runner: &AgentRunner, session: &Session) {
         println!("\n\x1b[2;37mLocal Antigravity Daemon (127.0.0.1:8045):\x1b[0m not detected (start Antigravity Tools for free inference)");
     }
 
-    println!("\n\x1b[1;34mFusion Gateway Models:\x1b[0m");
-    println!("  \x1b[1;33mDeepSeek V4 Flash:\x1b[0m deepseek-ai/DeepSeek-V4-Flash-0731 (shorthands: deepseek, flash, v4, fusion)");
-    println!("  \x1b[1;33mMiniMax M2.7:\x1b[0m      MiniMaxAI/MiniMax-M2.7 (shorthands: minimax, minimax-m2.7)");
+    println!("\n\x1b[1;34mFusion Gateway Main Models:\x1b[0m");
+    println!("  \x1b[1;33mDeepSeek 4 Flash:\x1b[0m      deepseek-v4-flash-0731 (shorthands: deepseek, flash, v4, fusion)");
+    println!("  \x1b[1;33mDeepSeek 4 Flash Fast:\x1b[0m deepseek-v4-flash-0731-fast (shorthands: flash-fast, 0731-flash-fast)");
+    println!("  \x1b[1;33mGLM 5.3 Flash:\x1b[0m         glm-5.3-flash (shorthands: glm, glm-5.3)");
+    println!("  \x1b[1;33mMiniMax M2.7:\x1b[0m          minimax-m2.7 (shorthands: minimax)");
     println!("\nUsage: \x1b[1;36m/model <model_name>\x1b[0m to switch.\n");
 }
 
@@ -3248,9 +3250,20 @@ pub fn handle_login(runner: &mut AgentRunner) {
                                     .get("userEmail")
                                     .and_then(|e| e.as_str())
                                     .unwrap_or("your account");
+                                let is_cli_session = api_key.starts_with("fc_cli_");
+                                let mode_str = if is_cli_session {
+                                    "\x1b[1;32m[Subscription Mode]\x1b[0m"
+                                } else {
+                                    "\x1b[1;36m[Pay-As-You-Go Mode]\x1b[0m"
+                                };
                                 println!();
-                                println!("\x1b[1;32m✓\x1b[0m Login successful! Authenticated as \x1b[1;37m{}\x1b[0m", email);
-                                println!("\x1b[2;37mFusion API key saved to {}\x1b[0m", crate::config::Config::config_path().display());
+                                println!("\x1b[1;32m✓\x1b[0m Login successful! Authenticated as \x1b[1;37m{}\x1b[0m {}", email, mode_str);
+                                if is_cli_session {
+                                    println!("\x1b[2;37mInteractive CLI session active (covered by your subscription fair-use quota).\x1b[0m");
+                                } else {
+                                    println!("\x1b[2;37mAPI Key session active (pay-as-you-go token metering).\x1b[0m");
+                                }
+                                println!("\x1b[2;37mCredentials saved to {}\x1b[0m", crate::config::Config::config_path().display());
                                 println!();
                                 return;
                             }

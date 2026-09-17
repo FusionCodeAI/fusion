@@ -43,6 +43,8 @@ fn test_backend_usage_full_render() {
         cache_savings_usd_this_month: 0.6065,
         cache_savings_by_model: model_savings,
         is_payg: false,
+        auth_type: None,
+        mode: None,
     };
 
     let rendered = render_backend_usage_fx(&report);

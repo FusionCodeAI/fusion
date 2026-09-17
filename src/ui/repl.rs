@@ -73,8 +73,16 @@ pub fn format_tokens_compact(tokens: u64) -> String {
 /// Format raw model string into display label.
 pub fn format_model_label(model: &str) -> &str {
     match model {
-        "deepseek-ai/DeepSeek-V4-Flash-0731" | "flash" | "v4" => "DeepSeek V4 Flash",
-        "MiniMaxAI/MiniMax-M2.7" | "minimax" => "MiniMax M2.7",
+        "deepseek-v4-flash-0731" | "deepseek-ai/DeepSeek-V4-Flash-0731" | "flash" | "v4" => {
+            "DeepSeek 4 0731 Flash"
+        }
+        "deepseek-v4-flash-0731-fast" | "deepseek-ai/DeepSeek-V4-Flash-0731-Fast" => {
+            "DeepSeek 4 0731 Flash Fast"
+        }
+        "glm-5.3-flash" | "zai-org/GLM-5.3-Flash" | "thudm/glm-5.3-flash" | "glm" => {
+            "GLM 5.3 Flash"
+        }
+        "minimax-m2.7" | "MiniMaxAI/MiniMax-M2.7" | "minimax" => "MiniMax M2.7",
         other => {
             if let Some((_, name)) = other.split_once('/') {
                 name
