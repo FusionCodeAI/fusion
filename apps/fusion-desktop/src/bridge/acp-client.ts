@@ -162,6 +162,13 @@ interface PendingRequest {
 export class AcpClient {
   private options: AcpClientOptions;
   private child: ChildProcess | null = null;
+  get childProcess(): ChildProcess | null {
+    return this.child;
+  }
+
+  set childProcess(proc: ChildProcess | null) {
+    this.child = proc;
+  }
   private stdinStream: Writable | null = null;
   private stdoutStream: Readable | null = null;
   private streamsConnected = false;
@@ -205,7 +212,7 @@ export class AcpClient {
   }
 
   async spawn(workspaceDir?: string): Promise<boolean> {
-    const effectiveCwd = workspaceDir || this.options.workspaceDir || process.cwd();
+    const effectiveCwd = workspaceDir || this.options.workspaceDir;
     const binPath = resolveFusionBinary(this.options.binaryPath);
     if (!binPath) {
       this.emitError(new Error("Fusion binary not found"));
@@ -213,13 +220,13 @@ export class AcpClient {
     }
 
     const args = [...(this.options.args ?? ["--acp"])];
-    if (workspaceDir && !args.includes("--cwd")) {
-      args.push("--cwd", workspaceDir);
+    if (effectiveCwd && !args.includes("--cwd")) {
+      args.push("--cwd", effectiveCwd);
     }
 
     try {
       this.child = cpSpawn(binPath, args, {
-        cwd: effectiveCwd,
+        cwd: effectiveCwd || process.cwd(),
         env: { ...process.env, ...this.options.env },
         stdio: ["pipe", "pipe", "pipe"],
       });
@@ -341,9 +348,11 @@ export class AcpClient {
       return this.streamsConnected;
     }
     return (
-      this.child !== null &&
-      !this.child.killed &&
-      this.child.exitCode === null
+      this.childProcess !== null &&
+      !this.childProcess.killed &&
+      this.childProcess.exitCode === null &&
+      this.childProcess.signalCode === null &&
+      this.streamsConnected
     );
   }
 

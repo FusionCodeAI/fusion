@@ -1,4 +1,5 @@
 import { describe, expect, it, beforeEach, afterEach } from "bun:test";
+import type { ChildProcess } from "node:child_process";
 import { PassThrough } from "node:stream";
 import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -511,6 +512,79 @@ describe("ACP Client Protocol - Process Lifecycle", () => {
     expect(emittedError).not.toBeNull();
     if (emittedError) {
       expect((emittedError as Error).message).toContain("not found");
+    }
+  });
+
+  it("returns false from isAlive when child process has a signalCode", async () => {
+    const client = new AcpClient();
+    const mockStdin = new PassThrough();
+    const mockStdout = new PassThrough();
+    client.attachStreams(mockStdout, mockStdin);
+
+    // Access internals for unit-testing process signal lifecycle
+    interface ClientInternals {
+      customStreamsActive: boolean;
+      streamsConnected: boolean;
+      child: {
+        killed: boolean;
+        exitCode: number | null;
+        signalCode: NodeJS.Signals | null;
+      } | null;
+    }
+    const internals = client as unknown as ClientInternals;
+    internals.customStreamsActive = false;
+    internals.streamsConnected = true;
+
+    const mockProcess = {
+      killed: false,
+      exitCode: null,
+      signalCode: null as NodeJS.Signals | null,
+    };
+    internals.child = mockProcess;
+    expect(client.isAlive()).toBe(true);
+
+    mockProcess.signalCode = "SIGTERM";
+    expect(client.isAlive()).toBe(false);
+    await expect(client.sendRequest("test/ping")).rejects.toThrow("ACP client is not connected");
+
+    mockProcess.signalCode = "SIGKILL";
+    expect(client.isAlive()).toBe(false);
+
+    mockProcess.signalCode = null;
+    expect(client.isAlive()).toBe(true);
+  });
+
+  it("includes --cwd when workspaceDir is provided in AcpClientOptions", async () => {
+    const tempDir = mkdtempSync(join(tmpdir(), "fusion-acp-cwd-"));
+    const fakeBin = join(tempDir, "fake-fusion");
+    writeFileSync(fakeBin, "#!/bin/sh\nsleep 5\n", { mode: 0o755 });
+
+    try {
+      const workspaceDir = join(tempDir, "workspace");
+      mkdirSync(workspaceDir, { recursive: true });
+
+      const client = new AcpClient({
+        binaryPath: fakeBin,
+        workspaceDir,
+      });
+
+      const spawned = await client.spawn();
+      expect(spawned).toBe(true);
+      expect(client.childProcess).not.toBeNull();
+
+      const spawnArgs = client.childProcess?.spawnargs;
+      expect(spawnArgs).toContain("--cwd");
+      const cwdIndex = spawnArgs.indexOf("--cwd");
+      expect(spawnArgs[cwdIndex + 1]).toBe(workspaceDir);
+
+      client.kill();
+      expect(client.isAlive()).toBe(false);
+    } finally {
+      try {
+        rmSync(tempDir, { recursive: true, force: true });
+      } catch {
+        // ignore
+      }
     }
   });
 });
