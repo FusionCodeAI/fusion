@@ -1,5 +1,12 @@
 import { DEFAULT_FUSION_MODEL } from "../models";
-import type { ChatMessage } from "../types";
+import type { ChatMessage, TurnStep } from "../types";
+import {
+  isTauriEnvironment,
+  listFusionSessions,
+  loadFusionSession,
+  saveFusionSession,
+  deleteFusionSession,
+} from "../lib/fusion-ipc";
 
 export interface ChatSessionRecord {
   id: string;
@@ -114,10 +121,141 @@ export function saveSession(session: ChatSessionRecord): void {
   }
 
   saveAllSessions(updated);
+
+  // Background sync to native ~/.fusion/sessions/ if in Tauri
+  if (isTauriEnvironment()) {
+    persistSessionToNativeDisk(session).catch((e) => {
+      console.warn("[session-storage] Native disk persist failed:", e);
+    });
+  }
 }
 
 /**
- * Deletes a session by identifier.
+ * Serializes and writes session JSON directly to ~/.fusion/sessions/<id>.json.
+ */
+export async function persistSessionToNativeDisk(session: ChatSessionRecord): Promise<void> {
+  if (!isTauriEnvironment()) return;
+
+  const nativePayload = {
+    id: session.id,
+    created_at: new Date(session.createdAt).toISOString(),
+    updated_at: new Date(session.updatedAt).toISOString(),
+    active_model: session.model,
+    title: session.title,
+    messages: session.messages.map((m) => ({
+      role: m.role,
+      content: m.content,
+      thought: m.thought,
+      steps: m.steps,
+      diff_patch: m.diffPatch,
+    })),
+    token_stats: {
+      prompt_tokens: 0,
+      completion_tokens: 0,
+      total_tokens: 0,
+      cache_read_tokens: 0,
+      cache_write_tokens: 0,
+      total_turns: session.messages.filter((m) => m.role === "user").length,
+    },
+  };
+
+  await saveFusionSession(nativePayload);
+}
+
+/**
+ * Syncs the frontend session list with native ~/.fusion/sessions/*.json on disk.
+ */
+export async function syncNativeFusionSessions(
+  currentSessions: ChatSessionRecord[]
+): Promise<ChatSessionRecord[]> {
+  if (!isTauriEnvironment()) {
+    return currentSessions;
+  }
+
+  try {
+    const nativeList = await listFusionSessions();
+    if (!nativeList || nativeList.length === 0) {
+      return currentSessions;
+    }
+
+    const mergedMap = new Map<string, ChatSessionRecord>();
+
+    // 1. Add current sessions
+    for (const s of currentSessions) {
+      mergedMap.set(s.id, s);
+    }
+
+    // 2. Add or update native sessions
+    for (const n of nativeList) {
+      const existing = mergedMap.get(n.id);
+      const parsedUpdated = n.updated_at ? new Date(n.updated_at).getTime() : Date.now();
+      const parsedCreated = n.created_at ? new Date(n.created_at).getTime() : Date.now();
+
+      if (existing) {
+        mergedMap.set(n.id, {
+          ...existing,
+          title: n.title || existing.title,
+          updatedAt: Math.max(existing.updatedAt, isNaN(parsedUpdated) ? 0 : parsedUpdated),
+          model: n.model || existing.model,
+        });
+      } else {
+        mergedMap.set(n.id, {
+          id: n.id,
+          title: n.title || "General chat conversation",
+          createdAt: isNaN(parsedCreated) ? Date.now() : parsedCreated,
+          updatedAt: isNaN(parsedUpdated) ? Date.now() : parsedUpdated,
+          model: n.model || DEFAULT_FUSION_MODEL.id,
+          messages: [],
+        });
+      }
+    }
+
+    const result = Array.from(mergedMap.values());
+    result.sort((a, b) => b.updatedAt - a.updatedAt);
+    saveAllSessions(result);
+    return result;
+  } catch (err) {
+    console.warn("[session-storage] syncNativeFusionSessions failed:", err);
+    return currentSessions;
+  }
+}
+
+/**
+ * Loads full messages for a session from ~/.fusion/sessions/<id>.json if available.
+ */
+export async function loadFullNativeSessionMessages(id: string): Promise<ChatMessage[] | null> {
+  if (!isTauriEnvironment()) {
+    return null;
+  }
+
+  try {
+    const raw = await loadFusionSession(id);
+    if (!raw) return null;
+
+    const rawMessages = raw.messages;
+    if (!Array.isArray(rawMessages)) return [];
+
+    const parsedMessages: ChatMessage[] = rawMessages.map((m, idx) => {
+      const rec = m as Record<string, unknown>;
+      return {
+        id: typeof rec.id === "string" ? rec.id : `msg-${id}-${idx}`,
+        role: (rec.role === "user" ? "user" : "assistant") as "user" | "assistant",
+        content: typeof rec.content === "string" ? rec.content : "",
+        thought: typeof rec.thought === "string" ? rec.thought : undefined,
+        steps: Array.isArray(rec.steps) ? (rec.steps as unknown as TurnStep[]) : undefined,
+        timestamp: typeof rec.timestamp === "number" ? rec.timestamp : Date.now(),
+      };
+    });
+
+    return parsedMessages;
+  } catch (err) {
+    console.warn(`[session-storage] loadFullNativeSessionMessages failed for '${id}':`, err);
+    return null;
+  }
+}
+
+/**
+ * Deletes a session by identifier both locally and from ~/.fusion/sessions/ on disk.
  */
 export function deleteSessionFromStorage(sessionId: string): ChatSessionRecord[] {
   const current = loadAllSessions();
@@ -126,6 +264,13 @@ export function deleteSessionFromStorage(sessionId: string): ChatSessionRecord[]
   // Always retain at least one session
   const finalSessions = filtered.length > 0 ? filtered : [getInitialDefaultSession()];
   saveAllSessions(finalSessions);
+
+  if (isTauriEnvironment()) {
+    deleteFusionSession(sessionId).catch((err) => {
+      console.warn("[session-storage] deleteFusionSession failed:", err);
+    });
+  }
+
   return finalSessions;
 }
 
