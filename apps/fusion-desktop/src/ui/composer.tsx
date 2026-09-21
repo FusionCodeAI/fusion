@@ -40,12 +40,6 @@ export function Composer({
     }
   };
 
-  const handleInputFocus = () => {
-    if (isModelPickerOpen) {
-      setIsModelPickerOpen(false);
-    }
-  };
-
   const handleSelectModel = (model: FusionModel) => {
     onSelectModel?.(model.id);
     setIsModelPickerOpen(false);
@@ -69,7 +63,7 @@ export function Composer({
       <div
         style={{
           width: "100%",
-          maxWidth: 760,
+          maxWidth: 680,
           display: "flex",
           flexDirection: "column",
           gap: 6,
@@ -206,19 +200,28 @@ export function Composer({
             <svg source={icons.plus} style={{ width: 11, height: 11, color: "#71717a" }} />
           </div>
 
-          {/* Center: Input */}
-          <input
+          {/* Center: Textarea with native caret and proper line height */}
+          <textarea
             value={text}
             onChange={(e: { value?: string }) => handleTextChange(e.value ?? "")}
             onSubmit={handleSend}
             placeholder="Send follow-up"
+            minRows={1}
+            maxRows={6}
+            theme={{
+              caret: "#18181b",
+            }}
             style={{
               flexGrow: 1,
-              fontSize: 13,
+              fontSize: 14,
+              lineHeight: 22,
               color: "#18181b",
               backgroundColor: "transparent",
               borderWidth: 0,
-              padding: 0,
+              paddingTop: 4,
+              paddingBottom: 4,
+              paddingLeft: 2,
+              paddingRight: 2,
             }}
           />
 

@@ -36,7 +36,7 @@ export function ChatView({
         overflow: "hidden",
       }}
     >
-      {/* Top Navigation Header (No IDE stuff, only title and sidebar toggle) */}
+      {/* Top Header: Session Title on Left, Sidebar Toggle on Right */}
       <div
         style={{
           flexShrink: 0,
@@ -52,7 +52,6 @@ export function ChatView({
           backgroundColor: "#ffffff",
         }}
       >
-        {/* Title and Drawer Icon */}
         <div style={{ display: "flex", flexDirection: "row", alignItems: "center", gap: 8 }}>
           <text style={{ fontSize: 13, fontWeight: "500", color: "#18181b" }}>
             {sessionTitle || "General chat conversation"}
@@ -60,7 +59,6 @@ export function ChatView({
           <svg source={icons.fileDrawer} style={{ width: 13, height: 13, color: "#71717a" }} />
         </div>
 
-        {/* Right Header: Only the sidebar toggle icon */}
         <div
           role="button"
           onClick={onToggleSidebar}
@@ -77,7 +75,7 @@ export function ChatView({
         </div>
       </div>
 
-      {/* Main Conversation Stream (Scrollable, centered, NO horizontal overflow!) */}
+      {/* Main Conversation Stream (Scrolls smoothly inside bounds) */}
       <div
         style={{
           flexGrow: 1,
@@ -128,6 +126,13 @@ export function ChatView({
 
             // Assistant message
             const isExpanded = !!expandedThoughts[msg.id];
+            // Filter out transient placeholder steps like "Waiting for model response..." or "Thinking"
+            const visibleSteps = (msg.steps || []).filter(
+              (s) =>
+                !s.title.toLowerCase().includes("waiting") &&
+                !s.title.toLowerCase().includes("think")
+            );
+
             return (
               <div
                 key={msg.id}
@@ -138,8 +143,8 @@ export function ChatView({
                   gap: 8,
                 }}
               >
-                {/* Thought briefly indicator (collapsed by default, neat inline row) */}
-                {msg.thought ? (
+                {/* Clean Thought briefly row (collapsed by default, neat inline text) */}
+                {msg.thought && msg.thought.trim().length > 0 ? (
                   <div style={{ display: "flex", flexDirection: "column", alignSelf: "flex-start" }}>
                     <div
                       onClick={() => toggleThought(msg.id)}
@@ -149,6 +154,8 @@ export function ChatView({
                         alignItems: "center",
                         gap: 6,
                         cursor: "pointer",
+                        paddingTop: 2,
+                        paddingBottom: 2,
                       }}
                     >
                       <text style={{ fontSize: 13, color: "#8e8e93" }}>
@@ -168,7 +175,7 @@ export function ChatView({
                           paddingLeft: 12,
                           paddingTop: 4,
                           paddingBottom: 4,
-                          marginTop: 6,
+                          marginTop: 4,
                           width: "100%",
                           maxWidth: 660,
                         }}
@@ -188,10 +195,10 @@ export function ChatView({
                   </div>
                 ) : null}
 
-                {/* Tool execution steps if any */}
-                {msg.steps && msg.steps.length > 0 && (
+                {/* Visible tool steps (Only real tool actions, no empty waiting boxes!) */}
+                {visibleSteps.length > 0 && (
                   <div style={{ display: "flex", flexDirection: "column", gap: 4, alignSelf: "flex-start" }}>
-                    {msg.steps.map((step: TurnStep) => (
+                    {visibleSteps.map((step: TurnStep) => (
                       <div
                         key={step.id}
                         style={{
@@ -222,16 +229,22 @@ export function ChatView({
                 )}
 
                 {/* Assistant Markdown text */}
-                <div style={{ paddingTop: 2, paddingBottom: 2 }}>
-                  <markdown
-                    source={msg.content || (isGenerating ? "Thinking..." : "")}
-                    theme={{
-                      appearance: "light",
-                      accent: "#2563eb",
-                    }}
-                    style={{ color: "#18181b", fontSize: 14, lineHeight: 24 }}
-                  />
-                </div>
+                {msg.content ? (
+                  <div style={{ paddingTop: 2, paddingBottom: 2 }}>
+                    <markdown
+                      source={msg.content}
+                      theme={{
+                        appearance: "light",
+                        accent: "#2563eb",
+                      }}
+                      style={{ color: "#18181b", fontSize: 14, lineHeight: 24 }}
+                    />
+                  </div>
+                ) : isGenerating ? (
+                  <div style={{ paddingTop: 4, paddingBottom: 4 }}>
+                    <text style={{ fontSize: 13, color: "#8e8e93" }}>Thinking...</text>
+                  </div>
+                ) : null}
 
                 {/* Action Icons: Thumbs up, Thumbs down, Copy, Branch, Just now */}
                 <div

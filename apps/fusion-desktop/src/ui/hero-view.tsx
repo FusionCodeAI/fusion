@@ -29,6 +29,14 @@ export function HeroView({
     if (trimmed) {
       onSubmit(trimmed);
       setPrompt("");
+      setIsModelPickerOpen(false);
+    }
+  };
+
+  const handlePromptChange = (val: string) => {
+    setPrompt(val);
+    if (isModelPickerOpen) {
+      setIsModelPickerOpen(false);
     }
   };
 
@@ -166,28 +174,35 @@ export function HeroView({
             borderWidth: 1,
             borderColor: "#e5e5e8",
             borderRadius: 14,
-            paddingTop: 14,
+            paddingTop: 12,
             paddingBottom: 10,
-            paddingLeft: 16,
+            paddingLeft: 14,
             paddingRight: 14,
             display: "flex",
             flexDirection: "column",
           }}
         >
-          <input
+          <textarea
             value={prompt}
-            onChange={(e: { value?: string }) => setPrompt(e.value ?? "")}
+            onChange={(e: { value?: string }) => handlePromptChange(e.value ?? "")}
             onSubmit={handleSubmit}
             placeholder="Ask anything, @ to mention, / for actions"
+            minRows={1}
+            maxRows={6}
+            theme={{
+              caret: "#18181b",
+            }}
             style={{
-              minHeight: 44,
               width: "100%",
               fontSize: 14,
               lineHeight: 22,
               color: "#18181b",
               backgroundColor: "transparent",
               borderWidth: 0,
-              padding: 0,
+              paddingTop: 4,
+              paddingBottom: 4,
+              paddingLeft: 2,
+              paddingRight: 2,
             }}
           />
 

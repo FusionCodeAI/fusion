@@ -82,7 +82,7 @@ export function Sidebar({
         flexDirection: "column",
         justifyContent: "space-between",
         flexShrink: 0,
-        paddingTop: 52, // Clean clearance for native macOS traffic lights
+        paddingTop: 52, // Space for native macOS traffic lights
       }}
     >
       {/* Top Header & Navigation */}
@@ -212,7 +212,7 @@ export function Sidebar({
           </div>
         </div>
 
-        {/* Section: Projects (ONLY Projects - Repositories removed) */}
+        {/* Section: Projects (ONLY Projects - clean, no repositories) */}
         <div
           style={{
             display: "flex",
@@ -244,7 +244,7 @@ export function Sidebar({
             gap: 1,
           }}
         >
-          {/* Active Workspace / Project item */}
+          {/* Active Workspace / Project item (Clean single row, NO emoji, NO path overflow) */}
           <div
             testId="sidebar-workspace-chip"
             onClick={onSelectWorkspace}
@@ -262,7 +262,7 @@ export function Sidebar({
               hover: { backgroundColor: "#ececee" },
             }}
           >
-            <svg source={icons.folder} style={{ width: 13, height: 13, color: "#52525b" }} />
+            <svg source={icons.folder} style={{ width: 13, height: 13, color: "#52525b", flexShrink: 0 }} />
             <text
               testId="sidebar-workspace-folder"
               style={{
@@ -273,11 +273,6 @@ export function Sidebar({
             >
               {folderName}
             </text>
-            <div style={{ display: "none" }}>
-              <text testId="sidebar-workspace-path">
-                {`📁 ${truncatePath(workspaceDir, 28)}`}
-              </text>
-            </div>
           </div>
 
           {/* New Project Action */}
