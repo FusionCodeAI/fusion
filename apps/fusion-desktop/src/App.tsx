@@ -399,26 +399,24 @@ export function App({
     setIsGenerating(true);
 
     // If starting a fresh chat, update active session title
-    if (messages.length === 0) {
-      const newTitle = trimmed.length > 28 ? `${trimmed.slice(0, 28)}...` : trimmed;
-      setSessionTitle(newTitle);
-    }
     try {
       await bridge.prompt(trimmed, selectedModel);
       notifyDesktopEvent("taskCompletion", {
         title: "Task completed",
         body: `Finished turn in "${sessionTitle}"`,
+        force: true,
       });
     } catch (err) {
-      setIsGenerating(false);
       console.error("[App] prompt error:", err);
       notifyDesktopEvent("sessionError", {
         title: "Session error",
         body: err instanceof Error ? err.message : String(err),
+        force: true,
       });
+    } finally {
+      setIsGenerating(false);
     }
   };
-
   const handleCancel = async () => {
     if (!isGenerating) return;
     try {

@@ -685,12 +685,23 @@ async fn stream_fusion_acp(
     });
     stdin.write_all(format!("{}\n", prompt_req).as_bytes()).await.map_err(|e| e.to_string())?;
     stdin.flush().await.map_err(|e| e.to_string())?;
-
     let mut full_text = String::new();
 
-    while let Ok(Some(line)) = reader.next_line().await {
-        if let Ok(val) = serde_json::from_str::<Value>(&line) {
-            if val.get("id") == Some(&serde_json::json!(3)) {
+    while let Ok(Ok(Some(line))) = tokio::time::timeout(tokio::time::Duration::from_secs(45), reader.next_line()).await {
+        if line.contains("\"id\":3") || line.contains("\"id\": 3") {
+            break;
+        }
+
+        let line_to_parse = if let Some(idx) = line.find('{') {
+            &line[idx..]
+        } else {
+            continue;
+        };
+
+        if let Ok(val) = serde_json::from_str::<Value>(line_to_parse) {
+            if val.get("id") == Some(&serde_json::json!(3))
+                || val.get("result").and_then(|r| r.get("stopReason")).is_some()
+            {
                 break;
             }
 
