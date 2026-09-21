@@ -39,3 +39,9 @@ export type { ConnectModelBannerProps } from "./ConnectModelBanner";
 
 export { ClineHeroView } from "./ClineHeroView";
 export type { ClineHeroViewProps } from "./ClineHeroView";
+
+export { ClineAvatar, ClineRobotSvg } from "./ClineAvatar";
+export type { ClineAvatarProps, ClineRobotSvgProps } from "./ClineAvatar";
+
+export { ClineWatermark } from "./ClineWatermark";
+export type { ClineWatermarkProps } from "./ClineWatermark";

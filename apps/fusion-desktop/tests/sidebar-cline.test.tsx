@@ -13,7 +13,7 @@ describe("Sidebar Cline Layout", () => {
         onSelectSession={() => {}}
       />
     );
-    expect(html).toContain('data-testid="fusion-logo"');
+    expect(html).toContain('data-testid="cline-avatar"');
     expect(html).toContain("Session");
     expect(html).toContain("Schedule");
     expect(html).toContain("Customize");

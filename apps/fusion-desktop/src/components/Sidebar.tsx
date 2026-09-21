@@ -11,8 +11,7 @@ import {
   Settings,
   X,
 } from "lucide-react";
-import { FusionLogo } from "./FusionLogo";
-
+import { ClineAvatar } from "./ClineAvatar";
 export interface SidebarSessionItem {
   id: string;
   title: string;
@@ -112,11 +111,10 @@ export function Sidebar({
           className="h-10 pl-[78px] pr-3 flex items-center justify-between border-b border-zinc-200/60"
         >
           {/* Fusion Brand Logo */}
+          {/* Circular Animated Cline Mascot */}
           <div className="flex items-center">
-            <FusionLogo className="w-4 h-4 text-[#5100cd]" fill="#5100cd" />
+            <ClineAvatar className="w-5 h-5 cursor-pointer" />
           </div>
-
-          {/* Navigation Controls: Back, Forward, Search */}
           <div className="flex items-center gap-1 text-zinc-500">
             <button
               type="button"

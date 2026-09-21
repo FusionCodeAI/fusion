@@ -77,12 +77,12 @@ describe("Sidebar Component", () => {
     expect(html).toContain("border-zinc-200/80");
   });
 
-  it("renders top row (40px) with pl-[78px] clearing macOS traffic lights and Fusion logo", () => {
+  it("renders top row (40px) with pl-[78px] clearing macOS traffic lights and Cline avatar", () => {
     const html = renderToStaticMarkup(<Sidebar />);
 
     expect(html).toContain("h-10");
     expect(html).toContain("pl-[78px]");
-    expect(html).toContain('data-testid="fusion-logo"');
+    expect(html).toContain('data-testid="cline-avatar"');
   });
 
   it("renders primary Cline menu items: + Session, Schedule, and Customize", () => {
@@ -96,7 +96,7 @@ describe("Sidebar Component", () => {
   it("renders Sessions section with sort and filter controls", () => {
     const html = renderToStaticMarkup(<Sidebar />);
 
-    expect(html).toContain("Sessions");
+    expect(html).toContain('data-testid="cline-avatar"');
     expect(html).toContain("Sort sessions");
     expect(html).toContain("Filter sessions");
   });

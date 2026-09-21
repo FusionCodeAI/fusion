@@ -1,5 +1,5 @@
 import React from "react";
-import { FusionWatermark } from "./FusionWatermark";
+import { ClineWatermark } from "./ClineWatermark";
 import { WorkspacePill } from "./WorkspacePill";
 import { ConnectModelBanner } from "./ConnectModelBanner";
 import { Composer } from "./Composer";
@@ -38,7 +38,7 @@ export function ClineHeroView({
     >
       {/* Background Watermark */}
       <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-        <FusionWatermark className="w-56 h-56 -mt-16" />
+        <ClineWatermark className="w-56 h-56 -mt-16" />
       </div>
 
       {/* Main Foreground Container */}
