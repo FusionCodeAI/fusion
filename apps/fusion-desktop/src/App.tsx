@@ -12,8 +12,9 @@ import { MarkdownRenderer } from "./components/MarkdownRenderer";
 import { CustomizeView } from "./components/CustomizeView";
 import { SettingsView } from "./components/SettingsView";
 import { SessionCommandBar } from "./components/SessionCommandBar";
+import { PushToast, type PushToastMessage } from "./components/PushToast";
 import { AgentBridge } from "./lib/agent-bridge";
-import { notifyDesktopEvent } from "./lib/desktop-notifications";
+import { notifyDesktopEvent, subscribeToPushToasts } from "./lib/desktop-notifications";
 import { pickProjectFolder, checkAuthStatus, startFusionLogin } from "./lib/fusion-ipc";
 import {
   loadAllSessions,
@@ -87,6 +88,18 @@ export function App({
 }: AppProps) {
   const [isSidebarOpen, setIsSidebarOpen] = useState(initialSidebarOpen);
   const [currentView, setCurrentView] = useState<"chat" | "customize" | "settings">("chat");
+  const [toasts, setToasts] = useState<PushToastMessage[]>([]);
+
+  useEffect(() => {
+    return subscribeToPushToasts((newToast) => {
+      setToasts((prev) => [newToast, ...prev.slice(0, 4)]);
+    });
+  }, []);
+
+  const handleDismissToast = (id: string) => {
+    setToasts((prev) => prev.filter((t) => t.id !== id));
+  };
+
   const [settingsSection, setSettingsSection] = useState<"general" | "api" | "account">("general");
   const [isCommandBarOpen, setIsCommandBarOpen] = useState(false);
 
@@ -625,6 +638,9 @@ export function App({
           setCurrentView("chat");
         }}
       />
+
+      {/* Floating Push Toast Banners */}
+      <PushToast toasts={toasts} onDismiss={handleDismissToast} />
     </div>
   );
 }
