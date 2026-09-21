@@ -10,9 +10,9 @@ import { Composer } from "./components/Composer";
 import { ClineAvatar } from "./components/ClineAvatar";
 import { MarkdownRenderer } from "./components/MarkdownRenderer";
 import { CustomizeView } from "./components/CustomizeView";
-import { NotificationModal } from "./components/NotificationModal";
+import { SettingsView } from "./components/SettingsView";
 import { AgentBridge } from "./lib/agent-bridge";
-import { pickProjectFolder } from "./lib/fusion-ipc";
+import { pickProjectFolder, checkAuthStatus, startFusionLogin } from "./lib/fusion-ipc";
 import {
   loadAllSessions,
   generateSessionId,
@@ -72,6 +72,7 @@ export interface AppProps {
   initialSidebarOpen?: boolean;
   initialModel?: string;
   initialSessions?: SidebarSessionItem[];
+  initialIsSignedIn?: boolean;
 }
 
 export function App({
@@ -80,21 +81,32 @@ export function App({
   initialSidebarOpen = true,
   initialModel = DEFAULT_FUSION_MODEL.id,
   initialSessions,
+  initialIsSignedIn,
 }: AppProps) {
   const [isSidebarOpen, setIsSidebarOpen] = useState(initialSidebarOpen);
-  const [currentView, setCurrentView] = useState<"chat" | "customize">("chat");
+  const [currentView, setCurrentView] = useState<"chat" | "customize" | "settings">("chat");
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
   const [isSignedIn, setIsSignedIn] = useState<boolean>(() => {
+    if (typeof initialIsSignedIn === "boolean") return initialIsSignedIn;
     if (typeof window !== "undefined" && window.localStorage) {
-      return window.localStorage.getItem("fusion_desktop_is_signed_in") === "true";
+      const stored = window.localStorage.getItem("fusion_desktop_is_signed_in");
+      if (stored !== null) return stored === "true";
     }
-    return false;
+    return true;
   });
 
-  const handleSignIn = () => {
-    setIsSignedIn(true);
+  useEffect(() => {
+    if (typeof initialIsSignedIn === "boolean") return;
+    checkAuthStatus().then((status) => {
+      setIsSignedIn(status.is_signed_in);
+    });
+  }, [initialIsSignedIn]);
+
+  const handleSignIn = async () => {
+    const res = await startFusionLogin();
+    setIsSignedIn(res.is_signed_in);
     if (typeof window !== "undefined" && window.localStorage) {
-      window.localStorage.setItem("fusion_desktop_is_signed_in", "true");
+      window.localStorage.setItem("fusion_desktop_is_signed_in", String(res.is_signed_in));
     }
   };
 
@@ -443,7 +455,7 @@ export function App({
           onNewChat={handleNewChat}
           onSelectSession={handleSelectSession}
           onCustomize={() => setCurrentView("customize")}
-          onOpenSettings={() => setIsNotificationsOpen(true)}
+          onOpenSettings={() => setCurrentView("settings")}
           onToggleSidebar={() => setIsSidebarOpen(false)}
         />
       )}
@@ -454,12 +466,23 @@ export function App({
             onClose={() => setCurrentView("chat")}
             onOpenMarketplace={() => {}}
           />
+        ) : currentView === "settings" ? (
+          <SettingsView
+            onClose={() => setCurrentView("chat")}
+            onSignOut={() => {
+              setIsSignedIn(false);
+              if (typeof window !== "undefined" && window.localStorage) {
+                window.localStorage.setItem("fusion_desktop_is_signed_in", "false");
+              }
+              setCurrentView("chat");
+            }}
+          />
         ) : (
           <>
             {/* TopHeader: 40px height, aligned with macOS traffic lights and sidebar */}
             <TopHeader
               title={sessionTitle}
-              onMore={() => setIsNotificationsOpen(true)}
+              onMore={() => setCurrentView("settings")}
               onToggleSidebar={() => setIsSidebarOpen((prev) => !prev)}
             />
 
@@ -539,10 +562,6 @@ export function App({
         )}
       </main>
 
-      <NotificationModal
-        isOpen={isNotificationsOpen}
-        onClose={() => setIsNotificationsOpen(false)}
-      />
     </div>
   );
 }

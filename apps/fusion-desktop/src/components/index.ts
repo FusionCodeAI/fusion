@@ -53,3 +53,6 @@ export type { NotificationModalProps, NotificationSettings } from "./Notificatio
 
 export { CustomizeView } from "./CustomizeView";
 export type { CustomizeViewProps } from "./CustomizeView";
+
+export { SettingsView } from "./SettingsView";
+export type { SettingsViewProps, SettingsTab } from "./SettingsView";

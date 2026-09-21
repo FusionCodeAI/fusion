@@ -173,6 +173,104 @@ async fn pick_project_folder() -> Result<Option<String>, String> {
     }
 }
 
+fn fusion_dir() -> PathBuf {
+    if let Ok(home) = std::env::var("HOME") {
+        return PathBuf::from(home).join(".fusion");
+    }
+    if let Ok(userprofile) = std::env::var("USERPROFILE") {
+        return PathBuf::from(userprofile).join(".fusion");
+    }
+    PathBuf::from(".fusion")
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AuthStatus {
+    pub is_signed_in: bool,
+    pub email: Option<String>,
+    pub provider: Option<String>,
+}
+
+#[tauri::command]
+fn check_auth_status() -> AuthStatus {
+    let dir = fusion_dir();
+
+    // 1. Check ~/.fusion/config.json
+    let config_path = dir.join("config.json");
+    if config_path.exists() {
+        if let Ok(content) = fs::read_to_string(&config_path) {
+            if let Ok(val) = serde_json::from_str::<Value>(&content) {
+                if let Some(key) = val.get("fusion_api_key").and_then(|k| k.as_str()) {
+                    if !key.trim().is_empty() {
+                        return AuthStatus {
+                            is_signed_in: true,
+                            email: val.get("email").and_then(|e| e.as_str()).map(|s| s.to_string()),
+                            provider: Some("fusion".to_string()),
+                        };
+                    }
+                }
+                if let Some(key) = val.get("anthropic_api_key").and_then(|k| k.as_str()) {
+                    if !key.trim().is_empty() {
+                        return AuthStatus {
+                            is_signed_in: true,
+                            email: None,
+                            provider: Some("anthropic".to_string()),
+                        };
+                    }
+                }
+            }
+        }
+    }
+
+    // 2. Check ~/.fusion/auth.json
+    let auth_path = dir.join("auth.json");
+    if auth_path.exists() {
+        if let Ok(content) = fs::read_to_string(&auth_path) {
+            if let Ok(val) = serde_json::from_str::<Value>(&content) {
+                if let Some(obj) = val.as_object() {
+                    if !obj.is_empty() {
+                        return AuthStatus {
+                            is_signed_in: true,
+                            email: None,
+                            provider: Some("fusion".to_string()),
+                        };
+                    }
+                }
+            }
+        }
+    }
+
+    // 3. Check environment variables
+    for env_key in &["FUSION_API_KEY", "ANTHROPIC_API_KEY", "OPENAI_API_KEY", "XAI_API_KEY", "DEEPSEEK_API_KEY"] {
+        if let Ok(val) = std::env::var(env_key) {
+            if !val.trim().is_empty() {
+                return AuthStatus {
+                    is_signed_in: true,
+                    email: None,
+                    provider: Some(env_key.to_lowercase()),
+                };
+            }
+        }
+    }
+
+    AuthStatus {
+        is_signed_in: false,
+        email: None,
+        provider: None,
+    }
+}
+
+#[tauri::command]
+async fn start_fusion_login() -> Result<AuthStatus, String> {
+    let bin = find_fusion_binary().unwrap_or_else(|_| PathBuf::from("fusion"));
+    let mut child = tokio::process::Command::new(bin)
+        .arg("login")
+        .spawn()
+        .map_err(|e| format!("Failed to run fusion login: {}", e))?;
+
+    let _ = child.wait().await;
+    Ok(check_auth_status())
+}
+
 fn find_fusion_binary() -> Result<PathBuf, String> {
     if let Ok(custom) = std::env::var("FUSION_BINARY_PATH") {
         let p = PathBuf::from(custom);
@@ -470,6 +568,8 @@ fn main() {
             execute_fusion_turn,
             stream_fusion_acp,
             pick_project_folder,
+            check_auth_status,
+            start_fusion_login,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

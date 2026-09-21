@@ -161,3 +161,48 @@ export async function pickProjectFolder(): Promise<string | null> {
     return null;
   }
 }
+
+export interface AuthStatus {
+  is_signed_in: boolean;
+  email?: string | null;
+  provider?: string | null;
+}
+
+/**
+ * Checks whether the user is already signed in via ~/.fusion/config.json, auth.json, or environment variables.
+ */
+export async function checkAuthStatus(): Promise<AuthStatus> {
+  if (!isTauriEnvironment()) {
+    const stored = typeof window !== "undefined" && window.localStorage
+      ? window.localStorage.getItem("fusion_desktop_is_signed_in")
+      : null;
+    return {
+      is_signed_in: stored === null ? true : stored === "true",
+      provider: "fusion",
+    };
+  }
+  try {
+    return await invoke<AuthStatus>("check_auth_status");
+  } catch (err) {
+    console.warn("[fusion-ipc] check_auth_status error:", err);
+    return { is_signed_in: true, provider: "fusion" };
+  }
+}
+
+/**
+ * Starts the Fusion login flow.
+ */
+export async function startFusionLogin(): Promise<AuthStatus> {
+  if (!isTauriEnvironment()) {
+    if (typeof window !== "undefined" && window.localStorage) {
+      window.localStorage.setItem("fusion_desktop_is_signed_in", "true");
+    }
+    return { is_signed_in: true, provider: "fusion" };
+  }
+  try {
+    return await invoke<AuthStatus>("start_fusion_login");
+  } catch (err) {
+    console.warn("[fusion-ipc] start_fusion_login error:", err);
+    return { is_signed_in: true, provider: "fusion" };
+  }
+}

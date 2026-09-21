@@ -156,7 +156,7 @@ describe("App Shell Component", () => {
     expect(html).toContain("shrink-0 p-4 flex flex-col items-center bg-white border-t border-zinc-100");
   });
   it("renders empty state with ClineHeroView and initial prompt composer", () => {
-    const html = renderToString(<App />);
+    const html = renderToString(<App initialIsSignedIn={false} />);
 
     expect(html).toContain("data-testid=\"cline-hero-view\"");
     expect(html).toContain("Sign in to start building");
