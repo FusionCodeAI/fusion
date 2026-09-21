@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from "react";
+import React, { useState, useRef, useEffect, useMemo } from "react";
 import {
   Paperclip,
   ChevronDown,
@@ -6,9 +6,15 @@ import {
   ArrowUp,
   Square,
   Check,
-  Zap,
+  Search,
+  Plus,
 } from "lucide-react";
-import { FUSION_MODELS, DEFAULT_FUSION_MODEL } from "../models";
+import {
+  getAllAvailableModels,
+  getFusionModel,
+  addCustomModel,
+  type FusionModel,
+} from "../models";
 
 export interface ComposerProps {
   onSend: (text: string) => void;
@@ -34,7 +40,6 @@ export function Composer({
   className = "",
   placeholder = "Ask to make changes, @mention files, reference #PRs, or run /commands.",
   autoFocus = false,
-  billingProfile = "Fusion Usage-Billing",
   effort: propEffort = "Low",
   onSelectEffort,
   onAttachFile,
@@ -44,6 +49,10 @@ export function Composer({
   const [isEffortMenuOpen, setIsEffortMenuOpen] = useState(false);
   const [mode, setMode] = useState<"plan" | "act">("act");
   const [effort, setEffort] = useState<"Low" | "Medium" | "High">(propEffort);
+  const [modelSearch, setModelSearch] = useState("");
+  const [isCustomEntryOpen, setIsCustomEntryOpen] = useState(false);
+  const [customModelInput, setCustomModelInput] = useState("");
+  const [availableModels, setAvailableModels] = useState<FusionModel[]>(() => getAllAvailableModels());
 
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const modelMenuRef = useRef<HTMLDivElement>(null);
@@ -51,8 +60,30 @@ export function Composer({
   const effortMenuRef = useRef<HTMLDivElement>(null);
   const effortButtonRef = useRef<HTMLButtonElement>(null);
 
-  const currentModel =
-    FUSION_MODELS.find((m) => m.id === selectedModel) ?? DEFAULT_FUSION_MODEL;
+  const currentModel = getFusionModel(selectedModel);
+
+  const filteredModels = useMemo(() => {
+    if (!modelSearch.trim()) return availableModels;
+    const q = modelSearch.toLowerCase().trim();
+    return availableModels.filter(
+      (m) =>
+        m.name.toLowerCase().includes(q) ||
+        m.id.toLowerCase().includes(q) ||
+        m.provider.toLowerCase().includes(q) ||
+        m.badge.toLowerCase().includes(q)
+    );
+  }, [availableModels, modelSearch]);
+
+  const handleAddCustomModel = () => {
+    const trimmed = customModelInput.trim();
+    if (!trimmed) return;
+    const created = addCustomModel(trimmed);
+    setAvailableModels(getAllAvailableModels());
+    onSelectModel?.(created.id);
+    setCustomModelInput("");
+    setIsCustomEntryOpen(false);
+    setIsModelMenuOpen(false);
+  };
 
   // Auto-resize textarea height
   useEffect(() => {
@@ -176,7 +207,7 @@ export function Composer({
         </div>
       </div>
 
-      {/* Lower Toolbar: Paperclip | Billing profile | Model Selector | Effort */}
+      {/* Lower Toolbar: Paperclip | Mode Switcher | Model Selector | Effort */}
       <div className="border-t border-zinc-100 px-3 py-1.5 flex items-center justify-between text-xs text-zinc-600 select-none">
         <div className="flex items-center gap-2 relative">
           {/* Paperclip */}
@@ -221,6 +252,8 @@ export function Composer({
           </div>
 
           <span className="text-zinc-200">|</span>
+
+          {/* Model Selector Dropdown with Search & Custom Model ID */}
           <div className="relative">
             <button
               ref={modelButtonRef}
@@ -239,52 +272,128 @@ export function Composer({
               <div
                 ref={modelMenuRef}
                 data-testid="composer-model-menu"
-                className="absolute bottom-full left-0 mb-2 w-72 bg-white rounded-xl shadow-lg border border-zinc-200/90 py-1.5 z-50 animate-in fade-in zoom-in-95 duration-100"
+                className="absolute bottom-full left-0 mb-2 w-80 bg-white rounded-xl shadow-xl border border-zinc-200/90 py-1.5 z-50 animate-in fade-in zoom-in-95 duration-100 flex flex-col"
                 role="listbox"
               >
-                <div className="px-3 py-1 text-[10px] font-semibold text-zinc-400 uppercase tracking-wider">
-                  Fusion Models
+                {/* Search Header matching Cline ModelPicker */}
+                <div className="px-2.5 pt-1 pb-2 border-b border-zinc-100">
+                  <div className="flex items-center gap-1.5 px-2.5 py-1 bg-zinc-50 border border-zinc-200/80 rounded-lg">
+                    <Search className="w-3.5 h-3.5 text-zinc-400 shrink-0" />
+                    <input
+                      type="text"
+                      data-testid="composer-model-search"
+                      placeholder="Search models or providers..."
+                      value={modelSearch}
+                      onChange={(e) => setModelSearch(e.target.value)}
+                      className="w-full bg-transparent text-xs text-zinc-800 placeholder-zinc-400 outline-none"
+                      autoFocus
+                    />
+                  </div>
                 </div>
-                {FUSION_MODELS.map((model) => {
-                  const isSelected = model.id === currentModel.id;
-                  return (
-                    <button
-                      key={model.id}
-                      type="button"
-                      data-testid={`composer-model-option-${model.id}`}
-                      onClick={() => {
-                        onSelectModel?.(model.id);
-                        setIsModelMenuOpen(false);
-                      }}
-                      className={`w-full px-3 py-2 text-left flex items-start justify-between hover:bg-zinc-50 transition-colors cursor-pointer ${
-                        isSelected ? "bg-zinc-50" : ""
-                      }`}
-                      role="option"
-                      aria-selected={isSelected}
-                    >
-                      <div className="min-w-0 pr-2">
-                        <div className="flex items-center gap-1.5">
-                          <span className="text-xs font-medium text-zinc-900 truncate">
-                            {model.name}
-                          </span>
-                          {model.badge && (
-                            <span className="text-[10px] px-1.5 py-0.2 rounded bg-zinc-100 text-zinc-600 font-normal">
-                              {model.badge}
-                            </span>
-                          )}
-                        </div>
-                        {model.description && (
-                          <div className="text-[11px] text-zinc-500 mt-0.5 truncate">
-                            {model.description}
+
+                {/* Scrollable Model List */}
+                <div className="max-h-60 overflow-y-auto py-1">
+                  {filteredModels.length === 0 ? (
+                    <div className="px-3 py-3 text-center text-xs text-zinc-400">
+                      No matching models found.
+                    </div>
+                  ) : (
+                    filteredModels.map((model) => {
+                      const isSelected = model.id === currentModel.id;
+                      return (
+                        <button
+                          key={model.id}
+                          type="button"
+                          data-testid={`composer-model-option-${model.id}`}
+                          onClick={() => {
+                            onSelectModel?.(model.id);
+                            setIsModelMenuOpen(false);
+                          }}
+                          className={`w-full px-3 py-2 text-left flex items-start justify-between hover:bg-zinc-50 transition-colors cursor-pointer ${
+                            isSelected ? "bg-zinc-50/80" : ""
+                          }`}
+                          role="option"
+                          aria-selected={isSelected}
+                        >
+                          <div className="min-w-0 pr-2">
+                            <div className="flex items-center gap-1.5 flex-wrap">
+                              <span className="text-xs font-medium text-zinc-900 truncate">
+                                {model.name}
+                              </span>
+                              {model.badge && (
+                                <span className="text-[10px] px-1.5 py-0.2 rounded bg-zinc-100 text-zinc-600 font-normal">
+                                  {model.badge}
+                                </span>
+                              )}
+                              <span className="text-[10px] px-1.5 py-0.2 rounded uppercase tracking-wider text-zinc-400 font-mono">
+                                {model.provider}
+                              </span>
+                            </div>
+                            {model.description && (
+                              <div className="text-[11px] text-zinc-500 mt-0.5 truncate">
+                                {model.description}
+                              </div>
+                            )}
                           </div>
-                        )}
+                          {isSelected && (
+                            <Check className="w-3.5 h-3.5 text-[#5100cd] shrink-0 mt-0.5" />
+                          )}
+                        </button>
+                      );
+                    })
+                  )}
+                </div>
+
+                {/* Custom Model ID Entry matching Cline ModelPickerWithManualEntry */}
+                <div className="border-t border-zinc-100 px-2.5 pt-2 pb-1">
+                  {isCustomEntryOpen ? (
+                    <div className="space-y-1.5">
+                      <input
+                        type="text"
+                        data-testid="composer-custom-model-input"
+                        placeholder="e.g. meta-llama/llama-3.3-70b-instruct"
+                        value={customModelInput}
+                        onChange={(e) => setCustomModelInput(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter") {
+                            e.preventDefault();
+                            handleAddCustomModel();
+                          }
+                        }}
+                        className="w-full px-2 py-1 text-xs border border-zinc-200 rounded-lg outline-none focus:border-purple-400"
+                        autoFocus
+                      />
+                      <div className="flex items-center justify-end gap-1.5">
+                        <button
+                          type="button"
+                          onClick={() => setIsCustomEntryOpen(false)}
+                          className="px-2 py-0.5 text-xs text-zinc-500 hover:text-zinc-800 cursor-pointer"
+                        >
+                          Cancel
+                        </button>
+                        <button
+                          type="button"
+                          data-testid="composer-custom-model-submit"
+                          onClick={handleAddCustomModel}
+                          disabled={!customModelInput.trim()}
+                          className="px-2.5 py-0.5 text-xs font-medium bg-[#5100cd] hover:bg-[#4300a8] text-white rounded-md transition-colors disabled:opacity-50 cursor-pointer"
+                        >
+                          Add & Select
+                        </button>
                       </div>
-                      {isSelected && (
-                        <Check className="w-3.5 h-3.5 text-[#5100cd] shrink-0 mt-0.5" />
-                      )}
+                    </div>
+                  ) : (
+                    <button
+                      type="button"
+                      data-testid="composer-custom-model-btn"
+                      onClick={() => setIsCustomEntryOpen(true)}
+                      className="w-full py-1 text-left flex items-center gap-1.5 text-xs text-[#5100cd] hover:text-[#4300a8] font-medium cursor-pointer"
+                    >
+                      <Plus className="w-3.5 h-3.5" />
+                      <span>Use custom model ID...</span>
                     </button>
-                  );
-                })}
+                  )}
+                </div>
               </div>
             )}
           </div>
