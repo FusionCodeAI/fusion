@@ -164,6 +164,7 @@ export async function pickProjectFolder(): Promise<string | null> {
 
 export interface AuthStatus {
   is_signed_in: boolean;
+  name?: string | null;
   email?: string | null;
   provider?: string | null;
 }
@@ -178,6 +179,8 @@ export async function checkAuthStatus(): Promise<AuthStatus> {
       : null;
     return {
       is_signed_in: stored === null ? true : stored === "true",
+      name: "Aung Myat Moe",
+      email: "aungmyatmoe834@gmail.com",
       provider: "fusion",
     };
   }

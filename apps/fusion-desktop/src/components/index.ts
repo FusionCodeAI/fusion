@@ -55,4 +55,4 @@ export { CustomizeView } from "./CustomizeView";
 export type { CustomizeViewProps } from "./CustomizeView";
 
 export { SettingsView } from "./SettingsView";
-export type { SettingsViewProps, SettingsTab } from "./SettingsView";
+export type { SettingsViewProps, SettingsSectionId } from "./SettingsView";

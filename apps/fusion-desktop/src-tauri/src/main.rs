@@ -186,6 +186,7 @@ fn fusion_dir() -> PathBuf {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AuthStatus {
     pub is_signed_in: bool,
+    pub name: Option<String>,
     pub email: Option<String>,
     pub provider: Option<String>,
 }
@@ -203,6 +204,7 @@ fn check_auth_status() -> AuthStatus {
                     if !key.trim().is_empty() {
                         return AuthStatus {
                             is_signed_in: true,
+                            name: val.get("name").and_then(|n| n.as_str()).map(|s| s.to_string()),
                             email: val.get("email").and_then(|e| e.as_str()).map(|s| s.to_string()),
                             provider: Some("fusion".to_string()),
                         };
@@ -212,10 +214,10 @@ fn check_auth_status() -> AuthStatus {
                     if !key.trim().is_empty() {
                         return AuthStatus {
                             is_signed_in: true,
+                            name: None,
                             email: None,
                             provider: Some("anthropic".to_string()),
                         };
-                    }
                 }
             }
         }
@@ -227,9 +229,9 @@ fn check_auth_status() -> AuthStatus {
         if let Ok(content) = fs::read_to_string(&auth_path) {
             if let Ok(val) = serde_json::from_str::<Value>(&content) {
                 if let Some(obj) = val.as_object() {
-                    if !obj.is_empty() {
                         return AuthStatus {
                             is_signed_in: true,
+                            name: None,
                             email: None,
                             provider: Some("fusion".to_string()),
                         };
@@ -245,6 +247,7 @@ fn check_auth_status() -> AuthStatus {
             if !val.trim().is_empty() {
                 return AuthStatus {
                     is_signed_in: true,
+                    name: None,
                     email: None,
                     provider: Some(env_key.to_lowercase()),
                 };
@@ -254,6 +257,7 @@ fn check_auth_status() -> AuthStatus {
 
     AuthStatus {
         is_signed_in: false,
+        name: None,
         email: None,
         provider: None,
     }

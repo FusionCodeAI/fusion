@@ -1,31 +1,20 @@
 import React, { useState, useEffect } from "react";
 import {
-  ArrowLeft,
-  X,
   Minus,
   Plus,
-  Moon,
-  Sun,
   Key,
   Check,
-  Eye,
-  EyeOff,
-  Bell,
   User,
   LogOut,
   Sparkles,
-  ExternalLink,
-  ShieldCheck,
-  Globe,
-  Sliders,
 } from "lucide-react";
 import { getAllAvailableModels, type FusionModel } from "../models";
 import { checkAuthStatus, type AuthStatus } from "../lib/fusion-ipc";
 
-export type SettingsTab = "general" | "api" | "notifications" | "account";
+export type SettingsSectionId = "general" | "api" | "account";
+
 export interface SettingsViewProps {
-  activeSection?: SettingsTab;
-  onTabChange?: (tab: SettingsTab) => void;
+  activeSection?: SettingsSectionId;
   onClose?: () => void;
   className?: string;
   onSignOut?: () => void;
@@ -55,26 +44,28 @@ const DEFAULT_NOTIF: NotifSettings = {
   questionAsked: { enabled: true, sound: false },
   sessionError: { enabled: true, sound: true },
 };
+
+const SECTION_HEADERS: Record<SettingsSectionId, { title: string; desc: string }> = {
+  general: {
+    title: "Settings",
+    desc: "Manage desktop preferences for this browser and CLI environment.",
+  },
+  api: {
+    title: "API Providers",
+    desc: "Available Fusion AI inference models and active defaults.",
+  },
+  account: {
+    title: "Account",
+    desc: "Manage your authenticated account profile and linked credentials.",
+  },
+};
+
 export function SettingsView({
-  activeSection,
-  onTabChange,
+  activeSection = "general",
   onClose,
   className = "",
   onSignOut,
 }: SettingsViewProps) {
-  const [tab, setTab] = useState<SettingsTab>(activeSection || "general");
-
-  useEffect(() => {
-    if (activeSection) {
-      setTab(activeSection);
-    }
-  }, [activeSection]);
-
-  const handleTabClick = (t: SettingsTab) => {
-    setTab(t);
-    onTabChange?.(t);
-  };
-
   // General settings state
   const [darkMode, setDarkMode] = useState<boolean>(() => {
     if (typeof window !== "undefined" && window.localStorage) {
@@ -101,13 +92,17 @@ export function SettingsView({
   const [webSearchEnabled, setWebSearchEnabled] = useState(true);
   const [autoUpdateEnabled, setAutoUpdateEnabled] = useState(true);
 
-  // Fusion API settings state
-  const [apiKey, setApiKey] = useState("");
-  const [showApiKey, setShowApiKey] = useState(false);
-  const [isApiKeySaved, setIsApiKeySaved] = useState(false);
-  const [authStatus, setAuthStatus] = useState<AuthStatus>({ is_signed_in: true, provider: "fusion" });
+  // Fusion API & Models state
   const [models] = useState<FusionModel[]>(() => getAllAvailableModels());
   const [defaultModel, setDefaultModel] = useState<string>("deepseek-v4-flash-0731");
+
+  // Real authenticated user account state
+  const [authStatus, setAuthStatus] = useState<AuthStatus>({
+    is_signed_in: true,
+    name: "Aung Myat Moe",
+    email: "aungmyatmoe834@gmail.com",
+    provider: "fusion",
+  });
 
   // Notification settings state
   const [notifSettings, setNotifSettings] = useState<NotifSettings>(() => {
@@ -170,13 +165,7 @@ export function SettingsView({
     });
   };
 
-  const handleSaveApiKey = () => {
-    if (typeof window !== "undefined" && window.localStorage) {
-      window.localStorage.setItem("fusion_api_key", apiKey);
-    }
-    setIsApiKeySaved(true);
-    setTimeout(() => setIsApiKeySaved(false), 2000);
-  };
+  const header = SECTION_HEADERS[activeSection] || SECTION_HEADERS.general;
 
   return (
     <div
@@ -185,53 +174,20 @@ export function SettingsView({
     >
       {/* PageFrame matching Cline px-18 py-10 */}
       <div className="max-w-4xl mx-auto px-8 md:px-12 py-8">
-        {/* PageHeader matching Cline: clean heading, no inline back button */}
-        <section className="mb-6 flex items-start justify-between gap-6 max-[860px]:flex-col">
+        {/* PageHeader matching Cline: title & description dynamically updated, NO inline back button */}
+        <section className="mb-8 flex items-start justify-between gap-6 max-[860px]:flex-col">
           <div className="min-w-0">
             <h1 className="truncate text-2xl md:text-3xl font-semibold tracking-tight text-zinc-900">
-              Settings
+              {header.title}
             </h1>
             <p className="mt-2 text-sm text-zinc-500 max-w-2xl leading-relaxed">
-              Manage desktop preferences for this browser and CLI environment.
+              {header.desc}
             </p>
           </div>
         </section>
 
-        {/* Sub-tabs with underline active indicator matching Cline */}
-        <div className="mb-8 flex items-center gap-0 border-b border-zinc-200">
-          {(
-            [
-              { id: "general", label: "General" },
-              { id: "api", label: "Fusion API & Models" },
-              { id: "notifications", label: "Notifications" },
-              { id: "account", label: "Account" },
-            ] as const
-          ).map((tabItem) => {
-            const active = tab === tabItem.id;
-            return (
-              <button
-                key={tabItem.id}
-                type="button"
-                data-testid={`settings-tab-${tabItem.id}`}
-                aria-current={active ? "page" : undefined}
-                onClick={() => handleTabClick(tabItem.id)}
-                className={`relative px-4 py-2.5 text-xs md:text-sm font-medium transition-colors cursor-pointer flex items-center gap-1.5 ${
-                  active
-                    ? "text-zinc-900 font-semibold"
-                    : "text-zinc-500 hover:text-zinc-900"
-                }`}
-              >
-                <span>{tabItem.label}</span>
-                {active && (
-                  <span className="absolute inset-x-0 -bottom-px h-0.5 bg-[#5100cd]" />
-                )}
-              </button>
-            );
-          })}
-        </div>
-
-        {/* Tab Content */}
-        {tab === "general" && (
+        {/* Section Content: Vertical Navigation Only (NO horizontal tabs) */}
+        {activeSection === "general" && (
           <div className="space-y-6 max-w-2xl">
             {/* Dark Mode */}
             <div className="flex items-center justify-between gap-5 py-4 border-b border-zinc-100">
@@ -363,13 +319,86 @@ export function SettingsView({
                 />
               </button>
             </div>
+
+            {/* Notifications Settings Table */}
+            <div className="pt-2 space-y-2">
+              <p className="text-xs font-semibold text-zinc-900 uppercase tracking-wider text-zinc-400">
+                Desktop Notifications
+              </p>
+              <div className="rounded-xl border border-zinc-200/80 bg-zinc-50/40 overflow-hidden">
+                <div className="grid grid-cols-[1fr_4rem_4rem] items-center gap-2 px-4 py-2 border-b border-zinc-200/60 bg-zinc-100/60 text-[11px] font-medium uppercase tracking-wider text-zinc-500">
+                  <span>Event</span>
+                  <span className="text-center">Notify</span>
+                  <span className="text-center">Sound</span>
+                </div>
+
+                {(
+                  [
+                    { id: "taskCompletion", label: "Task completed", desc: "When Fusion finishes an agent run or turn." },
+                    { id: "approvalNeeded", label: "Approval needed", desc: "When a tool or command is waiting for your approval." },
+                    { id: "questionAsked", label: "Question asked", desc: "When Fusion needs clarification before continuing." },
+                    { id: "sessionError", label: "Session error", desc: "When an agent turn stops because of an error." },
+                  ] as const
+                ).map((ev) => {
+                  const pref = notifSettings[ev.id];
+                  return (
+                    <div
+                      key={ev.id}
+                      className="grid grid-cols-[1fr_4rem_4rem] items-center gap-2 px-4 py-3 border-b border-zinc-200/40 last:border-b-0 hover:bg-zinc-50/60 transition-colors"
+                    >
+                      <div className="min-w-0 pr-2">
+                        <p className="text-xs font-semibold text-zinc-800">{ev.label}</p>
+                        <p className="text-[11px] text-zinc-500 mt-0.5">{ev.desc}</p>
+                      </div>
+
+                      <div className="flex justify-center">
+                        <button
+                          type="button"
+                          onClick={() => updateNotif(ev.id, "enabled", !pref.enabled)}
+                          className={`w-8 h-4.5 rounded-full transition-colors relative cursor-pointer ${
+                            pref.enabled ? "bg-[#5100cd]" : "bg-zinc-300"
+                          }`}
+                        >
+                          <span
+                            className={`absolute top-0.5 left-0.5 w-3.5 h-3.5 rounded-full bg-white transition-transform ${
+                              pref.enabled ? "translate-x-3.5" : "translate-x-0"
+                            }`}
+                          />
+                        </button>
+                      </div>
+
+                      <div className="flex justify-center">
+                        <button
+                          type="button"
+                          disabled={!pref.enabled}
+                          onClick={() => updateNotif(ev.id, "sound", !pref.sound)}
+                          className={`w-8 h-4.5 rounded-full transition-colors relative ${
+                            !pref.enabled
+                              ? "opacity-40 cursor-not-allowed bg-zinc-200"
+                              : pref.sound
+                              ? "bg-[#5100cd] cursor-pointer"
+                              : "bg-zinc-300 cursor-pointer"
+                          }`}
+                        >
+                          <span
+                            className={`absolute top-0.5 left-0.5 w-3.5 h-3.5 rounded-full bg-white transition-transform ${
+                              pref.sound ? "translate-x-3.5" : "translate-x-0"
+                            }`}
+                          />
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
           </div>
         )}
 
-        {/* Fusion API & Models Tab */}
-        {tab === "api" && (
+        {/* API Providers Tab: No raw key, no base URL, clean models roster */}
+        {activeSection === "api" && (
           <div className="space-y-6 max-w-2xl">
-            {/* Status Card */}
+            {/* Status Banner */}
             <div className="p-4 rounded-xl border border-purple-200 bg-purple-50/40 flex items-center justify-between">
               <div className="flex items-center gap-3">
                 <div className="w-9 h-9 rounded-lg bg-[#5100cd] text-white flex items-center justify-center shrink-0">
@@ -377,73 +406,26 @@ export function SettingsView({
                 </div>
                 <div>
                   <div className="flex items-center gap-2">
-                    <h3 className="text-sm font-semibold text-zinc-900">Fusion API Gateway</h3>
+                    <h3 className="text-sm font-semibold text-zinc-900">Fusion AI Gateway</h3>
                     <span className="text-[10px] font-medium px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700">
                       Connected & Active
                     </span>
                   </div>
                   <p className="text-xs text-zinc-500 mt-0.5">
-                    High-throughput inference with 90% prefix cache discounts.
+                    Authenticated device session active with prefix-cache optimizations.
                   </p>
                 </div>
-              </div>
-              <span className="text-xs font-mono font-medium text-[#5100cd] bg-white px-2.5 py-1 rounded-md border border-purple-200">
-                https://api.fusioncode.app/v1
-              </span>
-            </div>
-
-            {/* API Key configuration */}
-            <div className="p-5 rounded-xl border border-zinc-200 bg-zinc-50/50 space-y-3">
-              <div className="flex items-center justify-between">
-                <div>
-                  <label className="text-xs font-semibold text-zinc-900 flex items-center gap-1.5">
-                    <Key className="w-3.5 h-3.5 text-[#5100cd]" />
-                    <span>Fusion API Key</span>
-                  </label>
-                  <p className="text-[11px] text-zinc-500 mt-0.5">
-                    Device credentials automatically synced from ~/.fusion/config.json.
-                  </p>
-                </div>
-                <button
-                  type="button"
-                  data-testid="settings-save-apikey-btn"
-                  onClick={handleSaveApiKey}
-                  className="inline-flex items-center gap-1.5 px-3 py-1 text-xs font-medium bg-[#5100cd] hover:bg-[#4300a8] text-white rounded-lg transition-colors cursor-pointer shadow-2xs"
-                >
-                  {isApiKeySaved ? (
-                    <>
-                      <Check className="w-3.5 h-3.5 text-emerald-300" />
-                      <span>Saved</span>
-                    </>
-                  ) : (
-                    <span>Update Key</span>
-                  )}
-                </button>
-              </div>
-
-              <div className="relative">
-                <input
-                  type={showApiKey ? "text" : "password"}
-                  value={apiKey}
-                  onChange={(e) => setApiKey(e.target.value)}
-                  placeholder="fc_cli_••••••••••••••••••••••••"
-                  className="w-full pl-3 pr-10 py-2 text-xs font-mono rounded-lg border border-zinc-200 bg-white outline-none focus:border-[#5100cd]"
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowApiKey(!showApiKey)}
-                  className="absolute right-2.5 top-2 text-zinc-400 hover:text-zinc-600 cursor-pointer"
-                >
-                  {showApiKey ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                </button>
               </div>
             </div>
 
             {/* Supported Models List */}
             <div className="space-y-2">
-              <h4 className="text-xs font-semibold text-zinc-900 uppercase tracking-wider text-zinc-500">
-                Available Fusion Models ({models.length})
-              </h4>
+              <div className="flex items-center justify-between">
+                <h4 className="text-xs font-semibold uppercase tracking-wider text-zinc-500">
+                  Available Models ({models.length})
+                </h4>
+                <span className="text-xs text-zinc-400">Click to select active default</span>
+              </div>
               <div className="rounded-xl border border-zinc-200 overflow-hidden divide-y divide-zinc-100 bg-white">
                 {models.map((m) => (
                   <div key={m.id} className="p-3 flex items-center justify-between hover:bg-zinc-50/60 transition-colors">
@@ -464,7 +446,11 @@ export function SettingsView({
                     <button
                       type="button"
                       onClick={() => setDefaultModel(m.id)}
-                      className="px-2.5 py-1 text-xs rounded border border-zinc-200 hover:border-zinc-300 text-zinc-700 cursor-pointer shrink-0"
+                      className={`px-3 py-1 text-xs rounded-lg border transition-colors cursor-pointer shrink-0 ${
+                        m.id === defaultModel
+                          ? "bg-purple-50 border-purple-300 text-[#5100cd] font-semibold"
+                          : "border-zinc-200 hover:border-zinc-300 text-zinc-700 hover:bg-zinc-50"
+                      }`}
                     >
                       {m.id === defaultModel ? "Active" : "Set Default"}
                     </button>
@@ -475,98 +461,29 @@ export function SettingsView({
           </div>
         )}
 
-        {/* Notifications Tab */}
-        {tab === "notifications" && (
-          <div className="space-y-4 max-w-2xl">
-            <div className="rounded-xl border border-zinc-200 bg-zinc-50/40 overflow-hidden">
-              <div className="grid grid-cols-[1fr_4rem_4rem] items-center gap-2 px-4 py-2 border-b border-zinc-200/60 bg-zinc-100/60 text-[11px] font-medium uppercase tracking-wider text-zinc-500">
-                <span>Event</span>
-                <span className="text-center">Notify</span>
-                <span className="text-center">Sound</span>
-              </div>
-
-              {(
-                [
-                  { id: "taskCompletion", label: "Task completed", desc: "When Fusion finishes an agent run or turn." },
-                  { id: "approvalNeeded", label: "Approval needed", desc: "When a tool or command is waiting for your approval." },
-                  { id: "questionAsked", label: "Question asked", desc: "When Fusion needs clarification before continuing." },
-                  { id: "sessionError", label: "Session error", desc: "When an agent turn stops because of an error." },
-                ] as const
-              ).map((ev) => {
-                const pref = notifSettings[ev.id];
-                return (
-                  <div
-                    key={ev.id}
-                    className="grid grid-cols-[1fr_4rem_4rem] items-center gap-2 px-4 py-3 border-b border-zinc-200/40 last:border-b-0 hover:bg-zinc-50/60 transition-colors"
-                  >
-                    <div className="min-w-0 pr-2">
-                      <p className="text-xs font-semibold text-zinc-800">{ev.label}</p>
-                      <p className="text-[11px] text-zinc-500 mt-0.5">{ev.desc}</p>
-                    </div>
-
-                    {/* Notify Toggle */}
-                    <div className="flex justify-center">
-                      <button
-                        type="button"
-                        onClick={() => updateNotif(ev.id, "enabled", !pref.enabled)}
-                        className={`w-8 h-4.5 rounded-full transition-colors relative cursor-pointer ${
-                          pref.enabled ? "bg-[#5100cd]" : "bg-zinc-300"
-                        }`}
-                      >
-                        <span
-                          className={`absolute top-0.5 left-0.5 w-3.5 h-3.5 rounded-full bg-white transition-transform ${
-                            pref.enabled ? "translate-x-3.5" : "translate-x-0"
-                          }`}
-                        />
-                      </button>
-                    </div>
-
-                    {/* Sound Toggle */}
-                    <div className="flex justify-center">
-                      <button
-                        type="button"
-                        disabled={!pref.enabled}
-                        onClick={() => updateNotif(ev.id, "sound", !pref.sound)}
-                        className={`w-8 h-4.5 rounded-full transition-colors relative ${
-                          !pref.enabled
-                            ? "opacity-40 cursor-not-allowed bg-zinc-200"
-                            : pref.sound
-                            ? "bg-[#5100cd] cursor-pointer"
-                            : "bg-zinc-300 cursor-pointer"
-                        }`}
-                      >
-                        <span
-                          className={`absolute top-0.5 left-0.5 w-3.5 h-3.5 rounded-full bg-white transition-transform ${
-                            pref.sound ? "translate-x-3.5" : "translate-x-0"
-                          }`}
-                        />
-                      </button>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        )}
-
-        {/* Account Tab */}
-        {tab === "account" && (
+        {/* Real User Account Tab: real name & email, no wholesale benefits */}
+        {activeSection === "account" && (
           <div className="space-y-6 max-w-2xl">
             <div className="p-5 rounded-xl border border-zinc-200 bg-zinc-50/40 flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-full bg-purple-100 text-[#5100cd] flex items-center justify-center font-bold text-sm">
-                  <User className="w-5 h-5" />
+              <div className="flex items-center gap-3.5">
+                <div className="w-11 h-11 rounded-full bg-[#5100cd] text-white flex items-center justify-center font-bold text-base shadow-2xs">
+                  {authStatus.name ? authStatus.name.charAt(0).toUpperCase() : "A"}
                 </div>
                 <div>
-                  <h3 className="text-sm font-semibold text-zinc-900">
-                    {authStatus.email || "Fusion Authenticated User"}
-                  </h3>
-                  <div className="flex items-center gap-2 mt-0.5">
-                    <span className="text-[11px] font-medium px-2 py-0.5 rounded bg-purple-100 text-[#5100cd]">
-                      Subscription Mode
+                  <div className="flex items-center gap-2">
+                    <h3 className="text-sm font-semibold text-zinc-900">
+                      {authStatus.name || "Aung Myat Moe"}
+                    </h3>
+                    <span className="text-[10px] font-medium px-2 py-0.5 rounded bg-purple-100 text-[#5100cd]">
+                      Admin
                     </span>
-                    <span className="text-xs text-zinc-500">Device linked via ~/.fusion</span>
                   </div>
+                  <p className="text-xs text-zinc-600 mt-0.5">
+                    {authStatus.email || "aungmyatmoe834@gmail.com"}
+                  </p>
+                  <p className="text-[11px] text-zinc-400 mt-1">
+                    Device authenticated via ~/.fusion
+                  </p>
                 </div>
               </div>
 
@@ -575,21 +492,12 @@ export function SettingsView({
                   type="button"
                   data-testid="settings-signout-btn"
                   onClick={onSignOut}
-                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-red-200 bg-white hover:bg-red-50 text-xs font-medium text-red-600 transition-colors cursor-pointer"
+                  className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg border border-red-200 bg-white hover:bg-red-50 text-xs font-medium text-red-600 transition-colors cursor-pointer"
                 >
                   <LogOut className="w-3.5 h-3.5" />
                   <span>Sign out</span>
                 </button>
               )}
-            </div>
-
-            <div className="p-4 rounded-xl border border-zinc-200 bg-white space-y-2 text-xs text-zinc-600 leading-relaxed">
-              <p className="font-semibold text-zinc-900">Wholesale API Rate Benefits:</p>
-              <ul className="list-disc pl-4 space-y-1 text-zinc-500">
-                <li>DeepSeek V4 Flash & GLM 5.3 Flash at $0.01 per 1,000,000 tokens.</li>
-                <li>Zero 5-hour session lockouts during long multi-turn engineering tasks.</li>
-                <li>Credits and local configurations never expire.</li>
-              </ul>
             </div>
           </div>
         )}

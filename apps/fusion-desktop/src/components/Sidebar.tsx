@@ -8,9 +8,6 @@ import {
   Clock,
   Sliders,
   Cable,
-  Mic,
-  Download,
-  Network,
   CircleUser,
   ArrowUpDown,
   Filter,
@@ -26,13 +23,7 @@ export interface SidebarSessionItem {
   updatedAt?: number;
 }
 
-export type SettingsSectionId =
-  | "general"
-  | "api"
-  | "voice"
-  | "import"
-  | "remote"
-  | "account";
+export type SettingsSectionId = "general" | "api" | "account";
 
 export interface SidebarProps {
   sessions?: readonly SidebarSessionItem[];
@@ -331,39 +322,6 @@ export function Sidebar({
 
             <button
               type="button"
-              onClick={() => onOpenSettings?.("voice")}
-              className={`w-full flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs transition-colors cursor-pointer ${
-                settingsSection === "voice" ? "bg-zinc-200/70 text-zinc-900 font-medium" : "text-zinc-700 hover:bg-zinc-100 font-normal"
-              }`}
-            >
-              <Mic className="w-3.5 h-3.5 text-zinc-500" />
-              <span>Voice</span>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => onOpenSettings?.("import")}
-              className={`w-full flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs transition-colors cursor-pointer ${
-                settingsSection === "import" ? "bg-zinc-200/70 text-zinc-900 font-medium" : "text-zinc-700 hover:bg-zinc-100 font-normal"
-              }`}
-            >
-              <Download className="w-3.5 h-3.5 text-zinc-500" />
-              <span>Import</span>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => onOpenSettings?.("remote")}
-              className={`w-full flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs transition-colors cursor-pointer ${
-                settingsSection === "remote" ? "bg-zinc-200/70 text-zinc-900 font-medium" : "text-zinc-700 hover:bg-zinc-100 font-normal"
-              }`}
-            >
-              <Network className="w-3.5 h-3.5 text-zinc-500" />
-              <span>Remote</span>
-            </button>
-
-            <button
-              type="button"
               data-testid="sidebar-settings-account"
               onClick={() => onOpenSettings?.("account")}
               className={`w-full flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs transition-colors cursor-pointer ${
@@ -376,71 +334,74 @@ export function Sidebar({
           </div>
         )}
 
-        {/* Sessions Section Header */}
-        <div className="px-3 pt-3 pb-1 flex items-center justify-between text-xs text-zinc-500">
-          <span className="font-medium text-zinc-600">Sessions</span>
-          <div className="flex items-center gap-1">
-            <button
-              type="button"
-              className="p-1 rounded hover:bg-zinc-200/50 hover:text-zinc-800 transition-colors cursor-pointer"
-              title="Sort sessions"
-              aria-label="Sort sessions"
-            >
-              <ArrowUpDown className="w-3 h-3" />
-            </button>
-            <button
-              type="button"
-              className="p-1 rounded hover:bg-zinc-200/50 hover:text-zinc-800 transition-colors cursor-pointer"
-              title="Filter sessions"
-              aria-label="Filter sessions"
-            >
-              <Filter className="w-3 h-3" />
-            </button>
-          </div>
-        </div>
-
-        {/* Session List */}
-        <div className="flex-1 overflow-y-auto px-2 space-y-0.5">
-          {filteredSessions.map((session) => {
-            const isActive = session.id === activeSessionId && currentView === "chat";
-            return (
-              <div
-                key={session.id}
-                data-testid="sidebar-session-item"
-                data-session-id={session.id}
-                onClick={() => onSelectSession?.(session.id)}
-                className={`group flex items-center justify-between px-3 py-1.5 rounded-lg text-xs cursor-pointer transition-colors ${
-                  isActive
-                    ? "bg-zinc-200/60 font-medium text-zinc-900"
-                    : "hover:bg-zinc-100 text-zinc-700 font-normal"
-                }`}
-              >
-                <span className="truncate pr-2">{session.title}</span>
-                <div className="flex items-center gap-1 shrink-0 text-zinc-400">
-                  <span className="text-[11px] tabular-nums">
-                    {formatRelativeTime(session.updatedAt || session.createdAt)}
-                  </span>
-                  {onDeleteSession && (
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        onDeleteSession(session.id);
-                      }}
-                      className="opacity-0 group-hover:opacity-100 p-0.5 rounded hover:bg-zinc-200 text-zinc-400 hover:text-zinc-700 transition-opacity"
-                      title="Delete session"
-                      aria-label="Delete session"
-                    >
-                      <X className="w-3 h-3" />
-                    </button>
-                  )}
-                </div>
+        {/* Sessions Section: rendered ONLY when NOT on settings page */}
+        {currentView !== "settings" && (
+          <>
+            <div className="px-3 pt-3 pb-1 flex items-center justify-between text-xs text-zinc-500">
+              <span className="font-medium text-zinc-600">Sessions</span>
+              <div className="flex items-center gap-1">
+                <button
+                  type="button"
+                  className="p-1 rounded hover:bg-zinc-200/50 hover:text-zinc-800 transition-colors cursor-pointer"
+                  title="Sort sessions"
+                  aria-label="Sort sessions"
+                >
+                  <ArrowUpDown className="w-3 h-3" />
+                </button>
+                <button
+                  type="button"
+                  className="p-1 rounded hover:bg-zinc-200/50 hover:text-zinc-800 transition-colors cursor-pointer"
+                  title="Filter sessions"
+                  aria-label="Filter sessions"
+                >
+                  <Filter className="w-3 h-3" />
+                </button>
               </div>
-            );
-          })}
-        </div>
-      </div>
+            </div>
 
+            {/* Session List */}
+            <div className="flex-1 overflow-y-auto px-2 space-y-0.5">
+              {filteredSessions.map((session) => {
+                const isActive = session.id === activeSessionId && currentView === "chat";
+                return (
+                  <div
+                    key={session.id}
+                    data-testid="sidebar-session-item"
+                    data-session-id={session.id}
+                    onClick={() => onSelectSession?.(session.id)}
+                    className={`group flex items-center justify-between px-3 py-1.5 rounded-lg text-xs cursor-pointer transition-colors ${
+                      isActive
+                        ? "bg-zinc-200/60 font-medium text-zinc-900"
+                        : "hover:bg-zinc-100 text-zinc-700 font-normal"
+                    }`}
+                  >
+                    <span className="truncate pr-2">{session.title}</span>
+                    <div className="flex items-center gap-1 shrink-0 text-zinc-400">
+                      <span className="text-[11px] tabular-nums">
+                        {formatRelativeTime(session.updatedAt || session.createdAt)}
+                      </span>
+                      {onDeleteSession && (
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onDeleteSession(session.id);
+                          }}
+                          className="opacity-0 group-hover:opacity-100 p-0.5 rounded hover:bg-zinc-200 text-zinc-400 hover:text-zinc-700 transition-opacity"
+                          title="Delete session"
+                          aria-label="Delete session"
+                        >
+                          <X className="w-3 h-3" />
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </>
+        )}
+      </div>
       {/* Bottom Row: Settings Button matching Cline Image #1 & #2 */}
       <div className="p-2 border-t border-zinc-200/60">
         <button

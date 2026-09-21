@@ -85,7 +85,7 @@ export function App({
 }: AppProps) {
   const [isSidebarOpen, setIsSidebarOpen] = useState(initialSidebarOpen);
   const [currentView, setCurrentView] = useState<"chat" | "customize" | "settings">("chat");
-  const [settingsSection, setSettingsSection] = useState<"general" | "api" | "voice" | "import" | "remote" | "account">("general");
+  const [settingsSection, setSettingsSection] = useState<"general" | "api" | "account">("general");
   const [isSignedIn, setIsSignedIn] = useState<boolean>(() => {
     if (typeof initialIsSignedIn === "boolean") return initialIsSignedIn;
     if (typeof window !== "undefined" && window.localStorage) {
@@ -473,12 +473,7 @@ export function App({
           />
         ) : currentView === "settings" ? (
           <SettingsView
-            activeSection={settingsSection === "api" ? "api" : settingsSection === "account" ? "account" : "general"}
-            onTabChange={(tab) => {
-              if (tab === "api") setSettingsSection("api");
-              else if (tab === "account") setSettingsSection("account");
-              else setSettingsSection("general");
-            }}
+            activeSection={settingsSection}
             onClose={() => setCurrentView("chat")}
             onSignOut={() => {
               setIsSignedIn(false);
