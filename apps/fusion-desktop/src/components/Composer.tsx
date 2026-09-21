@@ -7,12 +7,10 @@ import {
   Square,
   Check,
   Search,
-  Plus,
 } from "lucide-react";
 import {
   getAllAvailableModels,
   getFusionModel,
-  addCustomModel,
   type FusionModel,
 } from "../models";
 
@@ -50,9 +48,7 @@ export function Composer({
   const [mode, setMode] = useState<"plan" | "act">("act");
   const [effort, setEffort] = useState<"Low" | "Medium" | "High">(propEffort);
   const [modelSearch, setModelSearch] = useState("");
-  const [isCustomEntryOpen, setIsCustomEntryOpen] = useState(false);
-  const [customModelInput, setCustomModelInput] = useState("");
-  const [availableModels, setAvailableModels] = useState<FusionModel[]>(() => getAllAvailableModels());
+  const [availableModels] = useState<FusionModel[]>(() => getAllAvailableModels());
 
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const modelMenuRef = useRef<HTMLDivElement>(null);
@@ -73,17 +69,6 @@ export function Composer({
         m.badge.toLowerCase().includes(q)
     );
   }, [availableModels, modelSearch]);
-
-  const handleAddCustomModel = () => {
-    const trimmed = customModelInput.trim();
-    if (!trimmed) return;
-    const created = addCustomModel(trimmed);
-    setAvailableModels(getAllAvailableModels());
-    onSelectModel?.(created.id);
-    setCustomModelInput("");
-    setIsCustomEntryOpen(false);
-    setIsModelMenuOpen(false);
-  };
 
   // Auto-resize textarea height
   useEffect(() => {
@@ -341,57 +326,6 @@ export function Composer({
                         </button>
                       );
                     })
-                  )}
-                </div>
-
-                {/* Custom Model ID Entry matching Cline ModelPickerWithManualEntry */}
-                <div className="border-t border-zinc-100 px-2.5 pt-2 pb-1">
-                  {isCustomEntryOpen ? (
-                    <div className="space-y-1.5">
-                      <input
-                        type="text"
-                        data-testid="composer-custom-model-input"
-                        placeholder="e.g. meta-llama/llama-3.3-70b-instruct"
-                        value={customModelInput}
-                        onChange={(e) => setCustomModelInput(e.target.value)}
-                        onKeyDown={(e) => {
-                          if (e.key === "Enter") {
-                            e.preventDefault();
-                            handleAddCustomModel();
-                          }
-                        }}
-                        className="w-full px-2 py-1 text-xs border border-zinc-200 rounded-lg outline-none focus:border-purple-400"
-                        autoFocus
-                      />
-                      <div className="flex items-center justify-end gap-1.5">
-                        <button
-                          type="button"
-                          onClick={() => setIsCustomEntryOpen(false)}
-                          className="px-2 py-0.5 text-xs text-zinc-500 hover:text-zinc-800 cursor-pointer"
-                        >
-                          Cancel
-                        </button>
-                        <button
-                          type="button"
-                          data-testid="composer-custom-model-submit"
-                          onClick={handleAddCustomModel}
-                          disabled={!customModelInput.trim()}
-                          className="px-2.5 py-0.5 text-xs font-medium bg-[#5100cd] hover:bg-[#4300a8] text-white rounded-md transition-colors disabled:opacity-50 cursor-pointer"
-                        >
-                          Add & Select
-                        </button>
-                      </div>
-                    </div>
-                  ) : (
-                    <button
-                      type="button"
-                      data-testid="composer-custom-model-btn"
-                      onClick={() => setIsCustomEntryOpen(true)}
-                      className="w-full py-1 text-left flex items-center gap-1.5 text-xs text-[#5100cd] hover:text-[#4300a8] font-medium cursor-pointer"
-                    >
-                      <Plus className="w-3.5 h-3.5" />
-                      <span>Use custom model ID...</span>
-                    </button>
                   )}
                 </div>
               </div>
