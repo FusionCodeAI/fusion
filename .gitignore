@@ -13,3 +13,4 @@ reference/
 *.rlib
 node_modules/
 sdk/dist/
+dist/

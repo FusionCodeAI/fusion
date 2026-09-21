@@ -4,18 +4,27 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "bun --hot src/app.tsx",
-    "test": "bun test",
-    "typecheck": "tsc --noEmit"
+    "dev": "vite",
+    "build": "tsc && vite build",
+    "typecheck": "tsc --noEmit",
+    "test": "bun test"
   },
   "dependencies": {
-    "@gpuix/native": "0.9.0",
-    "@gpuix/react": "0.9.0",
-    "react": "^19.0.0"
+    "@fusioncode/sdk": "^2.0.0-beta.3",
+    "@tauri-apps/api": "^2.0.0",
+    "@tauri-apps/plugin-shell": "^2.0.0",
+    "lucide-react": "^1.16.0",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0"
   },
   "devDependencies": {
+    "@tailwindcss/vite": "^4.0.0",
     "@types/bun": "latest",
     "@types/react": "^19.0.0",
-    "typescript": "^5.7.0"
+    "@types/react-dom": "^19.0.0",
+    "@vitejs/plugin-react": "^4.3.0",
+    "tailwindcss": "^4.0.0",
+    "typescript": "^5.7.0",
+    "vite": "^6.0.0"
   }
 }

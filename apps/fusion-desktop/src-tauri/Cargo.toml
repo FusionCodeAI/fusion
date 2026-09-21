@@ -1,0 +1,15 @@
+[package]
+name = "fusion-desktop"
+version = "2.0.0"
+description = "Fusion Desktop Agent Control Plane"
+authors = ["Fusion Authors"]
+edition = "2021"
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = ["tray-icon"] }
+tauri-plugin-shell = "2"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
