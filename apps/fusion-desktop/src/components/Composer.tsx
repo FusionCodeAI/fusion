@@ -149,11 +149,11 @@ export function Composer({
               type="button"
               data-testid="composer-cancel"
               onClick={onCancel}
-              className="w-7 h-7 rounded-full bg-zinc-900 hover:bg-zinc-800 text-white flex items-center justify-center transition-colors cursor-pointer shadow-xs"
+              className="w-8 h-8 rounded-full bg-zinc-900 hover:bg-zinc-800 text-white flex items-center justify-center transition-all active:scale-95 cursor-pointer shadow-xs"
               title="Stop generation"
               aria-label="Stop generation"
             >
-              <Square className="w-3 h-3 fill-current" />
+              <Square className="w-3.5 h-3.5 fill-current" />
             </button>
           ) : (
             <button
@@ -161,15 +161,15 @@ export function Composer({
               data-testid="composer-send"
               onClick={handleSubmit}
               disabled={!canSubmit}
-              className={`w-7 h-7 rounded-full flex items-center justify-center transition-all ${
+              className={`w-8 h-8 rounded-full flex items-center justify-center transition-all ${
                 canSubmit
-                  ? "bg-[#5100cd] hover:bg-[#4300a8] text-white cursor-pointer shadow-xs"
-                  : "bg-purple-100/60 text-purple-300 cursor-not-allowed"
+                  ? "bg-[#5100cd] hover:bg-[#4300a8] active:scale-95 text-white cursor-pointer shadow-sm ring-2 ring-purple-500/20"
+                  : "bg-purple-100/70 text-purple-400 border border-purple-200/50 cursor-not-allowed opacity-75"
               }`}
-              title="Send prompt"
+              title={canSubmit ? "Send message (Enter)" : "Type a message to send"}
               aria-label="Send prompt"
             >
-              <ArrowUp className="w-3.5 h-3.5 stroke-[2.5]" />
+              <ArrowUp className="w-4 h-4 stroke-[2.5]" />
             </button>
           )}
         </div>
