@@ -1,5 +1,8 @@
 // Prevents additional console window on Windows in release, DO NOT REMOVE!!
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
+#[cfg(target_os = "macos")]
+mod macos_notification;
+
 
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -275,27 +278,43 @@ async fn pick_project_folder() -> Result<Option<String>, String> {
         Ok(None)
     }
 }
-
 #[tauri::command]
 fn show_desktop_notification(
+    app: tauri::AppHandle,
     title: String,
     body: String,
     sound: Option<bool>,
 ) -> Result<(), String> {
+    let title = title.trim();
+    let body = body.trim();
+    if title.is_empty() || body.is_empty() {
+        return Err("notification title and body are required".to_string());
+    }
+
+    let mut notification = notify_rust::Notification::new();
+    notification
+        .summary(title)
+        .body(body)
+        .auto_icon();
+
+    if sound.unwrap_or(true) {
+        #[cfg(target_os = "macos")]
+        notification.sound_name("Ping");
+        #[cfg(not(target_os = "macos"))]
+        notification.sound_name("Default");
+    }
+
     #[cfg(target_os = "macos")]
     {
-        let sound_clause = if sound.unwrap_or(true) { "sound name \"default\"" } else { "" };
-        let clean_body = body.replace('\\', "\\\\").replace('"', "\\\"");
-        let clean_title = title.replace('\\', "\\\\").replace('"', "\\\"");
-        let script = format!(
-            "display notification \"{}\" with title \"{}\" {}",
-            clean_body, clean_title, sound_clause
-        );
-        let _ = std::process::Command::new("osascript")
-            .arg("-e")
-            .arg(script)
-            .spawn();
+        if let Err(e) = macos_notification::configure(&app) {
+            eprintln!("[notification] macOS LaunchServices configure warning: {}", e);
+        }
     }
+
+    notification
+        .show()
+        .map_err(|error| format!("failed showing notification: {error}"))?;
+
     Ok(())
 }
 fn fusion_dir() -> PathBuf {
