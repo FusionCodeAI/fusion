@@ -3,8 +3,14 @@ export interface MentionItem {
   label: string;
   value: string;
   description: string;
-  category: "context" | "file" | "git" | "diagnostics";
+  category: "context" | "file" | "folder" | "git" | "diagnostics";
   icon?: string;
+}
+
+export interface WorkspaceEntryLike {
+  path: string;
+  name?: string;
+  is_dir?: boolean;
 }
 
 export const DEFAULT_CONTEXT_MENTIONS: MentionItem[] = [
@@ -66,45 +72,86 @@ export const DEFAULT_CONTEXT_MENTIONS: MentionItem[] = [
   },
 ];
 
-export const COMMON_WORKSPACE_FILES = [
-  "Cargo.toml",
-  "package.json",
-  "README.md",
-  "tsconfig.json",
-  "src/main.rs",
-  "src/App.tsx",
-  "apps/fusion-desktop/src/App.tsx",
-  "apps/fusion-desktop/src/components/Composer.tsx",
-  "apps/fusion-desktop/src/components/Sidebar.tsx",
-  "apps/fusion-desktop/src/components/ClineHeroView.tsx",
-  "apps/fusion-desktop/src-tauri/src/main.rs",
-  "crates/fusion-shell/src/lib.rs",
-  "crates/fusion-builtins/src/lib.rs",
-  "crates/fusion-diff/src/lib.rs",
-  "crates/fusion-vcs/src/lib.rs",
-  "crates/fusion-ast/src/lib.rs",
+export const COMMON_WORKSPACE_FILES: WorkspaceEntryLike[] = [
+  { path: "Cargo.toml", name: "Cargo.toml", is_dir: false },
+  { path: "package.json", name: "package.json", is_dir: false },
+  { path: "README.md", name: "README.md", is_dir: false },
+  { path: "tsconfig.json", name: "tsconfig.json", is_dir: false },
+  { path: "src", name: "src", is_dir: true },
+  { path: "src/main.rs", name: "main.rs", is_dir: false },
+  { path: "src/App.tsx", name: "App.tsx", is_dir: false },
+  { path: "apps/fusion-desktop/src/App.tsx", name: "App.tsx", is_dir: false },
+  { path: "apps/fusion-desktop/src/components/Composer.tsx", name: "Composer.tsx", is_dir: false },
+  { path: "apps/fusion-desktop/src/components/Sidebar.tsx", name: "Sidebar.tsx", is_dir: false },
+  { path: "apps/fusion-desktop/src/components/ClineHeroView.tsx", name: "ClineHeroView.tsx", is_dir: false },
+  { path: "apps/fusion-desktop/src-tauri/src/main.rs", name: "main.rs", is_dir: false },
+  { path: "crates", name: "crates", is_dir: true },
+  { path: "crates/fusion-shell/src/lib.rs", name: "lib.rs", is_dir: false },
+  { path: "crates/fusion-builtins/src/lib.rs", name: "lib.rs", is_dir: false },
+  { path: "crates/fusion-diff/src/lib.rs", name: "lib.rs", is_dir: false },
+  { path: "crates/fusion-vcs/src/lib.rs", name: "lib.rs", is_dir: false },
+  { path: "crates/fusion-ast/src/lib.rs", name: "lib.rs", is_dir: false },
 ];
 
 export function filterMentions(
   query: string,
-  customFiles: string[] = []
+  entries: Array<WorkspaceEntryLike | string> = []
 ): MentionItem[] {
   const clean = query.trim().toLowerCase();
-  const term = clean.startsWith("@") ? clean.slice(1) : clean;
+  let term = clean.startsWith("@") ? clean.slice(1) : clean;
 
-  const fileItems: MentionItem[] = (customFiles.length > 0 ? customFiles : COMMON_WORKSPACE_FILES).map((path) => {
-    const filename = path.split("/").pop() || path;
+  const isFilterOnlyFiles = term.startsWith("file:") || term === "file";
+  const isFilterOnlyFolders = term.startsWith("folder:") || term === "folder";
+
+  if (isFilterOnlyFiles) {
+    term = term.replace(/^file:?/, "").trim();
+  } else if (isFilterOnlyFolders) {
+    term = term.replace(/^folder:?/, "").trim();
+  }
+
+  const rawEntries = entries.length > 0 ? entries : COMMON_WORKSPACE_FILES;
+
+  const entryItems: MentionItem[] = rawEntries.map((item) => {
+    if (typeof item === "string") {
+      const filename = item.split("/").pop() || item;
+      const isDir = item.endsWith("/") || !item.includes(".");
+      return {
+        id: `entry-${item}`,
+        label: `@${filename}`,
+        value: `@${item}`,
+        description: item,
+        category: isDir ? "folder" : "file",
+        icon: isDir ? "Folder" : "FileText",
+      };
+    }
+
+    const isDir = Boolean(item.is_dir);
+    const filename = item.name || item.path.split("/").pop() || item.path;
     return {
-      id: `file-${path}`,
+      id: `entry-${item.path}`,
       label: `@${filename}`,
-      value: `@${path}`,
-      description: path,
-      category: "file" as const,
-      icon: "FileText",
+      value: `@${item.path}`,
+      description: item.path,
+      category: isDir ? "folder" : "file",
+      icon: isDir ? "Folder" : "FileText",
     };
   });
 
-  const allItems = [...DEFAULT_CONTEXT_MENTIONS, ...fileItems];
+  // If user typed `@file:` or `@file`, only show files
+  if (isFilterOnlyFiles) {
+    return entryItems
+      .filter((e) => e.category === "file")
+      .filter((e) => !term || e.label.toLowerCase().includes(term) || e.description.toLowerCase().includes(term));
+  }
+
+  // If user typed `@folder:` or `@folder`, only show folders
+  if (isFilterOnlyFolders) {
+    return entryItems
+      .filter((e) => e.category === "folder")
+      .filter((e) => !term || e.label.toLowerCase().includes(term) || e.description.toLowerCase().includes(term));
+  }
+
+  const allItems = [...DEFAULT_CONTEXT_MENTIONS, ...entryItems];
 
   if (!term) {
     return allItems;

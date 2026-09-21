@@ -314,6 +314,84 @@ async fn pick_project_folder() -> Result<Option<String>, String> {
         Ok(None)
     }
 }
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct WorkspaceEntry {
+    pub path: String,
+    pub name: String,
+    pub is_dir: bool,
+}
+
+#[tauri::command]
+fn list_workspace_entries(workspace_dir: Option<String>) -> Result<Vec<WorkspaceEntry>, String> {
+    let root = match workspace_dir {
+        Some(dir) if !dir.trim().is_empty() => PathBuf::from(dir),
+        _ => std::env::current_dir().unwrap_or_else(|_| PathBuf::from(".")),
+    };
+
+    if !root.exists() {
+        return Ok(Vec::new());
+    }
+
+    let mut entries = Vec::new();
+    let mut stack = vec![root.clone()];
+    let max_entries = 500;
+
+    let ignored_names = [
+        "target", "node_modules", ".git", "dist", "build", ".DS_Store",
+        ".next", ".svelte-kit", ".turbo", "coverage", ".fusion",
+    ];
+
+    while let Some(current_dir) = stack.pop() {
+        if entries.len() >= max_entries {
+            break;
+        }
+
+        let read_dir = match fs::read_dir(&current_dir) {
+            Ok(rd) => rd,
+            Err(_) => continue,
+        };
+
+        for entry_res in read_dir.flatten() {
+            let path = entry_res.path();
+            let name = match path.file_name().and_then(|n| n.to_str()) {
+                Some(n) => n,
+                None => continue,
+            };
+
+            if name.starts_with('.') && name != ".env" && name != ".github" && name != ".claude" && name != ".agents" {
+                continue;
+            }
+
+            if ignored_names.contains(&name) {
+                continue;
+            }
+
+            let is_dir = path.is_dir();
+            let rel_path = path
+                .strip_prefix(&root)
+                .map(|p| p.to_string_lossy().to_string())
+                .unwrap_or_else(|_| name.to_string());
+
+            entries.push(WorkspaceEntry {
+                path: rel_path,
+                name: name.to_string(),
+                is_dir,
+            });
+
+            if is_dir && entries.len() < max_entries {
+                stack.push(path);
+            }
+
+            if entries.len() >= max_entries {
+                break;
+            }
+        }
+    }
+
+    entries.sort_by(|a, b| b.is_dir.cmp(&a.is_dir).then_with(|| a.path.cmp(&b.path)));
+
+    Ok(entries)
+}
 #[tauri::command]
 fn show_desktop_notification(
     app: tauri::AppHandle,
@@ -801,6 +879,8 @@ fn main() {
             list_fusion_sessions,
             load_fusion_session,
             save_fusion_session,
+            delete_fusion_session,
+            list_workspace_entries,
             pick_project_folder,
             execute_fusion_turn,
             stream_fusion_acp,

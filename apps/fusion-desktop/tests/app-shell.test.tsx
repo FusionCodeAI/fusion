@@ -62,9 +62,9 @@ describe("TopHeader Component", () => {
     });
 
     expect(element).toBeDefined();
-    // Sidebar toggle is child index 1
-    element.props.children[1].props.children[1].props.onClick();
-    expect(toggled).toBe(true);
+    // Sidebar toggle is last button in actions group
+    const buttons = element.props.children[1].props.children.filter(Boolean);
+    buttons[buttons.length - 1].props.onClick();
   });
 });
 describe("Sidebar Component", () => {

@@ -35,6 +35,7 @@ export interface ComposerProps {
   onSelectEffort?: (effort: "Low" | "Medium" | "High") => void;
   onAttachFile?: () => void;
   workspaceFiles?: string[];
+  workspaceEntries?: Array<{ path: string; name?: string; is_dir?: boolean } | string>;
 }
 
 export function Composer({
@@ -50,6 +51,7 @@ export function Composer({
   onSelectEffort,
   onAttachFile,
   workspaceFiles = [],
+  workspaceEntries,
 }: ComposerProps) {
   const [text, setText] = useState("");
   const [attachedImages, setAttachedImages] = useState<ChatImageAttachment[]>([]);
@@ -98,10 +100,8 @@ export function Composer({
   }, [slashQuery]);
 
   const filteredMentions = useMemo(() => {
-    return filterMentions(mentionQuery, workspaceFiles);
-  }, [mentionQuery, workspaceFiles]);
-
-  // Auto-resize textarea height
+    return filterMentions(mentionQuery, workspaceEntries || workspaceFiles);
+  }, [mentionQuery, workspaceEntries, workspaceFiles]);
   useEffect(() => {
     const textarea = textareaRef.current;
     if (!textarea) return;

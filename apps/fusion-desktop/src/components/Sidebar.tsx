@@ -14,6 +14,7 @@ import {
   Filter,
   Settings,
   X,
+  Pin,
 } from "lucide-react";
 import { ClineAvatar } from "./ClineAvatar";
 
@@ -24,8 +25,8 @@ export interface SidebarSessionItem {
   updatedAt?: number;
   workspace?: string;
   workspaceName?: string;
+  isPinned?: boolean;
 }
-
 export type SettingsSectionId = "general" | "api" | "account";
 
 export interface SidebarProps {
@@ -46,6 +47,7 @@ export interface SidebarProps {
   onOpenSearch?: () => void;
   onCustomize?: () => void;
   onOpenSettings?: (section?: SettingsSectionId) => void;
+  onTogglePinSession?: (id: string) => void;
   width?: number;
   onResize?: (width: number) => void;
   onResetWidth?: () => void;
@@ -95,6 +97,7 @@ export function Sidebar({
   onHistoryForward,
   onCustomize,
   onOpenSettings,
+  onTogglePinSession,
   width,
   onResize,
   onResetWidth,
@@ -150,6 +153,16 @@ export function Sidebar({
       }
     }
 
+    // Sort sessions in each group so pinned sessions appear at the top
+    for (const group of groups.values()) {
+      group.sessions.sort((a, b) => {
+        if (Boolean(a.isPinned) !== Boolean(b.isPinned)) {
+          return a.isPinned ? -1 : 1;
+        }
+        return (b.updatedAt || b.createdAt || 0) - (a.updatedAt || a.createdAt || 0);
+      });
+    }
+
     // Sort projects so active workspace project is first, then alphabetical
     return Array.from(groups.values()).sort((a, b) => {
       if (a.label.toLowerCase() === currentWorkspaceName) return -1;
@@ -189,6 +202,7 @@ export function Sidebar({
 
   const renderSessionRow = (session: SidebarSessionItem) => {
     const isActive = session.id === activeSessionId && currentView === "chat";
+    const isPinned = Boolean(session.isPinned);
     return (
       <div
         key={session.id}
@@ -201,11 +215,33 @@ export function Sidebar({
             : "hover:bg-zinc-100 text-zinc-700 font-normal"
         }`}
       >
-        <span className="truncate pr-2">{session.title}</span>
+        <div className="flex items-center gap-1.5 truncate pr-2 min-w-0">
+          {isPinned && (
+            <Pin className="w-3 h-3 text-zinc-800 shrink-0 fill-current rotate-45" />
+          )}
+          <span className="truncate">{session.title}</span>
+        </div>
         <div className="flex items-center gap-1 shrink-0 text-zinc-400">
           <span className="text-[11px] tabular-nums">
             {formatRelativeTime(session.updatedAt || session.createdAt)}
           </span>
+          {onTogglePinSession && (
+            <button
+              type="button"
+              data-testid={`sidebar-pin-${session.id}`}
+              onClick={(e) => {
+                e.stopPropagation();
+                onTogglePinSession(session.id);
+              }}
+              className={`${
+                isPinned ? "opacity-100 text-zinc-800" : "opacity-0 group-hover:opacity-100 text-zinc-400 hover:text-zinc-800"
+              } p-0.5 rounded hover:bg-zinc-200 transition-opacity cursor-pointer`}
+              title={isPinned ? "Unpin session" : "Pin session"}
+              aria-label={isPinned ? "Unpin session" : "Pin session"}
+            >
+              <Pin className={`w-3 h-3 ${isPinned ? "fill-current" : ""}`} />
+            </button>
+          )}
           {onDeleteSession && (
             <button
               type="button"

@@ -1,10 +1,12 @@
 import React from "react";
-import { Folder, MoreHorizontal, PanelLeft } from "lucide-react";
+import { Folder, MoreHorizontal, PanelLeft, Pin } from "lucide-react";
 
 export interface TopHeaderProps {
   title?: string;
   onToggleSidebar?: () => void;
   onMore?: () => void;
+  isPinned?: boolean;
+  onTogglePin?: () => void;
   isSidebarOpen?: boolean;
   className?: string;
 }
@@ -13,6 +15,8 @@ export function TopHeader({
   title = "General chat conversation",
   onToggleSidebar,
   onMore,
+  isPinned = false,
+  onTogglePin,
   isSidebarOpen = true,
   className = "",
 }: TopHeaderProps) {
@@ -33,8 +37,26 @@ export function TopHeader({
         <Folder className="w-3.5 h-3.5 text-zinc-500 shrink-0 cursor-default" />
       </div>
 
-      {/* Right: Actions (..., Sidebar toggle [|]) */}
-      <div className="flex items-center gap-2 shrink-0">
+      {/* Right: Actions (Pin, ..., Sidebar toggle [|]) */}
+      <div className="flex items-center gap-1.5 shrink-0">
+        {/* Pin button */}
+        {onTogglePin && (
+          <button
+            type="button"
+            data-testid="top-header-pin"
+            onClick={onTogglePin}
+            className={`p-1 rounded transition-colors cursor-pointer ${
+              isPinned
+                ? "text-zinc-900 bg-zinc-100"
+                : "text-zinc-400 hover:text-zinc-800 hover:bg-zinc-100"
+            }`}
+            title={isPinned ? "Unpin chat" : "Pin chat"}
+            aria-label={isPinned ? "Unpin chat" : "Pin chat"}
+          >
+            <Pin className={`w-3.5 h-3.5 ${isPinned ? "fill-current" : ""}`} />
+          </button>
+        )}
+
         {/* More options (...) */}
         <button
           type="button"

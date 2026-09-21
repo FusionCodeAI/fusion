@@ -17,6 +17,7 @@ export interface ChatSessionRecord {
   messages: ChatMessage[];
   workspace?: string;
   workspaceName?: string;
+  isPinned?: boolean;
 }
 const STORAGE_KEY = "fusion_desktop_sessions_v2";
 const ACTIVE_SESSION_KEY = "fusion_desktop_active_session_v2";

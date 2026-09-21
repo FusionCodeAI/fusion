@@ -18,6 +18,7 @@ export interface ClineHeroViewProps {
   billingProfile?: string;
   onAttachFile?: () => void;
   onPickWorkspaceFolder?: () => void;
+  workspaceEntries?: Array<{ path: string; name?: string; is_dir?: boolean } | string>;
   className?: string;
 }
 
@@ -34,6 +35,7 @@ export function ClineHeroView({
   onSelectEffort,
   onAttachFile,
   onPickWorkspaceFolder,
+  workspaceEntries,
   className = "",
 }: ClineHeroViewProps) {
   return (
@@ -68,7 +70,7 @@ export function ClineHeroView({
             effort={effort}
             onSelectEffort={onSelectEffort}
             onAttachFile={onAttachFile}
-            autoFocus
+            workspaceEntries={workspaceEntries}
           />
         </div>
       </div>

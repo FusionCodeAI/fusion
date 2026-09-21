@@ -14,7 +14,13 @@ import { SettingsView } from "./components/SettingsView";
 import { SessionCommandBar } from "./components/SessionCommandBar";
 import { AgentBridge } from "./lib/agent-bridge";
 import { notifyDesktopEvent } from "./lib/desktop-notifications";
-import { pickProjectFolder, checkAuthStatus, startFusionLogin } from "./lib/fusion-ipc";
+import {
+  pickProjectFolder,
+  checkAuthStatus,
+  startFusionLogin,
+  listWorkspaceEntries,
+  type WorkspaceEntry,
+} from "./lib/fusion-ipc";
 import {
   loadAllSessions,
   generateSessionId,
@@ -157,6 +163,16 @@ export function App({
     }
     return ".";
   });
+
+  const [workspaceEntries, setWorkspaceEntries] = useState<WorkspaceEntry[]>([]);
+
+  useEffect(() => {
+    listWorkspaceEntries(workspaceDir).then((entries) => {
+      if (entries && entries.length > 0) {
+        setWorkspaceEntries(entries);
+      }
+    });
+  }, [workspaceDir]);
 
   const workspaceName = getWorkspaceFolderName(workspaceDir);
 
@@ -512,6 +528,16 @@ export function App({
     }
   };
 
+  const handleTogglePinSession = (id: string) => {
+    setSessionsRecord((prev) => {
+      const updated = prev.map((s) =>
+        s.id === id ? { ...s, isPinned: !s.isPinned } : s
+      );
+      saveAllSessions(updated);
+      return updated;
+    });
+  };
+
   const handleModelChange = (modelId: string) => {
     setSelectedModel(modelId);
   };
@@ -527,6 +553,7 @@ export function App({
           sessions={sessionsRecord}
           activeSessionId={activeSessionId}
           onDeleteSession={handleDeleteSession}
+          onTogglePinSession={handleTogglePinSession}
           workspaceDir={workspaceDir}
           width={sidebarWidth}
           currentView={currentView}
@@ -569,6 +596,8 @@ export function App({
             {/* TopHeader: 40px height, aligned with macOS traffic lights and sidebar */}
             <TopHeader
               title={sessionTitle}
+              isPinned={activeSession?.isPinned}
+              onTogglePin={() => handleTogglePinSession(activeSessionId)}
               onMore={() => setCurrentView("settings")}
               onToggleSidebar={() => setIsSidebarOpen((prev) => !prev)}
             />
@@ -587,6 +616,7 @@ export function App({
               onSelectModel={handleModelChange}
               workspaceName={workspaceName}
               onPickWorkspaceFolder={handlePickProjectFolder}
+              workspaceEntries={workspaceEntries}
             />
           ) : (
             <div className="w-full max-w-[680px] flex flex-col gap-4">
@@ -642,6 +672,7 @@ export function App({
             isGenerating={isGenerating}
             selectedModel={selectedModel}
             onSelectModel={handleModelChange}
+            workspaceEntries={workspaceEntries}
           />
         </footer>
           </>

@@ -12,6 +12,12 @@ export interface DesktopSessionSummary {
   workspace_name?: string;
 }
 
+export interface WorkspaceEntry {
+  path: string;
+  name: string;
+  is_dir: boolean;
+}
+
 type usize = number;
 
 /**
@@ -46,6 +52,34 @@ export async function listFusionSessions(): Promise<DesktopSessionSummary[]> {
   }
 }
 
+
+/**
+ * Invokes the native Tauri command to recursively list workspace files and folders.
+ */
+export async function listWorkspaceEntries(workspaceDir?: string): Promise<WorkspaceEntry[]> {
+  if (!isTauriEnvironment()) {
+    return [
+      { path: "Cargo.toml", name: "Cargo.toml", is_dir: false },
+      { path: "package.json", name: "package.json", is_dir: false },
+      { path: "README.md", name: "README.md", is_dir: false },
+      { path: "tsconfig.json", name: "tsconfig.json", is_dir: false },
+      { path: "src", name: "src", is_dir: true },
+      { path: "src/main.rs", name: "main.rs", is_dir: false },
+      { path: "src/App.tsx", name: "App.tsx", is_dir: false },
+      { path: "apps/fusion-desktop/src/App.tsx", name: "App.tsx", is_dir: false },
+      { path: "apps/fusion-desktop/src/components/Composer.tsx", name: "Composer.tsx", is_dir: false },
+      { path: "crates", name: "crates", is_dir: true },
+    ];
+  }
+  try {
+    return await invoke<WorkspaceEntry[]>("list_workspace_entries", {
+      workspaceDir: workspaceDir || null,
+    });
+  } catch (err) {
+    console.warn("[fusion-ipc] list_workspace_entries failed:", err);
+    return [];
+  }
+}
 /**
  * Invokes the native Tauri command to load a session by UUID or prefix.
  */

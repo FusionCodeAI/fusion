@@ -1,6 +1,6 @@
 import React, { memo, useCallback, useEffect, useRef, useState } from "react";
 import { ChevronDown, ChevronRight } from "lucide-react";
-
+import { MarkdownRenderer } from "./MarkdownRenderer";
 export interface ThinkingRowProps {
   thought?: string;
   isGenerating?: boolean;
@@ -73,8 +73,8 @@ export const ThinkingRow = memo(function ThinkingRow({
         <span
           className={
             isGenerating
-              ? "animate-pulse text-[#5100cd] font-semibold"
-              : "text-zinc-600 font-medium"
+              ? "animate-pulse text-zinc-800 font-semibold"
+              : "text-zinc-500 font-medium"
           }
         >
           {title}
@@ -87,22 +87,20 @@ export const ThinkingRow = memo(function ThinkingRow({
       </button>
 
       {isExpanded && cleanThought ? (
-        <div className="relative mt-2 rounded-lg border-l-2 border-purple-300/80 pl-3 py-1 bg-purple-50/30 text-zinc-700">
+        <div className="relative mt-2 rounded-lg border-l-2 border-zinc-300 pl-3 py-1.5 bg-zinc-50/70 text-zinc-700 text-xs">
           <div
             ref={scrollRef}
             onScroll={checkScrollable}
-            className="max-h-[160px] overflow-y-auto text-[13px] leading-relaxed whitespace-pre-wrap break-words font-sans space-y-1.5 pr-2"
+            className="max-h-[220px] overflow-y-auto pr-2 text-zinc-700 select-text leading-relaxed"
           >
-            {cleanThought.split("\n\n").map((p, i) => (
-              <p key={i}>{p}</p>
-            ))}
+            <MarkdownRenderer content={cleanThought} />
           </div>
 
           {canScrollUp && (
-            <div className="absolute top-0 left-0 right-0 h-4 pointer-events-none bg-gradient-to-b from-purple-50/80 to-transparent" />
+            <div className="absolute top-0 left-0 right-0 h-4 pointer-events-none bg-gradient-to-b from-zinc-50/90 to-transparent" />
           )}
           {canScrollDown && (
-            <div className="absolute bottom-0 left-0 right-0 h-4 pointer-events-none bg-gradient-to-t from-purple-50/80 to-transparent" />
+            <div className="absolute bottom-0 left-0 right-0 h-4 pointer-events-none bg-gradient-to-t from-zinc-50/90 to-transparent" />
           )}
         </div>
       ) : null}
