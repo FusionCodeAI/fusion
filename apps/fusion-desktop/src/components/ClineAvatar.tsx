@@ -82,10 +82,10 @@ export function ClineAvatar({
           : "bg-zinc-100 hover:bg-zinc-200/70"
       } ${className}`}
     >
-      <ClineRobotSvg
-        className="w-[75%] h-[75%] text-zinc-700"
-        color="currentColor"
-        strokeWidth={7}
+      <img
+        src={isThinking ? "/fusion-mascot-animated.svg" : "/fusion-mascot.svg"}
+        alt="Avatar"
+        className="w-[85%] h-[85%] object-contain pointer-events-none select-none"
       />
     </div>
   );

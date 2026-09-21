@@ -1,29 +1,76 @@
-import React from "react";
-import { Folder, MoreHorizontal, PanelLeft, PanelRight, Pin } from "lucide-react";
+import React, { useState, useRef, useEffect } from "react";
+import {
+  Folder,
+  MoreHorizontal,
+  PanelRight,
+  Pin,
+  Download,
+  FileText,
+  Copy,
+  Trash2,
+  Check,
+  RotateCcw,
+} from "lucide-react";
 
 export interface TopHeaderProps {
   title?: string;
-  onToggleSidebar?: () => void;
-  onToggleRightPanel?: () => void;
-  onMore?: () => void;
   isPinned?: boolean;
   onTogglePin?: () => void;
-  isSidebarOpen?: boolean;
   isRightPanelOpen?: boolean;
+  onToggleRightPanel?: () => void;
+  onExportMarkdown?: () => void;
+  onExportHtml?: () => void;
+  onCopyTranscript?: () => void;
+  onClearSession?: () => void;
+  onDeleteSession?: () => void;
   className?: string;
 }
 
 export function TopHeader({
   title = "General chat conversation",
-  onToggleSidebar,
-  onToggleRightPanel,
-  onMore,
   isPinned = false,
   onTogglePin,
-  isSidebarOpen = true,
   isRightPanelOpen = false,
+  onToggleRightPanel,
+  onExportMarkdown,
+  onExportHtml,
+  onCopyTranscript,
+  onClearSession,
+  onDeleteSession,
   className = "",
 }: TopHeaderProps) {
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const [copied, setCopied] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
+  const buttonRef = useRef<HTMLButtonElement>(null);
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      const target = e.target as Node;
+      if (
+        isMenuOpen &&
+        menuRef.current &&
+        !menuRef.current.contains(target) &&
+        buttonRef.current &&
+        !buttonRef.current.contains(target)
+      ) {
+        setIsMenuOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [isMenuOpen]);
+
+  const handleCopy = () => {
+    onCopyTranscript?.();
+    setCopied(true);
+    setTimeout(() => {
+      setCopied(false);
+      setIsMenuOpen(false);
+    }, 1200);
+  };
+
   return (
     <header
       data-testid="top-header"
@@ -38,11 +85,11 @@ export function TopHeader({
         >
           {title}
         </span>
-        <Folder className="w-3.5 h-3.5 text-zinc-500 shrink-0 cursor-default" />
+        <Folder className="w-3.5 h-3.5 text-zinc-400 shrink-0 cursor-default" />
       </div>
 
-      {/* Right: Actions (Pin, ..., Sidebar toggle [|]) */}
-      <div className="flex items-center gap-1.5 shrink-0">
+      {/* Right: Actions (Pin, ..., Secondary Panel [|]) */}
+      <div className="flex items-center gap-1.5 shrink-0 relative">
         {/* Pin button */}
         {onTogglePin && (
           <button
@@ -63,25 +110,106 @@ export function TopHeader({
 
         {/* More options (...) */}
         <button
+          ref={buttonRef}
           type="button"
           data-testid="top-header-more"
-          onClick={onMore}
-          className="p-1 rounded text-zinc-500 hover:text-zinc-800 hover:bg-zinc-100 transition-colors cursor-pointer"
-          aria-label="More options"
+          onClick={() => setIsMenuOpen((prev) => !prev)}
+          className={`p-1 rounded transition-colors cursor-pointer ${
+            isMenuOpen ? "bg-zinc-100 text-zinc-900" : "text-zinc-500 hover:text-zinc-800 hover:bg-zinc-100"
+          }`}
+          aria-label="More session actions"
+          aria-expanded={isMenuOpen}
         >
           <MoreHorizontal className="w-4 h-4" />
         </button>
-        {/* Sidebar toggle ([|]) */}
-        <button
-          type="button"
-          data-testid="top-header-sidebar-toggle"
-          onClick={onToggleSidebar}
-          className="p-1 rounded text-zinc-500 hover:text-zinc-800 hover:bg-zinc-100 transition-colors cursor-pointer"
-          aria-label={isSidebarOpen ? "Collapse sidebar" : "Expand sidebar"}
-          title={isSidebarOpen ? "Collapse sidebar (Cmd+B)" : "Expand sidebar (Cmd+B)"}
-        >
-          <PanelLeft className="w-4 h-4" />
-        </button>
+
+        {/* Session Actions Dropdown Menu matching Cline */}
+        {isMenuOpen && (
+          <div
+            ref={menuRef}
+            data-testid="top-header-actions-menu"
+            className="absolute right-8 top-8 w-56 bg-white rounded-xl border border-zinc-200 shadow-xl py-1 z-50 text-xs text-zinc-700 select-none animate-in fade-in zoom-in-95 duration-100"
+          >
+            <div className="px-3 py-1 text-[10px] font-medium text-zinc-400 uppercase tracking-wider">
+              Session Actions
+            </div>
+
+            {/* Copy Transcript */}
+            <button
+              type="button"
+              data-testid="header-action-copy"
+              onClick={handleCopy}
+              className="w-full text-left px-3 py-1.5 flex items-center justify-between hover:bg-zinc-50 cursor-pointer transition-colors"
+            >
+              <div className="flex items-center gap-2">
+                {copied ? <Check className="w-3.5 h-3.5 text-zinc-900" /> : <Copy className="w-3.5 h-3.5 text-zinc-500" />}
+                <span>{copied ? "Copied to clipboard" : "Copy transcript"}</span>
+              </div>
+            </button>
+
+            {/* Export Markdown */}
+            <button
+              type="button"
+              data-testid="header-action-export-md"
+              onClick={() => {
+                onExportMarkdown?.();
+                setIsMenuOpen(false);
+              }}
+              className="w-full text-left px-3 py-1.5 flex items-center gap-2 hover:bg-zinc-50 cursor-pointer transition-colors"
+            >
+              <FileText className="w-3.5 h-3.5 text-zinc-500" />
+              <span>Export as Markdown (.md)</span>
+            </button>
+
+            {/* Export HTML */}
+            <button
+              type="button"
+              data-testid="header-action-export-html"
+              onClick={() => {
+                onExportHtml?.();
+                setIsMenuOpen(false);
+              }}
+              className="w-full text-left px-3 py-1.5 flex items-center gap-2 hover:bg-zinc-50 cursor-pointer transition-colors"
+            >
+              <Download className="w-3.5 h-3.5 text-zinc-500" />
+              <span>Export as Standalone HTML</span>
+            </button>
+
+            <div className="my-1 border-t border-zinc-100" />
+
+            {/* Clear Conversation */}
+            {onClearSession && (
+              <button
+                type="button"
+                data-testid="header-action-clear"
+                onClick={() => {
+                  onClearSession();
+                  setIsMenuOpen(false);
+                }}
+                className="w-full text-left px-3 py-1.5 flex items-center gap-2 hover:bg-zinc-50 cursor-pointer transition-colors text-zinc-700"
+              >
+                <RotateCcw className="w-3.5 h-3.5 text-zinc-500" />
+                <span>Clear conversation</span>
+              </button>
+            )}
+
+            {/* Delete Session */}
+            {onDeleteSession && (
+              <button
+                type="button"
+                data-testid="header-action-delete"
+                onClick={() => {
+                  onDeleteSession();
+                  setIsMenuOpen(false);
+                }}
+                className="w-full text-left px-3 py-1.5 flex items-center gap-2 hover:bg-red-50 text-red-600 cursor-pointer transition-colors"
+              >
+                <Trash2 className="w-3.5 h-3.5 text-red-500" />
+                <span>Delete session</span>
+              </button>
+            )}
+          </div>
+        )}
 
         {/* Right Secondary Panel toggle ([|]) matching Cline */}
         {onToggleRightPanel && (

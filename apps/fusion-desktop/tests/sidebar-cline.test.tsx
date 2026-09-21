@@ -15,7 +15,7 @@ describe("Sidebar Cline Layout matching Image #1 and #2", () => {
     );
     expect(html).toContain('data-testid="sidebar-nav-back"');
     expect(html).toContain('data-testid="sidebar-nav-forward"');
-    expect(html).toContain('data-testid="cline-avatar"');
+    expect(html).toContain('data-testid="fusion-mascot"');
     expect(html).toContain('data-testid="sidebar-search-btn"');
   });
 
@@ -68,7 +68,8 @@ describe("Sidebar Cline Layout matching Image #1 and #2", () => {
     // Project labels
     expect(html).toContain("fusion");
     expect(html).toContain("ecommerce-shop");
-    expect(html).toContain('data-testid="sidebar-sort-toggle"');
-    expect(html).toContain('data-testid="sidebar-filter-toggle"');
+    expect(html).toContain("Projects");
+    expect(html).not.toContain('data-testid="sidebar-sort-toggle"');
+    expect(html).not.toContain('data-testid="sidebar-filter-toggle"');
   });
 });

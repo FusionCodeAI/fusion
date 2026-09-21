@@ -580,6 +580,69 @@ export function App({
   const handleModelChange = (modelId: string) => {
     setSelectedModel(modelId);
   };
+  const handleExportMarkdown = () => {
+    const lines: string[] = [`# ${sessionTitle}\n`];
+    for (const m of messages) {
+      lines.push(`### ${m.role === "user" ? "User" : "Assistant"}\n`);
+      if (m.thought) {
+        lines.push(`> Thought:\n> ${m.thought.replace(/\n/g, "\n> ")}\n`);
+      }
+      lines.push(`${m.content}\n`);
+      if (m.diffPatch) {
+        lines.push(`\`\`\`diff\n${m.diffPatch}\n\`\`\`\n`);
+      }
+    }
+    const blob = new Blob([lines.join("\n")], { type: "text/markdown" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `${sessionTitle.replace(/[^a-zA-Z0-9_-]/g, "_")}.md`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const handleExportHtml = () => {
+    const htmlContent = `<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>${sessionTitle}</title>
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; max-width: 760px; margin: 40px auto; padding: 0 20px; line-height: 1.6; color: #18181b; }
+    h1 { font-size: 1.5rem; border-bottom: 1px solid #e4e4e7; padding-bottom: 8px; }
+    .msg { margin-bottom: 24px; padding: 16px; border-radius: 12px; background: #f4f4f5; }
+    .msg.user { background: #f4f4f5; font-weight: 500; }
+    .msg.assistant { background: #ffffff; border: 1px solid #e4e4e7; }
+    .role { font-size: 0.75rem; text-transform: uppercase; color: #71717a; margin-bottom: 6px; }
+    pre { background: #18181b; color: #f4f4f5; padding: 12px; border-radius: 8px; overflow-x: auto; }
+  </style>
+</head>
+<body>
+  <h1>${sessionTitle}</h1>
+  ${messages
+    .map(
+      (m) =>
+        `<div class="msg ${m.role}"><div class="role">${m.role}</div><div>${m.content}</div></div>`
+    )
+    .join("\n")}
+</body>
+</html>`;
+    const blob = new Blob([htmlContent], { type: "text/html" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `${sessionTitle.replace(/[^a-zA-Z0-9_-]/g, "_")}.html`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const handleCopyTranscript = () => {
+    const text = messages
+      .map((m) => `[${m.role.toUpperCase()}]:\n${m.content}`)
+      .join("\n\n---\n\n");
+    navigator.clipboard?.writeText(text);
+  };
+
 
   return (
     <div
@@ -637,12 +700,14 @@ export function App({
               title={sessionTitle}
               isPinned={activeSession?.isPinned}
               onTogglePin={() => handleTogglePinSession(activeSessionId)}
-              onMore={() => setCurrentView("settings")}
-              onToggleSidebar={() => setIsSidebarOpen((prev) => !prev)}
+              onExportMarkdown={handleExportMarkdown}
+              onExportHtml={handleExportHtml}
+              onCopyTranscript={handleCopyTranscript}
+              onClearSession={() => setMessages([])}
+              onDeleteSession={() => handleDeleteSession(activeSessionId)}
               isRightPanelOpen={isRightPanelOpen}
               onToggleRightPanel={() => setIsRightPanelOpen((prev) => !prev)}
             />
-        {/* Stream: strictly centered, vertical scroll */}
         <div
           ref={streamRef}
           data-testid="conversation-stream"
@@ -727,10 +792,10 @@ export function App({
         width={rightPanelWidth}
         onResize={setRightPanelWidth}
         activeTab={rightPanelTab}
-        onSelectTab={setRightPanelTab}
         diffPatch={latestDiffPatch}
+        workspaceDir={workspaceDir}
         workspaceEntries={workspaceEntries}
-        terminalLogs={terminalLogs}
+        externalLogs={terminalLogs}
       />
 
       {/* Session Search Command Bar (Cmd+K) */}

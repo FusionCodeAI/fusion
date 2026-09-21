@@ -392,6 +392,163 @@ fn list_workspace_entries(workspace_dir: Option<String>) -> Result<Vec<Workspace
 
     Ok(entries)
 }
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct TerminalExecutionResult {
+    pub command: String,
+    pub stdout: String,
+    pub stderr: String,
+    pub exit_code: i32,
+    pub success: bool,
+}
+
+#[tauri::command]
+async fn execute_terminal_command(
+    command: String,
+    cwd: Option<String>,
+) -> Result<TerminalExecutionResult, String> {
+    let raw_cmd = command.trim();
+    if raw_cmd.is_empty() {
+        return Err("command cannot be empty".to_string());
+    }
+
+    let work_dir = match cwd {
+        Some(dir) if !dir.trim().is_empty() => PathBuf::from(dir),
+        _ => std::env::current_dir().unwrap_or_else(|_| PathBuf::from(".")),
+    };
+
+    let mut process = std::process::Command::new("/bin/sh");
+    process.arg("-c").arg(raw_cmd);
+    process.current_dir(work_dir);
+
+    let path_env = std::env::var("PATH").unwrap_or_default();
+    let enriched_path = format!(
+        "/Users/aungmyatmoe/.cargo/bin:/opt/homebrew/opt/rustup/bin:/opt/homebrew/bin:{}",
+        path_env
+    );
+    process.env("PATH", enriched_path);
+
+    let output = process
+        .output()
+        .map_err(|e| format!("Failed to execute command: {}", e))?;
+
+    let stdout = String::from_utf8_lossy(&output.stdout).to_string();
+    let stderr = String::from_utf8_lossy(&output.stderr).to_string();
+    let exit_code = output.status.code().unwrap_or(if output.status.success() { 0 } else { 1 });
+
+    Ok(TerminalExecutionResult {
+        command: raw_cmd.to_string(),
+        stdout,
+        stderr,
+        exit_code,
+        success: output.status.success(),
+    })
+}
+
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct GitFileChange {
+    pub path: String,
+    pub status: String,
+    pub additions: usize,
+    pub deletions: usize,
+    pub patch: String,
+}
+
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct WorkspaceGitStatus {
+    pub branch: String,
+    pub changes: Vec<GitFileChange>,
+    pub full_diff: String,
+}
+
+#[tauri::command]
+fn get_workspace_git_diff(cwd: Option<String>) -> Result<WorkspaceGitStatus, String> {
+    let work_dir = match cwd {
+        Some(dir) if !dir.trim().is_empty() => PathBuf::from(dir),
+        _ => std::env::current_dir().unwrap_or_else(|_| PathBuf::from(".")),
+    };
+
+    // 1. Get current branch
+    let branch_output = std::process::Command::new("git")
+        .arg("rev-parse")
+        .arg("--abbrev-ref")
+        .arg("HEAD")
+        .current_dir(&work_dir)
+        .output()
+        .ok();
+    let branch = branch_output
+        .map(|o| String::from_utf8_lossy(&o.stdout).trim().to_string())
+        .unwrap_or_else(|| "main".to_string());
+
+    // 2. Get full uncommitted git diff
+    let full_diff_output = std::process::Command::new("git")
+        .arg("diff")
+        .arg("HEAD")
+        .current_dir(&work_dir)
+        .output()
+        .ok();
+    let full_diff = full_diff_output
+        .map(|o| String::from_utf8_lossy(&o.stdout).to_string())
+        .unwrap_or_default();
+
+    // 3. Get status porcelain
+    let status_output = std::process::Command::new("git")
+        .arg("status")
+        .arg("--porcelain=v1")
+        .current_dir(&work_dir)
+        .output()
+        .ok();
+
+    let mut changes = Vec::new();
+    if let Some(out) = status_output {
+        let stdout_str = String::from_utf8_lossy(&out.stdout);
+        for line in stdout_str.lines() {
+            let line = line.trim_end();
+            if line.len() < 3 {
+                continue;
+            }
+            let status_code = line[..2].trim().to_string();
+            let file_path = line[3..].trim().to_string();
+
+            // Run per-file diff
+            let file_diff_out = std::process::Command::new("git")
+                .arg("diff")
+                .arg("HEAD")
+                .arg("--")
+                .arg(&file_path)
+                .current_dir(&work_dir)
+                .output()
+                .ok();
+
+            let patch = file_diff_out
+                .map(|o| String::from_utf8_lossy(&o.stdout).to_string())
+                .unwrap_or_default();
+
+            let mut additions = 0;
+            let mut deletions = 0;
+            for pl in patch.lines() {
+                if pl.starts_with('+') && !pl.starts_with("+++") {
+                    additions += 1;
+                } else if pl.starts_with('-') && !pl.starts_with("---") {
+                    deletions += 1;
+                }
+            }
+
+            changes.push(GitFileChange {
+                path: file_path,
+                status: if status_code.is_empty() { "M".to_string() } else { status_code },
+                additions,
+                deletions,
+                patch,
+            });
+        }
+    }
+
+    Ok(WorkspaceGitStatus {
+        branch,
+        changes,
+        full_diff,
+    })
+}
 #[tauri::command]
 fn show_desktop_notification(
     app: tauri::AppHandle,
@@ -880,6 +1037,8 @@ fn main() {
             load_fusion_session,
             save_fusion_session,
             delete_fusion_session,
+            execute_terminal_command,
+            get_workspace_git_diff,
             list_workspace_entries,
             pick_project_folder,
             execute_fusion_turn,

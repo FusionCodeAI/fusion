@@ -45,26 +45,19 @@ describe("TopHeader Component", () => {
     expect(html).toContain(customTitle);
   });
 
-  it("renders right-side actions: More (...) and Sidebar toggle ([|]) without IDE button", () => {
-    const html = renderToStaticMarkup(<TopHeader />);
+  it("renders right-side actions: More (...) without IDE button", () => {
+    const html = renderToStaticMarkup(<TopHeader onToggleRightPanel={() => {}} />);
 
     expect(html).not.toContain("data-testid=\"top-header-ide\"");
     expect(html).toContain("data-testid=\"top-header-more\"");
-    expect(html).toContain("data-testid=\"top-header-sidebar-toggle\"");
+    expect(html).toContain("data-testid=\"top-header-right-panel-toggle\"");
   });
 
-  it("invokes onToggleSidebar when toggle button is clicked", () => {
-    let toggled = false;
-    const element = TopHeader({
-      onToggleSidebar: () => {
-        toggled = true;
-      },
-    });
-
-    expect(element).toBeDefined();
-    // Sidebar toggle is last button in actions group
-    const buttons = element.props.children[1].props.children.filter(Boolean);
-    buttons[buttons.length - 1].props.onClick();
+  it("renders TopHeader with right panel toggle button", () => {
+    const html = renderToStaticMarkup(
+      <TopHeader onToggleRightPanel={() => {}} />
+    );
+    expect(html).toContain("data-testid=\"top-header-right-panel-toggle\"");
   });
 });
 describe("Sidebar Component", () => {
@@ -84,7 +77,7 @@ describe("Sidebar Component", () => {
     expect(html).toContain("pl-[76px]");
     expect(html).toContain('data-testid="sidebar-nav-back"');
     expect(html).toContain('data-testid="sidebar-nav-forward"');
-    expect(html).toContain('data-testid="cline-avatar"');
+    expect(html).toContain('data-testid="fusion-mascot"');
     expect(html).toContain('data-testid="sidebar-search-btn"');
   });
 
@@ -96,11 +89,12 @@ describe("Sidebar Component", () => {
     expect(html).toContain("Customize");
   });
 
-  it("renders Sessions section with sort and filter controls", () => {
+  it("renders Projects section title cleanly without clock/filter controls", () => {
     const html = renderToStaticMarkup(<Sidebar />);
 
-    expect(html).toContain('data-testid="sidebar-sort-toggle"');
-    expect(html).toContain('data-testid="sidebar-filter-toggle"');
+    expect(html).toContain("Projects");
+    expect(html).not.toContain('data-testid="sidebar-sort-toggle"');
+    expect(html).not.toContain('data-testid="sidebar-filter-toggle"');
   });
 
   it("renders footer with Settings button", () => {

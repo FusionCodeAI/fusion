@@ -18,6 +18,28 @@ export interface WorkspaceEntry {
   is_dir: boolean;
 }
 
+export interface TerminalExecutionResult {
+  command: string;
+  stdout: string;
+  stderr: string;
+  exit_code: number;
+  success: boolean;
+}
+
+export interface GitFileChange {
+  path: string;
+  status: string;
+  additions: number;
+  deletions: number;
+  patch: string;
+}
+
+export interface WorkspaceGitStatus {
+  branch: string;
+  changes: GitFileChange[];
+  full_diff: string;
+}
+
 type usize = number;
 
 /**
@@ -299,5 +321,51 @@ export async function startFusionLogin(): Promise<AuthStatus> {
   } catch (err) {
     console.warn("[fusion-ipc] start_fusion_login error:", err);
     return { is_signed_in: true, provider: "fusion" };
+  }
+}
+/**
+ * Executes an interactive shell command in the workspace via Tauri backend.
+ */
+export async function executeTerminalCommand(
+  command: string,
+  cwd?: string
+): Promise<TerminalExecutionResult> {
+  if (!isTauriEnvironment()) {
+    return {
+      command,
+      stdout: `[mock-terminal] executed: ${command}\nexit code: 0\n`,
+      stderr: "",
+      exit_code: 0,
+      success: true,
+    };
+  }
+  return await invoke<TerminalExecutionResult>("execute_terminal_command", {
+    command,
+    cwd: cwd || null,
+  });
+}
+
+/**
+ * Fetches live git working tree changes and uncommitted diffs via Tauri backend.
+ */
+export async function getWorkspaceGitDiff(cwd?: string): Promise<WorkspaceGitStatus> {
+  if (!isTauriEnvironment()) {
+    return {
+      branch: "main",
+      changes: [],
+      full_diff: "",
+    };
+  }
+  try {
+    return await invoke<WorkspaceGitStatus>("get_workspace_git_diff", {
+      cwd: cwd || null,
+    });
+  } catch (err) {
+    console.warn("[fusion-ipc] get_workspace_git_diff failed:", err);
+    return {
+      branch: "main",
+      changes: [],
+      full_diff: "",
+    };
   }
 }
