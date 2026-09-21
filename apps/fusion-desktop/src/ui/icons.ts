@@ -69,4 +69,10 @@ export const icons = {
 
   // hugeicons:arrow-right-02
   arrowRightSubmit: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="#000" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><path d="M18.5 12H5m8 6s6-4.419 6-6-6-6-6-6"/></svg>`,
+
+  // hugeicons:link-external-02
+  externalLink: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="#000" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8"><path d="M13 11L21 3M21 3H15M21 3V9M19 13V19C19 20.1046 18.1046 21 17 21H5C3.89543 21 3 20.1046 3 19V7C3 5.89543 3.89543 5 5 5H11"/></svg>`,
+
+  // hugeicons:more-horizontal
+  dotsHorizontal: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="#000"><circle cx="5" cy="12" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="19" cy="12" r="2"/></svg>`,
 };
