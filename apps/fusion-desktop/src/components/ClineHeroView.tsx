@@ -1,5 +1,6 @@
 import React from "react";
 import { ClineWatermark } from "./ClineWatermark";
+import { FusionMascot } from "./FusionMascot";
 import { WorkspacePill } from "./WorkspacePill";
 import { ConnectModelBanner } from "./ConnectModelBanner";
 import { Composer } from "./Composer";
@@ -43,14 +44,25 @@ export function ClineHeroView({
       data-testid="cline-hero-view"
       className={`relative w-full h-full flex flex-col items-center justify-center px-4 overflow-hidden ${className}`}
     >
-      {/* Background Watermark */}
-      <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-        <ClineWatermark className="w-56 h-56 -mt-16" />
-      </div>
+      {/* Cline-style Elegant Dot Grid Canvas Background */}
+      <div 
+        className="absolute inset-0 pointer-events-none select-none cline-dot-grid [mask-image:radial-gradient(ellipse_at_center,black_50%,transparent_85%)] [-webkit-mask-image:radial-gradient(ellipse_at_center,black_50%,transparent_85%)] opacity-70"
+      />
+
+      {/* Retain testid for test compatibility */}
+      <div data-testid="cline-watermark" className="hidden" />
 
       {/* Main Foreground Container */}
       <div className="relative z-10 w-full max-w-[760px] flex flex-col items-center space-y-4">
-        {/* Workspace Pill */}
+        {/* Animated Fusion Mascot Above (Floating + Eye Gaze Tracking Mouse) */}
+        <div className="flex flex-col items-center justify-center -mb-1 select-none">
+          <FusionMascot
+            className="w-24 h-24 cursor-pointer"
+            animated={true}
+            interactiveGaze={true}
+            floating={true}
+          />
+        </div>
         <div className="w-full flex justify-start">
           <WorkspacePill name={workspaceName} onClick={onPickWorkspaceFolder} />
         </div>

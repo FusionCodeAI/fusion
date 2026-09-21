@@ -92,3 +92,19 @@ kbd {
 ::-webkit-scrollbar-thumb:hover {
   background: rgba(0, 0, 0, 0.22);
 }
+
+/* Smooth floating animation for the mascot */
+@keyframes fusion-float {
+  0%, 100% {
+    transform: translateY(0px) rotate(0deg);
+  }
+  50% {
+    transform: translateY(-7px) rotate(0.6deg);
+  }
+}
+
+/* Cline-style elegant canvas grid patterns */
+.cline-dot-grid {
+  background-image: radial-gradient(rgba(0, 0, 0, 0.08) 1.25px, transparent 1.25px);
+  background-size: 24px 24px;
+}
