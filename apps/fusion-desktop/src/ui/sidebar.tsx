@@ -94,12 +94,11 @@ export function Sidebar({
           overflow: "hidden",
         }}
       >
-        {/* Top Header Row: macOS traffic lights clearance (paddingLeft: 78), sidebar toggle and arrows */}
+        {/* Top Header Row: macOS traffic lights clearance (paddingLeft: 98), sidebar toggle and arrows */}
         <div
           style={{
             height: 40,
-            paddingLeft: 78, // Comfortable clearance for macOS traffic lights at x: 18, y: 14
-            paddingRight: 12,
+            paddingLeft: 98, // Generous clearance for macOS traffic lights at x: 18, y: 14
             display: "flex",
             flexDirection: "row",
             alignItems: "center",
