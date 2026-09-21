@@ -6,8 +6,9 @@ import { Composer } from "./Composer";
 
 export interface ClineHeroViewProps {
   workspaceName?: string;
+  isSignedIn?: boolean;
+  onSignIn?: () => void;
   onConnectModel?: () => void;
-  onModelSettings?: () => void;
   effort?: "Low" | "Medium" | "High";
   onSelectEffort?: (effort: "Low" | "Medium" | "High") => void;
   onSend: (text: string) => void;
@@ -21,8 +22,9 @@ export interface ClineHeroViewProps {
 
 export function ClineHeroView({
   workspaceName = "workspace",
+  isSignedIn = false,
+  onSignIn,
   onConnectModel,
-  onModelSettings,
   onSend,
   selectedModel,
   onSelectModel,
@@ -50,10 +52,10 @@ export function ClineHeroView({
           <WorkspacePill name={workspaceName} onClick={onPickWorkspaceFolder} />
         </div>
 
-        {/* Connect Model Banner */}
+        {/* Sign In / Connect Model Banner */}
         <ConnectModelBanner
-          onConnect={onConnectModel}
-          onSettings={onModelSettings}
+          isSignedIn={isSignedIn}
+          onSignIn={onSignIn || onConnectModel}
         />
 
         {/* Floating Composer Box */}

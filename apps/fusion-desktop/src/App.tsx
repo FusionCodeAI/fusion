@@ -84,6 +84,20 @@ export function App({
   const [isSidebarOpen, setIsSidebarOpen] = useState(initialSidebarOpen);
   const [currentView, setCurrentView] = useState<"chat" | "customize">("chat");
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
+  const [isSignedIn, setIsSignedIn] = useState<boolean>(() => {
+    if (typeof window !== "undefined" && window.localStorage) {
+      return window.localStorage.getItem("fusion_desktop_is_signed_in") === "true";
+    }
+    return false;
+  });
+
+  const handleSignIn = () => {
+    setIsSignedIn(true);
+    if (typeof window !== "undefined" && window.localStorage) {
+      window.localStorage.setItem("fusion_desktop_is_signed_in", "true");
+    }
+  };
+
 
   const [sidebarWidth, setSidebarWidth] = useState<number>(() => {
     if (typeof window !== "undefined" && window.localStorage) {
@@ -457,6 +471,8 @@ export function App({
         >
           {messages.length === 0 ? (
             <ClineHeroView
+              isSignedIn={isSignedIn}
+              onSignIn={handleSignIn}
               onSend={handleSend}
               selectedModel={selectedModel}
               onSelectModel={handleModelChange}

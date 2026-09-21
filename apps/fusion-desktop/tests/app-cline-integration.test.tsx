@@ -10,6 +10,8 @@ describe("App Integration with Cline Layout", () => {
     expect(html).toContain('data-testid="workspace-pill"');
     expect(html).toContain('data-testid="connect-model-banner"');
     expect(html).not.toContain("Fusion Usage-Billing");
-    expect(html).toContain("Connect a model to start building");
+    expect(html).toContain("Sign in to start building");
+    expect(html).toContain("Sign in");
+    expect(html).not.toContain("Model settings");
   });
 });

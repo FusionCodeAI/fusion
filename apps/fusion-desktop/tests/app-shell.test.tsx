@@ -159,7 +159,7 @@ describe("App Shell Component", () => {
     const html = renderToString(<App />);
 
     expect(html).toContain("data-testid=\"cline-hero-view\"");
-    expect(html).toContain("Connect a model to start building");
+    expect(html).toContain("Sign in to start building");
     expect(html).toContain("data-testid=\"workspace-pill\"");
   });
 

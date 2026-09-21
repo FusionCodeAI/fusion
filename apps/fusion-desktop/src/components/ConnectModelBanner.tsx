@@ -1,17 +1,26 @@
 import React from "react";
-import { Zap } from "lucide-react";
+import { Zap, LogIn } from "lucide-react";
 
 export interface ConnectModelBannerProps {
+  isSignedIn?: boolean;
+  onSignIn?: () => void;
   onConnect?: () => void;
-  onSettings?: () => void;
   className?: string;
 }
 
 export function ConnectModelBanner({
+  isSignedIn = false,
+  onSignIn,
   onConnect,
-  onSettings,
   className = "",
 }: ConnectModelBannerProps) {
+  // If the user is signed in, do not show the banner
+  if (isSignedIn) {
+    return null;
+  }
+
+  const handleAction = onSignIn || onConnect;
+
   return (
     <div
       data-testid="connect-model-banner"
@@ -23,29 +32,22 @@ export function ConnectModelBanner({
         </div>
         <div className="min-w-0">
           <div className="text-xs font-semibold text-zinc-900 truncate">
-            Connect a model to start building
+            Sign in to start building
           </div>
           <div className="text-[11px] text-zinc-500 truncate">
             Sign in with Fusion or add an API key — it takes under a minute.
           </div>
         </div>
       </div>
-      <div className="flex items-center gap-2 shrink-0">
+      <div className="flex items-center shrink-0">
         <button
           type="button"
-          data-testid="banner-connect-btn"
-          onClick={onConnect}
-          className="bg-[#5100cd] hover:bg-[#4300a8] text-white text-xs font-medium rounded-full px-4 py-1.5 transition-colors shadow-xs cursor-pointer"
+          data-testid="banner-signin-btn"
+          onClick={handleAction}
+          className="bg-[#5100cd] hover:bg-[#4300a8] text-white text-xs font-medium rounded-full px-5 py-1.5 transition-colors shadow-xs cursor-pointer flex items-center gap-1.5"
         >
-          Connect a model
-        </button>
-        <button
-          type="button"
-          data-testid="banner-settings-btn"
-          onClick={onSettings}
-          className="text-xs font-medium text-zinc-600 hover:text-zinc-900 px-2.5 py-1.5 cursor-pointer"
-        >
-          Model settings
+          <LogIn className="w-3.5 h-3.5" />
+          <span>Sign in</span>
         </button>
       </div>
     </div>
