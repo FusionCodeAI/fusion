@@ -7,6 +7,8 @@ import { UserMessage } from "./components/UserMessage";
 import { ToolCallRow } from "./components/ToolCallRow";
 import { DiffView } from "./components/DiffView";
 import { Composer } from "./components/Composer";
+import { ClineAvatar } from "./components/ClineAvatar";
+import { MarkdownRenderer } from "./components/MarkdownRenderer";
 import { AgentBridge } from "./lib/agent-bridge";
 import { DEFAULT_FUSION_MODEL } from "./models";
 import type { ChatMessage, TurnStep } from "./types";
@@ -328,29 +330,35 @@ export function App({
                 const showThinkingRow = hasThought || (isCurrent && !msg.content);
 
                 return (
-                  <div key={msg.id} className="w-full flex flex-col gap-2 py-1">
-                    {showThinkingRow && (
-                      <ThinkingRow
-                        thought={msg.thought || ""}
-                        isGenerating={isCurrent && !msg.content}
-                      />
-                    )}
+                  <div key={msg.id} className="w-full flex items-start gap-3 py-1">
+                    <ClineAvatar
+                      isThinking={isCurrent}
+                      className="w-7 h-7 shrink-0 mt-0.5"
+                    />
+                    <div className="flex-1 min-w-0 flex flex-col gap-2">
+                      {showThinkingRow && (
+                        <ThinkingRow
+                          thought={msg.thought || ""}
+                          isGenerating={isCurrent && !msg.content}
+                        />
+                      )}
 
-                    {msg.steps && msg.steps.length > 0 && (
-                      <div className="flex flex-col gap-1 w-full py-1">
-                        {msg.steps.map((step) => (
-                          <ToolCallRow key={step.id} step={step} />
-                        ))}
-                      </div>
-                    )}
+                      {msg.steps && msg.steps.length > 0 && (
+                        <div className="flex flex-col gap-1 w-full py-1">
+                          {msg.steps.map((step) => (
+                            <ToolCallRow key={step.id} step={step} />
+                          ))}
+                        </div>
+                      )}
 
-                    {msg.diffPatch && <DiffView patch={msg.diffPatch} />}
+                      {msg.diffPatch && <DiffView patch={msg.diffPatch} />}
 
-                    {msg.content && (
-                      <div className="text-[14px] leading-relaxed text-zinc-900 whitespace-pre-wrap break-words font-sans">
-                        {msg.content}
-                      </div>
-                    )}
+                      {msg.content && (
+                        <div className="text-[13px] leading-relaxed text-zinc-900 font-sans">
+                          <MarkdownRenderer content={msg.content} />
+                        </div>
+                      )}
+                    </div>
                   </div>
                 );
               })}
