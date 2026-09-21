@@ -1692,7 +1692,6 @@ fn handle_notify(args: &[String], runner: &mut AgentRunner) {
             .priority(crate::ui::notify::NotificationPriority::Success);
 
             let outcome = notif.send_sync(&notif_cfg);
-            #[cfg(not(target_os = "macos"))]
             println!(
                 "  • Desktop OS:       {}",
                 if outcome.desktop_sent {
