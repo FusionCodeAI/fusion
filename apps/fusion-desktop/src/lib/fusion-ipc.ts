@@ -145,3 +145,19 @@ export async function streamFusionAcp(
     throw err;
   }
 }
+
+/**
+ * Opens the native folder picker dialog to select a workspace directory.
+ */
+export async function pickProjectFolder(): Promise<string | null> {
+  if (!isTauriEnvironment()) {
+    return null;
+  }
+  try {
+    const res = await invoke<string | null>("pick_project_folder");
+    return res || null;
+  } catch (err) {
+    console.warn("[fusion-ipc] pick_project_folder error:", err);
+    return null;
+  }
+}

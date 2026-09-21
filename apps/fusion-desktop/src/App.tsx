@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from "react";
 import { TopHeader } from "./components/TopHeader";
-import { Sidebar, type SidebarSessionItem } from "./components/Sidebar";
+import { Sidebar, getWorkspaceFolderName, type SidebarSessionItem } from "./components/Sidebar";
 import { ClineHeroView } from "./components/ClineHeroView";
 import { ThinkingRow } from "./components/ThinkingRow";
 import { UserMessage } from "./components/UserMessage";
@@ -10,6 +10,7 @@ import { Composer } from "./components/Composer";
 import { ClineAvatar } from "./components/ClineAvatar";
 import { MarkdownRenderer } from "./components/MarkdownRenderer";
 import { AgentBridge } from "./lib/agent-bridge";
+import { pickProjectFolder } from "./lib/fusion-ipc";
 import {
   loadAllSessions,
   generateSessionId,
@@ -103,6 +104,26 @@ export function App({
       window.localStorage.removeItem("fusion_desktop_sidebar_width");
     }
   };
+  const [workspaceDir, setWorkspaceDir] = useState<string>(() => {
+    if (typeof window !== "undefined" && window.localStorage) {
+      return window.localStorage.getItem("fusion_desktop_workspace_dir") || ".";
+    }
+    return ".";
+  });
+
+  const workspaceName = getWorkspaceFolderName(workspaceDir);
+
+  const handlePickProjectFolder = async () => {
+    const selected = await pickProjectFolder();
+    if (selected) {
+      setWorkspaceDir(selected);
+      if (typeof window !== "undefined" && window.localStorage) {
+        window.localStorage.setItem("fusion_desktop_workspace_dir", selected);
+      }
+      bridge.setCwd?.(selected);
+    }
+  };
+
   const [sessionsRecord, setSessionsRecord] = useState<ChatSessionRecord[]>(() => {
     if (initialSessions && initialSessions.length > 0) {
       return initialSessions.map((s) => ({
@@ -427,7 +448,8 @@ export function App({
               onSend={handleSend}
               selectedModel={selectedModel}
               onSelectModel={handleModelChange}
-              workspaceName="workspace"
+              workspaceName={workspaceName}
+              onPickWorkspaceFolder={handlePickProjectFolder}
             />
           ) : (
             <div className="w-full max-w-[680px] flex flex-col gap-4">

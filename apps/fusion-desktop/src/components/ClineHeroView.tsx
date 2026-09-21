@@ -12,9 +12,8 @@ export interface ClineHeroViewProps {
   selectedModel?: string;
   onSelectModel?: (modelId: string) => void;
   billingProfile?: string;
-  effort?: "Low" | "Medium" | "High";
-  onSelectEffort?: (effort: "Low" | "Medium" | "High") => void;
   onAttachFile?: () => void;
+  onPickWorkspaceFolder?: () => void;
   className?: string;
 }
 
@@ -29,6 +28,7 @@ export function ClineHeroView({
   effort,
   onSelectEffort,
   onAttachFile,
+  onPickWorkspaceFolder,
   className = "",
 }: ClineHeroViewProps) {
   return (
@@ -45,7 +45,7 @@ export function ClineHeroView({
       <div className="relative z-10 w-full max-w-[760px] flex flex-col items-center space-y-4">
         {/* Workspace Pill */}
         <div className="flex justify-center">
-          <WorkspacePill name={workspaceName} />
+          <WorkspacePill name={workspaceName} onClick={onPickWorkspaceFolder} />
         </div>
 
         {/* Connect Model Banner */}
