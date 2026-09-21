@@ -669,7 +669,7 @@ describe("Desktop E2E: Component Sanity (Render & Instantiation)", () => {
         })
       );
       expect(html).toContain("Thought briefly");
-      expect(html).toContain("▾");
+      expect(html).toContain("lucide-chevron-down");
     });
   });
 

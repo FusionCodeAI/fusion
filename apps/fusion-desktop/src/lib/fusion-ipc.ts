@@ -1,4 +1,4 @@
-import { invoke } from "@tauri-apps/api/core";
+import { invoke, Channel } from "@tauri-apps/api/core";
 
 export interface DesktopSessionSummary {
   id: string;
@@ -102,6 +102,46 @@ export async function executeFusionTurn(
     });
   } catch (err) {
     console.warn("[fusion-ipc] execute_fusion_turn error:", err);
+    throw err;
+  }
+}
+
+export interface StreamAcpEvent {
+  type: "chunk" | "thought" | "step";
+  text?: string;
+  title?: string;
+  status?: string;
+}
+
+/**
+ * Streams real-time tokens, thoughts, and steps from the native Fusion ACP daemon.
+ */
+export async function streamFusionAcp(
+  prompt: string,
+  model?: string,
+  sessionId?: string,
+  cwd?: string,
+  onEvent?: (event: StreamAcpEvent) => void
+): Promise<string | null> {
+  if (!isTauriEnvironment()) {
+    return null;
+  }
+
+  const channel = new Channel<StreamAcpEvent>();
+  if (onEvent) {
+    channel.onmessage = onEvent;
+  }
+
+  try {
+    return await invoke<string>("stream_fusion_acp", {
+      prompt,
+      model: model || undefined,
+      sessionId: sessionId || undefined,
+      cwd: cwd || undefined,
+      onEvent: channel,
+    });
+  } catch (err) {
+    console.warn("[fusion-ipc] stream_fusion_acp error:", err);
     throw err;
   }
 }

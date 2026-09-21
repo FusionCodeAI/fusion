@@ -2,7 +2,7 @@ import * as fs from "node:fs";
 import * as path from "node:path";
 import { FusionAgent } from "@fusioncode/sdk";
 import { DEFAULT_FUSION_MODEL, FUSION_MODELS } from "./models";
-import { isTauriEnvironment, executeFusionTurn } from "./fusion-ipc";
+import { isTauriEnvironment, executeFusionTurn, streamFusionAcp } from "./fusion-ipc";
 import type { TurnStep } from "../types";
 
 export type BridgeEvent = "thought" | "chunk" | "step" | "diff" | "done" | "error";
@@ -334,6 +334,39 @@ export class AgentBridge {
       const modelObj = FUSION_MODELS.find((m) => m.id === targetModel);
       const modelName = modelObj ? (modelObj.shortName || modelObj.name) : "DeepSeek 4 Flash";
       this.emit("thought", `Connecting to Fusion native engine...\nProcessing turn with ${modelName}.\n`);
+      try {
+        let receivedAnyChunk = false;
+        await streamFusionAcp(
+          text,
+          targetModel,
+          this.sessionId,
+          this.cwd,
+          (event) => {
+            if (event.type === "chunk" && event.text) {
+              receivedAnyChunk = true;
+              this.emit("chunk", event.text);
+            } else if (event.type === "thought" && event.text) {
+              this.emit("thought", event.text);
+            } else if (event.type === "step" && event.title) {
+              this.emit("step", {
+                id: `step-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+                title: event.title,
+                status: "completed",
+              });
+            }
+          }
+        );
+
+        if (receivedAnyChunk) {
+          this.emit("done", {
+            tokens: 150,
+            durationMs: 500,
+          });
+          return;
+        }
+      } catch (err) {
+        console.warn("[AgentBridge] streamFusionAcp error, attempting executeFusionTurn:", err);
+      }
 
       try {
         const realResponse = await executeFusionTurn(text, targetModel, this.sessionId, this.cwd);

@@ -4,6 +4,7 @@
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::fs;
+use tokio::io::{AsyncBufReadExt, AsyncWriteExt};
 use std::path::PathBuf;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -136,7 +137,7 @@ fn save_fusion_session(session: Value) -> Result<String, String> {
 
     Ok(id.to_string())
 }
-
+#[allow(dead_code)]
 #[tauri::command]
 fn delete_fusion_session(id: String) -> Result<bool, String> {
     let dir = fusion_sessions_dir();
@@ -297,6 +298,143 @@ async fn execute_fusion_turn(
         Err(if !stderr.trim().is_empty() { stderr } else { format!("Process exited with status {}", output.status) })
     }
 }
+#[tauri::command]
+async fn stream_fusion_acp(
+    prompt: String,
+    model: Option<String>,
+    session_id: Option<String>,
+    cwd: Option<String>,
+    on_event: tauri::ipc::Channel<Value>,
+) -> Result<String, String> {
+    let binary = find_fusion_binary()?;
+    let mut cmd = tokio::process::Command::new(&binary);
+    cmd.arg("--acp");
+
+    if let Some(dir) = cwd {
+        let clean_d = dir.trim();
+        if !clean_d.is_empty() {
+            cmd.arg("-C").arg(clean_d);
+        }
+    }
+
+    cmd.stdin(std::process::Stdio::piped());
+    cmd.stdout(std::process::Stdio::piped());
+    cmd.stderr(std::process::Stdio::null());
+    cmd.envs(std::env::vars());
+
+    let mut child = cmd.spawn().map_err(|e| format!("Failed to spawn {}: {}", binary.display(), e))?;
+
+    let mut stdin = child.stdin.take().ok_or_else(|| "Failed to open stdin".to_string())?;
+    let stdout = child.stdout.take().ok_or_else(|| "Failed to open stdout".to_string())?;
+
+    // 1. Send initialize
+    let init_req = serde_json::json!({
+        "jsonrpc": "2.0",
+        "id": 1,
+        "method": "initialize",
+        "params": {
+            "protocolVersion": 1,
+            "clientInfo": { "name": "fusion-desktop", "version": "2.0.0" },
+            "capabilities": {}
+        }
+    });
+    stdin.write_all(format!("{}\n", init_req).as_bytes()).await.map_err(|e| e.to_string())?;
+    stdin.flush().await.map_err(|e| e.to_string())?;
+
+    let mut reader = tokio::io::BufReader::new(stdout).lines();
+
+    // Read initialize response
+    let _ = reader.next_line().await.map_err(|e| e.to_string())?;
+
+    // 2. Either session/load if session exists, or session/new
+    let target_session_id = session_id.unwrap_or_default();
+    let direct_path = fusion_sessions_dir().join(format!("{}.json", target_session_id));
+
+    let actual_session_id = if !target_session_id.is_empty() && direct_path.exists() {
+        let load_req = serde_json::json!({
+            "jsonrpc": "2.0",
+            "id": 2,
+            "method": "session/load",
+            "params": { "sessionId": target_session_id }
+        });
+        stdin.write_all(format!("{}\n", load_req).as_bytes()).await.map_err(|e| e.to_string())?;
+        stdin.flush().await.map_err(|e| e.to_string())?;
+        let _ = reader.next_line().await;
+        target_session_id
+    } else {
+        let chosen_model = model.unwrap_or_else(|| "deepseek-v4-flash-0731".to_string());
+        let new_req = serde_json::json!({
+            "jsonrpc": "2.0",
+            "id": 2,
+            "method": "session/new",
+            "params": { "model": chosen_model }
+        });
+        stdin.write_all(format!("{}\n", new_req).as_bytes()).await.map_err(|e| e.to_string())?;
+        stdin.flush().await.map_err(|e| e.to_string())?;
+        let new_line = reader.next_line().await.map_err(|e| e.to_string())?.unwrap_or_default();
+        let val: Value = serde_json::from_str(&new_line).unwrap_or_default();
+        val.get("result").and_then(|r| r.get("sessionId")).and_then(|s| s.as_str()).unwrap_or("").to_string()
+    };
+
+    // 3. Send session/prompt
+    let prompt_req = serde_json::json!({
+        "jsonrpc": "2.0",
+        "id": 3,
+        "method": "session/prompt",
+        "params": {
+            "sessionId": actual_session_id,
+            "prompt": prompt
+        }
+    });
+    stdin.write_all(format!("{}\n", prompt_req).as_bytes()).await.map_err(|e| e.to_string())?;
+    stdin.flush().await.map_err(|e| e.to_string())?;
+
+    // 4. Stream session/update events in REAL TIME!
+    let mut full_text = String::new();
+
+    while let Ok(Some(line)) = reader.next_line().await {
+        if let Ok(val) = serde_json::from_str::<Value>(&line) {
+            if val.get("id") == Some(&serde_json::json!(3)) {
+                break;
+            }
+
+            if val.get("method") == Some(&serde_json::json!("session/update")) {
+                if let Some(params) = val.get("params") {
+                    if let Some(update) = params.get("update") {
+                        let kind = update.get("sessionUpdate").and_then(|k| k.as_str()).unwrap_or("");
+                        if kind == "agent_message_chunk" {
+                            if let Some(text_val) = update.get("content").and_then(|c| c.get("text")).and_then(|t| t.as_str()) {
+                                full_text.push_str(text_val);
+                                let _ = on_event.send(serde_json::json!({
+                                    "type": "chunk",
+                                    "text": text_val
+                                }));
+                            }
+                        } else if kind == "thought" {
+                            if let Some(t_val) = update.get("content").and_then(|c| c.get("text")).and_then(|t| t.as_str()) {
+                                let _ = on_event.send(serde_json::json!({
+                                    "type": "thought",
+                                    "text": t_val
+                                }));
+                            }
+                        } else if kind == "tool_call" {
+                            let title = update.get("title").and_then(|t| t.as_str()).unwrap_or("Tool execution");
+                            let _ = on_event.send(serde_json::json!({
+                                "type": "step",
+                                "title": title,
+                                "status": "running"
+                            }));
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    let _ = child.kill().await;
+    Ok(full_text)
+}
+
 
 fn main() {
     tauri::Builder::default()
@@ -305,8 +443,8 @@ fn main() {
             list_fusion_sessions,
             load_fusion_session,
             save_fusion_session,
-            delete_fusion_session,
             execute_fusion_turn,
+            stream_fusion_acp,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

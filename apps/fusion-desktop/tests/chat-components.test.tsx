@@ -24,7 +24,7 @@ describe("Chat UI Components", () => {
       const html = renderToString(
         <ThinkingRow thought="Analyzing the database schema..." isGenerating={false} />
       );
-      expect(html).toContain("Thought briefly ▾");
+      expect(html).toContain("Thought briefly");
       expect(html).not.toContain("Analyzing the database schema...");
     });
   });

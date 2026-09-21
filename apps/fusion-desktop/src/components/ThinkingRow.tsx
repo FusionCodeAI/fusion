@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { Loader2 } from "lucide-react";
+import { Loader2, ChevronDown, ChevronUp } from "lucide-react";
 
 export interface ThinkingRowProps {
   thought: string;
@@ -15,6 +15,12 @@ export function ThinkingRow({ thought, isGenerating }: ThinkingRowProps) {
   }
 
   const isThinkingWithoutThought = Boolean(isGenerating && !thought);
+  const cleanParagraphs = thought
+    ? thought
+        .split("\n")
+        .map((line) => line.trim())
+        .filter((line) => line.length > 0)
+    : [];
 
   return (
     <div className="w-full py-1 select-none">
@@ -34,15 +40,20 @@ export function ThinkingRow({ thought, isGenerating }: ThinkingRowProps) {
             <span className="font-medium text-zinc-500">Thinking...</span>
           </>
         ) : (
-          <span className="font-medium">
-            {`Thought briefly ${isExpanded ? "▴" : "▾"}`}
+          <span className="font-medium inline-flex items-center gap-1">
+            <span>Thought briefly</span>
+            {isExpanded ? (
+              <ChevronUp className="w-3 h-3 text-zinc-400" />
+            ) : (
+              <ChevronDown className="w-3 h-3 text-zinc-400" />
+            )}
           </span>
         )}
       </button>
 
-      {isExpanded && Boolean(thought) && (
-        <div className="mt-2 text-[13px] text-zinc-600 leading-relaxed font-sans space-y-2 whitespace-pre-wrap break-words">
-          {thought.split("\n\n").map((paragraph, index) => (
+      {isExpanded && cleanParagraphs.length > 0 && (
+        <div className="mt-2 text-[13px] text-zinc-600 leading-relaxed font-sans space-y-1.5 whitespace-pre-wrap break-words">
+          {cleanParagraphs.map((paragraph, index) => (
             <p key={index}>{paragraph}</p>
           ))}
         </div>
