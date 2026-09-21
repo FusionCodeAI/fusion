@@ -1,9 +1,10 @@
 import { describe, expect, it, beforeEach, afterEach } from "bun:test";
 import { mkdtempSync, rmSync, writeFileSync, existsSync } from "node:fs";
+import { readFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { SessionStore } from "../src/state/session-store";
-import type { TurnStep } from "../src/types";
+import { SessionStore, isValidMessage, isValidSession } from "../src/state/session-store";
+import type { ChatSession, TurnStep } from "../src/types";
 
 describe("SessionStore - Session Lifecycle", () => {
   let tempDir: string;
@@ -353,6 +354,61 @@ describe("SessionStore - React Integration & Reactivity", () => {
       mutableTarget.activeSessionId = "modified";
     }).toThrow();
   });
+
+  it("ensures snapshot immutability so mutating store after snapshot does not mutate prior snapshot's messages or steps", () => {
+    const store = new SessionStore({ storagePath });
+    const session = store.createSession("Immutability Test");
+    store.appendUserMessage("Hello");
+    store.appendAssistantChunk("Initial answer");
+    store.appendThoughtStep("Step 1: thinking");
+
+    const snap1 = store.getSnapshot();
+    const snap1Session = snap1.sessions.find((s) => s.id === session.id)!;
+    const snap1AssistantMsg = snap1Session.messages.find((m) => m.role === "assistant")!;
+    const snap1Step = snap1AssistantMsg.steps![0];
+
+    // Verify snapshot and nested objects are frozen
+    expect(Object.isFrozen(snap1)).toBe(true);
+    expect(Object.isFrozen(snap1Session)).toBe(true);
+    expect(Object.isFrozen(snap1Session.messages)).toBe(true);
+    expect(Object.isFrozen(snap1AssistantMsg)).toBe(true);
+    expect(Object.isFrozen(snap1AssistantMsg.steps)).toBe(true);
+    expect(Object.isFrozen(snap1Step)).toBe(true);
+
+    const originalContent = snap1AssistantMsg.content;
+    const originalStepStatus = snap1Step.status;
+
+    // Mutate the store: append chunk, update step, add diff patch
+    store.appendAssistantChunk(" - additional text");
+    store.updateTurnStep(snap1Step.id, "completed", "done reasoning");
+    store.setDiffPatch("@@ -1,1 +1,1 @@\n-old\n+new");
+
+    const snap2 = store.getSnapshot();
+    const snap2Session = snap2.sessions.find((s) => s.id === session.id)!;
+    const snap2AssistantMsg = snap2Session.messages.find((m) => m.role === "assistant")!;
+    const snap2Step = snap2AssistantMsg.steps![0];
+
+    // Prior snapshot must remain untouched
+    expect(snap1AssistantMsg.content).toBe(originalContent);
+    expect(snap1Step.status).toBe(originalStepStatus);
+    expect(snap1AssistantMsg.diffPatch).toBeUndefined();
+
+    // New snapshot must reflect changes with new object references (for React.memo)
+    expect(snap2AssistantMsg).not.toBe(snap1AssistantMsg);
+    expect(snap2AssistantMsg.steps).not.toBe(snap1AssistantMsg.steps);
+    expect(snap2Step).not.toBe(snap1Step);
+    expect(snap2AssistantMsg.content).toBe("Initial answer - additional text");
+    expect(snap2Step.status).toBe("completed");
+    expect(snap2AssistantMsg.diffPatch).toBe("@@ -1,1 +1,1 @@\n-old\n+new");
+
+    // Direct mutation of snap1 must throw
+    expect(() => {
+      (snap1AssistantMsg as unknown as { content: string }).content = "mutated";
+    }).toThrow();
+    expect(() => {
+      (snap1Step as unknown as { status: string }).status = "failed";
+    }).toThrow();
+  });
 });
 
 describe("SessionStore - Disk Persistence", () => {
@@ -434,5 +490,158 @@ describe("SessionStore - Disk Persistence", () => {
     expect(store2.sessions).toHaveLength(1);
     expect(store2.sessions[0].title).toBe("Auto Saved Session");
     expect(store2.sessions[0].messages[0].content).toBe("Auto message");
+  });
+
+  it("resolves all concurrent save calls after the latest state is persisted to disk", async () => {
+    const store = new SessionStore({ storagePath });
+    const session = store.createSession("Concurrent Save Test");
+
+    store.appendUserMessage("Message 1");
+    const p1 = store.save();
+
+    store.appendUserMessage("Message 2");
+    const p2 = store.save();
+
+    store.appendUserMessage("Message 3");
+    const p3 = store.save();
+
+    await Promise.all([p1, p2, p3]);
+
+    const raw = await readFile(storagePath, "utf-8");
+    const persisted = JSON.parse(raw);
+
+    const persistedSession = persisted.sessions.find((s: Record<string, unknown>) => s.id === session.id);
+    expect(persistedSession).toBeDefined();
+    expect(persistedSession.messages).toHaveLength(3);
+    expect(persistedSession.messages[0].content).toBe("Message 1");
+    expect(persistedSession.messages[1].content).toBe("Message 2");
+    expect(persistedSession.messages[2].content).toBe("Message 3");
+  });
+
+  it("rejects without an infinite loop when performSave fails", async () => {
+    const badDir = join(tempDir, "regular-file-blocking-dir");
+    writeFileSync(badDir, "not-a-directory");
+    const badStoragePath = join(badDir, "sub-dir", "sessions.json");
+    const store = new SessionStore({ storagePath: badStoragePath, autoSave: true });
+    store.createSession("Fail Session");
+    store.appendUserMessage("Will fail to save");
+
+    let waitError: unknown = null;
+    try {
+      await store.waitForPendingSave();
+    } catch (err: unknown) {
+      waitError = err;
+    }
+    expect(waitError).toBeDefined();
+
+    // Calling waitForPendingSave again completes promptly without hanging
+    await expect(store.waitForPendingSave()).resolves.toBeUndefined();
+
+    // Explicit save failure also rejects both save and waitForPendingSave
+    const store2 = new SessionStore({ storagePath: badStoragePath });
+    store2.createSession("Explicit Fail");
+    let saveError: unknown = null;
+    try {
+      await store2.save();
+    } catch (err: unknown) {
+      saveError = err;
+    }
+    expect(saveError).toBeDefined();
+
+    let waitError2: unknown = null;
+    try {
+      await store2.waitForPendingSave();
+    } catch (err: unknown) {
+      waitError2 = err;
+    }
+    // Either save caught it or waitForPendingSave caught it
+    await expect(store2.waitForPendingSave()).resolves.toBeUndefined();
+  });
+  it("validates individual message records and rejects corrupted entries", () => {
+    const validSession: ChatSession = {
+      id: "sess-1",
+      title: "Valid Session",
+      createdAt: 1000,
+      updatedAt: 2000,
+      workspaceDir: "/workspace",
+      model: "claude-3-5-sonnet",
+      messages: [
+        {
+          id: "msg-1",
+          role: "user",
+          content: "Valid message",
+          timestamp: 1500,
+        },
+      ],
+    };
+
+    expect(isValidSession(validSession)).toBe(true);
+
+    // Corrupted message: missing role
+    expect(
+      isValidSession({
+        ...validSession,
+        messages: [{ id: "msg-2", content: "No role", timestamp: 1600 }],
+      })
+    ).toBe(false);
+
+    // Corrupted message: invalid role
+    expect(
+      isValidSession({
+        ...validSession,
+        messages: [{ id: "msg-2", role: "unknown_role", content: "Bad", timestamp: 1600 }],
+      })
+    ).toBe(false);
+
+    // Corrupted message: non-object item (null)
+    expect(
+      isValidSession({
+        ...validSession,
+        messages: [null],
+      })
+    ).toBe(false);
+
+    // Corrupted message: missing id
+    expect(
+      isValidSession({
+        ...validSession,
+        messages: [{ role: "user", content: "No id", timestamp: 1600 }],
+      })
+    ).toBe(false);
+
+    // Corrupted message: missing timestamp
+    expect(
+      isValidSession({
+        ...validSession,
+        messages: [{ id: "msg-3", role: "assistant", content: "No timestamp" }],
+      })
+    ).toBe(false);
+  });
+
+  it("ignores sessions with corrupted message structures during load", async () => {
+    const corruptPayload = {
+      version: 1,
+      sessions: [
+        {
+          id: "sess-corrupt",
+          title: "Corrupt Session",
+          createdAt: 1000,
+          updatedAt: 2000,
+          workspaceDir: "/workspace",
+          model: "claude-3-5-sonnet",
+          messages: [
+            { id: "msg-1", role: "user", content: "OK", timestamp: 1000 },
+            { id: "msg-2", role: "invalid-role", content: "Corrupt", timestamp: 1001 },
+          ],
+        },
+      ],
+      activeSessionId: "sess-corrupt",
+    };
+    writeFileSync(storagePath, JSON.stringify(corruptPayload), "utf-8");
+
+    const store = new SessionStore({ storagePath });
+    const loaded = await store.load();
+    expect(loaded).toBe(true);
+    expect(store.sessions).toHaveLength(0);
   });
 });

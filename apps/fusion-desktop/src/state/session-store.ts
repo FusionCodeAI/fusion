@@ -28,7 +28,52 @@ interface PersistedSessionData {
   selectedModel?: string;
 }
 
-function isValidSession(candidate: unknown): candidate is ChatSession {
+const VALID_ROLES: Record<string, true> = {
+  user: true,
+  assistant: true,
+  system: true,
+};
+
+export function isValidMessage(candidate: unknown): candidate is ChatMessage {
+  if (!candidate || typeof candidate !== "object") {
+    return false;
+  }
+  const msg = candidate as Record<string, unknown>;
+  if (
+    typeof msg.id !== "string" ||
+    typeof msg.role !== "string" ||
+    !VALID_ROLES[msg.role] ||
+    typeof msg.content !== "string" ||
+    typeof msg.timestamp !== "number"
+  ) {
+    return false;
+  }
+
+  if (msg.steps !== undefined) {
+    if (!Array.isArray(msg.steps)) {
+      return false;
+    }
+    for (const step of msg.steps) {
+      if (!step || typeof step !== "object") {
+        return false;
+      }
+      const s = step as Record<string, unknown>;
+      if (
+        typeof s.id !== "string" ||
+        typeof s.title !== "string" ||
+        typeof s.status !== "string" ||
+        !["running", "completed", "failed"].includes(s.status) ||
+        typeof s.timestamp !== "number"
+      ) {
+        return false;
+      }
+    }
+  }
+
+  return true;
+}
+
+export function isValidSession(candidate: unknown): candidate is ChatSession {
   if (!candidate || typeof candidate !== "object") {
     return false;
   }
@@ -40,7 +85,8 @@ function isValidSession(candidate: unknown): candidate is ChatSession {
     typeof session.updatedAt === "number" &&
     typeof session.workspaceDir === "string" &&
     typeof session.model === "string" &&
-    Array.isArray(session.messages)
+    Array.isArray(session.messages) &&
+    session.messages.every(isValidMessage)
   );
 }
 
@@ -57,6 +103,11 @@ export class SessionStore {
   private snapshot!: SessionStoreSnapshot;
 
   private savePromise: Promise<void> | null = null;
+  private pendingWaiters: Array<{
+    resolve: () => void;
+    reject: (err: unknown) => void;
+  }> = [];
+  private lastSaveError: unknown = null;
   private needsSave = false;
 
   constructor(options: SessionStoreOptions = {}) {
@@ -80,14 +131,22 @@ export class SessionStore {
   getSnapshot = (): SessionStoreSnapshot => {
     return this.snapshot;
   };
-
   private updateSnapshot(): void {
     this.snapshot = Object.freeze({
       sessions: Object.freeze(
         this.sessions.map((s) =>
           Object.freeze({
             ...s,
-            messages: [...s.messages],
+            messages: Object.freeze(
+              s.messages.map((m) =>
+                Object.freeze({
+                  ...m,
+                  steps: m.steps
+                    ? Object.freeze(m.steps.map((step) => Object.freeze({ ...step })))
+                    : undefined,
+                })
+              )
+            ),
           })
         )
       ),
@@ -95,7 +154,7 @@ export class SessionStore {
       workspaceDir: this.workspaceDir,
       selectedModel: this.selectedModel,
       isGenerating: this.isGenerating,
-    });
+    }) as unknown as SessionStoreSnapshot;
   }
 
   private notify(): void {
@@ -209,9 +268,13 @@ export class SessionStore {
     let targetMessage: ChatMessage;
 
     if (lastMessage && lastMessage.role === "assistant") {
-      lastMessage.content += delta;
-      lastMessage.timestamp = Date.now();
-      targetMessage = lastMessage;
+      targetMessage = {
+        ...lastMessage,
+        content: lastMessage.content + delta,
+        timestamp: Date.now(),
+        steps: lastMessage.steps ? [...lastMessage.steps] : undefined,
+      };
+      session.messages[session.messages.length - 1] = targetMessage;
     } else {
       targetMessage = {
         id: randomUUID(),
@@ -241,33 +304,38 @@ export class SessionStore {
             status: "running",
             timestamp: now,
           }
-        : step;
+        : { ...step };
 
     const lastMessage = session.messages[session.messages.length - 1];
     let assistantMessage: ChatMessage;
 
     if (lastMessage && lastMessage.role === "assistant") {
-      assistantMessage = lastMessage;
+      const existingSteps = lastMessage.steps ? [...lastMessage.steps] : [];
+      existingSteps.push(turnStep);
+      const stepSummary = turnStep.title + (turnStep.details ? `\n${turnStep.details}` : "");
+      const thought = lastMessage.thought
+        ? `${lastMessage.thought}\n${stepSummary}`
+        : stepSummary;
+
+      assistantMessage = {
+        ...lastMessage,
+        thought,
+        steps: existingSteps,
+        timestamp: now,
+      };
+      session.messages[session.messages.length - 1] = assistantMessage;
     } else {
+      const stepSummary = turnStep.title + (turnStep.details ? `\n${turnStep.details}` : "");
       assistantMessage = {
         id: randomUUID(),
         role: "assistant",
         content: "",
-        steps: [],
+        thought: stepSummary,
+        steps: [turnStep],
         timestamp: now,
       };
       session.messages.push(assistantMessage);
     }
-
-    if (!assistantMessage.steps) {
-      assistantMessage.steps = [];
-    }
-    assistantMessage.steps.push(turnStep);
-
-    const stepSummary = turnStep.title + (turnStep.details ? `\n${turnStep.details}` : "");
-    assistantMessage.thought = assistantMessage.thought
-      ? `${assistantMessage.thought}\n${stepSummary}`
-      : stepSummary;
 
     session.updatedAt = now;
     this.updateSnapshot();
@@ -285,12 +353,21 @@ export class SessionStore {
     for (let i = session.messages.length - 1; i >= 0; i--) {
       const msg = session.messages[i];
       if (msg.steps) {
-        const step = msg.steps.find((s) => s.id === stepId);
-        if (step) {
-          step.status = status;
-          if (details !== undefined) {
-            step.details = details;
-          }
+        const stepIndex = msg.steps.findIndex((s) => s.id === stepId);
+        if (stepIndex !== -1) {
+          const oldStep = msg.steps[stepIndex];
+          const updatedStep: TurnStep = {
+            ...oldStep,
+            status,
+            ...(details !== undefined ? { details } : {}),
+          };
+          const updatedSteps = [...msg.steps];
+          updatedSteps[stepIndex] = updatedStep;
+          const updatedMsg: ChatMessage = {
+            ...msg,
+            steps: updatedSteps,
+          };
+          session.messages[i] = updatedMsg;
           session.updatedAt = Date.now();
           this.updateSnapshot();
           this.notify();
@@ -307,8 +384,13 @@ export class SessionStore {
     const now = Date.now();
 
     if (lastMessage && lastMessage.role === "assistant") {
-      lastMessage.diffPatch = diffPatch;
-      lastMessage.timestamp = now;
+      const updatedMsg: ChatMessage = {
+        ...lastMessage,
+        diffPatch,
+        timestamp: now,
+        steps: lastMessage.steps ? [...lastMessage.steps] : undefined,
+      };
+      session.messages[session.messages.length - 1] = updatedMsg;
     } else {
       const newMsg: ChatMessage = {
         id: randomUUID(),
@@ -379,26 +461,71 @@ export class SessionStore {
   async save(): Promise<void> {
     if (this.savePromise) {
       this.needsSave = true;
-      await this.savePromise;
-      if (this.needsSave) {
-        this.needsSave = false;
-        return this.save();
-      }
-      return;
+      return new Promise<void>((resolve, reject) => {
+        this.pendingWaiters.push({ resolve, reject });
+      });
     }
 
-    this.savePromise = this.performSave().finally(() => {
-      this.savePromise = null;
-    });
+    this.savePromise = this.runSaveQueue();
     return this.savePromise;
   }
 
-  async waitForPendingSave(): Promise<void> {
-    while (this.savePromise || this.needsSave) {
-      await this.savePromise;
+  private async runSaveQueue(): Promise<void> {
+    let currentBatch: Array<{
+      resolve: () => void;
+      reject: (err: unknown) => void;
+    }> = [];
+
+    try {
+      this.lastSaveError = null;
+      while (true) {
+        currentBatch = this.pendingWaiters;
+        this.pendingWaiters = [];
+        this.needsSave = false;
+
+        await this.performSave();
+
+        for (const waiter of currentBatch) {
+          waiter.resolve();
+        }
+        currentBatch = [];
+
+        if (this.pendingWaiters.length === 0) {
+          break;
+        }
+      }
+    } catch (err: unknown) {
+      this.lastSaveError = err;
+      const toReject = [...currentBatch, ...this.pendingWaiters];
+      currentBatch = [];
+      this.pendingWaiters = [];
+      for (const waiter of toReject) {
+        waiter.reject(err);
+      }
+      throw err;
+    } finally {
+      this.needsSave = false;
+      this.savePromise = null;
     }
   }
 
+  async waitForPendingSave(): Promise<void> {
+    try {
+      while (this.savePromise) {
+        await this.savePromise;
+      }
+      if (this.lastSaveError) {
+        const err = this.lastSaveError;
+        this.lastSaveError = null;
+        throw err;
+      }
+    } catch (err: unknown) {
+      this.lastSaveError = null;
+      throw err;
+    } finally {
+      this.needsSave = false;
+    }
+  }
   private async performSave(): Promise<void> {
     const dir = dirname(this.storagePath);
     await mkdir(dir, { recursive: true });
