@@ -40,6 +40,7 @@ export interface SidebarProps {
   onToggleSidebar?: () => void;
   onHistoryBack?: () => void;
   onHistoryForward?: () => void;
+  onOpenSearch?: () => void;
   onCustomize?: () => void;
   onOpenSettings?: (section?: SettingsSectionId) => void;
   width?: number;
@@ -73,7 +74,6 @@ export function getWorkspaceFolderName(workspaceDir?: string): string {
   const parts = workspaceDir.replace(/[\\/]+$/, "").split(/[\\/]/);
   return parts[parts.length - 1] || "No Repo";
 }
-
 export function Sidebar({
   sessions,
   activeSessionId,
@@ -84,6 +84,7 @@ export function Sidebar({
   onNewChat,
   onSelectSession,
   onDeleteSession,
+  onOpenSearch,
   onHistoryBack,
   onHistoryForward,
   onCustomize,
@@ -93,7 +94,6 @@ export function Sidebar({
   onResetWidth,
   className = "",
 }: SidebarProps) {
-  const [searchQuery, setSearchQuery] = useState("");
   const [isSearchOpen, setIsSearchOpen] = useState(false);
 
   const defaultSessions: SidebarSessionItem[] = useMemo(
@@ -109,13 +109,7 @@ export function Sidebar({
   );
 
   const sessionList = sessions && sessions.length > 0 ? sessions : defaultSessions;
-
-  const filteredSessions = useMemo(() => {
-    if (!searchQuery.trim()) return sessionList;
-    const q = searchQuery.toLowerCase();
-    return sessionList.filter((s) => s.title.toLowerCase().includes(q));
-  }, [sessionList, searchQuery]);
-
+  const filteredSessions = sessionList;
   const handleMouseDown = (e: React.MouseEvent) => {
     e.preventDefault();
     const startX = e.clientX;
@@ -196,40 +190,14 @@ export function Sidebar({
           <button
             type="button"
             data-testid="sidebar-search-btn"
-            onClick={() => setIsSearchOpen((prev) => !prev)}
+            onClick={onOpenSearch}
             className="size-8 rounded-md flex items-center justify-center text-zinc-500 hover:text-zinc-900 hover:bg-zinc-200/60 cursor-pointer"
-            title="Search sessions (Cmd/Ctrl+P)"
+            title="Search sessions (Cmd/Ctrl+K)"
             aria-label="Search sessions"
           >
             <Search className="w-4 h-4" />
           </button>
         </div>
-
-        {/* Search Bar Input (toggled) */}
-        {isSearchOpen && (
-          <div className="px-3 pb-2">
-            <div className="flex items-center gap-1.5 px-2 py-1 bg-white border border-zinc-200 rounded-md shadow-2xs">
-              <Search className="w-3.5 h-3.5 text-zinc-400 shrink-0" />
-              <input
-                type="text"
-                placeholder="Search..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full bg-transparent text-xs text-zinc-800 placeholder-zinc-400 outline-none"
-                autoFocus
-              />
-              {searchQuery && (
-                <button
-                  type="button"
-                  onClick={() => setSearchQuery("")}
-                  className="p-0.5 text-zinc-400 hover:text-zinc-600 cursor-pointer"
-                >
-                  <X className="w-3 h-3" />
-                </button>
-              )}
-            </div>
-          </div>
-        )}
 
         {/* Primary Action Buttons: Session, Schedule, Customize matching Image #1 & #2 */}
         <div className="px-2 pt-1 pb-1 space-y-0.5">

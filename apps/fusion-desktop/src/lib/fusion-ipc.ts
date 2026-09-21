@@ -26,6 +26,14 @@ export function isTauriEnvironment(): boolean {
  */
 export async function listFusionSessions(): Promise<DesktopSessionSummary[]> {
   if (!isTauriEnvironment()) {
+    try {
+      const res = await fetch("/api/sessions");
+      if (res.ok) {
+        return await res.json();
+      }
+    } catch {
+      // fallback
+    }
     return [];
   }
   try {
@@ -41,6 +49,14 @@ export async function listFusionSessions(): Promise<DesktopSessionSummary[]> {
  */
 export async function loadFusionSession(id: string): Promise<Record<string, unknown> | null> {
   if (!isTauriEnvironment()) {
+    try {
+      const res = await fetch(`/api/session/${id}`);
+      if (res.ok) {
+        return await res.json();
+      }
+    } catch {
+      // fallback
+    }
     return null;
   }
   try {

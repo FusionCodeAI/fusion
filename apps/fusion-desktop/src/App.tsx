@@ -11,6 +11,7 @@ import { ClineAvatar } from "./components/ClineAvatar";
 import { MarkdownRenderer } from "./components/MarkdownRenderer";
 import { CustomizeView } from "./components/CustomizeView";
 import { SettingsView } from "./components/SettingsView";
+import { SessionCommandBar } from "./components/SessionCommandBar";
 import { AgentBridge } from "./lib/agent-bridge";
 import { pickProjectFolder, checkAuthStatus, startFusionLogin } from "./lib/fusion-ipc";
 import {
@@ -86,6 +87,19 @@ export function App({
   const [isSidebarOpen, setIsSidebarOpen] = useState(initialSidebarOpen);
   const [currentView, setCurrentView] = useState<"chat" | "customize" | "settings">("chat");
   const [settingsSection, setSettingsSection] = useState<"general" | "api" | "account">("general");
+  const [isCommandBarOpen, setIsCommandBarOpen] = useState(false);
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && (e.key.toLowerCase() === "k" || e.key.toLowerCase() === "p")) {
+        e.preventDefault();
+        setIsCommandBarOpen((prev) => !prev);
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, []);
+
   const [isSignedIn, setIsSignedIn] = useState<boolean>(() => {
     if (typeof initialIsSignedIn === "boolean") return initialIsSignedIn;
     if (typeof window !== "undefined" && window.localStorage) {
@@ -214,6 +228,22 @@ export function App({
     syncNativeFusionSessions(sessionsRecord).then((synced) => {
       if (synced && synced.length > 0) {
         setSessionsRecord(synced);
+        const currentActive = synced.find((s) => s.id === activeSessionId);
+        if (!currentActive || currentActive.id === "session-default") {
+          const firstReal = synced.find((s) => s.id !== "session-default") || synced[0];
+          if (firstReal) {
+            setActiveSessionId(firstReal.id);
+            setSessionTitle(firstReal.title);
+            setSelectedModel(firstReal.model);
+            if (firstReal.messages && firstReal.messages.length > 0) {
+              setMessages(firstReal.messages);
+            } else {
+              loadFullNativeSessionMessages(firstReal.id).then((loadedMsgs) => {
+                if (loadedMsgs && loadedMsgs.length > 0) setMessages(loadedMsgs);
+              });
+            }
+          }
+        }
       }
     });
   }, []);
@@ -448,13 +478,17 @@ export function App({
       {/* Sidebar: resizable, collapsed when isSidebarOpen is false */}
       {isSidebarOpen && (
         <Sidebar
+          sessions={sessionsRecord}
+          activeSessionId={activeSessionId}
+          onDeleteSession={handleDeleteSession}
           width={sidebarWidth}
           currentView={currentView}
           canNavigateBack={currentView !== "chat"}
           onHistoryBack={() => setCurrentView("chat")}
           onResize={handleSidebarResize}
-          onResetWidth={handleSidebarResetWidth}
           onNewChat={handleNewChat}
+          onSelectSession={handleSelectSession}
+          onOpenSearch={() => setIsCommandBarOpen(true)}
           onCustomize={() => setCurrentView("customize")}
           settingsSection={settingsSection}
           onOpenSettings={(sec) => {
@@ -567,6 +601,16 @@ export function App({
         )}
       </main>
 
+      {/* Session Search Command Bar (Cmd+K) */}
+      <SessionCommandBar
+        open={isCommandBarOpen}
+        onOpenChange={setIsCommandBarOpen}
+        sessions={sessionsRecord}
+        onOpenSession={(id) => {
+          handleSelectSession(id);
+          setCurrentView("chat");
+        }}
+      />
     </div>
   );
 }

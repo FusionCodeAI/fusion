@@ -201,9 +201,6 @@ export async function persistSessionToNativeDisk(session: ChatSessionRecord): Pr
 export async function syncNativeFusionSessions(
   currentSessions: ChatSessionRecord[]
 ): Promise<ChatSessionRecord[]> {
-  if (!isTauriEnvironment()) {
-    return currentSessions;
-  }
 
   try {
     const nativeList = await listFusionSessions();
@@ -257,9 +254,6 @@ export async function syncNativeFusionSessions(
  * Loads full messages for a session from ~/.fusion/sessions/<id>.json if available.
  */
 export async function loadFullNativeSessionMessages(id: string): Promise<ChatMessage[] | null> {
-  if (!isTauriEnvironment()) {
-    return null;
-  }
 
   try {
     const raw = await loadFusionSession(id);
