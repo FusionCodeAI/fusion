@@ -12,6 +12,8 @@
     "desktop:build": "bunx @tauri-apps/cli build"
   },
   "dependencies": {
+    "@fontsource-variable/geist-mono": "^5.3.0",
+    "@fontsource-variable/inter": "^5.3.0",
     "@fusioncode/sdk": "^2.0.0-beta.3",
     "@tauri-apps/api": "^2.0.0",
     "@tauri-apps/plugin-shell": "^2.0.0",

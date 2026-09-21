@@ -9,7 +9,7 @@ import { DiffView } from "./components/DiffView";
 import { Composer } from "./components/Composer";
 import { ClineAvatar } from "./components/ClineAvatar";
 import { MarkdownRenderer } from "./components/MarkdownRenderer";
-import { CustomizeModal } from "./components/CustomizeModal";
+import { CustomizeView } from "./components/CustomizeView";
 import { NotificationModal } from "./components/NotificationModal";
 import { AgentBridge } from "./lib/agent-bridge";
 import { pickProjectFolder } from "./lib/fusion-ipc";
@@ -82,7 +82,7 @@ export function App({
   initialSessions,
 }: AppProps) {
   const [isSidebarOpen, setIsSidebarOpen] = useState(initialSidebarOpen);
-  const [isCustomizeOpen, setIsCustomizeOpen] = useState(false);
+  const [currentView, setCurrentView] = useState<"chat" | "customize">("chat");
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
 
   const [sidebarWidth, setSidebarWidth] = useState<number>(() => {
@@ -367,8 +367,8 @@ export function App({
     setSessionTitle("General chat conversation");
     setMessages([]);
     setIsGenerating(false);
+    setCurrentView("chat");
   };
-
   const handleSelectSession = async (id: string) => {
     if (id === activeSessionId) return;
     const target = sessionsRecord.find((s) => s.id === id) || loadAllSessions().find((s) => s.id === id);
@@ -392,9 +392,9 @@ export function App({
         }
       }
       setIsGenerating(false);
+      setCurrentView("chat");
     }
   };
-
   const handleDeleteSession = (id: string) => {
     const updated = deleteSessionFromStorage(id);
     setSessionsRecord(updated);
@@ -428,20 +428,26 @@ export function App({
           onResetWidth={handleSidebarResetWidth}
           onNewChat={handleNewChat}
           onSelectSession={handleSelectSession}
-          onCustomize={() => setIsCustomizeOpen(true)}
+          onCustomize={() => setCurrentView("customize")}
           onOpenSettings={() => setIsNotificationsOpen(true)}
           onToggleSidebar={() => setIsSidebarOpen(false)}
         />
       )}
-
-      {/* Conversation Area */}
+      {/* Main Content Area */}
       <main className="flex-1 min-h-0 flex flex-col overflow-hidden">
-        {/* TopHeader: 40px height, aligned with macOS traffic lights and sidebar */}
-        <TopHeader
-          title={sessionTitle}
-          onMore={() => setIsNotificationsOpen(true)}
-          onToggleSidebar={() => setIsSidebarOpen((prev) => !prev)}
-        />
+        {currentView === "customize" ? (
+          <CustomizeView
+            onClose={() => setCurrentView("chat")}
+            onOpenMarketplace={() => {}}
+          />
+        ) : (
+          <>
+            {/* TopHeader: 40px height, aligned with macOS traffic lights and sidebar */}
+            <TopHeader
+              title={sessionTitle}
+              onMore={() => setIsNotificationsOpen(true)}
+              onToggleSidebar={() => setIsSidebarOpen((prev) => !prev)}
+            />
 
         {/* Stream: strictly centered, vertical scroll */}
         <div
@@ -513,15 +519,10 @@ export function App({
             onSelectModel={handleModelChange}
           />
         </footer>
+          </>
+        )}
       </main>
 
-      {/* Cline Customize Modal */}
-      <CustomizeModal
-        isOpen={isCustomizeOpen}
-        onClose={() => setIsCustomizeOpen(false)}
-      />
-
-      {/* Cline Notification Settings Modal */}
       <NotificationModal
         isOpen={isNotificationsOpen}
         onClose={() => setIsNotificationsOpen(false)}

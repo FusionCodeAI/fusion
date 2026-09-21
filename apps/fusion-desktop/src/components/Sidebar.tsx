@@ -4,7 +4,7 @@ import {
   ArrowRight,
   Search,
   Plus,
-  LayoutGrid,
+  Blocks,
   ArrowUpDown,
   Filter,
   Settings,
@@ -226,7 +226,7 @@ export function Sidebar({
             onClick={onCustomize}
             className="w-full flex items-center gap-2 px-3 py-1.5 rounded-lg hover:bg-zinc-100 text-xs font-normal text-zinc-700 transition-colors cursor-pointer"
           >
-            <LayoutGrid className="w-3.5 h-3.5 text-zinc-500" />
+            <Blocks className="w-3.5 h-3.5 text-zinc-500" />
             <span>Customize</span>
           </button>
         </div>

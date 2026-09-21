@@ -1,1 +1,94 @@
+@import "@fontsource-variable/inter";
+@import "@fontsource-variable/geist-mono";
 @import "tailwindcss";
+
+:root {
+  /* Brand tokens copied from Cline (@cline/ui/theme/tokens.css) */
+  --brand-violet: oklch(0.55 0.22 293);
+  --brand-violet-surface: oklch(0.55 0.22 293);
+  --brand-violet-surface-foreground: oklch(0.985 0.005 293);
+  --brand-lilac: oklch(0.88 0.09 315);
+  --brand-magenta: oklch(0.75 0.15 330);
+  --brand-periwinkle: oklch(0.69 0.14 275);
+  --brand-cyan: oklch(0.87 0.07 210);
+
+  /* Typography tokens copied directly from Cline */
+  --font-sans: "Inter Variable", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  --font-mono: "Geist Mono Variable", ui-monospace, "SFMono-Regular", Menlo, Consolas, "Liberation Mono", monospace;
+  --font-weight-normal: 480;
+  --font-weight-medium: 560;
+  --font-weight-semibold: 640;
+  --font-weight-bold: 640;
+
+  /* Font metrics from Cline tokens.css */
+  --text-xs: 0.8rem;
+  --text-xs--line-height: 1rem;
+  --text-xs--letter-spacing: 0.0025em;
+  --text-sm: 0.86667rem;
+  --text-sm--line-height: 1.25rem;
+  --text-sm--letter-spacing: 0em;
+  --text-base: 1rem;
+  --text-base--line-height: 1.5rem;
+  --text-base--letter-spacing: 0em;
+  --text-lg: 1.125rem;
+  --text-lg--line-height: 1.625rem;
+  --text-lg--letter-spacing: -0.0025em;
+  --text-xl: 1.25rem;
+  --text-xl--line-height: 1.75rem;
+  --text-xl--letter-spacing: -0.005em;
+  --text-2xl: 1.5rem;
+  --text-2xl--line-height: 1.875rem;
+  --text-2xl--letter-spacing: -0.00625em;
+  --text-3xl: 1.75rem;
+  --text-3xl--line-height: 2.25rem;
+  --text-3xl--letter-spacing: -0.0075em;
+}
+
+body {
+  font-family: var(--font-sans);
+  font-weight: var(--font-weight-normal);
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+}
+
+/* User-selectable surfaces matching Cline desktop globals.css */
+input,
+textarea,
+[contenteditable="true"],
+.cline-chat-selectable,
+.cline-markdown,
+pre,
+code {
+  -webkit-user-select: text;
+  user-select: text;
+}
+
+code,
+pre,
+kbd {
+  font-family: var(--font-mono);
+}
+
+/* Custom scrollbars matching Cline */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(0, 0, 0, 0.12);
+  border-radius: 9999px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(0, 0, 0, 0.22);
+}

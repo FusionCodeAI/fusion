@@ -50,3 +50,6 @@ export type { CustomizeModalProps, CustomizeTab } from "./CustomizeModal";
 
 export { NotificationModal } from "./NotificationModal";
 export type { NotificationModalProps, NotificationSettings } from "./NotificationModal";
+
+export { CustomizeView } from "./CustomizeView";
+export type { CustomizeViewProps } from "./CustomizeView";
