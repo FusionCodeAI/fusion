@@ -134,6 +134,45 @@ export function resolveFusionBinary(
   return null;
 }
 
+export function formatToolTitle(name: string, argsRaw?: unknown): string {
+  let args: Record<string, unknown> = {};
+  if (typeof argsRaw === "string") {
+    try {
+      args = JSON.parse(argsRaw);
+    } catch {
+      return `${name}: ${argsRaw.slice(0, 32)}`;
+    }
+  } else if (typeof argsRaw === "object" && argsRaw !== null) {
+    args = argsRaw as Record<string, unknown>;
+  }
+
+  const tool = name.toLowerCase();
+  if (tool === "bash") {
+    const cmd = String(args.command ?? args.cmd ?? "").trim();
+    const truncated = cmd.length > 36 ? cmd.slice(0, 34) + "..." : cmd;
+    return truncated ? `Ran ${truncated}` : "Ran terminal command";
+  }
+  if (tool === "read" || tool === "read_file") {
+    const p = String(args.path ?? args.file ?? "");
+    const shortPath = p.replace(/^[./\\]+/, "");
+    return shortPath ? `Read ${shortPath}` : "Read file";
+  }
+  if (tool === "edit" || tool === "edit_file") {
+    const p = String(args.path ?? args.file ?? "");
+    const shortPath = p.replace(/^[./\\]+/, "");
+    return shortPath ? `Edited ${shortPath}` : "Edited file";
+  }
+  if (tool === "write") {
+    const p = String(args.path ?? args.file ?? "");
+    const shortPath = p.replace(/^[./\\]+/, "");
+    return shortPath ? `Wrote ${shortPath}` : "Created file";
+  }
+  if (tool === "grep" || tool === "glob" || tool === "search") {
+    const q = String(args.pattern ?? args.query ?? args.path ?? "");
+    return q ? `Searched "${q.slice(0, 24)}"` : "Searched files";
+  }
+  return `Ran ${name}`;
+}
 export interface TurnStepEvent {
   title: string;
   status: "running" | "completed" | "failed";
@@ -185,6 +224,7 @@ export class AcpClient {
   private doneListeners = new Set<(info?: TurnDoneEvent) => void>();
   private errorListeners = new Set<(err: Error) => void>();
   private exitListeners = new Set<(code: number | null) => void>();
+  private toolCallsArgs = new Map<string, unknown>();
 
   public sessionId: string;
 
@@ -578,9 +618,14 @@ export class AcpClient {
       }
       case "tool_call": {
         const name = typeof update.name === "string" ? update.name : "tool";
+        const callId = typeof update.callId === "string" ? update.callId : "";
+        if (callId && update.args) {
+          this.toolCallsArgs.set(callId, update.args);
+        }
+        const title = formatToolTitle(name, update.args);
         const args = typeof update.args === "string" ? update.args : JSON.stringify(update.args);
         this.emitStep({
-          title: `Tool: ${name}`,
+          title,
           status: "running",
           details: args,
         });
@@ -588,14 +633,15 @@ export class AcpClient {
       }
       case "tool_call_result": {
         const name = typeof update.name === "string" ? update.name : "tool";
+        const callId = typeof update.callId === "string" ? update.callId : "";
+        const args = update.args ?? (callId ? this.toolCallsArgs.get(callId) : undefined);
         const success = update.success !== false;
+        const title = formatToolTitle(name, args);
         let details: string | undefined;
         if (typeof update.output === "string") {
           details = update.output;
         } else if (typeof update.output === "object" && update.output !== null) {
           details = JSON.stringify(update.output);
-        } else if (typeof update.error === "string") {
-          details = update.error;
         } else if (typeof update.error === "object" && update.error !== null) {
           details = JSON.stringify(update.error);
         } else if (update.output !== undefined && update.output !== null) {
@@ -604,7 +650,7 @@ export class AcpClient {
           details = String(update.error);
         }
         this.emitStep({
-          title: `Tool: ${name}`,
+          title,
           status: success ? "completed" : "failed",
           details,
         });

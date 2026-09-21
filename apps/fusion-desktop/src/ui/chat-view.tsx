@@ -213,15 +213,20 @@ export function ChatView({
                             maxWidth: 700,
                           }}
                         >
-                          <text
+                          <markdown
+                            source={msg.thought}
+                            theme={{
+                              appearance: "light",
+                              accent: "#2563eb",
+                              codeText: "#18181b",
+                              codeWash: "#f4f4f5",
+                            }}
                             style={{
                               fontSize: 13,
                               lineHeight: 22,
-                              color: "#71717a",
+                              color: "#52525b",
                             }}
-                          >
-                            {msg.thought}
-                          </text>
+                          />
                         </div>
                       )}
                     </div>
@@ -318,6 +323,8 @@ export function ChatView({
                         theme={{
                           appearance: "light",
                           accent: "#2563eb",
+                          codeText: "#18181b",
+                          codeWash: "#f4f4f5",
                         }}
                         style={{ color: "#18181b", fontSize: 14, lineHeight: 24 }}
                       />
@@ -325,6 +332,23 @@ export function ChatView({
                   ) : isGenerating ? (
                     <div style={{ paddingTop: 4, paddingBottom: 4 }}>
                       <text style={{ fontSize: 13, color: "#8e8e93" }}>Thinking...</text>
+                    </div>
+                  ) : null}
+
+                  {/* Native GPUIX Diff Viewer */}
+                  {msg.diffPatch ? (
+                    <div style={{ marginTop: 8, width: "100%", borderRadius: 8, overflow: "hidden" }}>
+                      <diff
+                        patch={msg.diffPatch}
+                        wordDiff
+                        theme={{
+                          appearance: "light",
+                          diffAdd: "#16a34a",
+                          diffDel: "#dc2626",
+                          diffHunkBg: "#f4f4f5",
+                        }}
+                        style={{ borderRadius: 8 }}
+                      />
                     </div>
                   ) : null}
                 </div>

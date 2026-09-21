@@ -405,7 +405,7 @@ describe("ACP Client Protocol - Notification Dispatching", () => {
       }) + "\n"
     );
     expect(steps).toHaveLength(1);
-    expect(steps[0].title).toBe("Tool: read_file");
+    expect(steps[0].title).toBe("Read src/main.rs");
     expect(steps[0].status).toBe("running");
 
     // session/update: tool_call_result
@@ -426,7 +426,7 @@ describe("ACP Client Protocol - Notification Dispatching", () => {
       }) + "\n"
     );
     expect(steps).toHaveLength(2);
-    expect(steps[1].title).toBe("Tool: read_file");
+    expect(steps[1].title).toBe("Read src/main.rs");
     expect(steps[1].status).toBe("completed");
 
     // session/update: token_stats
