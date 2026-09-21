@@ -209,6 +209,7 @@ impl ClipboardManager {
         }
 
         // 5. Fallback to in-memory clipboard buffer
+        #[cfg(not(target_os = "windows"))]
         ClipboardBackendKind::InMemory
     }
 
