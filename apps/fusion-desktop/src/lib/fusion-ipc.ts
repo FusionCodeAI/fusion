@@ -218,14 +218,18 @@ export async function showDesktopNotification(
   body: string,
   sound: boolean = true
 ): Promise<void> {
-  if (!isTauriEnvironment()) return;
-  try {
-    await invoke("show_desktop_notification", { title, body, sound });
-  } catch (err) {
-    console.warn("[fusion-ipc] show_desktop_notification error:", err);
+  if (isTauriEnvironment()) {
+    try {
+      await invoke("show_desktop_notification", { title, body, sound });
+      return;
+    } catch (err) {
+      console.warn("[fusion-ipc] show_desktop_notification error:", err);
+    }
   }
+  try {
+    await fetch(`/api/notify?title=${encodeURIComponent(title)}&body=${encodeURIComponent(body)}`);
+  } catch {}
 }
-
 /**
  * Plays an authentic macOS system sound (Ping, Glass, Hero, Pop, Basso).
  */
