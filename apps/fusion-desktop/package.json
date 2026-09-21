@@ -1,0 +1,21 @@
+{
+  "name": "fusion-desktop",
+  "version": "2.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "bun --hot src/app.tsx",
+    "test": "bun test",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@gpuix/native": "0.9.0",
+    "@gpuix/react": "0.9.0",
+    "react": "^19.0.0"
+  },
+  "devDependencies": {
+    "@types/bun": "latest",
+    "@types/react": "^19.0.0",
+    "typescript": "^5.7.0"
+  }
+}
