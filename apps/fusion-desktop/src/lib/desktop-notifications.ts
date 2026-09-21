@@ -25,23 +25,6 @@ export const DEFAULT_NOTIFICATION_SETTINGS: DesktopNotificationSettings = {
 
 export const NOTIFICATION_STORAGE_KEY = "fusion_desktop_notification_settings_v1";
 
-export interface PushToastPayload {
-  id: string;
-  type: DesktopNotificationEventType;
-  title: string;
-  body: string;
-  timestamp: number;
-}
-
-type PushToastListener = (toast: PushToastPayload) => void;
-
-const toastListeners = new Set<PushToastListener>();
-
-export function subscribeToPushToasts(listener: PushToastListener): () => void {
-  toastListeners.add(listener);
-  return () => toastListeners.delete(listener);
-}
-
 export function readDesktopNotificationSettings(): DesktopNotificationSettings {
   if (typeof window === "undefined" || !window.localStorage) {
     return { ...DEFAULT_NOTIFICATION_SETTINGS };
@@ -110,10 +93,7 @@ export function playNotificationSound(): void {
 }
 
 /**
- * Sends push notifications across 3 layers:
- * 1. Audio chime through speakers
- * 2. In-app floating push banner (always visible immediately)
- * 3. Native macOS / Windows Notification Center
+ * Dispatches macOS native Push Notification Center alerts.
  */
 export async function notifyDesktopEvent(
   eventType: DesktopNotificationEventType,
@@ -132,34 +112,20 @@ export async function notifyDesktopEvent(
   }
 
   const shouldPlaySound = options.sound ?? pref.sound;
+
   // 1. Play real native audio sound (macOS afplay Ping.aiff + WebAudio)
   if (shouldPlaySound) {
     playSystemSound("Ping").catch(() => {});
     playNotificationSound();
   }
 
-  // 2. Broadcast in-app floating push toast
-  const toastPayload: PushToastPayload = {
-    id: `notif-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
-    type: eventType,
-    title: options.title,
-    body: options.body,
-    timestamp: Date.now(),
-  };
-
-  for (const listener of toastListeners) {
-    try {
-      listener(toastPayload);
-    } catch {}
-  }
-
-  // 3. System / OS Notification via Tauri
+  // 2. Native System Push Notification (Tauri macOS Notification Center)
   if (isTauriEnvironment()) {
     await showDesktopNotification(options.title, options.body, shouldPlaySound);
     return;
   }
 
-  // 4. Web Notification API fallback
+  // 3. Web Notification API fallback
   if (typeof window !== "undefined" && "Notification" in window) {
     if (Notification.permission === "granted") {
       try {

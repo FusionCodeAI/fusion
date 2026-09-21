@@ -226,9 +226,6 @@ export async function showDesktopNotification(
       console.warn("[fusion-ipc] show_desktop_notification error:", err);
     }
   }
-  try {
-    await fetch(`/api/notify?title=${encodeURIComponent(title)}&body=${encodeURIComponent(body)}`);
-  } catch {}
 }
 /**
  * Plays an authentic macOS system sound (Ping, Glass, Hero, Pop, Basso).

@@ -133,25 +133,6 @@ function fusionLocalSessionsPlugin() {
           res.end(JSON.stringify({ ok: true }));
           return;
         }
-        if (req.url && req.url.startsWith("/api/notify")) {
-          const urlObj = new URL(req.url, "http://localhost");
-          const title = (urlObj.searchParams.get("title") || "Fusion").replace(/"/g, '\\"');
-          const body = (urlObj.searchParams.get("body") || "Notification").replace(/"/g, '\\"');
-          const script = `display notification "${body}" with title "${title}" sound name "default"`;
-
-          import("node:child_process").then(({ spawn }) => {
-            spawn("osascript", ["-e", script]);
-            const soundPath = "/System/Library/Sounds/Ping.aiff";
-            if (fs.existsSync(soundPath)) {
-              spawn("afplay", [soundPath]);
-            }
-          });
-
-          res.setHeader("Content-Type", "application/json");
-          res.end(JSON.stringify({ ok: true }));
-          return;
-        }
-
 
         next();
       });

@@ -294,36 +294,19 @@ fn show_desktop_notification(
     let should_sound = sound.unwrap_or(true);
     #[cfg(target_os = "macos")]
     {
-        if macos_notification::configure(&app).is_ok() {
-            let mut notification = notify_rust::Notification::new();
-            notification
-                .summary(title)
-                .body(body)
-                .auto_icon();
-            if should_sound {
-                notification.sound_name("default");
-            }
-            let _ = notification.show();
+        if let Err(e) = macos_notification::configure(&app) {
+            eprintln!("[notification] macOS LaunchServices configure warning: {}", e);
         }
 
-        // Guaranteed macOS Notification Center alert
-        let sound_clause = if should_sound { "sound name \"default\"" } else { "" };
-        let clean_body = body.replace('\\', "\\\\").replace('"', "\\\"");
-        let clean_title = title.replace('\\', "\\\\").replace('"', "\\\"");
-        let script = format!(
-            "display notification \"{}\" with title \"{}\" {}",
-            clean_body, clean_title, sound_clause
-        );
-        let _ = std::process::Command::new("osascript")
-            .arg("-e")
-            .arg(script)
-            .spawn();
-
+        let mut notification = notify_rust::Notification::new();
+        notification
+            .summary(title)
+            .body(body)
+            .auto_icon();
         if should_sound {
-            let _ = std::process::Command::new("afplay")
-                .arg("/System/Library/Sounds/Ping.aiff")
-                .spawn();
+            notification.sound_name("default");
         }
+        let _ = notification.show();
     }
 
     #[cfg(not(target_os = "macos"))]
