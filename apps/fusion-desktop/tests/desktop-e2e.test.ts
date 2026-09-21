@@ -795,7 +795,7 @@ describe("Desktop E2E: Component Sanity (Render & Instantiation)", () => {
       );
 
       // Card container classes
-      expect(html).toContain("max-w-[680px]");
+      expect(html).toContain("max-w-[760px]");
       expect(html).toContain("rounded-2xl");
       expect(html).toContain("bg-white");
       expect(html).toContain("border-zinc-200");
@@ -803,9 +803,9 @@ describe("Desktop E2E: Component Sanity (Render & Instantiation)", () => {
       // Default model badge
       expect(html).toContain(DEFAULT_FUSION_MODEL.shortName);
 
-      // Context info and send button
-      expect(html).toContain("main");
-      expect(html).toContain("Ask anything, type @ to mention");
+      // Toolbar info and send button
+      expect(html).toContain("Fusion Usage-Billing");
+      expect(html).toContain("Low");
     });
 
     it("instantiates and renders Composer with selected model", () => {

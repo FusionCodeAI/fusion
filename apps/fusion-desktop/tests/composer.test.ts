@@ -17,7 +17,7 @@ describe("Composer & HeroView components", () => {
     const html = renderToStaticMarkup(React.createElement(Composer, props));
 
     // Must be elevated card, not pill
-    expect(html).toContain("max-w-[680px]");
+    expect(html).toContain("max-w-[760px]");
     expect(html).toContain("rounded-2xl");
     expect(html).toContain("bg-white");
     expect(html).toContain("border-zinc-200");
@@ -25,9 +25,9 @@ describe("Composer & HeroView components", () => {
 
     // Must include default model shortName
     expect(html).toContain(DEFAULT_FUSION_MODEL.shortName);
-
-    // Must include sub-row git branch and context limit gauge
-    expect(html).toContain("main");
+    // Must include toolbar items: paperclip, billing profile, effort
+    expect(html).toContain("Fusion Usage-Billing");
+    expect(html).toContain("Low");
   });
 
   it("renders Composer with custom selectedModel", () => {

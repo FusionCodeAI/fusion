@@ -56,6 +56,12 @@ export function formatRelativeTime(timestamp?: number, now: number = Date.now())
   if (months < 12) return `${months}mo`;
   return `${Math.floor(diff / (365 * day))}y`;
 }
+export function getWorkspaceFolderName(workspaceDir?: string): string {
+  if (!workspaceDir || workspaceDir === "/") return "No Repo";
+  const parts = workspaceDir.replace(/[\\/]+$/, "").split(/[\\/]/);
+  return parts[parts.length - 1] || "No Repo";
+}
+
 
 export function Sidebar({
   sessions,
@@ -178,7 +184,7 @@ export function Sidebar({
             className="w-full flex items-center gap-2 px-3 py-1.5 rounded-lg bg-zinc-200/70 hover:bg-zinc-200 text-xs font-medium text-zinc-900 transition-colors cursor-pointer"
           >
             <Plus className="w-3.5 h-3.5 text-zinc-700" />
-            <span>+ Session</span>
+            <span>Session</span>
           </button>
 
           {/* Schedule */}

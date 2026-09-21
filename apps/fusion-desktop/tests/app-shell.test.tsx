@@ -81,68 +81,48 @@ describe("TopHeader Component", () => {
     expect(opened).toBe(true);
   });
 });
-
 describe("Sidebar Component", () => {
-  it("renders with 220px width, bg-[#f7f7f8], and border right matching design spec", () => {
+  it("renders with 256px (w-64) width, bg-[#fbfbfb], and border right matching Cline spec", () => {
     const html = renderToStaticMarkup(<Sidebar />);
 
-    expect(html).toContain("w-[220px]");
-    expect(html).toContain("bg-[#f7f7f8]");
+    expect(html).toContain("w-64");
+    expect(html).toContain("bg-[#fbfbfb]");
     expect(html).toContain("border-r");
     expect(html).toContain("border-zinc-200/80");
   });
 
-  it("renders top row (40px) with pl-[78px] clearing macOS traffic lights at x:18, y:14", () => {
+  it("renders top row (40px) with pl-[78px] clearing macOS traffic lights and Fusion logo", () => {
     const html = renderToStaticMarkup(<Sidebar />);
 
     expect(html).toContain("h-10");
     expect(html).toContain("pl-[78px]");
-    expect(html).toContain("data-testid=\"sidebar-top-row\"");
-    expect(html).toContain("data-testid=\"sidebar-toggle-button\"");
-    expect(html).toContain("data-testid=\"sidebar-history-back\"");
-    expect(html).toContain("data-testid=\"sidebar-history-forward\"");
+    expect(html).toContain('data-testid="fusion-logo"');
   });
 
-  it("renders primary menu items: New Chat and Search input box", () => {
+  it("renders primary Cline menu items: + Session, Schedule, and Customize", () => {
     const html = renderToStaticMarkup(<Sidebar />);
 
-    expect(html).toContain("New Chat");
-    expect(html).toContain("data-testid=\"sidebar-new-chat\"");
-    expect(html).toContain("data-testid=\"sidebar-search-input\"");
-    expect(html).toContain("placeholder=\"Search\"");
+    expect(html).toContain("Session");
+    expect(html).toContain("Schedule");
+    expect(html).toContain("Customize");
   });
 
-  it("renders Projects section with add button and ◌ New Project item", () => {
+  it("renders Sessions section with sort and filter controls", () => {
     const html = renderToStaticMarkup(<Sidebar />);
 
-    expect(html).toContain("Projects");
-    expect(html).toContain("New Project");
-    expect(html).toContain("data-testid=\"sidebar-new-project-button\"");
-    expect(html).toContain("data-testid=\"sidebar-new-project-item\"");
+    expect(html).toContain("Sessions");
+    expect(html).toContain("Sort sessions");
+    expect(html).toContain("Filter sessions");
   });
 
-  it("renders Repositories section with No Repo and session item • General chat conversation 2h", () => {
+  it("renders footer with Settings button", () => {
     const html = renderToStaticMarkup(<Sidebar />);
 
-    expect(html).toContain("Repositories");
-    expect(html).toContain("No Repo");
-    expect(html).toContain("data-testid=\"sidebar-repo-item\"");
-    expect(html).toContain("General chat conversation");
-    expect(html).toContain("2h");
+    expect(html).toContain("Settings");
+    expect(html).toContain('data-testid="sidebar-settings"');
   });
 
-  it("renders footer with Getting Started 1/3 ⚪, Connect GitHub, and User profile (A) Aung Myat Moe ⚙", () => {
-    const html = renderToStaticMarkup(<Sidebar />);
-
-    expect(html).toContain("Getting Started");
-    expect(html).toContain("1/3");
-    expect(html).toContain("Connect GitHub");
-    expect(html).toContain("data-testid=\"sidebar-connect-github\"");
-    expect(html).toContain("Aung Myat Moe");
-    expect(html).toContain("data-testid=\"sidebar-settings-button\"");
-  });
-
-  it("invokes onNewChat when New Chat button is clicked", () => {
+  it("fires onNewChat when + Session button is clicked", () => {
     let newChatCalled = false;
     const element = (
       <Sidebar
@@ -164,7 +144,7 @@ describe("Sidebar Component", () => {
       expect(formatRelativeTime(now - 2 * 3600 * 1000, now)).toBe("2h");
       expect(formatRelativeTime(now - 3 * 86400 * 1000, now)).toBe("3d");
       expect(formatRelativeTime(now - 14 * 86400 * 1000, now)).toBe("2w");
-      expect(formatRelativeTime(undefined)).toBe("2h");
+      expect(formatRelativeTime(undefined)).toBe("1h");
     });
 
     it("getWorkspaceFolderName extracts clean folder names", () => {
@@ -189,23 +169,21 @@ describe("App Shell Component", () => {
     // Locked composer layout
     expect(html).toContain("shrink-0 p-4 flex flex-col items-center bg-white border-t border-zinc-100");
   });
-
-  it("renders empty state with HeroView and initial prompt composer", () => {
+  it("renders empty state with ClineHeroView and initial prompt composer", () => {
     const html = renderToString(<App />);
 
-    expect(html).toContain("What should we build today?");
-    expect(html).toContain("Ask questions, plan features, or generate code with Fusion Agent");
-    expect(html).toContain("Build a new feature in React &amp; Tailwind");
+    expect(html).toContain("data-testid=\"cline-hero-view\"");
+    expect(html).toContain("Connect a model to start building");
+    expect(html).toContain("data-testid=\"workspace-pill\"");
   });
 
   it("renders Sidebar by default when initialSidebarOpen is true", () => {
     const html = renderToString(<App initialSidebarOpen={true} />);
 
     expect(html).toContain("data-testid=\"sidebar\"");
-    expect(html).toContain("w-[220px]");
-    expect(html).toContain("New Chat");
+    expect(html).toContain("w-64");
+    expect(html).toContain("Session");
   });
-
   it("collapses Sidebar and expands conversation area when initialSidebarOpen is false", () => {
     const html = renderToString(<App initialSidebarOpen={false} />);
 

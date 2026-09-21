@@ -14,7 +14,7 @@ describe("Sidebar Cline Layout", () => {
       />
     );
     expect(html).toContain('data-testid="fusion-logo"');
-    expect(html).toContain("+ Session");
+    expect(html).toContain("Session");
     expect(html).toContain("Schedule");
     expect(html).toContain("Customize");
     expect(html).toContain("Sessions");

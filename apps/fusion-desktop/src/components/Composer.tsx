@@ -212,7 +212,7 @@ export function Composer({
               aria-expanded={isModelMenuOpen}
               aria-haspopup="listbox"
             >
-              <span>{currentModel.name}</span>
+              <span>{currentModel.shortName || currentModel.name}</span>
               <ChevronDown className="w-3 h-3 text-zinc-400" />
             </button>
 
@@ -248,9 +248,9 @@ export function Composer({
                           <span className="text-xs font-medium text-zinc-900 truncate">
                             {model.name}
                           </span>
-                          {model.tag && (
+                          {model.badge && (
                             <span className="text-[10px] px-1.5 py-0.2 rounded bg-zinc-100 text-zinc-600 font-normal">
-                              {model.tag}
+                              {model.badge}
                             </span>
                           )}
                         </div>
