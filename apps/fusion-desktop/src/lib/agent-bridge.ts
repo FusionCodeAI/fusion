@@ -333,7 +333,6 @@ export class AgentBridge {
     if (!this.forceLocalEngine && isTauriEnvironment()) {
       const modelObj = FUSION_MODELS.find((m) => m.id === targetModel);
       const modelName = modelObj ? (modelObj.shortName || modelObj.name) : "DeepSeek 4 Flash";
-      this.emit("thought", `Connecting to Fusion native engine...\nProcessing turn with ${modelName}.\n`);
       try {
         let receivedAnyChunk = false;
         await streamFusionAcp(

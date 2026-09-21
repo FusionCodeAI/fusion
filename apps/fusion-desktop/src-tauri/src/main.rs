@@ -421,13 +421,6 @@ async fn stream_fusion_acp(
                                     "text": thought_text
                                 }));
                             }
-                        } else if kind == "status" {
-                            if let Some(msg) = update.get("message").and_then(|m| m.as_str()) {
-                                let _ = on_event.send(serde_json::json!({
-                                    "type": "thought",
-                                    "text": format!("{}\n", msg)
-                                }));
-                            }
                         } else if kind == "tool_call" {
                             let name = update.get("name").and_then(|t| t.as_str()).unwrap_or("tool");
                             let title = format!("Ran {}", name);

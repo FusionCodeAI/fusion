@@ -657,7 +657,7 @@ describe("Desktop E2E: Component Sanity (Render & Instantiation)", () => {
         })
       );
       expect(html).toContain("Thinking...");
-      expect(html).toContain("animate-spin");
+      expect(html).toContain("animate-pulse");
     });
 
     it("instantiates and renders collapsed thought toggle when thought is provided", () => {
