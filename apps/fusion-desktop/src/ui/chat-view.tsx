@@ -325,9 +325,6 @@ export function ChatView({
                       <div style={{ cursor: "pointer", display: "flex", alignItems: "center" }}>
                         <svg source={icons.copy} style={{ width: 13, height: 13, color: "#a1a1aa" }} />
                       </div>
-                      <div style={{ cursor: "pointer", display: "flex", alignItems: "center" }}>
-                        <svg source={icons.branch} style={{ width: 13, height: 13, color: "#a1a1aa" }} />
-                      </div>
                       <text style={{ fontSize: 11, color: "#a1a1aa", marginLeft: 4 }}>Just now</text>
                     </div>
                   </div>

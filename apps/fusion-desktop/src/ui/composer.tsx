@@ -64,47 +64,12 @@ export function Composer({
         style={{
           width: "100%",
           maxWidth: 680,
+          position: "relative",
           display: "flex",
           flexDirection: "column",
           gap: 6,
         }}
       >
-        {/* Upper Action Pills matching Image #1 */}
-        <div style={{ display: "flex", flexDirection: "row", alignItems: "center", gap: 8, alignSelf: "flex-start" }}>
-          <div
-            style={{
-              paddingTop: 4,
-              paddingBottom: 4,
-              paddingLeft: 10,
-              paddingRight: 10,
-              borderRadius: 14,
-              backgroundColor: "#f4f4f5",
-              cursor: "pointer",
-            }}
-          >
-            <text style={{ fontSize: 11, color: "#3f3f46", fontWeight: "500" }}>Continue Working</text>
-          </div>
-
-          <div
-            style={{
-              display: "flex",
-              flexDirection: "row",
-              alignItems: "center",
-              gap: 4,
-              paddingTop: 4,
-              paddingBottom: 4,
-              paddingLeft: 10,
-              paddingRight: 10,
-              borderRadius: 14,
-              backgroundColor: "#f4f4f5",
-              cursor: "pointer",
-            }}
-          >
-            <text style={{ fontSize: 11, color: "#3f3f46", fontWeight: "500" }}>Create Branch & Commit</text>
-            <svg source={icons.chevronDown} style={{ width: 8, height: 8, color: "#71717a" }} />
-          </div>
-        </div>
-
         {/* Model Picker Popup Dropdown if open */}
         {isModelPickerOpen && (
           <div
@@ -117,6 +82,7 @@ export function Composer({
               display: "flex",
               flexDirection: "column",
               gap: 2,
+              marginBottom: 6,
             }}
           >
             <div style={{ paddingLeft: 8, paddingTop: 4, paddingBottom: 4 }}>
@@ -177,161 +143,181 @@ export function Composer({
           </div>
         )}
 
-        {/* Rounded Pill Composer matching Image #1 */}
+        {/* Elevated Multi-Row Composer Card (NOT a capsule pill!) */}
         <div
           style={{
             backgroundColor: "#ffffff",
             borderWidth: 1,
             borderColor: "#e5e5e8",
-            borderRadius: 22,
-            paddingTop: 6,
-            paddingBottom: 6,
-            paddingLeft: 12,
-            paddingRight: 8,
+            borderRadius: 12,
+            paddingTop: 12,
+            paddingBottom: 10,
+            paddingLeft: 14,
+            paddingRight: 12,
             display: "flex",
-            flexDirection: "row",
-            alignItems: "center",
-            justifyContent: "space-between",
+            flexDirection: "column",
           }}
         >
-          {/* Left: Plus icon in soft circle */}
-          <div
-            style={{
-              width: 22,
-              height: 22,
-              borderRadius: 11,
-              backgroundColor: "#f4f4f5",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              cursor: "pointer",
-              marginRight: 10,
-            }}
-          >
-            <svg source={icons.plus} style={{ width: 11, height: 11, color: "#71717a" }} />
-          </div>
-
-          {/* Center: Textarea with proper padding & dark caret */}
+          {/* Multi-line input area */}
           <textarea
             value={text}
             onChange={(e: { value?: string }) => handleTextChange(e.value ?? "")}
             onSubmit={handleSend}
             placeholder="Send follow-up"
-            minRows={1}
-            maxRows={6}
+            minRows={2}
+            maxRows={8}
             theme={{
               caret: "#18181b",
             }}
             style={{
-              flexGrow: 1,
+              width: "100%",
               fontSize: 14,
               lineHeight: 22,
               color: "#18181b",
               backgroundColor: "transparent",
               borderWidth: 0,
               paddingTop: 4,
-              paddingBottom: 4,
+              paddingBottom: 8,
               paddingLeft: 2,
               paddingRight: 2,
             }}
           />
 
-          {/* Right Toolbar: Model Selector and Mic Button */}
-          <div style={{ display: "flex", flexDirection: "row", alignItems: "center", gap: 10 }}>
-            {/* Model Pill */}
-            <div
-              onClick={() => setIsModelPickerOpen(!isModelPickerOpen)}
-              style={{
-                display: "flex",
-                flexDirection: "row",
-                alignItems: "center",
-                gap: 4,
-                cursor: "pointer",
-                paddingTop: 2,
-                paddingBottom: 2,
-                paddingLeft: 6,
-                paddingRight: 6,
-                borderRadius: 6,
-                backgroundColor: isModelPickerOpen ? "#f4f4f5" : "transparent",
-                hover: { backgroundColor: "#f4f4f5" },
-              }}
-            >
-              <text style={{ fontSize: 12, color: "#52525b", fontWeight: "500" }}>
-                {activeModelObj.shortName}
-              </text>
-              <svg source={icons.chevronDown} style={{ width: 9, height: 9, color: "#71717a" }} />
+          {/* Bottom Toolbar inside the card */}
+          <div
+            style={{
+              display: "flex",
+              flexDirection: "row",
+              alignItems: "center",
+              justifyContent: "space-between",
+              paddingTop: 8,
+              marginTop: 4,
+            }}
+          >
+            {/* Left: Plus context & Model selector pill */}
+            <div style={{ display: "flex", flexDirection: "row", alignItems: "center", gap: 8 }}>
+              <div
+                style={{
+                  width: 22,
+                  height: 22,
+                  borderRadius: 6,
+                  backgroundColor: "#f4f4f5",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  cursor: "pointer",
+                  hover: { backgroundColor: "#e4e4e7" },
+                }}
+              >
+                <svg source={icons.plus} style={{ width: 12, height: 12, color: "#71717a" }} />
+              </div>
+
+              <div
+                onClick={() => setIsModelPickerOpen(!isModelPickerOpen)}
+                style={{
+                  display: "flex",
+                  flexDirection: "row",
+                  alignItems: "center",
+                  gap: 5,
+                  cursor: "pointer",
+                  paddingTop: 3,
+                  paddingBottom: 3,
+                  paddingLeft: 8,
+                  paddingRight: 8,
+                  borderRadius: 6,
+                  backgroundColor: isModelPickerOpen ? "#ebebec" : "#f4f4f5",
+                  hover: { backgroundColor: "#e4e4e7" },
+                }}
+              >
+                <text style={{ fontSize: 12, color: "#3f3f46", fontWeight: "500" }}>
+                  {activeModelObj.shortName}
+                </text>
+                <svg source={icons.chevronDown} style={{ width: 9, height: 9, color: "#71717a" }} />
+              </div>
             </div>
 
-            {/* Mic / Action Button (Black circular button) */}
-            {isGenerating ? (
+            {/* Right: Mic & Send/Stop action */}
+            <div style={{ display: "flex", flexDirection: "row", alignItems: "center", gap: 8 }}>
               <div
-                onClick={onCancel}
                 style={{
-                  width: 28,
-                  height: 28,
-                  borderRadius: 14,
-                  backgroundColor: "#ef4444",
+                  cursor: "pointer",
                   display: "flex",
                   alignItems: "center",
                   justifyContent: "center",
-                  cursor: "pointer",
+                  width: 24,
+                  height: 24,
+                  borderRadius: 6,
+                  hover: { backgroundColor: "#f4f4f5" },
                 }}
               >
-                <div style={{ width: 10, height: 10, borderRadius: 2, backgroundColor: "#ffffff" }} />
+                <svg source={icons.mic} style={{ width: 14, height: 14, color: "#71717a" }} />
               </div>
-            ) : (
-              <div
-                onClick={text.trim() ? handleSend : undefined}
-                style={{
-                  width: 28,
-                  height: 28,
-                  borderRadius: 14,
-                  backgroundColor: "#000000",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  cursor: "pointer",
-                }}
-              >
-                {text.trim() ? (
-                  <svg source={icons.arrowRightSubmit} style={{ width: 13, height: 13, color: "#ffffff" }} />
-                ) : (
-                  <svg source={icons.mic} style={{ width: 13, height: 13, color: "#ffffff" }} />
-                )}
-              </div>
-            )}
+
+              {isGenerating ? (
+                <div
+                  onClick={onCancel}
+                  style={{
+                    width: 26,
+                    height: 26,
+                    borderRadius: 13,
+                    backgroundColor: "#ef4444",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    cursor: "pointer",
+                  }}
+                >
+                  <div style={{ width: 9, height: 9, borderRadius: 2, backgroundColor: "#ffffff" }} />
+                </div>
+              ) : (
+                <div
+                  onClick={text.trim() ? handleSend : undefined}
+                  style={{
+                    width: 26,
+                    height: 26,
+                    borderRadius: 13,
+                    backgroundColor: text.trim() ? "#18181b" : "#f4f4f5",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    cursor: text.trim() ? "pointer" : "default",
+                    hover: text.trim() ? { backgroundColor: "#27272a" } : {},
+                  }}
+                >
+                  <svg
+                    source={icons.arrowRightSubmit}
+                    style={{
+                      width: 12,
+                      height: 12,
+                      color: text.trim() ? "#ffffff" : "#a1a1aa",
+                    }}
+                  />
+                </div>
+              )}
+            </div>
           </div>
         </div>
 
-        {/* Sub-row below Composer: Branch, This Mac, Context Limit Circle */}
+        {/* Sub-row below Composer: Branch on Left, Context Meter on Right (NO This Mac!) */}
         <div
           style={{
             display: "flex",
             flexDirection: "row",
             alignItems: "center",
             justifyContent: "space-between",
-            paddingLeft: 8,
+            paddingLeft: 6,
             paddingRight: 4,
-            paddingTop: 4,
+            paddingTop: 2,
           }}
         >
-          <div style={{ display: "flex", flexDirection: "row", alignItems: "center", gap: 14 }}>
-            {/* Branch */}
-            <div style={{ display: "flex", flexDirection: "row", alignItems: "center", gap: 4, cursor: "pointer" }}>
-              <svg source={icons.branch} style={{ width: 11, height: 11, color: "#71717a" }} />
-              <text style={{ fontSize: 11, color: "#71717a" }}>main</text>
-              <svg source={icons.chevronDown} style={{ width: 8, height: 8, color: "#71717a" }} />
-            </div>
-
-            {/* This Mac */}
-            <div style={{ display: "flex", flexDirection: "row", alignItems: "center", gap: 4, cursor: "pointer" }}>
-              <svg source={icons.laptop} style={{ width: 12, height: 12, color: "#71717a" }} />
-              <text style={{ fontSize: 11, color: "#71717a" }}>This Mac</text>
-              <svg source={icons.chevronDown} style={{ width: 8, height: 8, color: "#71717a" }} />
-            </div>
+          {/* Branch indicator */}
+          <div style={{ display: "flex", flexDirection: "row", alignItems: "center", gap: 4, cursor: "pointer" }}>
+            <svg source={icons.branch} style={{ width: 11, height: 11, color: "#71717a" }} />
+            <text style={{ fontSize: 11, color: "#71717a" }}>main</text>
+            <svg source={icons.chevronDown} style={{ width: 8, height: 8, color: "#71717a" }} />
           </div>
 
-          {/* Context Limit Circle Gauge */}
+          {/* Context Limit Usage Meter on the far right */}
           <div style={{ cursor: "pointer", display: "flex", alignItems: "center" }}>
             <svg source={icons.contextMeter} style={{ width: 13, height: 13, color: "#71717a" }} />
           </div>

@@ -121,16 +121,6 @@ export function Sidebar({
           >
             <svg source={icons.sidebarToggle} style={{ width: 14, height: 14, color: "#52525b" }} />
           </div>
-
-          {/* Right: History Arrows */}
-          <div style={{ display: "flex", flexDirection: "row", alignItems: "center", gap: 8 }}>
-            <div style={{ cursor: "pointer", display: "flex", alignItems: "center" }}>
-              <svg source={icons.arrowLeft} style={{ width: 13, height: 13, color: "#8e8e93" }} />
-            </div>
-            <div style={{ cursor: "pointer", display: "flex", alignItems: "center" }}>
-              <svg source={icons.arrowRight} style={{ width: 13, height: 13, color: "#8e8e93" }} />
-            </div>
-          </div>
         </div>
 
         {/* Primary Navigation Actions */}
