@@ -78,6 +78,30 @@ export function App({
   initialSessions,
 }: AppProps) {
   const [isSidebarOpen, setIsSidebarOpen] = useState(initialSidebarOpen);
+  const [sidebarWidth, setSidebarWidth] = useState<number>(() => {
+    if (typeof window !== "undefined" && window.localStorage) {
+      const stored = window.localStorage.getItem("fusion_desktop_sidebar_width");
+      if (stored) {
+        const parsed = parseInt(stored, 10);
+        if (!isNaN(parsed) && parsed >= 180 && parsed <= 520) return parsed;
+      }
+    }
+    return 260;
+  });
+
+  const handleSidebarResize = (newWidth: number) => {
+    setSidebarWidth(newWidth);
+    if (typeof window !== "undefined" && window.localStorage) {
+      window.localStorage.setItem("fusion_desktop_sidebar_width", String(newWidth));
+    }
+  };
+
+  const handleSidebarResetWidth = () => {
+    setSidebarWidth(260);
+    if (typeof window !== "undefined" && window.localStorage) {
+      window.localStorage.removeItem("fusion_desktop_sidebar_width");
+    }
+  };
   const [sessionsRecord, setSessionsRecord] = useState<ChatSessionRecord[]>(() => {
     if (initialSessions && initialSessions.length > 0) {
       return initialSessions.map((s) => ({
@@ -367,10 +391,13 @@ export function App({
       data-testid="app-shell"
       className="h-screen w-screen flex flex-row overflow-hidden bg-white"
     >
-      {/* Sidebar: collapsed when isSidebarOpen is false */}
+      {/* Sidebar: resizable, collapsed when isSidebarOpen is false */}
       {isSidebarOpen && (
         <Sidebar
           sessions={sessionsRecord}
+          width={sidebarWidth}
+          onResize={handleSidebarResize}
+          onResetWidth={handleSidebarResetWidth}
           onNewChat={handleNewChat}
           onSelectSession={handleSelectSession}
           onDeleteSession={handleDeleteSession}

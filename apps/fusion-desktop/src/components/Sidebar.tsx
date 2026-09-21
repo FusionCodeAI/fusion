@@ -31,8 +31,10 @@ export interface SidebarProps {
   onHistoryBack?: () => void;
   onHistoryForward?: () => void;
   onSchedule?: () => void;
-  onCustomize?: () => void;
   onOpenSettings?: () => void;
+  width?: number;
+  onResize?: (width: number) => void;
+  onResetWidth?: () => void;
   className?: string;
 }
 
@@ -70,9 +72,12 @@ export function Sidebar({
   onDeleteSession,
   onHistoryBack,
   onHistoryForward,
-  onSchedule,
   onCustomize,
+  onSchedule,
   onOpenSettings,
+  width,
+  onResize,
+  onResetWidth,
   className = "",
 }: SidebarProps) {
   const [searchQuery, setSearchQuery] = useState("");
@@ -98,11 +103,42 @@ export function Sidebar({
     return sessionList.filter((s) => s.title.toLowerCase().includes(q));
   }, [sessionList, searchQuery]);
 
+  const handleMouseDown = (e: React.MouseEvent) => {
+    e.preventDefault();
+    const startX = e.clientX;
+    const initialWidth = width ?? 256;
+
+    const onMouseMove = (moveEvent: MouseEvent) => {
+      const delta = moveEvent.clientX - startX;
+      const newWidth = Math.min(Math.max(initialWidth + delta, 180), 520);
+      onResize?.(newWidth);
+    };
+
+    const onMouseUp = () => {
+      window.removeEventListener("mousemove", onMouseMove);
+      window.removeEventListener("mouseup", onMouseUp);
+    };
+
+    window.addEventListener("mousemove", onMouseMove);
+    window.addEventListener("mouseup", onMouseUp);
+  };
+
+  const widthStyle = width ? { width: `${width}px` } : undefined;
+
   return (
     <aside
       data-testid="sidebar"
-      className={`w-64 h-full shrink-0 flex flex-col justify-between border-r border-zinc-200/80 bg-[#fbfbfb] select-none text-zinc-800 ${className}`}
+      style={widthStyle}
+      className={`relative ${width ? "" : "w-64"} h-full shrink-0 flex flex-col justify-between border-r border-zinc-200/80 bg-[#fbfbfb] select-none text-zinc-800 ${className}`}
     >
+      {/* Right Edge Resize Handle */}
+      <div
+        data-testid="sidebar-resize-handle"
+        onMouseDown={handleMouseDown}
+        onDoubleClick={onResetWidth}
+        title="Drag to resize sidebar (double-click to reset)"
+        className="absolute top-0 right-0 bottom-0 w-1 cursor-col-resize hover:w-1.5 hover:bg-[#5100cd]/40 active:bg-[#5100cd] transition-all z-20"
+      />
       {/* Top Section */}
       <div className="flex flex-col min-h-0">
         {/* Top Header Row with Traffic Lights clearance */}
