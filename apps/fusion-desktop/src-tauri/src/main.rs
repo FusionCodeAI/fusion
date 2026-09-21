@@ -16,6 +16,8 @@ pub struct DesktopSessionSummary {
     pub model: String,
     pub message_count: usize,
     pub preview: String,
+    pub workspace: Option<String>,
+    pub workspace_name: Option<String>,
 }
 
 fn fusion_sessions_dir() -> PathBuf {
@@ -70,6 +72,10 @@ fn list_fusion_sessions() -> Result<Vec<DesktopSessionSummary>, String> {
                             }
                         })
                         .unwrap_or_default();
+                    let workspace = val.get("workspace").and_then(|w| w.as_str()).map(|s| s.to_string());
+                    let workspace_name = workspace.as_ref().and_then(|w| {
+                        PathBuf::from(w).file_name().and_then(|n| n.to_str()).map(|s| s.to_string())
+                    });
 
                     summaries.push(DesktopSessionSummary {
                         id,
@@ -79,6 +85,8 @@ fn list_fusion_sessions() -> Result<Vec<DesktopSessionSummary>, String> {
                         model,
                         message_count,
                         preview,
+                        workspace,
+                        workspace_name,
                     });
                 }
             }

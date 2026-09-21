@@ -99,9 +99,8 @@ describe("Sidebar Component", () => {
   it("renders Sessions section with sort and filter controls", () => {
     const html = renderToStaticMarkup(<Sidebar />);
 
-    expect(html).toContain('data-testid="cline-avatar"');
-    expect(html).toContain("Sort sessions");
-    expect(html).toContain("Filter sessions");
+    expect(html).toContain('data-testid="sidebar-sort-toggle"');
+    expect(html).toContain('data-testid="sidebar-filter-toggle"');
   });
 
   it("renders footer with Settings button", () => {

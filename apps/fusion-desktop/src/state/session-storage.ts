@@ -15,8 +15,9 @@ export interface ChatSessionRecord {
   updatedAt: number;
   model: string;
   messages: ChatMessage[];
+  workspace?: string;
+  workspaceName?: string;
 }
-
 const STORAGE_KEY = "fusion_desktop_sessions_v2";
 const ACTIVE_SESSION_KEY = "fusion_desktop_active_session_v2";
 
@@ -220,13 +221,14 @@ export async function syncNativeFusionSessions(
       const existing = mergedMap.get(n.id);
       const parsedUpdated = n.updated_at ? new Date(n.updated_at).getTime() : Date.now();
       const parsedCreated = n.created_at ? new Date(n.created_at).getTime() : Date.now();
-
       if (existing) {
         mergedMap.set(n.id, {
           ...existing,
           title: n.title || existing.title,
           updatedAt: Math.max(existing.updatedAt, isNaN(parsedUpdated) ? 0 : parsedUpdated),
           model: n.model || existing.model,
+          workspace: n.workspace || existing.workspace,
+          workspaceName: n.workspace_name || existing.workspaceName,
         });
       } else {
         mergedMap.set(n.id, {
@@ -235,6 +237,8 @@ export async function syncNativeFusionSessions(
           createdAt: isNaN(parsedCreated) ? Date.now() : parsedCreated,
           updatedAt: isNaN(parsedUpdated) ? Date.now() : parsedUpdated,
           model: n.model || DEFAULT_FUSION_MODEL.id,
+          workspace: n.workspace,
+          workspaceName: n.workspace_name,
           messages: [],
         });
       }

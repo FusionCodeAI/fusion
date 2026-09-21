@@ -415,6 +415,8 @@ export function App({
       updatedAt: Date.now(),
       model: selectedModel,
       messages: [],
+      workspace: workspaceDir,
+      workspaceName: workspaceName,
     };
     saveSession(newSession);
     setSessionsRecord((prev) => [newSession, ...prev]);
@@ -478,9 +480,8 @@ export function App({
       {/* Sidebar: resizable, collapsed when isSidebarOpen is false */}
       {isSidebarOpen && (
         <Sidebar
-          sessions={sessionsRecord}
-          activeSessionId={activeSessionId}
           onDeleteSession={handleDeleteSession}
+          workspaceDir={workspaceDir}
           width={sidebarWidth}
           currentView={currentView}
           canNavigateBack={currentView !== "chat"}

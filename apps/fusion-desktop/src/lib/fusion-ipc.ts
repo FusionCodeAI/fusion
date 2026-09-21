@@ -8,6 +8,8 @@ export interface DesktopSessionSummary {
   model: string;
   message_count: usize | number;
   preview: string;
+  workspace?: string;
+  workspace_name?: string;
 }
 
 type usize = number;

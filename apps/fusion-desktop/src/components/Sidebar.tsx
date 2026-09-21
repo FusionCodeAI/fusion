@@ -9,7 +9,8 @@ import {
   Sliders,
   Cable,
   CircleUser,
-  ArrowUpDown,
+  FolderTree,
+  ChevronDown,
   Filter,
   Settings,
   X,
@@ -21,6 +22,8 @@ export interface SidebarSessionItem {
   title: string;
   createdAt?: number;
   updatedAt?: number;
+  workspace?: string;
+  workspaceName?: string;
 }
 
 export type SettingsSectionId = "general" | "api" | "account";
@@ -71,12 +74,15 @@ export function formatRelativeTime(timestamp?: number, now: number = Date.now())
 
 export function getWorkspaceFolderName(workspaceDir?: string): string {
   if (!workspaceDir || workspaceDir === "/") return "No Repo";
+  if (workspaceDir === ".") return "fusion";
   const parts = workspaceDir.replace(/[\\/]+$/, "").split(/[\\/]/);
   return parts[parts.length - 1] || "No Repo";
 }
+
 export function Sidebar({
   sessions,
   activeSessionId,
+  workspaceDir = ".",
   currentView = "chat",
   settingsSection = "general",
   canNavigateBack = false,
@@ -94,22 +100,73 @@ export function Sidebar({
   onResetWidth,
   className = "",
 }: SidebarProps) {
-  const [isSearchOpen, setIsSearchOpen] = useState(false);
+  const [sortMode, setSortMode] = useState<"time" | "project">("project");
+  const [isFilterCurrentWorkspace, setIsFilterCurrentWorkspace] = useState(false);
+  const [collapsedProjects, setCollapsedProjects] = useState<Set<string>>(() => new Set());
 
   const defaultSessions: SidebarSessionItem[] = useMemo(
     () => [
       {
         id: "session-default",
-        title: "hi",
+        title: "General chat conversation",
         createdAt: Date.now() - 3600 * 1000,
         updatedAt: Date.now() - 3600 * 1000,
+        workspaceName: getWorkspaceFolderName(workspaceDir),
       },
     ],
-    []
+    [workspaceDir]
   );
 
   const sessionList = sessions && sessions.length > 0 ? sessions : defaultSessions;
-  const filteredSessions = sessionList;
+  const currentWorkspaceName = getWorkspaceFolderName(workspaceDir).toLowerCase();
+
+  // Filter sessions if current workspace filter is active
+  const displayedSessions = useMemo(() => {
+    if (!isFilterCurrentWorkspace) return sessionList;
+    return sessionList.filter((s) => {
+      const sWs = (s.workspaceName || "").toLowerCase();
+      const sPath = (s.workspace || "").toLowerCase();
+      return (
+        sWs === currentWorkspaceName ||
+        sPath.includes(currentWorkspaceName) ||
+        (!s.workspace && currentWorkspaceName === "fusion")
+      );
+    });
+  }, [sessionList, isFilterCurrentWorkspace, currentWorkspaceName]);
+
+  // Group by project when sortMode === "project"
+  const projectGroups = useMemo(() => {
+    const groups = new Map<string, { label: string; workspacePath: string; sessions: SidebarSessionItem[] }>();
+
+    for (const session of displayedSessions) {
+      const wsPath = session.workspace || "";
+      const wsName = session.workspaceName || (wsPath ? getWorkspaceFolderName(wsPath) : "General Chat");
+      const key = wsName.toLowerCase();
+      const existing = groups.get(key);
+      if (existing) {
+        existing.sessions.push(session);
+      } else {
+        groups.set(key, { label: wsName, workspacePath: wsPath, sessions: [session] });
+      }
+    }
+
+    // Sort projects so active workspace project is first, then alphabetical
+    return Array.from(groups.values()).sort((a, b) => {
+      if (a.label.toLowerCase() === currentWorkspaceName) return -1;
+      if (b.label.toLowerCase() === currentWorkspaceName) return 1;
+      return a.label.localeCompare(b.label);
+    });
+  }, [displayedSessions, currentWorkspaceName]);
+
+  const toggleProjectCollapse = (label: string) => {
+    setCollapsedProjects((prev) => {
+      const next = new Set(prev);
+      if (next.has(label)) next.delete(label);
+      else next.add(label);
+      return next;
+    });
+  };
+
   const handleMouseDown = (e: React.MouseEvent) => {
     e.preventDefault();
     const startX = e.clientX;
@@ -128,6 +185,44 @@ export function Sidebar({
 
     document.addEventListener("mousemove", onMouseMove);
     document.addEventListener("mouseup", onMouseUp);
+  };
+
+  const renderSessionRow = (session: SidebarSessionItem) => {
+    const isActive = session.id === activeSessionId && currentView === "chat";
+    return (
+      <div
+        key={session.id}
+        data-testid="sidebar-session-item"
+        data-session-id={session.id}
+        onClick={() => onSelectSession?.(session.id)}
+        className={`group flex items-center justify-between px-2.5 py-1.5 rounded-lg text-xs cursor-pointer transition-colors ${
+          isActive
+            ? "bg-zinc-200/70 font-medium text-zinc-900"
+            : "hover:bg-zinc-100 text-zinc-700 font-normal"
+        }`}
+      >
+        <span className="truncate pr-2">{session.title}</span>
+        <div className="flex items-center gap-1 shrink-0 text-zinc-400">
+          <span className="text-[11px] tabular-nums">
+            {formatRelativeTime(session.updatedAt || session.createdAt)}
+          </span>
+          {onDeleteSession && (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                onDeleteSession(session.id);
+              }}
+              className="opacity-0 group-hover:opacity-100 p-0.5 rounded hover:bg-zinc-200 text-zinc-400 hover:text-zinc-700 transition-opacity cursor-pointer"
+              title="Delete session"
+              aria-label="Delete session"
+            >
+              <X className="w-3 h-3" />
+            </button>
+          )}
+        </div>
+      </div>
+    );
   };
 
   return (
@@ -257,7 +352,7 @@ export function Sidebar({
           )}
         </div>
 
-        {/* SETTINGS Group Section: rendered ONLY when on settings page matching Image #2 */}
+        {/* SETTINGS Group Section: rendered ONLY when on settings page */}
         {currentView === "settings" && (
           <div className="px-2 pt-2 pb-1 space-y-0.5 border-t border-zinc-200/50">
             <div className="px-3 py-1 text-[11px] font-medium text-zinc-400 uppercase tracking-wider">
@@ -302,74 +397,90 @@ export function Sidebar({
           </div>
         )}
 
-        {/* Sessions Section: rendered ONLY when NOT on settings page */}
+        {/* Sessions Section Header & List: ONLY shown when NOT on settings page */}
         {currentView !== "settings" && (
           <>
             <div className="px-3 pt-3 pb-1 flex items-center justify-between text-xs text-zinc-500">
-              <span className="font-medium text-zinc-600">Sessions</span>
+              <button
+                type="button"
+                onClick={() => setSortMode((prev) => (prev === "time" ? "project" : "time"))}
+                className="font-medium text-zinc-600 hover:text-zinc-900 transition-colors cursor-pointer flex items-center gap-1.5"
+                title={sortMode === "time" ? "Sorted by time — click to group by project" : "Grouped by project — click to sort by time"}
+              >
+                <span>{sortMode === "time" ? "Sessions" : "Projects"}</span>
+              </button>
               <div className="flex items-center gap-1">
                 <button
                   type="button"
+                  data-testid="sidebar-sort-toggle"
+                  onClick={() => setSortMode((prev) => (prev === "time" ? "project" : "time"))}
                   className="p-1 rounded hover:bg-zinc-200/50 hover:text-zinc-800 transition-colors cursor-pointer"
-                  title="Sort sessions"
-                  aria-label="Sort sessions"
+                  title={sortMode === "time" ? "Group by project" : "Sort by time"}
+                  aria-label="Toggle sort mode"
                 >
-                  <ArrowUpDown className="w-3 h-3" />
+                  {sortMode === "time" ? (
+                    <FolderTree className="w-3.5 h-3.5 text-zinc-500" />
+                  ) : (
+                    <Clock className="w-3.5 h-3.5 text-zinc-500" />
+                  )}
                 </button>
                 <button
                   type="button"
-                  className="p-1 rounded hover:bg-zinc-200/50 hover:text-zinc-800 transition-colors cursor-pointer"
-                  title="Filter sessions"
-                  aria-label="Filter sessions"
+                  data-testid="sidebar-filter-toggle"
+                  onClick={() => setIsFilterCurrentWorkspace((prev) => !prev)}
+                  className={`p-1 rounded transition-colors cursor-pointer ${
+                    isFilterCurrentWorkspace
+                      ? "bg-purple-100 text-[#5100cd]"
+                      : "hover:bg-zinc-200/50 text-zinc-500 hover:text-zinc-800"
+                  }`}
+                  title={isFilterCurrentWorkspace ? "Showing current project only — click to show all" : "Filter by current project"}
+                  aria-label="Filter by current project"
                 >
-                  <Filter className="w-3 h-3" />
+                  <Filter className="w-3.5 h-3.5" />
                 </button>
               </div>
             </div>
 
-            {/* Session List */}
+            {/* Session List: grouped by Project or flat by Time */}
             <div className="flex-1 overflow-y-auto px-2 space-y-0.5">
-              {filteredSessions.map((session) => {
-                const isActive = session.id === activeSessionId && currentView === "chat";
-                return (
-                  <div
-                    key={session.id}
-                    data-testid="sidebar-session-item"
-                    data-session-id={session.id}
-                    onClick={() => onSelectSession?.(session.id)}
-                    className={`group flex items-center justify-between px-3 py-1.5 rounded-lg text-xs cursor-pointer transition-colors ${
-                      isActive
-                        ? "bg-zinc-200/60 font-medium text-zinc-900"
-                        : "hover:bg-zinc-100 text-zinc-700 font-normal"
-                    }`}
-                  >
-                    <span className="truncate pr-2">{session.title}</span>
-                    <div className="flex items-center gap-1 shrink-0 text-zinc-400">
-                      <span className="text-[11px] tabular-nums">
-                        {formatRelativeTime(session.updatedAt || session.createdAt)}
-                      </span>
-                      {onDeleteSession && (
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            onDeleteSession(session.id);
-                          }}
-                          className="opacity-0 group-hover:opacity-100 p-0.5 rounded hover:bg-zinc-200 text-zinc-400 hover:text-zinc-700 transition-opacity"
-                          title="Delete session"
-                          aria-label="Delete session"
-                        >
-                          <X className="w-3 h-3" />
-                        </button>
+              {sortMode === "project" ? (
+                projectGroups.map((group) => {
+                  const isCollapsed = collapsedProjects.has(group.label);
+                  return (
+                    <div key={group.label} className="mb-2 min-w-0">
+                      <button
+                        type="button"
+                        onClick={() => toggleProjectCollapse(group.label)}
+                        className="flex h-7 w-full min-w-0 items-center gap-1.5 rounded-md px-1.5 text-left text-xs font-semibold text-zinc-600 hover:bg-zinc-100 transition-colors cursor-pointer"
+                        title={group.label}
+                      >
+                        <ChevronDown
+                          className={`size-3.5 shrink-0 transition-transform ${
+                            isCollapsed ? "-rotate-90 text-zinc-400" : "text-zinc-500"
+                          }`}
+                        />
+                        <span className="truncate">{group.label}</span>
+                        <span className="text-[11px] text-zinc-400 font-normal ml-auto tabular-nums">
+                          {group.sessions.length}
+                        </span>
+                      </button>
+
+                      {!isCollapsed && (
+                        <div className="pl-3 space-y-0.5 mt-0.5">
+                          {group.sessions.map((session) => renderSessionRow(session))}
+                        </div>
                       )}
                     </div>
-                  </div>
-                );
-              })}
+                  );
+                })
+              ) : (
+                displayedSessions.map((session) => renderSessionRow(session))
+              )}
             </div>
           </>
         )}
       </div>
+
       {/* Bottom Row: Settings Button matching Cline Image #1 & #2 */}
       <div className="p-2 border-t border-zinc-200/60">
         <button

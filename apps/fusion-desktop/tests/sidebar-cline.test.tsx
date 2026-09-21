@@ -30,7 +30,6 @@ describe("Sidebar Cline Layout matching Image #1 and #2", () => {
     expect(html).toContain("Session");
     expect(html).toContain("Schedule");
     expect(html).toContain("Customize");
-    expect(html).toContain("Sessions");
     expect(html).toContain("Settings");
     // Settings group is NOT shown in main chat view
     expect(html).not.toContain('data-testid="sidebar-settings-general"');
@@ -50,5 +49,26 @@ describe("Sidebar Cline Layout matching Image #1 and #2", () => {
     expect(html).toContain('data-testid="sidebar-settings-api"');
     expect(html).toContain("General");
     expect(html).toContain("API Providers");
+  });
+
+  test("groups sessions by project with collapsible sections and sort/filter controls", () => {
+    const sessions = [
+      { id: "s1", title: "fix bug", createdAt: Date.now(), updatedAt: Date.now(), workspaceName: "fusion" },
+      { id: "s2", title: "add cart", createdAt: Date.now(), updatedAt: Date.now(), workspaceName: "ecommerce-shop" },
+    ];
+
+    const html = renderToStaticMarkup(
+      <Sidebar
+        sessions={sessions}
+        workspaceDir="/Users/aungmyatmoe/TheSpace/fusion"
+        onNewChat={() => {}}
+      />
+    );
+
+    // Project labels
+    expect(html).toContain("fusion");
+    expect(html).toContain("ecommerce-shop");
+    expect(html).toContain('data-testid="sidebar-sort-toggle"');
+    expect(html).toContain('data-testid="sidebar-filter-toggle"');
   });
 });

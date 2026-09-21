@@ -28,6 +28,8 @@ function fusionLocalSessionsPlugin() {
                   const fullPath = path.join(sessionsDir, entry.name);
                   const raw = fs.readFileSync(fullPath, "utf-8");
                   const parsed = JSON.parse(raw);
+                  const ws = parsed.workspace || parsed.cwd || "";
+                  const wsName = ws ? path.basename(ws) : "General Chat";
                   summaries.push({
                     id: parsed.id || entry.name.replace(".json", ""),
                     title: parsed.title || "General chat conversation",
@@ -39,10 +41,41 @@ function fusionLocalSessionsPlugin() {
                       Array.isArray(parsed.messages) && parsed.messages.length > 0
                         ? (parsed.messages[parsed.messages.length - 1].content || "").slice(0, 100)
                         : "",
+                    workspace: ws,
+                    workspace_name: wsName,
                   });
                 } catch {
                   // ignore unparseable
                 }
+              } else if (entry.isDirectory() && entry.name.startsWith("%2F")) {
+                try {
+                  const decodedWs = decodeURIComponent(entry.name);
+                  const wsName = path.basename(decodedWs) || "Workspace";
+                  const subDirPath = path.join(sessionsDir, entry.name);
+                  const subEntries = fs.readdirSync(subDirPath, { withFileTypes: true });
+
+                  for (const sub of subEntries) {
+                    if (sub.isDirectory()) {
+                      const summaryPath = path.join(subDirPath, sub.name, "summary.json");
+                      if (fs.existsSync(summaryPath)) {
+                        try {
+                          const sum = JSON.parse(fs.readFileSync(summaryPath, "utf-8"));
+                          summaries.push({
+                            id: sum.info?.id || sub.name,
+                            title: sum.session_summary || "Workspace session",
+                            created_at: sum.created_at || "",
+                            updated_at: sum.updated_at || "",
+                            model: sum.current_model_id || "deepseek-v4-flash-0731",
+                            message_count: sum.num_chat_messages || sum.num_messages || 0,
+                            preview: `Workspace session in ${wsName}`,
+                            workspace: decodedWs,
+                            workspace_name: wsName,
+                          });
+                        } catch {}
+                      }
+                    }
+                  }
+                } catch {}
               }
             }
 
@@ -71,6 +104,19 @@ function fusionLocalSessionsPlugin() {
             res.end(fs.readFileSync(sessionPath, "utf-8"));
             return;
           } else {
+            // Check subdirectories
+            const sessionsDir = path.join(os.homedir(), ".fusion", "sessions");
+            const subEntries = fs.readdirSync(sessionsDir, { withFileTypes: true });
+            for (const sub of subEntries) {
+              if (sub.isDirectory()) {
+                const subSessionPath = path.join(sessionsDir, sub.name, id, "summary.json");
+                if (fs.existsSync(subSessionPath)) {
+                  res.setHeader("Content-Type", "application/json");
+                  res.end(fs.readFileSync(subSessionPath, "utf-8"));
+                  return;
+                }
+              }
+            }
             res.statusCode = 404;
             res.end(JSON.stringify({ error: "Session not found" }));
             return;
