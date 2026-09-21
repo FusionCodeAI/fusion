@@ -42,11 +42,11 @@ export function ClineHeroView({
   return (
     <div
       data-testid="cline-hero-view"
-      className={`relative w-full h-full flex flex-col items-center justify-center px-4 overflow-hidden ${className}`}
+      className={`relative w-full h-full flex flex-col items-center justify-center px-4 overflow-hidden group ${className}`}
     >
-      {/* Cline-style Elegant Dot Grid Canvas Background */}
-      <div 
-        className="absolute inset-0 pointer-events-none select-none cline-dot-grid [mask-image:radial-gradient(ellipse_at_center,black_50%,transparent_85%)] [-webkit-mask-image:radial-gradient(ellipse_at_center,black_50%,transparent_85%)] opacity-70"
+      {/* Cline-style Soft Square Grid: hidden by default, softly reveals on hover */}
+      <div
+        className="absolute inset-0 pointer-events-none select-none cline-dot-grid opacity-0 group-hover:opacity-70 transition-opacity duration-700 ease-out [mask-image:radial-gradient(ellipse_at_center,black_35%,transparent_85%)] [-webkit-mask-image:radial-gradient(ellipse_at_center,black_35%,transparent_85%)]"
       />
 
       {/* Retain testid for test compatibility */}

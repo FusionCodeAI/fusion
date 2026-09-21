@@ -105,6 +105,8 @@ kbd {
 
 /* Cline-style elegant canvas grid patterns */
 .cline-dot-grid {
-  background-image: radial-gradient(rgba(0, 0, 0, 0.08) 1.25px, transparent 1.25px);
-  background-size: 24px 24px;
+  background-image:
+    linear-gradient(to right, rgba(113, 113, 122, 0.14) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(113, 113, 122, 0.14) 1px, transparent 1px);
+  background-size: 28px 28px;
 }
