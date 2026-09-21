@@ -17,6 +17,8 @@ import {
   deleteSessionFromStorage,
   getStoredActiveSessionId,
   setStoredActiveSessionId,
+  syncNativeFusionSessions,
+  loadFullNativeSessionMessages,
   type ChatSessionRecord,
 } from "./state/session-storage";
 import { DEFAULT_FUSION_MODEL } from "./models";
@@ -134,6 +136,15 @@ export function App({
       return updated;
     });
   }, [messages, sessionTitle, selectedModel, activeSessionId]);
+
+  // On startup: synchronize session list with native ~/.fusion/sessions/
+  useEffect(() => {
+    syncNativeFusionSessions(sessionsRecord).then((synced) => {
+      if (synced && synced.length > 0) {
+        setSessionsRecord(synced);
+      }
+    });
+  }, []);
 
   // Lazily initialize AgentBridge if not provided
   const bridgeRef = useRef<AgentBridge | null>(null);
@@ -306,7 +317,7 @@ export function App({
     setIsGenerating(false);
   };
 
-  const handleSelectSession = (id: string) => {
+  const handleSelectSession = async (id: string) => {
     if (id === activeSessionId) return;
     const target = sessionsRecord.find((s) => s.id === id) || loadAllSessions().find((s) => s.id === id);
     if (target) {
@@ -314,7 +325,20 @@ export function App({
       setStoredActiveSessionId(target.id);
       setSessionTitle(target.title);
       setSelectedModel(target.model || DEFAULT_FUSION_MODEL.id);
-      setMessages(target.messages || []);
+
+      if (target.messages && target.messages.length > 0) {
+        setMessages(target.messages);
+      } else {
+        const nativeMessages = await loadFullNativeSessionMessages(target.id);
+        if (nativeMessages && nativeMessages.length > 0) {
+          setMessages(nativeMessages);
+          setSessionsRecord((prev) =>
+            prev.map((s) => (s.id === target.id ? { ...s, messages: nativeMessages } : s))
+          );
+        } else {
+          setMessages([]);
+        }
+      }
       setIsGenerating(false);
     }
   };
