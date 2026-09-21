@@ -82,10 +82,9 @@ export function Sidebar({
         flexDirection: "column",
         justifyContent: "space-between",
         flexShrink: 0,
-        paddingTop: 52, // Space for native macOS traffic lights
       }}
     >
-      {/* Top Header & Navigation */}
+      {/* Top Container: Header & Session/Project List */}
       <div
         style={{
           display: "flex",
@@ -94,34 +93,36 @@ export function Sidebar({
           overflow: "hidden",
         }}
       >
-        {/* Navigation control row: Sidebar toggle and history arrows */}
+        {/* Top Header Row (Height 40px, perfectly aligned with Main Stage Header) */}
         <div
           style={{
-            height: 36,
-            paddingLeft: 14,
-            paddingRight: 14,
+            height: 40,
+            paddingLeft: 12,
+            paddingRight: 12,
             display: "flex",
             flexDirection: "row",
             alignItems: "center",
             justifyContent: "space-between",
-            marginBottom: 8,
+            borderBottomWidth: 1,
+            borderColor: "#f0f0f2",
+            flexShrink: 0,
           }}
         >
+          {/* Left: Sidebar Toggle */}
           <div
             role="button"
             onClick={onToggleSidebar}
             style={{
               cursor: "pointer",
-              padding: 4,
-              borderRadius: 4,
+              padding: 2,
               display: "flex",
               alignItems: "center",
-              hover: { backgroundColor: "#ececee" },
             }}
           >
             <svg source={icons.sidebarToggle} style={{ width: 14, height: 14, color: "#52525b" }} />
           </div>
 
+          {/* Right: History Arrows */}
           <div style={{ display: "flex", flexDirection: "row", alignItems: "center", gap: 8 }}>
             <div style={{ cursor: "pointer", display: "flex", alignItems: "center" }}>
               <svg source={icons.arrowLeft} style={{ width: 13, height: 13, color: "#8e8e93" }} />
@@ -132,7 +133,7 @@ export function Sidebar({
           </div>
         </div>
 
-        {/* Primary Navigation Actions */}
+        {/* Primary Action Items */}
         <div
           testId="sidebar-header"
           style={{
@@ -140,8 +141,9 @@ export function Sidebar({
             flexDirection: "column",
             paddingLeft: 8,
             paddingRight: 8,
+            paddingTop: 8,
             paddingBottom: 8,
-            gap: 2,
+            gap: 4,
           }}
         >
           {/* New Chat */}
@@ -221,7 +223,7 @@ export function Sidebar({
             justifyContent: "space-between",
             paddingLeft: 14,
             paddingRight: 14,
-            paddingTop: 10,
+            paddingTop: 8,
             paddingBottom: 4,
           }}
         >

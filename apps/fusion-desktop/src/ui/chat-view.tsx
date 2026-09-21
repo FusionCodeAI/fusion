@@ -15,10 +15,11 @@ export function ChatView({
   isGenerating = false,
   onToggleSidebar,
 }: ChatViewProps) {
-  const [expandedThoughts, setExpandedThoughts] = useState<Record<string, boolean>>({});
+  // Thoughts are expanded by default or toggleable
+  const [collapsedThoughts, setCollapsedThoughts] = useState<Record<string, boolean>>({});
 
   const toggleThought = (id: string) => {
-    setExpandedThoughts((prev) => ({
+    setCollapsedThoughts((prev) => ({
       ...prev,
       [id]: !prev[id],
     }));
@@ -36,13 +37,13 @@ export function ChatView({
         overflow: "hidden",
       }}
     >
-      {/* Top Header matching reference image: Title on Left, IDE / ... / Sidebar toggle on Right */}
+      {/* Top Header matching Image #2: Title on Left, IDE / ... / Sidebar toggle on Right */}
       <div
         style={{
           flexShrink: 0,
-          height: 44,
-          paddingLeft: 20,
-          paddingRight: 20,
+          height: 40,
+          paddingLeft: 18,
+          paddingRight: 18,
           display: "flex",
           flexDirection: "row",
           alignItems: "center",
@@ -52,7 +53,7 @@ export function ChatView({
           backgroundColor: "#ffffff",
         }}
       >
-        {/* Title and Drawer Icon */}
+        {/* Left: General chat conversation [drawer icon] */}
         <div style={{ display: "flex", flexDirection: "row", alignItems: "center", gap: 8 }}>
           <text style={{ fontSize: 13, fontWeight: "500", color: "#18181b" }}>
             {sessionTitle || "General chat conversation"}
@@ -153,7 +154,7 @@ export function ChatView({
               }
 
               // Assistant message
-              const isExpanded = !!expandedThoughts[msg.id];
+              const isCollapsed = !!collapsedThoughts[msg.id];
               const visibleSteps = (msg.steps || []).filter(
                 (s) =>
                   !s.title.toLowerCase().includes("waiting") &&
@@ -168,52 +169,48 @@ export function ChatView({
                     paddingBottom: 20,
                     display: "flex",
                     flexDirection: "column",
-                    gap: 8,
+                    gap: 10,
                   }}
                 >
-                  {/* Thought briefly (collapsed by default) */}
+                  {/* Thought briefly (matching Image #1 exactly: no boxes, clean typography) */}
                   {msg.thought && msg.thought.trim().length > 0 ? (
-                    <div style={{ display: "flex", flexDirection: "column", alignSelf: "flex-start" }}>
+                    <div style={{ display: "flex", flexDirection: "column", alignSelf: "flex-start", gap: 6 }}>
                       <div
                         onClick={() => toggleThought(msg.id)}
                         style={{
                           display: "flex",
                           flexDirection: "row",
                           alignItems: "center",
-                          gap: 6,
+                          gap: 4,
                           cursor: "pointer",
-                          paddingTop: 2,
-                          paddingBottom: 2,
                         }}
                       >
-                        <text style={{ fontSize: 13, color: "#8e8e93" }}>
-                          Thought briefly
-                        </text>
+                        <text style={{ fontSize: 13, color: "#71717a" }}>Thought </text>
+                        <text style={{ fontSize: 13, color: "#8e8e93" }}>briefly</text>
                         <svg
-                          source={isExpanded ? icons.chevronDown : icons.chevronRight}
-                          style={{ width: 10, height: 10, color: "#8e8e93" }}
+                          source={isCollapsed ? icons.chevronRight : icons.chevronDown}
+                          style={{ width: 10, height: 10, color: "#8e8e93", marginLeft: 2 }}
                         />
                       </div>
 
-                      {isExpanded && (
+                      {/* Expanded thought text (clean unboxed muted gray paragraphs) */}
+                      {!isCollapsed && (
                         <div
                           style={{
-                            borderLeftWidth: 2,
-                            borderColor: "#e5e5e8",
-                            paddingLeft: 12,
-                            paddingTop: 4,
-                            paddingBottom: 4,
-                            marginTop: 4,
+                            display: "flex",
+                            flexDirection: "column",
+                            gap: 6,
+                            paddingTop: 2,
+                            paddingBottom: 2,
                             width: "100%",
-                            maxWidth: 680,
+                            maxWidth: 700,
                           }}
                         >
                           <text
                             style={{
-                              fontSize: 12,
-                              lineHeight: 18,
+                              fontSize: 13,
+                              lineHeight: 22,
                               color: "#71717a",
-                              fontFamily: "monospace",
                             }}
                           >
                             {msg.thought}
@@ -256,7 +253,7 @@ export function ChatView({
                     </div>
                   )}
 
-                  {/* Assistant Markdown Content */}
+                  {/* Assistant Markdown Content (crisp black text) */}
                   {msg.content ? (
                     <div style={{ paddingTop: 2, paddingBottom: 2 }}>
                       <markdown
@@ -274,7 +271,7 @@ export function ChatView({
                     </div>
                   ) : null}
 
-                  {/* Action Icons: Thumbs up, Thumbs down, Copy, Branch, Just now */}
+                  {/* Action Icons: Thumbs up, Thumbs down, Copy, Branch, Timestamp */}
                   <div
                     style={{
                       display: "flex",
@@ -292,9 +289,6 @@ export function ChatView({
                     </div>
                     <div style={{ cursor: "pointer", display: "flex", alignItems: "center" }}>
                       <svg source={icons.copy} style={{ width: 13, height: 13, color: "#a1a1aa" }} />
-                    </div>
-                    <div style={{ cursor: "pointer", display: "flex", alignItems: "center" }}>
-                      <svg source={icons.branch} style={{ width: 13, height: 13, color: "#a1a1aa" }} />
                     </div>
                     <text style={{ fontSize: 11, color: "#a1a1aa", marginLeft: 4 }}>Just now</text>
                   </div>
