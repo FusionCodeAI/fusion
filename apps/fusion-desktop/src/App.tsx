@@ -252,6 +252,20 @@ export function App({
     });
   }, []);
 
+  // Listen for notification click deep-routing to session
+  useEffect(() => {
+    const handleCustomOpenSession = (e: Event) => {
+      const custom = e as CustomEvent<{ sessionId: string }>;
+      if (custom.detail?.sessionId) {
+        setActiveSessionId(custom.detail.sessionId);
+        setCurrentView("chat");
+      }
+    };
+    window.addEventListener("open_session", handleCustomOpenSession);
+    return () => {
+      window.removeEventListener("open_session", handleCustomOpenSession);
+    };
+  }, []);
   // Lazily initialize AgentBridge if not provided
   const bridgeRef = useRef<AgentBridge | null>(null);
   if (!bridgeRef.current) {
@@ -391,6 +405,7 @@ export function App({
       notifyDesktopEvent("taskCompletion", {
         title: "Task completed",
         body: `Finished turn in "${sessionTitle}"`,
+        sessionId: activeSessionId,
         force: true,
       });
     } catch (err) {
@@ -398,6 +413,7 @@ export function App({
       notifyDesktopEvent("sessionError", {
         title: "Session error",
         body: err instanceof Error ? err.message : String(err),
+        sessionId: activeSessionId,
         force: true,
       });
     } finally {

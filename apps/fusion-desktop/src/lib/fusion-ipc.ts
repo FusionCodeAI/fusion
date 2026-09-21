@@ -216,11 +216,17 @@ export async function checkAuthStatus(): Promise<AuthStatus> {
 export async function showDesktopNotification(
   title: string,
   body: string,
+  sessionId?: string,
   sound: boolean = true
 ): Promise<void> {
   if (isTauriEnvironment()) {
     try {
-      await invoke("show_desktop_notification", { title, body, sound });
+      await invoke("show_desktop_notification", {
+        title,
+        body,
+        sessionId: sessionId || undefined,
+        sound,
+      });
       return;
     } catch (err) {
       console.warn("[fusion-ipc] show_desktop_notification error:", err);

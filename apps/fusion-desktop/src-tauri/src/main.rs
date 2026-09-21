@@ -8,8 +8,15 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::fs;
 use std::path::PathBuf;
+use tauri::{Emitter, Manager};
 use tokio::io::{AsyncBufReadExt, AsyncWriteExt};
 
+fn notification_response_opens_session(response: &notify_rust::NotificationResponse) -> bool {
+    matches!(
+        response,
+        notify_rust::NotificationResponse::Default | notify_rust::NotificationResponse::Action(_)
+    )
+}
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct DesktopSessionSummary {
     pub id: String,
@@ -283,6 +290,7 @@ fn show_desktop_notification(
     app: tauri::AppHandle,
     title: String,
     body: String,
+    session_id: Option<String>,
     sound: Option<bool>,
 ) -> Result<(), String> {
     let title = title.trim();
@@ -292,31 +300,51 @@ fn show_desktop_notification(
     }
 
     let should_sound = sound.unwrap_or(true);
-    #[cfg(target_os = "macos")]
-    {
-        if let Err(e) = macos_notification::configure(&app) {
-            eprintln!("[notification] macOS LaunchServices configure warning: {}", e);
-        }
 
-        let mut notification = notify_rust::Notification::new();
-        notification
-            .summary(title)
-            .body(body)
-            .auto_icon();
-        if should_sound {
-            notification.sound_name("default");
-        }
-        let _ = notification.show();
+    let mut notification = notify_rust::Notification::new();
+    notification
+        .summary(title)
+        .body(body)
+        .auto_icon()
+        .action("open-session", "Open");
+
+    if should_sound {
+        #[cfg(target_os = "macos")]
+        notification.sound_name("default");
+        #[cfg(not(target_os = "macos"))]
+        notification.sound_name("Default");
     }
 
-    #[cfg(not(target_os = "macos"))]
+    #[cfg(target_os = "windows")]
     {
-        let mut notification = notify_rust::Notification::new();
-        notification.summary(title).body(body).auto_icon();
-        if should_sound {
-            notification.sound_name("Default");
+        notification.app_id(&app.config().identifier);
+    }
+
+    #[cfg(target_os = "macos")]
+    macos_notification::configure(&app)?;
+
+    let handle = notification
+        .show()
+        .map_err(|error| format!("failed showing notification: {error}"))?;
+
+    if let Some(sid) = session_id {
+        let clean_sid = sid.trim().to_string();
+        if !clean_sid.is_empty() {
+            let app_handle = app.clone();
+            std::thread::spawn(move || {
+                if let Err(error) = handle.wait_for_response(move |response: &notify_rust::NotificationResponse| {
+                    if notification_response_opens_session(response) {
+                        if let Some(window) = app_handle.get_webview_window("main") {
+                            let _ = window.unminimize();
+                            let _ = window.set_focus();
+                        }
+                        let _ = app_handle.emit("open_session", serde_json::json!({ "sessionId": clean_sid }));
+                    }
+                }) {
+                    eprintln!("[notification] wait_for_response error: {error}");
+                }
+            });
         }
-        let _ = notification.show();
     }
 
     Ok(())

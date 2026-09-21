@@ -100,6 +100,7 @@ export async function notifyDesktopEvent(
   options: {
     title: string;
     body: string;
+    sessionId?: string;
     sound?: boolean;
     force?: boolean;
   }
@@ -112,36 +113,45 @@ export async function notifyDesktopEvent(
   }
 
   const shouldPlaySound = options.sound ?? pref.sound;
-
-  // 1. Play real native audio sound (macOS afplay Ping.aiff + WebAudio)
-  if (shouldPlaySound) {
-    playSystemSound("Ping").catch(() => {});
-    playNotificationSound();
-  }
-
-  // 2. Native System Push Notification (Tauri macOS Notification Center)
+  // 1. Native System Push Notification (Tauri macOS / Windows / Linux) with session deep-routing
   if (isTauriEnvironment()) {
-    await showDesktopNotification(options.title, options.body, shouldPlaySound);
+    await showDesktopNotification(options.title, options.body, options.sessionId, shouldPlaySound);
     return;
   }
 
-  // 3. Web Notification API fallback
+  // 2. Web Notification fallback
   if (typeof window !== "undefined" && "Notification" in window) {
     if (Notification.permission === "granted") {
       try {
-        new Notification(options.title, {
+        const notif = new Notification(options.title, {
           body: options.body,
           icon: "/favicon.ico",
         });
+        if (options.sessionId) {
+          notif.onclick = () => {
+            window.focus();
+            window.dispatchEvent(
+              new CustomEvent("open_session", { detail: { sessionId: options.sessionId } })
+            );
+          };
+        }
       } catch {}
     } else if (Notification.permission !== "denied") {
       try {
         const perm = await Notification.requestPermission();
         if (perm === "granted") {
-          new Notification(options.title, {
+          const notif = new Notification(options.title, {
             body: options.body,
             icon: "/favicon.ico",
           });
+          if (options.sessionId) {
+            notif.onclick = () => {
+              window.focus();
+              window.dispatchEvent(
+                new CustomEvent("open_session", { detail: { sessionId: options.sessionId } })
+              );
+            };
+          }
         }
       } catch {}
     }
