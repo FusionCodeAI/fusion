@@ -1,5 +1,16 @@
 import React, { useState, useEffect, useRef, useMemo } from "react";
-import { Search, Loader2, MessageSquare, ArrowRight, CornerDownLeft } from "lucide-react";
+import {
+  Search,
+  Plus,
+  Folder,
+  PanelLeft,
+  Compass,
+  Zap,
+  Settings,
+  Blocks,
+  MessageSquare,
+  Pin,
+} from "lucide-react";
 import { type SidebarSessionItem } from "./Sidebar";
 import { type ChatSessionRecord } from "../state/session-storage";
 
@@ -8,14 +19,57 @@ export interface SessionCommandBarProps {
   onOpenChange: (open: boolean) => void;
   sessions?: readonly SidebarSessionItem[] | ChatSessionRecord[];
   onOpenSession: (sessionId: string) => void;
+  onNewChat?: () => void;
+  onOpenFolder?: () => void;
+  onToggleSidebar?: () => void;
+  onOpenSettings?: () => void;
+  onOpenCustomize?: () => void;
+  onSetMode?: (mode: "plan" | "act") => void;
 }
 
-interface SearchResultItem {
+interface PaletteCommand {
+  id: string;
+  type: "command";
+  title: string;
+  subtitle: string;
+  category: "Action" | "Mode" | "Navigation";
+  shortcut?: string;
+  icon: string;
+  action: () => void;
+}
+
+interface PaletteSession {
+  id: string;
+  type: "session";
   sessionId: string;
   title: string;
   role: string;
   snippet: string;
+  isPinned?: boolean;
   updatedAt?: number;
+}
+
+type PaletteItem = PaletteCommand | PaletteSession;
+
+function renderPaletteIcon(iconName: string) {
+  switch (iconName) {
+    case "Plus":
+      return <Plus className="w-4 h-4 text-zinc-600" />;
+    case "Folder":
+      return <Folder className="w-4 h-4 text-zinc-600" />;
+    case "PanelLeft":
+      return <PanelLeft className="w-4 h-4 text-zinc-600" />;
+    case "Compass":
+      return <Compass className="w-4 h-4 text-zinc-600" />;
+    case "Zap":
+      return <Zap className="w-4 h-4 text-zinc-600" />;
+    case "Settings":
+      return <Settings className="w-4 h-4 text-zinc-600" />;
+    case "Blocks":
+      return <Blocks className="w-4 h-4 text-zinc-600" />;
+    default:
+      return <MessageSquare className="w-4 h-4 text-zinc-400" />;
+  }
 }
 
 export function SessionCommandBar({
@@ -23,10 +77,17 @@ export function SessionCommandBar({
   onOpenChange,
   sessions = [],
   onOpenSession,
+  onNewChat,
+  onOpenFolder,
+  onToggleSidebar,
+  onOpenSettings,
+  onOpenCustomize,
+  onSetMode,
 }: SessionCommandBarProps) {
   const [query, setQuery] = useState("");
   const [selectedIndex, setSelectedIndex] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
+  const listRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (open) {
@@ -38,13 +99,117 @@ export function SessionCommandBar({
     }
   }, [open]);
 
-  // Search across session titles and message contents
-  const results: SearchResultItem[] = useMemo(() => {
+  // Static Action Commands
+  const commands: PaletteCommand[] = useMemo(() => {
+    const list: PaletteCommand[] = [
+      {
+        id: "cmd-new-chat",
+        type: "command",
+        title: "New Session",
+        subtitle: "Start a fresh conversation",
+        category: "Action",
+        shortcut: "Cmd+N",
+        icon: "Plus",
+        action: () => {
+          onNewChat?.();
+          onOpenChange(false);
+        },
+      },
+      {
+        id: "cmd-open-folder",
+        type: "command",
+        title: "Open Project Folder...",
+        subtitle: "Switch workspace directory",
+        category: "Action",
+        shortcut: "Cmd+O",
+        icon: "Folder",
+        action: () => {
+          onOpenFolder?.();
+          onOpenChange(false);
+        },
+      },
+      {
+        id: "cmd-toggle-sidebar",
+        type: "command",
+        title: "Toggle Sidebar",
+        subtitle: "Expand or collapse the sidebar",
+        category: "Navigation",
+        shortcut: "Cmd+B",
+        icon: "PanelLeft",
+        action: () => {
+          onToggleSidebar?.();
+          onOpenChange(false);
+        },
+      },
+      {
+        id: "cmd-plan-mode",
+        type: "command",
+        title: "Switch to Plan Mode",
+        subtitle: "Architect mode (designs solution without code edits)",
+        category: "Mode",
+        icon: "Compass",
+        action: () => {
+          onSetMode?.("plan");
+          onOpenChange(false);
+        },
+      },
+      {
+        id: "cmd-act-mode",
+        type: "command",
+        title: "Switch to Act Mode",
+        subtitle: "Execution mode (direct implementation & tool execution)",
+        category: "Mode",
+        icon: "Zap",
+        action: () => {
+          onSetMode?.("act");
+          onOpenChange(false);
+        },
+      },
+      {
+        id: "cmd-settings",
+        type: "command",
+        title: "Open Settings",
+        subtitle: "Manage models, API keys, and preferences",
+        category: "Navigation",
+        shortcut: "Cmd+,",
+        icon: "Settings",
+        action: () => {
+          onOpenSettings?.();
+          onOpenChange(false);
+        },
+      },
+      {
+        id: "cmd-customize",
+        type: "command",
+        title: "Customize & Skills",
+        subtitle: "Browse skills and agent marketplace",
+        category: "Navigation",
+        icon: "Blocks",
+        action: () => {
+          onOpenCustomize?.();
+          onOpenChange(false);
+        },
+      },
+    ];
+    return list;
+  }, [onNewChat, onOpenFolder, onToggleSidebar, onSetMode, onOpenSettings, onOpenCustomize, onOpenChange]);
+
+  // Filter commands and search sessions
+  const combinedItems: PaletteItem[] = useMemo(() => {
     const q = query.trim().toLowerCase();
-    if (!q) return [];
 
-    const hits: SearchResultItem[] = [];
+    // 1. Filter commands
+    const matchingCommands = commands.filter((c) => {
+      if (!q) return true;
+      return (
+        c.title.toLowerCase().includes(q) ||
+        c.subtitle.toLowerCase().includes(q) ||
+        c.category.toLowerCase().includes(q)
+      );
+    });
 
+    // 2. Filter / Rank sessions
+    const matchingSessions: PaletteSession[] = [];
     for (const s of sessions) {
       const titleMatch = s.title.toLowerCase().includes(q);
       const sessionRecord = s as ChatSessionRecord;
@@ -52,7 +217,7 @@ export function SessionCommandBar({
       let matchedSnippet = "";
       let matchedRole = "session";
 
-      if (sessionRecord.messages && Array.isArray(sessionRecord.messages)) {
+      if (q && sessionRecord.messages && Array.isArray(sessionRecord.messages)) {
         for (const msg of sessionRecord.messages) {
           const content = msg.content || "";
           const thought = msg.thought || "";
@@ -68,19 +233,30 @@ export function SessionCommandBar({
         }
       }
 
-      if (titleMatch || matchedSnippet) {
-        hits.push({
+      if (!q || titleMatch || matchedSnippet) {
+        matchingSessions.push({
+          id: `session-${s.id}`,
+          type: "session",
           sessionId: s.id,
           title: s.title,
           role: matchedRole,
-          snippet: matchedSnippet || `Conversation in session "${s.title}"`,
+          snippet: matchedSnippet || `Conversation in "${s.title}"`,
+          isPinned: (s as SidebarSessionItem).isPinned,
           updatedAt: s.updatedAt || s.createdAt,
         });
       }
     }
 
-    return hits.slice(0, 30);
-  }, [query, sessions]);
+    // Sort matching sessions so pinned are first, then chronological
+    matchingSessions.sort((a, b) => {
+      if (Boolean(a.isPinned) !== Boolean(b.isPinned)) {
+        return a.isPinned ? -1 : 1;
+      }
+      return (b.updatedAt || 0) - (a.updatedAt || 0);
+    });
+
+    return [...matchingCommands, ...matchingSessions.slice(0, 25)];
+  }, [query, commands, sessions]);
 
   // Keyboard navigation
   useEffect(() => {
@@ -92,36 +268,41 @@ export function SessionCommandBar({
         onOpenChange(false);
       } else if (e.key === "ArrowDown") {
         e.preventDefault();
-        setSelectedIndex((prev) => (results.length > 0 ? (prev + 1) % results.length : 0));
+        setSelectedIndex((prev) => (combinedItems.length > 0 ? (prev + 1) % combinedItems.length : 0));
       } else if (e.key === "ArrowUp") {
         e.preventDefault();
-        setSelectedIndex((prev) => (results.length > 0 ? (prev - 1 + results.length) % results.length : 0));
+        setSelectedIndex((prev) => (combinedItems.length > 0 ? (prev - 1 + combinedItems.length) % combinedItems.length : 0));
       } else if (e.key === "Enter") {
         e.preventDefault();
-        if (results.length > 0 && results[selectedIndex]) {
-          onOpenSession(results[selectedIndex].sessionId);
-          onOpenChange(false);
+        const selected = combinedItems[selectedIndex];
+        if (selected) {
+          if (selected.type === "command") {
+            selected.action();
+          } else {
+            onOpenSession(selected.sessionId);
+            onOpenChange(false);
+          }
         }
       }
     };
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [open, results, selectedIndex, onOpenChange, onOpenSession]);
+  }, [open, combinedItems, selectedIndex, onOpenChange, onOpenSession]);
 
   if (!open) return null;
 
   return (
     <div
       data-testid="session-command-bar-overlay"
-      className="fixed inset-0 z-50 bg-black/40 backdrop-blur-xs flex items-start justify-center pt-24 p-4 animate-in fade-in duration-100"
+      className="fixed inset-0 z-50 bg-black/40 backdrop-blur-xs flex items-start justify-center pt-20 p-4 animate-in fade-in duration-100"
       onClick={(e) => {
         if (e.target === e.currentTarget) onOpenChange(false);
       }}
     >
       <div
         data-testid="session-command-bar"
-        className="w-full max-w-2xl bg-white rounded-2xl border border-zinc-200/90 shadow-2xl overflow-hidden flex flex-col max-h-[36rem] animate-in zoom-in-95 duration-100"
+        className="w-full max-w-2xl bg-white rounded-2xl border border-zinc-200 shadow-2xl overflow-hidden flex flex-col max-h-[36rem] animate-in zoom-in-95 duration-100"
       >
         {/* Search Input matching Cline CommandInput */}
         <div className="flex items-center px-4 border-b border-zinc-200/80 bg-white">
@@ -135,65 +316,80 @@ export function SessionCommandBar({
               setQuery(e.target.value);
               setSelectedIndex(0);
             }}
-            placeholder="Search all session history..."
+            placeholder="Type a command or search sessions..."
             className="w-full py-3.5 text-sm text-zinc-900 bg-transparent outline-none placeholder-zinc-400"
           />
         </div>
 
-        {/* Results List matching Cline CommandList */}
-        <div className="flex-1 overflow-y-auto min-h-[14rem] max-h-[26rem] p-2">
-          {!query.trim() ? (
-            <div className="flex flex-col items-center justify-center py-12 text-center text-zinc-400 space-y-1">
-              <MessageSquare className="w-8 h-8 stroke-1 text-zinc-300 mb-1" />
-              <p className="text-xs font-medium text-zinc-600">Search session history</p>
-              <p className="text-[11px] text-zinc-400 max-w-xs">
-                Search messages, commands, errors, and files across all conversations.
-              </p>
-            </div>
-          ) : results.length === 0 ? (
+        {/* Results List */}
+        <div ref={listRef} className="flex-1 overflow-y-auto min-h-[14rem] max-h-[26rem] p-2">
+          {combinedItems.length === 0 ? (
             <div className="py-12 text-center text-xs text-zinc-400">
-              No matching session history for "{query}".
+              No matching commands or session history for "{query}".
             </div>
           ) : (
             <div className="space-y-1" data-testid="command-bar-results">
-              <div className="px-2 py-1 text-[11px] font-semibold text-zinc-400 uppercase tracking-wider">
-                Session history ({results.length})
-              </div>
-              {results.map((hit, idx) => {
+              {combinedItems.map((item, idx) => {
                 const isSelected = idx === selectedIndex;
+                const isCommand = item.type === "command";
+
                 return (
                   <div
-                    key={`${hit.sessionId}-${idx}`}
+                    key={item.id}
                     data-testid="command-bar-item"
                     onClick={() => {
-                      onOpenSession(hit.sessionId);
-                      onOpenChange(false);
+                      if (item.type === "command") {
+                        item.action();
+                      } else {
+                        onOpenSession(item.sessionId);
+                        onOpenChange(false);
+                      }
                     }}
                     onMouseEnter={() => setSelectedIndex(idx)}
-                    className={`px-3 py-2.5 rounded-xl cursor-pointer transition-colors flex items-start justify-between gap-3 ${
-                      isSelected ? "bg-[#5100cd]/8 text-zinc-900" : "hover:bg-zinc-50 text-zinc-700"
+                    className={`px-3 py-2 rounded-xl cursor-pointer transition-colors flex items-center justify-between gap-3 ${
+                      isSelected ? "bg-zinc-100 text-zinc-900 font-medium" : "hover:bg-zinc-50 text-zinc-700"
                     }`}
                   >
-                    <div className="min-w-0 flex-1">
-                      <div className="flex items-center gap-2">
-                        <span className="text-[10px] font-medium uppercase px-1.5 py-0.2 rounded bg-zinc-100 text-zinc-600">
-                          {hit.role}
-                        </span>
-                        <span className="text-xs font-semibold text-zinc-900 truncate">
-                          {hit.title}
-                        </span>
+                    <div className="min-w-0 flex-1 flex items-center gap-2.5">
+                      <div className="p-1 rounded bg-zinc-100 shrink-0">
+                        {isCommand ? (
+                          renderPaletteIcon(item.icon)
+                        ) : item.isPinned ? (
+                          <Pin className="w-3.5 h-3.5 text-zinc-800 fill-current rotate-45" />
+                        ) : (
+                          <MessageSquare className="w-3.5 h-3.5 text-zinc-400" />
+                        )}
                       </div>
-                      <p className="text-xs text-zinc-500 mt-1 line-clamp-2 leading-relaxed">
-                        {hit.snippet}
-                      </p>
+
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs font-semibold text-zinc-900 truncate">
+                            {item.title}
+                          </span>
+                          {!isCommand && (
+                            <span className="text-[10px] font-mono px-1.5 py-0.2 rounded bg-zinc-100 text-zinc-500">
+                              {item.role}
+                            </span>
+                          )}
+                        </div>
+                        <p className="text-[11px] text-zinc-500 truncate leading-relaxed">
+                          {isCommand ? item.subtitle : item.snippet}
+                        </p>
+                      </div>
                     </div>
 
-                    {isSelected && (
-                      <div className="shrink-0 mt-1 text-[#5100cd] flex items-center gap-1 text-[11px] font-medium">
-                        <span>Open</span>
-                        <CornerDownLeft className="w-3.5 h-3.5" />
-                      </div>
-                    )}
+                    <div className="shrink-0 flex items-center gap-2">
+                      {isCommand && item.shortcut && (
+                        <kbd className="rounded border border-zinc-200 bg-white px-1.5 py-0.5 font-mono text-[10px] text-zinc-500 shadow-2xs">
+                          {item.shortcut}
+                        </kbd>
+                      )}
+                      {isSelected && (
+                        <div className="text-zinc-700 flex items-center gap-1 text-[11px]">
+                          <span>↵</span>
+                        </div>
+                      )}
+                    </div>
                   </div>
                 );
               })}
@@ -204,22 +400,19 @@ export function SessionCommandBar({
         {/* Footer matching Cline CommandBar */}
         <div className="flex items-center justify-between border-t border-zinc-100 bg-zinc-50/60 px-4 py-2 text-[11px] text-zinc-500">
           <div className="flex items-center gap-2">
-            <span>Navigate with</span>
+            <span>Navigate</span>
             <kbd className="rounded border border-zinc-200 bg-white px-1.5 py-0.5 font-mono text-[10px] text-zinc-600">
               ↑↓
             </kbd>
-            <span>and open with</span>
+            <span>Select</span>
             <kbd className="rounded border border-zinc-200 bg-white px-1.5 py-0.5 font-mono text-[10px] text-zinc-600">
               ↵
             </kbd>
           </div>
           <div className="flex items-center gap-1.5">
+            <span>Command Palette</span>
             <kbd className="rounded border border-zinc-200 bg-white px-1.5 py-0.5 font-mono text-[10px] text-zinc-600 shadow-2xs">
               Cmd+K
-            </kbd>
-            <span>or</span>
-            <kbd className="rounded border border-zinc-200 bg-white px-1.5 py-0.5 font-mono text-[10px] text-zinc-600 shadow-2xs">
-              Cmd+P
             </kbd>
           </div>
         </div>

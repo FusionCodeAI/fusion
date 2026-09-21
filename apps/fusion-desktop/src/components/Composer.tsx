@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect, useMemo } from "react";
 import {
   Paperclip,
   ChevronDown,
-  Globe,
+  Brain,
   ArrowUp,
   Square,
   Check,
@@ -670,7 +670,7 @@ export function Composer({
               aria-expanded={isEffortMenuOpen}
               aria-haspopup="listbox"
             >
-              <Globe className="w-3.5 h-3.5 text-zinc-400" />
+              <Brain className="w-3.5 h-3.5 text-zinc-400" />
               <span className="font-medium text-[12px]">{effort}</span>
               <ChevronDown className="w-3 h-3 text-zinc-400" />
             </button>

@@ -17,13 +17,14 @@ describe("Cline Session Command Bar (Cmd+K) Layout & Feature Parity", () => {
     );
     expect(html).toContain('data-testid="session-command-bar"');
     expect(html).toContain('data-testid="command-bar-input"');
-    expect(html).toContain("Search all session history...");
+    expect(html).toContain("Type a command or search sessions...");
     expect(html).toContain("Cmd+K");
-    expect(html).toContain("Cmd+P");
-    expect(html).toContain("Navigate with");
+    expect(html).toContain("New Session");
+    expect(html).toContain("Open Project Folder...");
+    expect(html).toContain("Toggle Sidebar");
   });
 
-  test("renders matching session results when query matches sessions", () => {
+  test("renders matching session results and actions when open", () => {
     const sessions = [
       {
         id: "s-1",
@@ -42,6 +43,7 @@ describe("Cline Session Command Bar (Cmd+K) Layout & Feature Parity", () => {
         onOpenSession={() => {}}
       />
     );
-    expect(html).toContain("Search session history");
+    expect(html).toContain("Build authentication flow");
+    expect(html).toContain("New Session");
   });
 });

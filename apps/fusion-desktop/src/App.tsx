@@ -688,6 +688,14 @@ export function App({
           handleSelectSession(id);
           setCurrentView("chat");
         }}
+        onNewChat={handleNewChat}
+        onOpenFolder={handlePickProjectFolder}
+        onToggleSidebar={() => setIsSidebarOpen((prev) => !prev)}
+        onOpenSettings={() => {
+          setSettingsSection("general");
+          setCurrentView("settings");
+        }}
+        onOpenCustomize={() => setCurrentView("customize")}
       />
     </div>
   );
