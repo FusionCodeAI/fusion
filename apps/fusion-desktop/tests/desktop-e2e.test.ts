@@ -803,8 +803,8 @@ describe("Desktop E2E: Component Sanity (Render & Instantiation)", () => {
       // Default model badge
       expect(html).toContain(DEFAULT_FUSION_MODEL.shortName);
 
-      // Toolbar info and send button
-      expect(html).toContain("Fusion Usage-Billing");
+      // Toolbar info without billing profile
+      expect(html).not.toContain("Fusion Usage-Billing");
       expect(html).toContain("Low");
     });
 

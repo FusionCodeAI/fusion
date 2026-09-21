@@ -9,11 +9,11 @@ describe("Composer Cline Layout", () => {
       <Composer onSend={() => {}} selectedModel="deepseek-4-flash" />
     );
     expect(html).toContain("Ask to make changes, @mention files, reference #PRs, or run /commands.");
-    expect(html).toContain("Fusion Usage-Billing");
+    expect(html).not.toContain("Fusion Usage-Billing");
     expect(html).toContain("DeepSeek 4");
     expect(html).toContain("Low");
     expect(html).toContain('data-testid="composer-paperclip"');
-    expect(html).toContain('data-testid="composer-billing-profile"');
+    expect(html).not.toContain('data-testid="composer-billing-profile"');
     expect(html).toContain('data-testid="composer-effort"');
   });
 });

@@ -25,8 +25,8 @@ describe("Composer & HeroView components", () => {
 
     // Must include default model shortName
     expect(html).toContain(DEFAULT_FUSION_MODEL.shortName);
-    // Must include toolbar items: paperclip, billing profile, effort
-    expect(html).toContain("Fusion Usage-Billing");
+    // Must include toolbar items: paperclip, model, effort (no billing profile)
+    expect(html).not.toContain("Fusion Usage-Billing");
     expect(html).toContain("Low");
   });
 
