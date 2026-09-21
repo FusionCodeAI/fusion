@@ -61,8 +61,9 @@ fn list_fusion_sessions() -> Result<Vec<DesktopSessionSummary>, String> {
                         .and_then(|c| c.as_str())
                         .map(|s| {
                             let clean = s.trim();
-                            if clean.len() > 100 {
-                                format!("{}...", &clean[..100])
+                            if clean.chars().count() > 100 {
+                                let truncated: String = clean.chars().take(100).collect();
+                                format!("{}...", truncated)
                             } else {
                                 clean.to_string()
                             }
