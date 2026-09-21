@@ -45,11 +45,10 @@ describe("TopHeader Component", () => {
     expect(html).toContain(customTitle);
   });
 
-  it("renders right-side actions: IDE ↗, More (...), and Sidebar toggle ([|])", () => {
+  it("renders right-side actions: More (...) and Sidebar toggle ([|]) without IDE button", () => {
     const html = renderToStaticMarkup(<TopHeader />);
 
-    expect(html).toContain("IDE");
-    expect(html).toContain("data-testid=\"top-header-ide\"");
+    expect(html).not.toContain("data-testid=\"top-header-ide\"");
     expect(html).toContain("data-testid=\"top-header-more\"");
     expect(html).toContain("data-testid=\"top-header-sidebar-toggle\"");
   });
@@ -62,23 +61,10 @@ describe("TopHeader Component", () => {
       },
     });
 
-    // Verify component element is created and call prop directly
     expect(element).toBeDefined();
-    // Simulate callback
-    element.props.children[1].props.children[2].props.onClick();
+    // Sidebar toggle is child index 1
+    element.props.children[1].props.children[1].props.onClick();
     expect(toggled).toBe(true);
-  });
-
-  it("invokes onOpenIde when IDE button is clicked", () => {
-    let opened = false;
-    const element = TopHeader({
-      onOpenIde: () => {
-        opened = true;
-      },
-    });
-
-    element.props.children[1].props.children[0].props.onClick();
-    expect(opened).toBe(true);
   });
 });
 describe("Sidebar Component", () => {

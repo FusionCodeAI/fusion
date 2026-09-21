@@ -1,10 +1,9 @@
 import React from "react";
-import { Folder, ExternalLink, MoreHorizontal, PanelLeft } from "lucide-react";
+import { Folder, MoreHorizontal, PanelLeft } from "lucide-react";
 
 export interface TopHeaderProps {
   title?: string;
   onToggleSidebar?: () => void;
-  onOpenIde?: () => void;
   onMore?: () => void;
   isSidebarOpen?: boolean;
   className?: string;
@@ -13,7 +12,6 @@ export interface TopHeaderProps {
 export function TopHeader({
   title = "General chat conversation",
   onToggleSidebar,
-  onOpenIde,
   onMore,
   isSidebarOpen = true,
   className = "",
@@ -35,20 +33,8 @@ export function TopHeader({
         <Folder className="w-3.5 h-3.5 text-zinc-500 shrink-0 cursor-default" />
       </div>
 
-      {/* Right: Actions (IDE ↗, ..., Sidebar toggle [|]) */}
+      {/* Right: Actions (..., Sidebar toggle [|]) */}
       <div className="flex items-center gap-2 shrink-0">
-        {/* IDE ↗ button */}
-        <button
-          type="button"
-          data-testid="top-header-ide"
-          onClick={onOpenIde}
-          className="inline-flex items-center gap-1 px-2 py-1 rounded text-xs font-medium text-zinc-600 hover:text-zinc-900 hover:bg-zinc-100 transition-colors cursor-pointer"
-          aria-label="Open in IDE"
-        >
-          <span>IDE</span>
-          <ExternalLink className="w-3 h-3 text-zinc-500" />
-        </button>
-
         {/* More options (...) */}
         <button
           type="button"
