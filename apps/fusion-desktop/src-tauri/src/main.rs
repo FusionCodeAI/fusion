@@ -149,6 +149,107 @@ fn delete_fusion_session(id: String) -> Result<bool, String> {
     }
 }
 
+fn find_fusion_binary() -> Result<PathBuf, String> {
+    if let Ok(custom) = std::env::var("FUSION_BINARY_PATH") {
+        let p = PathBuf::from(custom);
+        if p.exists() {
+            return Ok(p);
+        }
+    }
+
+    if let Ok(current_exe) = std::env::current_exe() {
+        if let Some(parent) = current_exe.parent() {
+            let adjacent = parent.join("fusion");
+            if adjacent.exists() {
+                return Ok(adjacent);
+            }
+            let bin_sub = parent.join("bin").join("fusion");
+            if bin_sub.exists() {
+                return Ok(bin_sub);
+            }
+            let resources_bin = parent.join("../Resources/bin/fusion");
+            if resources_bin.exists() {
+                return Ok(resources_bin);
+            }
+        }
+    }
+
+    let candidates = [
+        PathBuf::from("../../target/release/fusion"),
+        PathBuf::from("../../target/debug/fusion"),
+        PathBuf::from("../../../target/release/fusion"),
+        PathBuf::from("../../../target/debug/fusion"),
+        PathBuf::from("target/release/fusion"),
+        PathBuf::from("target/debug/fusion"),
+    ];
+
+    for c in &candidates {
+        if c.exists() {
+            if let Ok(canon) = c.canonicalize() {
+                return Ok(canon);
+            }
+            return Ok(c.clone());
+        }
+    }
+
+    if let Ok(output) = std::process::Command::new("which").arg("fusion").output() {
+        if output.status.success() {
+            let path_str = String::from_utf8_lossy(&output.stdout).trim().to_string();
+            if !path_str.is_empty() {
+                let p = PathBuf::from(path_str);
+                if p.exists() {
+                    return Ok(p);
+                }
+            }
+        }
+    }
+
+    Err("Could not locate 'fusion' binary. Please build it with 'cargo build --release' or set FUSION_BINARY_PATH.".to_string())
+}
+
+#[tauri::command]
+async fn execute_fusion_turn(
+    prompt: String,
+    model: Option<String>,
+    session_id: Option<String>,
+    cwd: Option<String>,
+) -> Result<String, String> {
+    let binary = find_fusion_binary()?;
+    let mut cmd = std::process::Command::new(&binary);
+
+    if let Some(m) = model {
+        if !m.trim().is_empty() {
+            cmd.arg("-m").arg(m);
+        }
+    }
+
+    if let Some(s) = session_id {
+        if !s.trim().is_empty() {
+            cmd.arg("-r").arg(s);
+        }
+    }
+
+    if let Some(dir) = cwd {
+        if !dir.trim().is_empty() {
+            cmd.arg("-C").arg(dir);
+        }
+    }
+
+    cmd.arg(&prompt);
+    cmd.envs(std::env::vars());
+
+    let output = cmd.output().map_err(|e| format!("Failed to spawn {}: {}", binary.display(), e))?;
+
+    let stdout = String::from_utf8_lossy(&output.stdout).to_string();
+    let stderr = String::from_utf8_lossy(&output.stderr).to_string();
+
+    if output.status.success() {
+        Ok(stdout)
+    } else {
+        Err(if !stderr.trim().is_empty() { stderr } else { format!("Process exited with status {}", output.status) })
+    }
+}
+
 fn main() {
     tauri::Builder::default()
         .plugin(tauri_plugin_shell::init())
@@ -157,6 +258,7 @@ fn main() {
             load_fusion_session,
             save_fusion_session,
             delete_fusion_session,
+            execute_fusion_turn,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
