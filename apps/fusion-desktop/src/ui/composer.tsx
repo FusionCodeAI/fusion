@@ -69,31 +69,6 @@ export function Composer({
           gap: 6,
         }}
       >
-        {/* Upper Pill: Create Branch & Commit */}
-        <div
-          style={{
-            alignSelf: "flex-start",
-            display: "flex",
-            flexDirection: "row",
-            alignItems: "center",
-            gap: 6,
-            paddingTop: 4,
-            paddingBottom: 4,
-            paddingLeft: 10,
-            paddingRight: 10,
-            borderRadius: 14,
-            backgroundColor: "#f4f4f5",
-            borderWidth: 1,
-            borderColor: "#e5e5e8",
-            cursor: "pointer",
-          }}
-        >
-          <text style={{ fontSize: 11, color: "#3f3f46", fontWeight: "500" }}>
-            Create Branch & Commit
-          </text>
-          <svg source={icons.chevronDown} style={{ width: 9, height: 9, color: "#71717a" }} />
-        </div>
-
         {/* Model Picker Popup Dropdown if open */}
         {isModelPickerOpen && (
           <div

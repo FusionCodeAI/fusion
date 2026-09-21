@@ -15,11 +15,18 @@ export function ChatView({
   isGenerating = false,
   onToggleSidebar,
 }: ChatViewProps) {
-  // Thoughts are expanded by default or toggleable
   const [collapsedThoughts, setCollapsedThoughts] = useState<Record<string, boolean>>({});
+  const [expandedSteps, setExpandedSteps] = useState<Record<string, boolean>>({});
 
   const toggleThought = (id: string) => {
     setCollapsedThoughts((prev) => ({
+      ...prev,
+      [id]: !prev[id],
+    }));
+  };
+
+  const toggleStep = (id: string) => {
+    setExpandedSteps((prev) => ({
       ...prev,
       [id]: !prev[id],
     }));
@@ -220,36 +227,86 @@ export function ChatView({
                     </div>
                   ) : null}
 
-                  {/* Real Tool Steps if any */}
+                  {/* Real Tool Steps (Collapsed by default into tiny 24px pills, NEVER raw dumps!) */}
                   {visibleSteps.length > 0 && (
-                    <div style={{ display: "flex", flexDirection: "column", gap: 4, alignSelf: "flex-start" }}>
-                      {visibleSteps.map((step: TurnStep) => (
-                        <div
-                          key={step.id}
-                          style={{
-                            paddingTop: 3,
-                            paddingBottom: 3,
-                            paddingLeft: 8,
-                            paddingRight: 8,
-                            borderRadius: 6,
-                            backgroundColor: "#f4f4f5",
-                            display: "flex",
-                            flexDirection: "row",
-                            alignItems: "center",
-                            gap: 6,
-                          }}
-                        >
-                          <text style={{ fontSize: 11, color: step.status === "completed" ? "#16a34a" : "#d97706" }}>
-                            {step.status === "completed" ? "✓" : "⚡"}
-                          </text>
-                          <text style={{ fontSize: 12, color: "#3f3f46" }}>{step.title}</text>
-                          {step.details && (
-                            <text style={{ fontSize: 11, color: "#71717a", paddingLeft: 4 }}>
-                              {step.details}
-                            </text>
-                          )}
-                        </div>
-                      ))}
+                    <div style={{ display: "flex", flexDirection: "column", gap: 6, alignSelf: "flex-start", maxWidth: "100%" }}>
+                      {visibleSteps.map((step: TurnStep) => {
+                        const isStepExpanded = !!expandedSteps[step.id];
+                        const hasDetails = step.details && step.details.trim().length > 0;
+
+                        return (
+                          <div
+                            key={step.id}
+                            style={{
+                              display: "flex",
+                              flexDirection: "column",
+                              gap: 4,
+                              alignSelf: "flex-start",
+                              maxWidth: "100%",
+                            }}
+                          >
+                            {/* Compact Tool Status Pill */}
+                            <div
+                              onClick={() => hasDetails && toggleStep(step.id)}
+                              style={{
+                                paddingTop: 4,
+                                paddingBottom: 4,
+                                paddingLeft: 10,
+                                paddingRight: 10,
+                                borderRadius: 6,
+                                backgroundColor: "#f4f4f5",
+                                display: "flex",
+                                flexDirection: "row",
+                                alignItems: "center",
+                                gap: 6,
+                                cursor: hasDetails ? "pointer" : "default",
+                                hover: hasDetails ? { backgroundColor: "#e4e4e7" } : {},
+                              }}
+                            >
+                              <text style={{ fontSize: 11, color: step.status === "completed" ? "#16a34a" : "#d97706" }}>
+                                {step.status === "completed" ? "✓" : "⚡"}
+                              </text>
+                              <text style={{ fontSize: 12, color: "#3f3f46", fontWeight: "500" }}>
+                                {step.title}
+                              </text>
+                              {hasDetails && (
+                                <svg
+                                  source={isStepExpanded ? icons.chevronDown : icons.chevronRight}
+                                  style={{ width: 9, height: 9, color: "#8e8e93", marginLeft: 4 }}
+                                />
+                              )}
+                            </div>
+
+                            {/* Collapsible raw output inspection box (ONLY visible when user clicks!) */}
+                            {isStepExpanded && hasDetails && (
+                              <div
+                                style={{
+                                  maxHeight: 160,
+                                  maxWidth: 680,
+                                  overflow: "scroll",
+                                  backgroundColor: "#f9f9fb",
+                                  borderWidth: 1,
+                                  borderColor: "#e5e5e8",
+                                  borderRadius: 6,
+                                  padding: 10,
+                                  marginTop: 2,
+                                }}
+                              >
+                                <text
+                                  style={{
+                                    fontSize: 11,
+                                    lineHeight: 16,
+                                    color: "#52525b",
+                                    fontFamily: "monospace",
+                                  }}
+                                >
+                                  {step.details}
+                                </text>
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
                     </div>
                   )}
 
@@ -270,7 +327,6 @@ export function ChatView({
                       <text style={{ fontSize: 13, color: "#8e8e93" }}>Thinking...</text>
                     </div>
                   ) : null}
-
                 </div>
               );
             })}
