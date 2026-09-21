@@ -291,29 +291,46 @@ fn show_desktop_notification(
         return Err("notification title and body are required".to_string());
     }
 
-    let mut notification = notify_rust::Notification::new();
-    notification
-        .summary(title)
-        .body(body)
-        .auto_icon();
-
-    if sound.unwrap_or(true) {
-        #[cfg(target_os = "macos")]
-        notification.sound_name("Ping");
-        #[cfg(not(target_os = "macos"))]
-        notification.sound_name("Default");
-    }
+    let should_sound = sound.unwrap_or(true);
 
     #[cfg(target_os = "macos")]
     {
-        if let Err(e) = macos_notification::configure(&app) {
-            eprintln!("[notification] macOS LaunchServices configure warning: {}", e);
+        let mut tried_rust = false;
+        if macos_notification::configure(&app).is_ok() {
+            let mut notification = notify_rust::Notification::new();
+            notification.summary(title).body(body).auto_icon();
+            if should_sound {
+                notification.sound_name("Ping");
+            }
+            if notification.show().is_ok() {
+                tried_rust = true;
+            }
+        }
+
+        if !tried_rust {
+            let sound_clause = if should_sound { "sound name \"Ping\"" } else { "" };
+            let clean_body = body.replace('\\', "\\\\").replace('"', "\\\"");
+            let clean_title = title.replace('\\', "\\\\").replace('"', "\\\"");
+            let script = format!(
+                "display notification \"{}\" with title \"{}\" {}",
+                clean_body, clean_title, sound_clause
+            );
+            let _ = std::process::Command::new("osascript")
+                .arg("-e")
+                .arg(script)
+                .spawn();
         }
     }
 
-    notification
-        .show()
-        .map_err(|error| format!("failed showing notification: {error}"))?;
+    #[cfg(not(target_os = "macos"))]
+    {
+        let mut notification = notify_rust::Notification::new();
+        notification.summary(title).body(body).auto_icon();
+        if should_sound {
+            notification.sound_name("Default");
+        }
+        let _ = notification.show();
+    }
 
     Ok(())
 }

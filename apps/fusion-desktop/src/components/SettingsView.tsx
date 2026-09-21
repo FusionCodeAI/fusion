@@ -10,6 +10,7 @@ import {
 } from "lucide-react";
 import { getAllAvailableModels, type FusionModel } from "../models";
 import { checkAuthStatus, type AuthStatus } from "../lib/fusion-ipc";
+import { notifyDesktopEvent } from "../lib/desktop-notifications";
 
 export type SettingsSectionId = "general" | "api" | "account";
 
@@ -116,6 +117,18 @@ export function SettingsView({
     }
     return DEFAULT_NOTIF;
   });
+
+  const [testNotifSent, setTestNotifSent] = useState(false);
+
+  const handleTestNotification = async () => {
+    await notifyDesktopEvent("taskCompletion", {
+      title: "Fusion",
+      body: "Desktop notifications are working natively on your Mac!",
+      force: true,
+    });
+    setTestNotifSent(true);
+    setTimeout(() => setTestNotifSent(false), 2500);
+  };
 
   useEffect(() => {
     checkAuthStatus().then((res) => {
@@ -327,11 +340,20 @@ export function SettingsView({
                     Notify only while the Fusion window is in the background. Clicking a notification opens its session.
                   </p>
                 </div>
-                <span className="shrink-0 text-xs font-medium text-zinc-400">
-                  Allowed by system
-                </span>
+                <div className="flex items-center gap-2 shrink-0">
+                  <span className="text-xs font-medium text-zinc-400">
+                    Allowed by system
+                  </span>
+                  <button
+                    type="button"
+                    data-testid="settings-test-notification"
+                    onClick={handleTestNotification}
+                    className="px-2.5 py-1 text-xs font-medium rounded-lg border border-zinc-200 bg-white hover:bg-zinc-50 text-zinc-700 transition-colors cursor-pointer shadow-2xs"
+                  >
+                    {testNotifSent ? "Sent!" : "Send test"}
+                  </button>
+                </div>
               </div>
-
               <div className="mt-4 rounded-xl border border-zinc-200/80 bg-zinc-50/40 overflow-hidden">
                 <div className="grid grid-cols-[minmax(0,1fr)_5rem_4rem] items-center gap-3 border-b border-zinc-200/60 bg-zinc-100/60 px-4 py-2 text-xs font-medium uppercase tracking-wide text-zinc-500">
                   <span>Event</span>
