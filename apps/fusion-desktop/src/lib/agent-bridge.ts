@@ -27,24 +27,28 @@ export interface AgentBridgeOptions {
   agent?: FusionAgent;
 }
 
-/**
- * Resolves the location of the `fusion` binary across common dev and packaged paths.
- */
-const fsRecord = fs as Record<string, any>;
-const pathRecord = path as Record<string, any>;
+const fsRecord = fs as unknown as Record<string, unknown>;
+const pathRecord = path as unknown as Record<string, unknown>;
 const existsSync = (p: string): boolean => {
   try {
-    return typeof fsRecord["existsSync"] === "function" ? Boolean(fsRecord["existsSync"](p)) : false;
+    const fn = fsRecord["existsSync"];
+    return typeof fn === "function" ? Boolean((fn as (arg: string) => boolean)(p)) : false;
   } catch {
     return false;
   }
 };
-const resolve = (...args: string[]): string =>
-  typeof pathRecord["resolve"] === "function" ? pathRecord["resolve"](...args) : args.join("/");
-const join = (...args: string[]): string =>
-  typeof pathRecord["join"] === "function" ? pathRecord["join"](...args) : args.join("/");
-const dirname = (p: string): string =>
-  typeof pathRecord["dirname"] === "function" ? pathRecord["dirname"](p) : p;
+const resolve = (...args: string[]): string => {
+  const fn = pathRecord["resolve"];
+  return typeof fn === "function" ? String((fn as (...a: string[]) => string)(...args)) : args.join("/");
+};
+const join = (...args: string[]): string => {
+  const fn = pathRecord["join"];
+  return typeof fn === "function" ? String((fn as (...a: string[]) => string)(...args)) : args.join("/");
+};
+const dirname = (p: string): string => {
+  const fn = pathRecord["dirname"];
+  return typeof fn === "function" ? String((fn as (arg: string) => string)(p)) : p;
+};
 
 export function resolveFusionBinary(customPath?: string): string | null {
   if (customPath !== undefined) {
@@ -53,29 +57,31 @@ export function resolveFusionBinary(customPath?: string): string | null {
     return existsSync(trimmed) ? resolve(trimmed) : null;
   }
 
-  const envPath = process.env.FUSION_BINARY_PATH;
+  const isNode = typeof process !== "undefined" && typeof process.env !== "undefined";
+  const envPath = isNode ? process.env.FUSION_BINARY_PATH : undefined;
   if (envPath && existsSync(envPath)) {
     return resolve(envPath);
   }
 
-  const packagedPath = join(dirname(process.execPath), "fusion");
-  if (existsSync(packagedPath)) {
+  const packagedPath = isNode && process.execPath ? join(dirname(process.execPath), "fusion") : "";
+  if (packagedPath && existsSync(packagedPath)) {
     return resolve(packagedPath);
   }
 
-  const cwd = process.cwd();
-  const baseDir = import.meta.dir;
+  const cwd = isNode && typeof process.cwd === "function" ? process.cwd() : ".";
+  const metaDir = typeof import.meta !== "undefined" && (import.meta as unknown as Record<string, unknown>).dir
+    ? String((import.meta as unknown as Record<string, unknown>).dir)
+    : ".";
   const candidates = [
     resolve(cwd, "../../target/release/fusion"),
     resolve(cwd, "../../target/debug/fusion"),
     resolve(cwd, "target/release/fusion"),
     resolve(cwd, "target/debug/fusion"),
-    resolve(baseDir, "../../target/release/fusion"),
-    resolve(baseDir, "../../target/debug/fusion"),
-    resolve(baseDir, "../../../target/release/fusion"),
-    resolve(baseDir, "../../../target/debug/fusion"),
+    resolve(metaDir, "../../target/release/fusion"),
+    resolve(metaDir, "../../target/debug/fusion"),
+    resolve(metaDir, "../../../target/release/fusion"),
+    resolve(metaDir, "../../../target/debug/fusion"),
   ];
-
   for (const candidate of candidates) {
     if (existsSync(candidate)) {
       return candidate;
