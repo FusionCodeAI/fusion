@@ -24,7 +24,7 @@ export interface SessionCommandBarProps {
   onToggleSidebar?: () => void;
   onOpenSettings?: () => void;
   onOpenCustomize?: () => void;
-  onSetMode?: (mode: "plan" | "act") => void;
+  onSetMode?: (mode: "plan" | "agent") => void;
 }
 
 interface PaletteCommand {
@@ -154,14 +154,14 @@ export function SessionCommandBar({
         },
       },
       {
-        id: "cmd-act-mode",
+        id: "cmd-agent-mode",
         type: "command",
-        title: "Switch to Act Mode",
-        subtitle: "Execution mode (direct implementation & tool execution)",
+        title: "Switch to Agent Mode",
+        subtitle: "Agent mode (full implementation & tool execution)",
         category: "Mode",
         icon: "Zap",
         action: () => {
-          onSetMode?.("act");
+          onSetMode?.("agent");
           onOpenChange(false);
         },
       },

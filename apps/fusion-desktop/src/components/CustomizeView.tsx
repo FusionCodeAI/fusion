@@ -22,7 +22,6 @@ export type CustomizeTab =
 
 export interface CustomizeViewProps {
   onClose?: () => void;
-  onOpenMarketplace?: () => void;
   className?: string;
 }
 
@@ -38,10 +37,10 @@ interface CustomItem {
 
 const SECTION_DESCRIPTIONS: Record<CustomizeTab, string> = {
   tools: "Inspect built-in tools and tools contributed by plugins.",
-  plugins: "Manage installed plugins and add new plugins from the marketplace.",
-  skills: "Manage installed skills and add new skills from the marketplace.",
+  plugins: "Manage installed plugins.",
   rules: "Review project and global rule files that shape agent behavior.",
-  mcp: "Manage installed MCP servers and add new servers from the marketplace.",
+  skills: "Manage installed skills.",
+  mcp: "Manage installed MCP servers.",
   hooks: "Inspect hook configuration and recent execution status.",
 };
 
@@ -154,7 +153,6 @@ const DEFAULT_RULE_TEXT = `# Project Rules & System Instructions
 
 export function CustomizeView({
   onClose,
-  onOpenMarketplace,
   className = "",
 }: CustomizeViewProps) {
   const [tab, setTab] = useState<CustomizeTab>("tools");
@@ -265,20 +263,8 @@ export function CustomizeView({
               Customize
             </h1>
             <p className="mt-2 text-sm text-zinc-500 max-w-2xl leading-relaxed">
-              Extend what Cline can do and how it works. Explore the marketplace for more options.
+              Extend what Fusion can do and how it works. All capabilities are managed right here.
             </p>
-          </div>
-
-          <div className="flex shrink-0 items-center gap-2">
-            <button
-              type="button"
-              data-testid="customize-marketplace-btn"
-              onClick={onOpenMarketplace}
-              className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg border border-zinc-200 bg-white hover:bg-zinc-50 text-xs font-medium text-zinc-800 shadow-2xs transition-colors cursor-pointer"
-            >
-              <Store className="size-4 text-zinc-700" />
-              <span>Marketplace</span>
-            </button>
           </div>
         </section>
 

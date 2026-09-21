@@ -63,22 +63,12 @@ describe("RightPanel (Secondary Panel matching Cline)", () => {
   });
 
   test("renders terminal console in terminal tab", () => {
-    const logs = [
-      { command: "cargo check", output: "Finished dev profile", status: "completed" as const },
-    ];
-
     const html = renderToStaticMarkup(
-      <RightPanel
-        open={true}
-        activeTab="terminal"
-        terminalLogs={logs}
-        onClose={() => {}}
-      />
+      <RightPanel open={true} activeTab="terminal" onClose={() => {}} />
     );
 
     expect(html).toContain('data-testid="right-panel-terminal"');
-    expect(html).toContain("cargo check");
-    expect(html).toContain("Finished dev profile");
-    expect(html).toContain("Embedded Shell Output");
+    expect(html).toContain('data-testid="open-native-terminal"');
+    expect(html).toContain("Native macOS Terminal");
   });
 });

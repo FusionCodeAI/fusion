@@ -284,28 +284,26 @@ export function App({
   }, [messages, sessionTitle, selectedModel, activeSessionId]);
 
   // On startup: synchronize session list with native ~/.fusion/sessions/
+  // NOTE: only refresh the LIST. Never switch the active session, title, or
+  // messages on mount — doing so yanked the view to another conversation.
   useEffect(() => {
+    let cancelled = false;
     syncNativeFusionSessions(sessionsRecord).then((synced) => {
-      if (synced && synced.length > 0) {
-        setSessionsRecord(synced);
-        const currentActive = synced.find((s) => s.id === activeSessionId);
-        if (!currentActive || currentActive.id === "session-default") {
-          const firstReal = synced.find((s) => s.id !== "session-default") || synced[0];
-          if (firstReal) {
-            setActiveSessionId(firstReal.id);
-            setSessionTitle(firstReal.title);
-            setSelectedModel(firstReal.model);
-            if (firstReal.messages && firstReal.messages.length > 0) {
-              setMessages(firstReal.messages);
-            } else {
-              loadFullNativeSessionMessages(firstReal.id).then((loadedMsgs) => {
-                if (loadedMsgs && loadedMsgs.length > 0) setMessages(loadedMsgs);
-              });
-            }
+      if (!cancelled && synced && synced.length > 0) {
+        setSessionsRecord((prev) => {
+          const active = prev.find((s) => s.id === activeSessionId);
+          if (active) {
+            // Preserve the active (possibly in-progress) session verbatim.
+            return synced.map((s) => (s.id === active.id ? active : s));
           }
-        }
+          return synced;
+        });
       }
     });
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Listen for notification click deep-routing to session
@@ -349,8 +347,13 @@ export function App({
 
   // Auto-scroll stream to bottom as content streams in
   useEffect(() => {
-    if (streamRef.current) {
-      streamRef.current.scrollTop = streamRef.current.scrollHeight;
+    const el = streamRef.current;
+    if (!el) return;
+    // Only follow the stream when the user is already at (or near) the bottom;
+    // if they scrolled up to read, never yank them around.
+    const distanceFromBottom = el.scrollHeight - el.scrollTop - el.clientHeight;
+    if (distanceFromBottom < 120) {
+      el.scrollTop = el.scrollHeight;
     }
   }, [messages, isGenerating]);
 
@@ -679,7 +682,6 @@ export function App({
         {currentView === "customize" ? (
           <CustomizeView
             onClose={() => setCurrentView("chat")}
-            onOpenMarketplace={() => {}}
           />
         ) : currentView === "settings" ? (
           <SettingsView
@@ -792,6 +794,7 @@ export function App({
         width={rightPanelWidth}
         onResize={setRightPanelWidth}
         activeTab={rightPanelTab}
+        onSelectTab={setRightPanelTab}
         diffPatch={latestDiffPatch}
         workspaceDir={workspaceDir}
         workspaceEntries={workspaceEntries}

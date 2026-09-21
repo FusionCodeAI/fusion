@@ -370,7 +370,7 @@ export function Sidebar({
             <span>Customize</span>
           </button>
 
-          {/* Indented sub-items when Customize is open matching Image #1 */}
+          {/* Indented sub-items when Customize is open */}
           {currentView === "customize" && (
             <div className="space-y-0.5 pl-5">
               <button
@@ -378,12 +378,6 @@ export function Sidebar({
                 className="w-full flex items-center px-3 py-1 rounded-md bg-zinc-200/80 text-xs font-medium text-zinc-900 cursor-pointer"
               >
                 <span>Installed</span>
-              </button>
-              <button
-                type="button"
-                className="w-full flex items-center px-3 py-1 rounded-md hover:bg-zinc-100 text-xs font-normal text-zinc-600 transition-colors cursor-pointer"
-              >
-                <span>Marketplace</span>
               </button>
             </div>
           )}

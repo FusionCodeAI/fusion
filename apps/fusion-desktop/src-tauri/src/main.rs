@@ -314,6 +314,45 @@ async fn pick_project_folder() -> Result<Option<String>, String> {
         Ok(None)
     }
 }
+
+/// Opens the REAL native macOS Terminal.app at the given workspace directory,
+/// exactly like Cline drives the genuine user terminal (not an in-app markup).
+#[tauri::command]
+fn open_native_terminal(cwd: Option<String>) -> Result<(), String> {
+    #[cfg(target_os = "macos")]
+    {
+        let work_dir = match cwd {
+            Some(dir) if !dir.trim().is_empty() => dir.trim().to_string(),
+            _ => std::env::current_dir()
+                .map(|p| p.to_string_lossy().to_string())
+                .unwrap_or_else(|_| "~".to_string()),
+        };
+
+        // AppleScript: activate Terminal.app, run cd in a new tab
+        let script = format!(
+            "tell application \"Terminal\"\nactivate\ndo script \"cd '{}' && clear\"\nend tell",
+            work_dir.replace('\'', "")
+        );
+
+        let output = std::process::Command::new("osascript")
+            .arg("-e")
+            .arg(&script)
+            .output()
+            .map_err(|e| format!("Failed to open Terminal.app: {}", e))?;
+
+        if !output.status.success() {
+            return Err(String::from_utf8_lossy(&output.stderr).to_string());
+        }
+
+        Ok(())
+    }
+    #[cfg(not(target_os = "macos"))]
+    {
+        let _ = cwd;
+        Ok(())
+    }
+}
+
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct WorkspaceEntry {
     pub path: String,
@@ -1038,11 +1077,12 @@ fn main() {
             save_fusion_session,
             delete_fusion_session,
             execute_terminal_command,
-            get_workspace_git_diff,
-            list_workspace_entries,
-            pick_project_folder,
+            open_native_terminal,
             execute_fusion_turn,
             stream_fusion_acp,
+            list_workspace_entries,
+            get_workspace_git_diff,
+            pick_project_folder,
             check_auth_status,
             start_fusion_login,
             show_desktop_notification,

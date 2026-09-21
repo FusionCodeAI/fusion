@@ -69,7 +69,7 @@ export function Composer({
   // Model & Effort state
   const [isModelMenuOpen, setIsModelMenuOpen] = useState(false);
   const [isEffortMenuOpen, setIsEffortMenuOpen] = useState(false);
-  const [mode, setMode] = useState<"plan" | "act">("act");
+  const [mode, setMode] = useState<"plan" | "agent">("agent");
   const [effort, setEffort] = useState<"Low" | "Medium" | "High">(propEffort);
   const [modelSearch, setModelSearch] = useState("");
   const [availableModels] = useState<FusionModel[]>(() => getAllAvailableModels());
@@ -257,8 +257,8 @@ export function Composer({
       return;
     }
 
-    if (skill.trigger === "/act") {
-      setMode("act");
+    if (skill.trigger === "/act" || skill.trigger === "/agent") {
+      setMode("agent");
       setText((prev) => prev.replace(/(?:^|\n)\/[a-zA-Z0-9:_-]*$/, ""));
       return;
     }
@@ -525,7 +525,7 @@ export function Composer({
             <Paperclip className="w-3.5 h-3.5" />
           </button>
 
-          {/* Plan | Act Mode Toggle matching Cline */}
+          {/* Plan | Agent Mode Toggle */}
           <div
             data-testid="composer-mode-switcher"
             className="inline-flex items-center rounded-lg border border-zinc-200 bg-zinc-100/90 p-0.5 text-[11px] font-medium select-none"
@@ -542,15 +542,14 @@ export function Composer({
               Plan
             </button>
             <button
-              type="button"
-              onClick={() => setMode("act")}
+              onClick={() => setMode("agent")}
               className={`px-2 py-0.5 rounded-md transition-all cursor-pointer ${
-                mode === "act"
+                mode === "agent"
                   ? "bg-white text-zinc-900 shadow-xs font-semibold"
                   : "text-zinc-500 hover:text-zinc-800"
               }`}
             >
-              Act
+              Agent
             </button>
           </div>
 
