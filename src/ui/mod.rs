@@ -15,6 +15,7 @@ pub mod file_picker;
 pub mod inline;
 pub mod keymap_config;
 pub mod keys;
+pub mod macos_notification;
 pub mod markdown;
 pub mod mermaid_ascii;
 pub mod model_picker;
