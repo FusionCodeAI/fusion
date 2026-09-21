@@ -24,3 +24,18 @@ export type { SidebarProps, SidebarSessionItem } from "./Sidebar";
 
 export { MarkdownRenderer } from "./MarkdownRenderer";
 export type { MarkdownRendererProps } from "./MarkdownRenderer";
+
+export { FusionLogo } from "./FusionLogo";
+export type { FusionLogoProps } from "./FusionLogo";
+
+export { FusionWatermark } from "./FusionWatermark";
+export type { FusionWatermarkProps } from "./FusionWatermark";
+
+export { WorkspacePill } from "./WorkspacePill";
+export type { WorkspacePillProps } from "./WorkspacePill";
+
+export { ConnectModelBanner } from "./ConnectModelBanner";
+export type { ConnectModelBannerProps } from "./ConnectModelBanner";
+
+export { ClineHeroView } from "./ClineHeroView";
+export type { ClineHeroViewProps } from "./ClineHeroView";

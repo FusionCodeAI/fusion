@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import { TopHeader } from "./components/TopHeader";
 import { Sidebar, type SidebarSessionItem } from "./components/Sidebar";
-import { HeroView } from "./components/HeroView";
+import { ClineHeroView } from "./components/ClineHeroView";
 import { ThinkingRow } from "./components/ThinkingRow";
 import { UserMessage } from "./components/UserMessage";
 import { ToolCallRow } from "./components/ToolCallRow";
@@ -310,12 +310,11 @@ export function App({
           className="flex-1 min-h-0 overflow-y-auto px-8 py-4 flex flex-col items-center"
         >
           {messages.length === 0 ? (
-            <HeroView
+            <ClineHeroView
               onSend={handleSend}
-              onCancel={handleCancel}
-              isGenerating={isGenerating}
               selectedModel={selectedModel}
               onSelectModel={handleModelChange}
+              workspaceName="workspace"
             />
           ) : (
             <div className="w-full max-w-[680px] flex flex-col gap-4">
