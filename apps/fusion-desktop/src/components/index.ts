@@ -65,3 +65,6 @@ export type { SettingsViewProps, SettingsSectionId } from "./SettingsView";
 
 export { SessionCommandBar } from "./SessionCommandBar";
 export type { SessionCommandBarProps } from "./SessionCommandBar";
+
+export { RightPanel } from "./RightPanel";
+export type { RightPanelProps, RightPanelTab } from "./RightPanel";

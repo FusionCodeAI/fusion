@@ -1,23 +1,27 @@
 import React from "react";
-import { Folder, MoreHorizontal, PanelLeft, Pin } from "lucide-react";
+import { Folder, MoreHorizontal, PanelLeft, PanelRight, Pin } from "lucide-react";
 
 export interface TopHeaderProps {
   title?: string;
   onToggleSidebar?: () => void;
+  onToggleRightPanel?: () => void;
   onMore?: () => void;
   isPinned?: boolean;
   onTogglePin?: () => void;
   isSidebarOpen?: boolean;
+  isRightPanelOpen?: boolean;
   className?: string;
 }
 
 export function TopHeader({
   title = "General chat conversation",
   onToggleSidebar,
+  onToggleRightPanel,
   onMore,
   isPinned = false,
   onTogglePin,
   isSidebarOpen = true,
+  isRightPanelOpen = false,
   className = "",
 }: TopHeaderProps) {
   return (
@@ -67,7 +71,6 @@ export function TopHeader({
         >
           <MoreHorizontal className="w-4 h-4" />
         </button>
-
         {/* Sidebar toggle ([|]) */}
         <button
           type="button"
@@ -79,6 +82,24 @@ export function TopHeader({
         >
           <PanelLeft className="w-4 h-4" />
         </button>
+
+        {/* Right Secondary Panel toggle ([|]) matching Cline */}
+        {onToggleRightPanel && (
+          <button
+            type="button"
+            data-testid="top-header-right-panel-toggle"
+            onClick={onToggleRightPanel}
+            className={`p-1 rounded transition-colors cursor-pointer ${
+              isRightPanelOpen
+                ? "bg-zinc-100 text-zinc-900"
+                : "text-zinc-500 hover:text-zinc-800 hover:bg-zinc-100"
+            }`}
+            aria-label={isRightPanelOpen ? "Collapse secondary panel" : "Expand secondary panel"}
+            title={isRightPanelOpen ? "Collapse secondary panel (Cmd+J)" : "Expand secondary panel (Cmd+J)"}
+          >
+            <PanelRight className="w-4 h-4" />
+          </button>
+        )}
       </div>
     </header>
   );

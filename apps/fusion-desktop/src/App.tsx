@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useMemo } from "react";
 import { TopHeader } from "./components/TopHeader";
 import { Sidebar, getWorkspaceFolderName, type SidebarSessionItem } from "./components/Sidebar";
 import { ClineHeroView } from "./components/ClineHeroView";
@@ -12,6 +12,7 @@ import { MarkdownRenderer } from "./components/MarkdownRenderer";
 import { CustomizeView } from "./components/CustomizeView";
 import { SettingsView } from "./components/SettingsView";
 import { SessionCommandBar } from "./components/SessionCommandBar";
+import { RightPanel, type RightPanelTab } from "./components/RightPanel";
 import { AgentBridge } from "./lib/agent-bridge";
 import { notifyDesktopEvent } from "./lib/desktop-notifications";
 import {
@@ -220,10 +221,48 @@ export function App({
     if (initialMessages.length > 0) return initialMessages;
     return activeSession?.messages || [];
   });
+
   if (typeof window !== "undefined") {
     (window as any).__FUSION_SESSIONS__ = sessionsRecord;
   }
 
+  const [isRightPanelOpen, setIsRightPanelOpen] = useState(false);
+  const [rightPanelTab, setRightPanelTab] = useState<RightPanelTab>("changes");
+  const [rightPanelWidth, setRightPanelWidth] = useState(380);
+
+  const latestDiffPatch = useMemo(() => {
+    for (let i = messages.length - 1; i >= 0; i--) {
+      if (messages[i].diffPatch) return messages[i].diffPatch!;
+    }
+    return "";
+  }, [messages]);
+
+  const terminalLogs = useMemo(() => {
+    const logs: Array<{ command: string; output?: string; status?: "running" | "completed" | "failed" }> = [];
+    for (const msg of messages) {
+      if (msg.steps) {
+        for (const s of msg.steps) {
+          logs.push({
+            command: s.title,
+            output: s.details,
+            status: s.status,
+          });
+        }
+      }
+    }
+    return logs;
+  }, [messages]);
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "j") {
+        e.preventDefault();
+        setIsRightPanelOpen((prev) => !prev);
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, []);
 
   // Persist messages and state to session storage
   useEffect(() => {
@@ -600,6 +639,8 @@ export function App({
               onTogglePin={() => handleTogglePinSession(activeSessionId)}
               onMore={() => setCurrentView("settings")}
               onToggleSidebar={() => setIsSidebarOpen((prev) => !prev)}
+              isRightPanelOpen={isRightPanelOpen}
+              onToggleRightPanel={() => setIsRightPanelOpen((prev) => !prev)}
             />
         {/* Stream: strictly centered, vertical scroll */}
         <div
@@ -678,6 +719,19 @@ export function App({
           </>
         )}
       </main>
+
+      {/* Right Secondary Panel (Changes, Files, Terminal) matching Cline */}
+      <RightPanel
+        open={isRightPanelOpen}
+        onClose={() => setIsRightPanelOpen(false)}
+        width={rightPanelWidth}
+        onResize={setRightPanelWidth}
+        activeTab={rightPanelTab}
+        onSelectTab={setRightPanelTab}
+        diffPatch={latestDiffPatch}
+        workspaceEntries={workspaceEntries}
+        terminalLogs={terminalLogs}
+      />
 
       {/* Session Search Command Bar (Cmd+K) */}
       <SessionCommandBar
