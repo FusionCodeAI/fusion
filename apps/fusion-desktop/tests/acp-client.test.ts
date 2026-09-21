@@ -449,6 +449,56 @@ describe("ACP Client Protocol - Notification Dispatching", () => {
     expect(metrics?.tokens).toBe(800);
     expect(metrics?.durationMs).toBe(1200);
   });
+
+  it("stringifies object output and error in tool_call_result session updates", () => {
+    const client = new AcpClient();
+    const mockStdin = new PassThrough();
+    const mockStdout = new PassThrough();
+    client.attachStreams(mockStdout, mockStdin);
+
+    const steps: TurnStepEvent[] = [];
+    client.onStep((step) => steps.push(step));
+
+    mockStdout.write(
+      JSON.stringify({
+        jsonrpc: "2.0",
+        method: "session/update",
+        params: {
+          sessionId: "s1",
+          update: {
+            sessionUpdate: "tool_call_result",
+            callId: "call-1",
+            name: "calculate",
+            output: { result: 42, details: "success" },
+            success: true,
+          },
+        },
+      }) + "\n"
+    );
+
+    mockStdout.write(
+      JSON.stringify({
+        jsonrpc: "2.0",
+        method: "session/update",
+        params: {
+          sessionId: "s1",
+          update: {
+            sessionUpdate: "tool_call_result",
+            callId: "call-2",
+            name: "calculate",
+            error: { code: -32600, message: "Invalid payload" },
+            success: false,
+          },
+        },
+      }) + "\n"
+    );
+
+    expect(steps).toHaveLength(2);
+    expect(steps[0].details).toBe(JSON.stringify({ result: 42, details: "success" }));
+    expect(steps[0].status).toBe("completed");
+    expect(steps[1].details).toBe(JSON.stringify({ code: -32600, message: "Invalid payload" }));
+    expect(steps[1].status).toBe("failed");
+  });
 });
 
 describe("ACP Client Protocol - Mock Stream Parsing", () => {
@@ -573,9 +623,105 @@ describe("ACP Client Protocol - Process Lifecycle", () => {
       expect(client.childProcess).not.toBeNull();
 
       const spawnArgs = client.childProcess?.spawnargs;
-      expect(spawnArgs).toContain("--cwd");
-      const cwdIndex = spawnArgs.indexOf("--cwd");
-      expect(spawnArgs[cwdIndex + 1]).toBe(workspaceDir);
+      expect(spawnArgs).toBeDefined();
+      if (spawnArgs) {
+        expect(spawnArgs).toContain("--cwd");
+        const cwdIndex = spawnArgs.indexOf("--cwd");
+        expect(spawnArgs[cwdIndex + 1]).toBe(workspaceDir);
+      }
+
+      client.kill();
+      expect(client.isAlive()).toBe(false);
+    } finally {
+      try {
+        rmSync(tempDir, { recursive: true, force: true });
+      } catch {
+        // ignore
+      }
+    }
+  });
+
+  it("emits error when stdin emits an error", () => {
+    const client = new AcpClient();
+    const mockStdin = new PassThrough();
+    const mockStdout = new PassThrough();
+    client.attachStreams(mockStdout, mockStdin);
+
+    let emittedError: Error | null = null;
+    client.onError((err) => {
+      emittedError = err;
+    });
+
+    mockStdin.emit("error", new Error("stdin failure"));
+    expect(emittedError).not.toBeNull();
+    expect((emittedError as Error | null)?.message).toBe("stdin failure");
+  });
+
+  it("rejects in-flight pending requests with 'Stream closed' when stdout closes", async () => {
+    const client = new AcpClient();
+    const mockStdin = new PassThrough();
+    const mockStdout = new PassThrough();
+    client.attachStreams(mockStdout, mockStdin);
+
+    const pending = client.sendRequest("slow/request");
+    mockStdout.emit("close");
+
+    await expect(pending).rejects.toThrow("Stream closed");
+  });
+
+  it("does not emit duplicate exit when stdout closes after child exited", () => {
+    const client = new AcpClient();
+    const mockStdin = new PassThrough();
+    const mockStdout = new PassThrough();
+    client.attachStreams(mockStdout, mockStdin);
+
+    interface ClientInternals {
+      customStreamsActive: boolean;
+      streamsConnected: boolean;
+      childExited: boolean;
+      child: {
+        killed: boolean;
+        exitCode: number | null;
+        signalCode: NodeJS.Signals | null;
+      } | null;
+    }
+    const internals = client as unknown as ClientInternals;
+    internals.customStreamsActive = false;
+    internals.childExited = true;
+    internals.child = {
+      killed: false,
+      exitCode: 0,
+      signalCode: null,
+    };
+
+    const exitCodes: Array<number | null> = [];
+    client.onExit((code) => {
+      exitCodes.push(code);
+    });
+
+    mockStdout.emit("close");
+    expect(exitCodes).toHaveLength(0);
+  });
+
+  it("kills existing child process before re-spawning when already alive", async () => {
+    const tempDir = mkdtempSync(join(tmpdir(), "fusion-acp-respawn-"));
+    const fakeBin = join(tempDir, "fake-fusion");
+    writeFileSync(fakeBin, "#!/bin/sh\nsleep 10\n", { mode: 0o755 });
+
+    try {
+      const client = new AcpClient({ binaryPath: fakeBin });
+      const firstSpawn = await client.spawn();
+      expect(firstSpawn).toBe(true);
+      expect(client.isAlive()).toBe(true);
+      const firstChild = client.childProcess;
+
+      const secondSpawn = await client.spawn();
+      expect(secondSpawn).toBe(true);
+      expect(client.isAlive()).toBe(true);
+      const secondChild = client.childProcess;
+
+      expect(firstChild).not.toBe(secondChild);
+      expect(firstChild?.killed).toBe(true);
 
       client.kill();
       expect(client.isAlive()).toBe(false);

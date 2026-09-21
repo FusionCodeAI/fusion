@@ -173,6 +173,7 @@ export class AcpClient {
   private stdoutStream: Readable | null = null;
   private streamsConnected = false;
   private customStreamsActive = false;
+  private childExited = false;
 
   private nextRequestId = 0;
   private pendingRequests = new Map<string | number, PendingRequest>();
@@ -205,13 +206,63 @@ export class AcpClient {
       this.emitError(err);
     });
 
+    stdin.on("error", (err: unknown) => {
+      this.emitError(err instanceof Error ? err : new Error(String(err)));
+    });
+
     stdout.on("close", () => {
       this.streamsConnected = false;
-      this.emitExit(null);
+      this.cleanupPending(new Error("Stream closed"));
+      const childAlreadyExited = Boolean(
+        this.childExited ||
+        (this.child && (this.child.exitCode !== null || this.child.signalCode !== null))
+      );
+      if (!childAlreadyExited) {
+        this.emitExit(null);
+      }
     });
   }
 
   async spawn(workspaceDir?: string): Promise<boolean> {
+    if (this.isAlive()) {
+      const existingChild = this.child;
+      this.kill();
+      if (
+        existingChild &&
+        existingChild.exitCode === null &&
+        existingChild.signalCode === null &&
+        typeof existingChild.once === "function"
+      ) {
+        await new Promise<void>((resolve) => {
+          let finished = false;
+          const finish = () => {
+            if (!finished) {
+              finished = true;
+              clearTimeout(timer);
+              resolve();
+            }
+          };
+          const timer = setTimeout(() => {
+            try {
+              if (
+                typeof existingChild.kill === "function" &&
+                (!existingChild.killed ||
+                  (existingChild.exitCode === null &&
+                    existingChild.signalCode === null))
+              ) {
+                existingChild.kill("SIGKILL");
+              }
+            } catch {
+              // ignore
+            }
+            finish();
+          }, 500);
+
+          existingChild.once("exit", finish);
+        });
+      }
+    }
+
     const effectiveCwd = workspaceDir || this.options.workspaceDir;
     const binPath = resolveFusionBinary(this.options.binaryPath);
     if (!binPath) {
@@ -236,17 +287,25 @@ export class AcpClient {
         return false;
       }
 
+      this.childExited = false;
       this.attachStreams(this.child.stdout, this.child.stdin);
       this.customStreamsActive = false;
 
-      this.child.on("error", (err: Error) => {
-        this.emitError(err);
+      const proc = this.child;
+
+      proc.on("error", (err: Error) => {
+        if (this.child === proc) {
+          this.emitError(err);
+        }
       });
 
-      this.child.on("exit", (code: number | null) => {
-        this.streamsConnected = false;
-        this.cleanupPending(`ACP client exited with code ${code}`);
-        this.emitExit(code);
+      proc.on("exit", (code: number | null) => {
+        if (this.child === proc) {
+          this.childExited = true;
+          this.streamsConnected = false;
+          this.cleanupPending(`ACP client exited with code ${code}`);
+          this.emitExit(code);
+        }
       });
 
       return true;
@@ -336,7 +395,7 @@ export class AcpClient {
   }
 
   kill(): void {
-    if (this.child && !this.child.killed) {
+    if (this.child && !this.child.killed && typeof this.child.kill === "function") {
       this.child.kill();
     }
     this.streamsConnected = false;
@@ -415,9 +474,7 @@ export class AcpClient {
       const pending = this.pendingRequests.get(msg.id);
       if (pending) {
         this.pendingRequests.delete(msg.id);
-        if (pending.timer) {
-          clearTimeout(pending.timer);
-        }
+        clearTimeout(pending.timer);
         if (msg.error) {
           pending.reject(
             new Error(msg.error.message || `RPC Error code ${msg.error.code}`)
@@ -528,11 +585,24 @@ export class AcpClient {
       case "tool_call_result": {
         const name = typeof update.name === "string" ? update.name : "tool";
         const success = update.success !== false;
-        const output = typeof update.output === "string" ? update.output : (update.error as string | undefined);
+        let details: string | undefined;
+        if (typeof update.output === "string") {
+          details = update.output;
+        } else if (typeof update.output === "object" && update.output !== null) {
+          details = JSON.stringify(update.output);
+        } else if (typeof update.error === "string") {
+          details = update.error;
+        } else if (typeof update.error === "object" && update.error !== null) {
+          details = JSON.stringify(update.error);
+        } else if (update.output !== undefined && update.output !== null) {
+          details = String(update.output);
+        } else if (update.error !== undefined && update.error !== null) {
+          details = String(update.error);
+        }
         this.emitStep({
           title: `Tool: ${name}`,
           status: success ? "completed" : "failed",
-          details: output,
+          details,
         });
         break;
       }
@@ -606,12 +676,11 @@ export class AcpClient {
     }
   }
 
-  private cleanupPending(reason: string): void {
+  private cleanupPending(reason: string | Error): void {
+    const error = reason instanceof Error ? reason : new Error(reason);
     for (const pending of this.pendingRequests.values()) {
-      if (pending.timer) {
-        clearTimeout(pending.timer);
-      }
-      pending.reject(new Error(reason));
+      clearTimeout(pending.timer);
+      pending.reject(error);
     }
     this.pendingRequests.clear();
   }
