@@ -222,6 +222,7 @@ export function Sidebar({
           {/* Customize */}
           <button
             type="button"
+            data-testid="sidebar-customize-item"
             onClick={onCustomize}
             className="w-full flex items-center gap-2 px-3 py-1.5 rounded-lg hover:bg-zinc-100 text-xs font-normal text-zinc-700 transition-colors cursor-pointer"
           >

@@ -4,8 +4,8 @@
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::fs;
-use tokio::io::{AsyncBufReadExt, AsyncWriteExt};
 use std::path::PathBuf;
+use tokio::io::{AsyncBufReadExt, AsyncWriteExt};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct DesktopSessionSummary {
@@ -99,7 +99,6 @@ fn load_fusion_session(id: String) -> Result<Value, String> {
     let target_path = if direct_path.exists() {
         direct_path
     } else {
-        // Try finding by prefix
         let mut found = None;
         if let Ok(entries) = fs::read_dir(&dir) {
             for entry in entries.flatten() {
@@ -137,6 +136,7 @@ fn save_fusion_session(session: Value) -> Result<String, String> {
 
     Ok(id.to_string())
 }
+
 #[allow(dead_code)]
 #[tauri::command]
 fn delete_fusion_session(id: String) -> Result<bool, String> {
@@ -150,8 +150,30 @@ fn delete_fusion_session(id: String) -> Result<bool, String> {
     }
 }
 
+#[tauri::command]
+async fn pick_project_folder() -> Result<Option<String>, String> {
+    #[cfg(target_os = "macos")]
+    {
+        let output = std::process::Command::new("osascript")
+            .arg("-e")
+            .arg("try\nPOSIX path of (choose folder with prompt \"Select Project Folder\")\non error\n\"\"\nend try")
+            .output()
+            .map_err(|e| e.to_string())?;
+
+        let res = String::from_utf8_lossy(&output.stdout).trim().to_string();
+        if res.is_empty() {
+            Ok(None)
+        } else {
+            Ok(Some(res))
+        }
+    }
+    #[cfg(not(target_os = "macos"))]
+    {
+        Ok(None)
+    }
+}
+
 fn find_fusion_binary() -> Result<PathBuf, String> {
-    // 1. Explicit environment variable override
     if let Ok(custom) = std::env::var("FUSION_BINARY_PATH") {
         let p = PathBuf::from(custom);
         if p.exists() {
@@ -159,7 +181,6 @@ fn find_fusion_binary() -> Result<PathBuf, String> {
         }
     }
 
-    // 2. Standard ~/.local/bin/fusion
     if let Ok(home) = std::env::var("HOME") {
         let p = PathBuf::from(home).join(".local").join("bin").join("fusion");
         if p.exists() {
@@ -167,7 +188,6 @@ fn find_fusion_binary() -> Result<PathBuf, String> {
         }
     }
 
-    // 3. Walk up from current executable to find target/release/fusion in workspace root
     if let Ok(current_exe) = std::env::current_exe() {
         let mut cur = current_exe.as_path();
         while let Some(parent) = cur.parent() {
@@ -183,7 +203,6 @@ fn find_fusion_binary() -> Result<PathBuf, String> {
         }
     }
 
-    // 4. Check workspace relative candidates
     let candidates = [
         PathBuf::from("../../target/release/fusion"),
         PathBuf::from("../../../target/release/fusion"),
@@ -200,7 +219,6 @@ fn find_fusion_binary() -> Result<PathBuf, String> {
         }
     }
 
-    // 5. System PATH check
     if let Ok(output) = std::process::Command::new("which").arg("fusion").output() {
         if output.status.success() {
             let path_str = String::from_utf8_lossy(&output.stdout).trim().to_string();
@@ -223,7 +241,6 @@ fn clean_terminal_output(raw: &str) -> String {
         if c == '\x1b' {
             if chars.peek() == Some(&']') {
                 chars.next();
-                // OSC sequence until \x07 (bell) or \n
                 for sc in chars.by_ref() {
                     if sc == '\x07' || sc == '\n' {
                         break;
@@ -231,7 +248,6 @@ fn clean_terminal_output(raw: &str) -> String {
                 }
             } else if chars.peek() == Some(&'[') {
                 chars.next();
-                // CSI sequence until letter
                 for sc in chars.by_ref() {
                     if sc.is_alphabetic() {
                         break;
@@ -262,7 +278,6 @@ async fn execute_fusion_turn(
         }
     }
 
-    // Only pass -r if the session file actually exists on disk in ~/.fusion/sessions/
     if let Some(s) = session_id {
         let clean_s = s.trim();
         if !clean_s.is_empty() {
@@ -298,6 +313,7 @@ async fn execute_fusion_turn(
         Err(if !stderr.trim().is_empty() { stderr } else { format!("Process exited with status {}", output.status) })
     }
 }
+
 #[tauri::command]
 async fn stream_fusion_acp(
     prompt: String,
@@ -327,7 +343,6 @@ async fn stream_fusion_acp(
     let mut stdin = child.stdin.take().ok_or_else(|| "Failed to open stdin".to_string())?;
     let stdout = child.stdout.take().ok_or_else(|| "Failed to open stdout".to_string())?;
 
-    // 1. Send initialize
     let init_req = serde_json::json!({
         "jsonrpc": "2.0",
         "id": 1,
@@ -342,11 +357,8 @@ async fn stream_fusion_acp(
     stdin.flush().await.map_err(|e| e.to_string())?;
 
     let mut reader = tokio::io::BufReader::new(stdout).lines();
-
-    // Read initialize response
     let _ = reader.next_line().await.map_err(|e| e.to_string())?;
 
-    // 2. Either session/load if session exists, or session/new
     let target_session_id = session_id.unwrap_or_default();
     let direct_path = fusion_sessions_dir().join(format!("{}.json", target_session_id));
 
@@ -376,7 +388,6 @@ async fn stream_fusion_acp(
         val.get("result").and_then(|r| r.get("sessionId")).and_then(|s| s.as_str()).unwrap_or("").to_string()
     };
 
-    // 3. Send session/prompt
     let prompt_req = serde_json::json!({
         "jsonrpc": "2.0",
         "id": 3,
@@ -389,7 +400,6 @@ async fn stream_fusion_acp(
     stdin.write_all(format!("{}\n", prompt_req).as_bytes()).await.map_err(|e| e.to_string())?;
     stdin.flush().await.map_err(|e| e.to_string())?;
 
-    // 4. Stream session/update events in REAL TIME!
     let mut full_text = String::new();
 
     while let Ok(Some(line)) = reader.next_line().await {
@@ -397,6 +407,7 @@ async fn stream_fusion_acp(
             if val.get("id") == Some(&serde_json::json!(3)) {
                 break;
             }
+
             if val.get("method") == Some(&serde_json::json!("session/update")) {
                 if let Some(params) = val.get("params") {
                     if let Some(update) = params.get("update") {
@@ -448,7 +459,6 @@ async fn stream_fusion_acp(
     Ok(full_text)
 }
 
-
 fn main() {
     tauri::Builder::default()
         .plugin(tauri_plugin_shell::init())
@@ -456,8 +466,10 @@ fn main() {
             list_fusion_sessions,
             load_fusion_session,
             save_fusion_session,
+            delete_fusion_session,
             execute_fusion_turn,
             stream_fusion_acp,
+            pick_project_folder,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

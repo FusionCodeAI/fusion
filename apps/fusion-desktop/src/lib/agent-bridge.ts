@@ -317,6 +317,10 @@ export class AgentBridge {
   setSessionId(id: string): void {
     this.sessionId = id;
   }
+  setCwd(cwd: string): void {
+    this.cwd = cwd;
+  }
+
 
   async prompt(text: string, model?: string): Promise<void> {
     const targetModel = model ?? this.activeModel;
