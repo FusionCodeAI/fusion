@@ -90,6 +90,55 @@ fn list_fusion_sessions() -> Result<Vec<DesktopSessionSummary>, String> {
                     });
                 }
             }
+        } else if path.is_dir() {
+            let dir_name = entry.file_name().to_string_lossy().to_string();
+            if dir_name.starts_with("%2F") {
+                let decoded_ws = dir_name.replace("%2F", "/").replace("%20", " ");
+                let ws_name = PathBuf::from(&decoded_ws)
+                    .file_name()
+                    .and_then(|n| n.to_str())
+                    .unwrap_or("Workspace")
+                    .to_string();
+
+                if let Ok(sub_entries) = fs::read_dir(&path) {
+                    for sub in sub_entries.flatten() {
+                        let sub_p = sub.path();
+                        if sub_p.is_dir() {
+                            let summary_path = sub_p.join("summary.json");
+                            if summary_path.exists() {
+                                if let Ok(c) = fs::read_to_string(&summary_path) {
+                                    if let Ok(sum) = serde_json::from_str::<Value>(&c) {
+                                        let sid = sum.get("info").and_then(|i| i.get("id")).and_then(|v| v.as_str()).map(|s| s.to_string())
+                                            .unwrap_or_else(|| sub.file_name().to_string_lossy().to_string());
+                                        let raw_summary = sum.get("session_summary").and_then(|s| s.as_str()).unwrap_or("");
+                                        let title = if !raw_summary.trim().is_empty() {
+                                            raw_summary.to_string()
+                                        } else {
+                                            format!("{} session", ws_name)
+                                        };
+                                        let created_at = sum.get("created_at").and_then(|v| v.as_str()).unwrap_or("").to_string();
+                                        let updated_at = sum.get("updated_at").and_then(|v| v.as_str()).unwrap_or("").to_string();
+                                        let model = sum.get("current_model_id").and_then(|v| v.as_str()).unwrap_or("deepseek-v4-flash-0731").to_string();
+                                        let message_count = sum.get("num_chat_messages").or_else(|| sum.get("num_messages")).and_then(|m| m.as_u64()).unwrap_or(0) as usize;
+
+                                        summaries.push(DesktopSessionSummary {
+                                            id: sid,
+                                            title,
+                                            created_at,
+                                            updated_at,
+                                            model,
+                                            message_count,
+                                            preview: format!("Workspace session in {}", ws_name),
+                                            workspace: Some(decoded_ws.clone()),
+                                            workspace_name: Some(ws_name.clone()),
+                                        });
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
         }
     }
 
@@ -104,27 +153,73 @@ fn load_fusion_session(id: String) -> Result<Value, String> {
     let dir = fusion_sessions_dir();
     let direct_path = dir.join(format!("{}.json", id));
 
-    let target_path = if direct_path.exists() {
-        direct_path
-    } else {
-        let mut found = None;
-        if let Ok(entries) = fs::read_dir(&dir) {
-            for entry in entries.flatten() {
-                let p = entry.path();
-                if let Some(stem) = p.file_stem().and_then(|s| s.to_str()) {
-                    if stem.starts_with(&id) && p.extension().and_then(|s| s.to_str()) == Some("json") {
-                        found = Some(p);
-                        break;
+    if direct_path.exists() {
+        let content = fs::read_to_string(&direct_path).map_err(|e| e.to_string())?;
+        return serde_json::from_str(&content).map_err(|e| e.to_string());
+    }
+
+    // Check root files by prefix
+    if let Ok(entries) = fs::read_dir(&dir) {
+        for entry in entries.flatten() {
+            let p = entry.path();
+            if let Some(stem) = p.file_stem().and_then(|s| s.to_str()) {
+                if stem.starts_with(&id) && p.extension().and_then(|s| s.to_str()) == Some("json") {
+                    let content = fs::read_to_string(&p).map_err(|e| e.to_string())?;
+                    return serde_json::from_str(&content).map_err(|e| e.to_string());
+                }
+            }
+        }
+    }
+
+    // Check workspace subdirectories
+    if let Ok(entries) = fs::read_dir(&dir) {
+        for entry in entries.flatten() {
+            let p = entry.path();
+            if p.is_dir() {
+                let session_dir = p.join(&id);
+                if session_dir.is_dir() {
+                    let summary_p = session_dir.join("summary.json");
+                    if summary_p.exists() {
+                        let c = fs::read_to_string(&summary_p).map_err(|e| e.to_string())?;
+                        let mut sum_val: Value = serde_json::from_str(&c).map_err(|e| e.to_string())?;
+                        let mut msgs = Vec::new();
+
+                        let history_p = session_dir.join("chat_history.jsonl");
+                        if history_p.exists() {
+                            if let Ok(h_content) = fs::read_to_string(&history_p) {
+                                for line in h_content.lines() {
+                                    if let Ok(l_val) = serde_json::from_str::<Value>(line) {
+                                        let role = l_val.get("type").and_then(|t| t.as_str()).unwrap_or("user");
+                                        let text = if let Some(c_arr) = l_val.get("content").and_then(|c| c.as_array()) {
+                                            c_arr.iter().filter_map(|item| item.get("text").and_then(|t| t.as_str())).collect::<Vec<_>>().join("\n")
+                                        } else if let Some(s) = l_val.get("content").and_then(|c| c.as_str()) {
+                                            s.to_string()
+                                        } else {
+                                            String::new()
+                                        };
+
+                                        if !text.is_empty() && role != "system" {
+                                            msgs.push(serde_json::json!({
+                                                "role": role,
+                                                "content": text
+                                            }));
+                                        }
+                                    }
+                                }
+                            }
+                        }
+
+                        if let Some(obj) = sum_val.as_object_mut() {
+                            obj.insert("messages".to_string(), serde_json::json!(msgs));
+                        }
+                        return Ok(sum_val);
                     }
                 }
             }
         }
-        found.ok_or_else(|| format!("Session not found with ID or prefix '{}'", id))?
-    };
+    }
 
-    let content = fs::read_to_string(&target_path).map_err(|e| e.to_string())?;
-    let val: Value = serde_json::from_str(&content).map_err(|e| e.to_string())?;
-    Ok(val)
+    Err(format!("Session not found with ID or prefix '{}'", id))
 }
 
 #[tauri::command]

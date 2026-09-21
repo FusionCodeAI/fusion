@@ -118,6 +118,8 @@ export function loadAllSessions(): ChatSessionRecord[] {
             thought: cleanThought(m.thought),
           }))
         : [],
+      workspace: typeof s.workspace === "string" ? s.workspace : undefined,
+      workspaceName: typeof s.workspaceName === "string" ? s.workspaceName : undefined,
     }));
 
     return sanitized;
@@ -169,13 +171,14 @@ export function saveSession(session: ChatSessionRecord): void {
  */
 export async function persistSessionToNativeDisk(session: ChatSessionRecord): Promise<void> {
   if (!isTauriEnvironment()) return;
-
   const nativePayload = {
     id: session.id,
     created_at: new Date(session.createdAt).toISOString(),
     updated_at: new Date(session.updatedAt).toISOString(),
     active_model: session.model,
     title: session.title,
+    workspace: session.workspace,
+    workspace_name: session.workspaceName,
     messages: session.messages.map((m) => ({
       role: m.role,
       content: m.content,

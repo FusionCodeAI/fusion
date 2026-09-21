@@ -202,6 +202,9 @@ export function App({
     if (initialMessages.length > 0) return initialMessages;
     return activeSession?.messages || [];
   });
+  if (typeof window !== "undefined") {
+    (window as any).__FUSION_SESSIONS__ = sessionsRecord;
+  }
 
 
   // Persist messages and state to session storage
@@ -480,6 +483,8 @@ export function App({
       {/* Sidebar: resizable, collapsed when isSidebarOpen is false */}
       {isSidebarOpen && (
         <Sidebar
+          sessions={sessionsRecord}
+          activeSessionId={activeSessionId}
           onDeleteSession={handleDeleteSession}
           workspaceDir={workspaceDir}
           width={sidebarWidth}
