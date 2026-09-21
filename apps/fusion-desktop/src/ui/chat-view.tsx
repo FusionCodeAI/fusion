@@ -60,13 +60,8 @@ export function ChatView({
           <svg source={icons.fileDrawer} style={{ width: 13, height: 13, color: "#71717a" }} />
         </div>
 
-        {/* Right Header Items: IDE link, dots, and sidebar toggle */}
+        {/* Right Header Items: dots and sidebar toggle */}
         <div style={{ display: "flex", flexDirection: "row", alignItems: "center", gap: 14 }}>
-          <div style={{ display: "flex", flexDirection: "row", alignItems: "center", gap: 4, cursor: "pointer" }}>
-            <text style={{ fontSize: 12, color: "#71717a" }}>IDE</text>
-            <svg source={icons.externalLink} style={{ width: 11, height: 11, color: "#71717a" }} />
-          </div>
-
           <div style={{ cursor: "pointer", display: "flex", alignItems: "center" }}>
             <svg source={icons.dotsHorizontal} style={{ width: 14, height: 14, color: "#71717a" }} />
           </div>

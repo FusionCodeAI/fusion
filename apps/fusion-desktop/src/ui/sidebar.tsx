@@ -202,44 +202,6 @@ export function Sidebar({
               </div>
             ) : null}
           </div>
-
-          {/* Automations */}
-          <div
-            style={{
-              display: "flex",
-              flexDirection: "row",
-              alignItems: "center",
-              gap: 8,
-              height: 30,
-              borderRadius: 6,
-              paddingLeft: 8,
-              paddingRight: 8,
-              cursor: "pointer",
-              hover: { backgroundColor: "#ececee" },
-            }}
-          >
-            <svg source={icons.automations} style={{ width: 13, height: 13, color: "#52525b" }} />
-            <text style={{ fontSize: 13, color: "#27272a" }}>Automations</text>
-          </div>
-
-          {/* Customize */}
-          <div
-            style={{
-              display: "flex",
-              flexDirection: "row",
-              alignItems: "center",
-              gap: 8,
-              height: 30,
-              borderRadius: 6,
-              paddingLeft: 8,
-              paddingRight: 8,
-              cursor: "pointer",
-              hover: { backgroundColor: "#ececee" },
-            }}
-          >
-            <svg source={icons.customize} style={{ width: 13, height: 13, color: "#52525b" }} />
-            <text style={{ fontSize: 13, color: "#27272a" }}>Customize</text>
-          </div>
         </div>
 
         {/* Section: Projects */}
@@ -450,53 +412,6 @@ export function Sidebar({
           gap: 10,
         }}
       >
-        {/* Getting Started Card */}
-        <div
-          style={{
-            backgroundColor: "#f0f0f2",
-            borderRadius: 8,
-            padding: 10,
-            display: "flex",
-            flexDirection: "column",
-            gap: 8,
-          }}
-        >
-          <div
-            style={{
-              display: "flex",
-              flexDirection: "row",
-              alignItems: "center",
-              justifyContent: "space-between",
-            }}
-          >
-            <text style={{ fontSize: 11, fontWeight: "500", color: "#52525b" }}>
-              Getting Started
-            </text>
-            <text style={{ fontSize: 10, color: "#8e8e93" }}>1/3 ⚪</text>
-          </div>
-
-          <div
-            style={{
-              height: 28,
-              borderRadius: 6,
-              backgroundColor: "#ffffff",
-              borderWidth: 1,
-              borderColor: "#e5e5e8",
-              display: "flex",
-              flexDirection: "row",
-              alignItems: "center",
-              justifyContent: "center",
-              gap: 6,
-              cursor: "pointer",
-              hover: { backgroundColor: "#fbfbfb" },
-            }}
-          >
-            <svg source={icons.github} style={{ width: 12, height: 12, color: "#18181b" }} />
-            <text style={{ fontSize: 11, fontWeight: "500", color: "#18181b" }}>
-              Connect GitHub
-            </text>
-          </div>
-        </div>
 
         {/* User Profile & Settings Row */}
         <div

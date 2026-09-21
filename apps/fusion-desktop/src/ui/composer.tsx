@@ -298,25 +298,17 @@ export function Composer({
           </div>
         </div>
 
-        {/* Sub-row below Composer: Branch on Left, Context Meter on Right (NO This Mac!) */}
+        {/* Sub-row below Composer: Context Meter on Right */}
         <div
           style={{
             display: "flex",
             flexDirection: "row",
             alignItems: "center",
-            justifyContent: "space-between",
-            paddingLeft: 6,
+            justifyContent: "flex-end",
             paddingRight: 4,
             paddingTop: 2,
           }}
         >
-          {/* Branch indicator */}
-          <div style={{ display: "flex", flexDirection: "row", alignItems: "center", gap: 4, cursor: "pointer" }}>
-            <svg source={icons.branch} style={{ width: 11, height: 11, color: "#71717a" }} />
-            <text style={{ fontSize: 11, color: "#71717a" }}>main</text>
-            <svg source={icons.chevronDown} style={{ width: 8, height: 8, color: "#71717a" }} />
-          </div>
-
           {/* Context Limit Usage Meter on the far right */}
           <div style={{ cursor: "pointer", display: "flex", alignItems: "center" }}>
             <svg source={icons.contextMeter} style={{ width: 13, height: 13, color: "#71717a" }} />
