@@ -2,7 +2,7 @@ import React, { useState, useMemo } from "react";
 import type { ChatSession } from "../types";
 
 export interface SidebarProps {
-  sessions: ChatSession[];
+  sessions: readonly ChatSession[];
   activeSessionId: string | null;
   workspaceDir: string;
   userName?: string;
