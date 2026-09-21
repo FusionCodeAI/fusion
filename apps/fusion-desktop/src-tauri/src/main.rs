@@ -150,6 +150,7 @@ fn delete_fusion_session(id: String) -> Result<bool, String> {
 }
 
 fn find_fusion_binary() -> Result<PathBuf, String> {
+    // 1. Explicit environment variable override
     if let Ok(custom) = std::env::var("FUSION_BINARY_PATH") {
         let p = PathBuf::from(custom);
         if p.exists() {
@@ -157,30 +158,36 @@ fn find_fusion_binary() -> Result<PathBuf, String> {
         }
     }
 
-    if let Ok(current_exe) = std::env::current_exe() {
-        if let Some(parent) = current_exe.parent() {
-            let adjacent = parent.join("fusion");
-            if adjacent.exists() {
-                return Ok(adjacent);
-            }
-            let bin_sub = parent.join("bin").join("fusion");
-            if bin_sub.exists() {
-                return Ok(bin_sub);
-            }
-            let resources_bin = parent.join("../Resources/bin/fusion");
-            if resources_bin.exists() {
-                return Ok(resources_bin);
-            }
+    // 2. Standard ~/.local/bin/fusion
+    if let Ok(home) = std::env::var("HOME") {
+        let p = PathBuf::from(home).join(".local").join("bin").join("fusion");
+        if p.exists() {
+            return Ok(p);
         }
     }
 
+    // 3. Walk up from current executable to find target/release/fusion in workspace root
+    if let Ok(current_exe) = std::env::current_exe() {
+        let mut cur = current_exe.as_path();
+        while let Some(parent) = cur.parent() {
+            let rel = parent.join("target").join("release").join("fusion");
+            if rel.exists() {
+                return Ok(rel);
+            }
+            let deb = parent.join("target").join("debug").join("fusion");
+            if deb.exists() {
+                return Ok(deb);
+            }
+            cur = parent;
+        }
+    }
+
+    // 4. Check workspace relative candidates
     let candidates = [
         PathBuf::from("../../target/release/fusion"),
-        PathBuf::from("../../target/debug/fusion"),
         PathBuf::from("../../../target/release/fusion"),
-        PathBuf::from("../../../target/debug/fusion"),
+        PathBuf::from("../../../../target/release/fusion"),
         PathBuf::from("target/release/fusion"),
-        PathBuf::from("target/debug/fusion"),
     ];
 
     for c in &candidates {
@@ -192,6 +199,7 @@ fn find_fusion_binary() -> Result<PathBuf, String> {
         }
     }
 
+    // 5. System PATH check
     if let Ok(output) = std::process::Command::new("which").arg("fusion").output() {
         if output.status.success() {
             let path_str = String::from_utf8_lossy(&output.stdout).trim().to_string();
@@ -207,6 +215,35 @@ fn find_fusion_binary() -> Result<PathBuf, String> {
     Err("Could not locate 'fusion' binary. Please build it with 'cargo build --release' or set FUSION_BINARY_PATH.".to_string())
 }
 
+fn clean_terminal_output(raw: &str) -> String {
+    let mut out = String::with_capacity(raw.len());
+    let mut chars = raw.chars().peekable();
+    while let Some(c) = chars.next() {
+        if c == '\x1b' {
+            if chars.peek() == Some(&']') {
+                chars.next();
+                // OSC sequence until \x07 (bell) or \n
+                for sc in chars.by_ref() {
+                    if sc == '\x07' || sc == '\n' {
+                        break;
+                    }
+                }
+            } else if chars.peek() == Some(&'[') {
+                chars.next();
+                // CSI sequence until letter
+                for sc in chars.by_ref() {
+                    if sc.is_alphabetic() {
+                        break;
+                    }
+                }
+            }
+        } else {
+            out.push(c);
+        }
+    }
+    out.trim().to_string()
+}
+
 #[tauri::command]
 async fn execute_fusion_turn(
     prompt: String,
@@ -218,20 +255,27 @@ async fn execute_fusion_turn(
     let mut cmd = std::process::Command::new(&binary);
 
     if let Some(m) = model {
-        if !m.trim().is_empty() {
-            cmd.arg("-m").arg(m);
+        let clean_m = m.trim();
+        if !clean_m.is_empty() {
+            cmd.arg("-m").arg(clean_m);
         }
     }
 
+    // Only pass -r if the session file actually exists on disk in ~/.fusion/sessions/
     if let Some(s) = session_id {
-        if !s.trim().is_empty() {
-            cmd.arg("-r").arg(s);
+        let clean_s = s.trim();
+        if !clean_s.is_empty() {
+            let direct = fusion_sessions_dir().join(format!("{}.json", clean_s));
+            if direct.exists() {
+                cmd.arg("-r").arg(clean_s);
+            }
         }
     }
 
     if let Some(dir) = cwd {
-        if !dir.trim().is_empty() {
-            cmd.arg("-C").arg(dir);
+        let clean_d = dir.trim();
+        if !clean_d.is_empty() {
+            cmd.arg("-C").arg(clean_d);
         }
     }
 
@@ -243,8 +287,12 @@ async fn execute_fusion_turn(
     let stdout = String::from_utf8_lossy(&output.stdout).to_string();
     let stderr = String::from_utf8_lossy(&output.stderr).to_string();
 
+    let cleaned_stdout = clean_terminal_output(&stdout);
+
     if output.status.success() {
-        Ok(stdout)
+        Ok(cleaned_stdout)
+    } else if !cleaned_stdout.is_empty() {
+        Ok(cleaned_stdout)
     } else {
         Err(if !stderr.trim().is_empty() { stderr } else { format!("Process exited with status {}", output.status) })
     }

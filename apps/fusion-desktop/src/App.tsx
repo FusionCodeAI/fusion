@@ -12,6 +12,7 @@ import { MarkdownRenderer } from "./components/MarkdownRenderer";
 import { AgentBridge } from "./lib/agent-bridge";
 import {
   loadAllSessions,
+  generateSessionId,
   saveSession,
   saveAllSessions,
   deleteSessionFromStorage,
@@ -324,7 +325,7 @@ export function App({
   };
 
   const handleNewChat = () => {
-    const newSessionId = `session-${Date.now()}`;
+    const newSessionId = generateSessionId();
     const newSession: ChatSessionRecord = {
       id: newSessionId,
       title: "General chat conversation",
