@@ -227,6 +227,18 @@ export async function showDesktopNotification(
 }
 
 /**
+ * Plays an authentic macOS system sound (Ping, Glass, Hero, Pop, Basso).
+ */
+export async function playSystemSound(sound: string = "Ping"): Promise<void> {
+  if (!isTauriEnvironment()) return;
+  try {
+    await invoke("play_system_sound", { sound });
+  } catch (err) {
+    console.warn("[fusion-ipc] play_system_sound error:", err);
+  }
+}
+
+/**
  * Starts the Fusion login flow.
  */
 export async function startFusionLogin(): Promise<AuthStatus> {

@@ -331,7 +331,34 @@ fn show_desktop_notification(
         }
         let _ = notification.show();
     }
+    if should_sound {
+        #[cfg(target_os = "macos")]
+        {
+            let _ = std::process::Command::new("afplay")
+                .arg("/System/Library/Sounds/Ping.aiff")
+                .spawn();
+        }
+    }
 
+    Ok(())
+}
+
+#[tauri::command]
+fn play_system_sound(sound: Option<String>) -> Result<(), String> {
+    #[cfg(target_os = "macos")]
+    {
+        let name = sound.unwrap_or_else(|| "Ping".to_string());
+        let path = format!("/System/Library/Sounds/{}.aiff", name);
+        if std::path::Path::new(&path).exists() {
+            let _ = std::process::Command::new("afplay")
+                .arg(&path)
+                .spawn();
+        } else {
+            let _ = std::process::Command::new("afplay")
+                .arg("/System/Library/Sounds/Ping.aiff")
+                .spawn();
+        }
+    }
     Ok(())
 }
 fn fusion_dir() -> PathBuf {
@@ -734,8 +761,8 @@ fn main() {
             stream_fusion_acp,
             check_auth_status,
             start_fusion_login,
-            pick_project_folder,
             show_desktop_notification,
+            play_system_sound,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

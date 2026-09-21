@@ -1,4 +1,4 @@
-import { isTauriEnvironment, showDesktopNotification } from "./fusion-ipc";
+import { isTauriEnvironment, showDesktopNotification, playSystemSound } from "./fusion-ipc";
 
 export type DesktopNotificationEventType =
   | "taskCompletion"
@@ -25,6 +25,23 @@ export const DEFAULT_NOTIFICATION_SETTINGS: DesktopNotificationSettings = {
 
 export const NOTIFICATION_STORAGE_KEY = "fusion_desktop_notification_settings_v1";
 
+export interface PushToastPayload {
+  id: string;
+  type: DesktopNotificationEventType;
+  title: string;
+  body: string;
+  timestamp: number;
+}
+
+type PushToastListener = (toast: PushToastPayload) => void;
+
+const toastListeners = new Set<PushToastListener>();
+
+export function subscribeToPushToasts(listener: PushToastListener): () => void {
+  toastListeners.add(listener);
+  return () => toastListeners.delete(listener);
+}
+
 export function readDesktopNotificationSettings(): DesktopNotificationSettings {
   if (typeof window === "undefined" || !window.localStorage) {
     return { ...DEFAULT_NOTIFICATION_SETTINGS };
@@ -50,8 +67,53 @@ export function writeDesktopNotificationSettings(
 }
 
 /**
- * Sends a native macOS / Windows / Linux desktop notification
- * only when the window is in the background or unfocused, matching Cline's behavior.
+ * Plays a clean, high-fidelity notification chime using WebAudio synthesis.
+ * Guaranteed to play through Mac speakers/headphones immediately.
+ */
+export function playNotificationSound(): void {
+  if (typeof window === "undefined") return;
+  try {
+    const AudioCtx =
+      window.AudioContext ||
+      (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
+    const ctx = new AudioCtx();
+    if (ctx.state === "suspended") {
+      ctx.resume().catch(() => {});
+    }
+    const now = ctx.currentTime;
+
+    const osc1 = ctx.createOscillator();
+    const osc2 = ctx.createOscillator();
+    const gain = ctx.createGain();
+
+    osc1.type = "sine";
+    osc2.type = "sine";
+
+    // Two-tone chime (F#5: 739.99 Hz -> B5: 987.77 Hz)
+    osc1.frequency.setValueAtTime(739.99, now);
+    osc2.frequency.setValueAtTime(987.77, now + 0.08);
+
+    gain.gain.setValueAtTime(0.2, now);
+    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.4);
+
+    osc1.connect(gain);
+    osc2.connect(gain);
+    gain.connect(ctx.destination);
+
+    osc1.start(now);
+    osc1.stop(now + 0.15);
+    osc2.start(now + 0.08);
+    osc2.stop(now + 0.4);
+  } catch (err) {
+    console.warn("[desktop-notifications] playNotificationSound error:", err);
+  }
+}
+
+/**
+ * Sends push notifications across 3 layers:
+ * 1. Audio chime through speakers
+ * 2. In-app floating push banner (always visible immediately)
+ * 3. Native macOS / Windows Notification Center
  */
 export async function notifyDesktopEvent(
   eventType: DesktopNotificationEventType,
@@ -69,22 +131,35 @@ export async function notifyDesktopEvent(
     return;
   }
 
-  // Cline rule: "Notify only while the window is in the background."
-  const isBackground =
-    typeof document !== "undefined" &&
-    (document.hidden || !document.hasFocus());
-
-  if (!isBackground && !options.force) {
-    return;
+  const shouldPlaySound = options.sound ?? pref.sound;
+  // 1. Play real native audio sound (macOS afplay Ping.aiff + WebAudio)
+  if (shouldPlaySound) {
+    playSystemSound("Ping").catch(() => {});
+    playNotificationSound();
   }
 
-  const shouldPlaySound = options.sound ?? pref.sound;
+  // 2. Broadcast in-app floating push toast
+  const toastPayload: PushToastPayload = {
+    id: `notif-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+    type: eventType,
+    title: options.title,
+    body: options.body,
+    timestamp: Date.now(),
+  };
+
+  for (const listener of toastListeners) {
+    try {
+      listener(toastPayload);
+    } catch {}
+  }
+
+  // 3. System / OS Notification via Tauri
   if (isTauriEnvironment()) {
     await showDesktopNotification(options.title, options.body, shouldPlaySound);
     return;
   }
 
-  // Web Notification fallback
+  // 4. Web Notification API fallback
   if (typeof window !== "undefined" && "Notification" in window) {
     if (Notification.permission === "granted") {
       try {
