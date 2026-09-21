@@ -413,17 +413,18 @@ fn check_auth_status() -> AuthStatus {
                             email: None,
                             provider: Some("anthropic".to_string()),
                         };
+                    }
                 }
             }
         }
     }
-
     // 2. Check ~/.fusion/auth.json
     let auth_path = dir.join("auth.json");
     if auth_path.exists() {
         if let Ok(content) = fs::read_to_string(&auth_path) {
             if let Ok(val) = serde_json::from_str::<Value>(&content) {
                 if let Some(obj) = val.as_object() {
+                    if !obj.is_empty() {
                         return AuthStatus {
                             is_signed_in: true,
                             name: None,
@@ -774,7 +775,7 @@ fn main() {
             list_fusion_sessions,
             load_fusion_session,
             save_fusion_session,
-            delete_fusion_session,
+            pick_project_folder,
             execute_fusion_turn,
             stream_fusion_acp,
             check_auth_status,
