@@ -189,7 +189,7 @@ pub enum NotificationBackend {
     /// Automatically detect the best available backend based on OS and environment.
     #[default]
     Auto,
-    /// macOS AppleScript notification (`osascript`).
+    /// macOS Native Notification Center notification.
     MacOS,
     /// Linux/Unix desktop notification (`notify-send` / `kdialog`).
     Linux,
@@ -214,7 +214,7 @@ impl NotificationBackend {
 
         #[cfg(target_os = "macos")]
         {
-            return Self::TerminalOsc;
+            return Self::MacOS;
         }
 
         #[cfg(target_os = "windows")]
@@ -256,7 +256,7 @@ impl NotificationBackend {
     pub fn name(&self) -> &'static str {
         match self {
             Self::Auto => "auto",
-            Self::MacOS => "macos (osascript)",
+            Self::MacOS => "macos (notification center)",
             Self::Linux => "linux (notify-send)",
             Self::Windows => "windows (powershell)",
             Self::Termux => "termux (termux-notification)",
@@ -270,7 +270,7 @@ impl NotificationBackend {
     pub fn is_available(&self) -> bool {
         match self {
             Self::Auto => true,
-            Self::MacOS => cfg!(target_os = "macos") || is_executable_in_path("osascript"),
+            Self::MacOS => cfg!(target_os = "macos"),
             Self::Linux => is_executable_in_path("notify-send") || is_executable_in_path("kdialog"),
             Self::Windows => {
                 cfg!(target_os = "windows")
@@ -1305,26 +1305,32 @@ end run"#;
     pub fn send_desktop(&self, backend: NotificationBackend) -> Result<(), NotificationError> {
         #[cfg(target_os = "macos")]
         {
-            if let Some(tn_path) = find_terminal_notifier() {
-                let mut args = vec![
-                    "-title".to_string(),
-                    self.title.clone(),
-                    "-message".to_string(),
-                    self.body.clone(),
-                ];
+            let is_macos_backend = matches!(backend, NotificationBackend::MacOS | NotificationBackend::Auto);
+
+            if is_macos_backend {
+                if let Err(err) = crate::ui::macos_notification::configure() {
+                    tracing::warn!("Failed configuring macOS notification identity: {err}");
+                }
+
+                let mut notif = notify_rust::Notification::new();
+                notif.summary(&self.title)
+                    .body(&self.body)
+                    .auto_icon();
+
                 if let Some(sub) = &self.subtitle {
                     if !sub.is_empty() {
-                        args.push("-subtitle".to_string());
-                        args.push(sub.clone());
+                        notif.subtitle(sub);
                     }
                 }
+
                 if self.sound {
-                    args.push("-sound".to_string());
-                    args.push("default".to_string());
+                    notif.sound_name("default");
                 }
-                if let Ok(()) = execute_process_with_timeout(&tn_path, &args, self.timeout_ms) {
-                    return Ok(());
-                }
+
+                return notif
+                    .show()
+                    .map(|_| ())
+                    .map_err(|e| NotificationError::CommandFailed(format!("notify_rust error: {e}")));
             }
         }
 
@@ -2336,7 +2342,7 @@ mod tests {
     #[test]
     fn test_backend_availability_and_names() {
         assert_eq!(NotificationBackend::Auto.name(), "auto");
-        assert_eq!(NotificationBackend::MacOS.name(), "macos (osascript)");
+        assert_eq!(NotificationBackend::MacOS.name(), "macos (notification center)");
         assert_eq!(NotificationBackend::Linux.name(), "linux (notify-send)");
         assert_eq!(NotificationBackend::Windows.name(), "windows (powershell)");
         assert_eq!(
