@@ -85,11 +85,11 @@ describe("Sidebar Component", () => {
     expect(html).toContain('data-testid="cline-avatar"');
   });
 
-  it("renders primary Cline menu items: + Session, Schedule, and Customize", () => {
+  it("renders primary Cline menu items: + Session and Customize (no Schedule)", () => {
     const html = renderToStaticMarkup(<Sidebar />);
 
     expect(html).toContain("Session");
-    expect(html).toContain("Schedule");
+    expect(html).not.toContain("Schedule");
     expect(html).toContain("Customize");
   });
 

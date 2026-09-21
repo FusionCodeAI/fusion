@@ -4,7 +4,6 @@ import {
   ArrowRight,
   Search,
   Plus,
-  Clock,
   LayoutGrid,
   ArrowUpDown,
   Filter,
@@ -30,7 +29,6 @@ export interface SidebarProps {
   onToggleSidebar?: () => void;
   onHistoryBack?: () => void;
   onHistoryForward?: () => void;
-  onSchedule?: () => void;
   onCustomize?: () => void;
   onOpenSettings?: () => void;
   width?: number;
@@ -74,7 +72,6 @@ export function Sidebar({
   onHistoryBack,
   onHistoryForward,
   onCustomize,
-  onSchedule,
   onOpenSettings,
   width,
   onResize,
@@ -220,16 +217,6 @@ export function Sidebar({
           >
             <Plus className="w-3.5 h-3.5 text-zinc-700" />
             <span>Session</span>
-          </button>
-
-          {/* Schedule */}
-          <button
-            type="button"
-            onClick={onSchedule}
-            className="w-full flex items-center gap-2 px-3 py-1.5 rounded-lg hover:bg-zinc-100 text-xs font-normal text-zinc-700 transition-colors cursor-pointer"
-          >
-            <Clock className="w-3.5 h-3.5 text-zinc-500" />
-            <span>Schedule</span>
           </button>
 
           {/* Customize */}
