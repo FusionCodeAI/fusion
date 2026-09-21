@@ -134,22 +134,21 @@ export function ChatView({
                     key={msg.id}
                     style={{
                       width: "100%",
-                      paddingBottom: 16,
+                      paddingBottom: 12,
                       display: "flex",
-                      flexDirection: "column",
+                      flexDirection: "row",
+                      justifyContent: "flex-end",
                     }}
                   >
                     <div
                       style={{
-                        width: "100%",
-                        backgroundColor: "#ffffff",
-                        borderWidth: 1,
-                        borderColor: "#e5e5e8",
+                        maxWidth: 540,
+                        backgroundColor: "#f4f4f5",
                         borderRadius: 14,
-                        paddingTop: 12,
-                        paddingBottom: 12,
-                        paddingLeft: 18,
-                        paddingRight: 18,
+                        paddingTop: 10,
+                        paddingBottom: 10,
+                        paddingLeft: 16,
+                        paddingRight: 16,
                       }}
                     >
                       <text style={{ fontSize: 14, lineHeight: 22, color: "#18181b" }}>

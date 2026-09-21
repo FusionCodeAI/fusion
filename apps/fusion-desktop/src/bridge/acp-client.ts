@@ -425,7 +425,7 @@ export class AcpClient {
       ...(model ? { model } : {}),
       ...(this.sessionId ? { sessionId: this.sessionId } : {}),
     };
-    await this.sendRequest("session/prompt", params);
+    await this.sendRequest("session/prompt", params, 0);
   }
 
   async cancel(): Promise<void> {
@@ -602,16 +602,37 @@ export class AcpClient {
     switch (kind) {
       case "agent_message_chunk": {
         const content = update.content as Record<string, unknown> | undefined;
-        const text = (content?.text ?? update.delta ?? update.text ?? "") as string;
+        let text = (content?.text ?? update.delta ?? update.text ?? "") as string;
         if (text) {
-          this.emitChunk(text);
+          if (text.includes("DSML") || text.includes("<｜") || text.includes("tool_calls")) {
+            const queryMatch = text.match(/<[|｜]DSML[|｜]parameter[^>]*>([^<]+)<\/[|｜]DSML[|｜]parameter>/);
+            if (queryMatch) {
+              this.emitStep({
+                title: `Searched "${queryMatch[1]}"`,
+                status: "completed",
+              });
+            }
+            text = text.replace(/<[|｜]DSML[|｜][\s\S]*?[|｜]DSML[|｜]tool_calls>/g, "")
+                       .replace(/<[|｜]DSML[|｜][\s\S]*?>/g, "")
+                       .replace(/<\/?(tool_call|function_call)[^>]*>/g, "");
+          }
+          if (text.length > 0) {
+            this.emitChunk(text);
+          }
         }
         break;
       }
       case "agent_thought_chunk": {
         const content = update.content as Record<string, unknown> | undefined;
         const thought = (update.thought ?? content?.text ?? "") as string;
-        if (thought) {
+        const lower = thought.toLowerCase().trim();
+        if (
+          thought &&
+          !lower.includes("waiting for model") &&
+          !lower.includes("waiting for response") &&
+          lower !== "thinking..." &&
+          lower !== "thinking"
+        ) {
           this.emitThought(thought);
         }
         break;
@@ -664,6 +685,15 @@ export class AcpClient {
       }
       case "status": {
         const message = typeof update.message === "string" ? update.message : "Status";
+        const lower = message.toLowerCase().trim();
+        if (
+          lower.includes("waiting for model") ||
+          lower.includes("waiting for response") ||
+          lower === "thinking..." ||
+          lower === "thinking"
+        ) {
+          break;
+        }
         const level = update.level as string | undefined;
         this.emitStep({
           title: message,

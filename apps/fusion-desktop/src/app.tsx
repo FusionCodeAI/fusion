@@ -104,9 +104,6 @@ export function App() {
       await client.prompt(promptText, snapshot.selectedModel || DEFAULT_FUSION_MODEL.id);
     } catch (err) {
       console.error("Failed to send prompt to agent:", err);
-      store.appendAssistantChunk(
-        "\n\n*(Notice: Connected to Fusion agent. Ready for instructions.)*"
-      );
       store.setGenerating(false);
     }
   };
