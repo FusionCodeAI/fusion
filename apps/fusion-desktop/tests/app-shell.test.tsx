@@ -77,19 +77,22 @@ describe("Sidebar Component", () => {
     expect(html).toContain("border-zinc-200/80");
   });
 
-  it("renders top row (40px) with pl-[78px] clearing macOS traffic lights and Cline avatar", () => {
+  it("renders 2-row top header clearing macOS traffic lights with nav arrows and logo", () => {
     const html = renderToStaticMarkup(<Sidebar />);
 
-    expect(html).toContain("h-10");
-    expect(html).toContain("pl-[78px]");
+    expect(html).toContain("h-12");
+    expect(html).toContain("pl-[76px]");
+    expect(html).toContain('data-testid="sidebar-nav-back"');
+    expect(html).toContain('data-testid="sidebar-nav-forward"');
     expect(html).toContain('data-testid="cline-avatar"');
+    expect(html).toContain('data-testid="sidebar-search-btn"');
   });
 
-  it("renders primary Cline menu items: + Session and Customize (no Schedule)", () => {
+  it("renders primary Cline menu items matching Image #1: Session, Schedule, Customize", () => {
     const html = renderToStaticMarkup(<Sidebar />);
 
     expect(html).toContain("Session");
-    expect(html).not.toContain("Schedule");
+    expect(html).toContain("Schedule");
     expect(html).toContain("Customize");
   });
 

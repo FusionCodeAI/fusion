@@ -85,7 +85,7 @@ export function App({
 }: AppProps) {
   const [isSidebarOpen, setIsSidebarOpen] = useState(initialSidebarOpen);
   const [currentView, setCurrentView] = useState<"chat" | "customize" | "settings">("chat");
-  const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
+  const [settingsSection, setSettingsSection] = useState<"general" | "api" | "voice" | "import" | "remote" | "account">("general");
   const [isSignedIn, setIsSignedIn] = useState<boolean>(() => {
     if (typeof initialIsSignedIn === "boolean") return initialIsSignedIn;
     if (typeof window !== "undefined" && window.localStorage) {
@@ -448,14 +448,19 @@ export function App({
       {/* Sidebar: resizable, collapsed when isSidebarOpen is false */}
       {isSidebarOpen && (
         <Sidebar
-          sessions={sessionsRecord}
           width={sidebarWidth}
+          currentView={currentView}
+          canNavigateBack={currentView !== "chat"}
+          onHistoryBack={() => setCurrentView("chat")}
           onResize={handleSidebarResize}
           onResetWidth={handleSidebarResetWidth}
           onNewChat={handleNewChat}
-          onSelectSession={handleSelectSession}
           onCustomize={() => setCurrentView("customize")}
-          onOpenSettings={() => setCurrentView("settings")}
+          settingsSection={settingsSection}
+          onOpenSettings={(sec) => {
+            if (sec) setSettingsSection(sec);
+            setCurrentView("settings");
+          }}
           onToggleSidebar={() => setIsSidebarOpen(false)}
         />
       )}
@@ -468,6 +473,12 @@ export function App({
           />
         ) : currentView === "settings" ? (
           <SettingsView
+            activeSection={settingsSection === "api" ? "api" : settingsSection === "account" ? "account" : "general"}
+            onTabChange={(tab) => {
+              if (tab === "api") setSettingsSection("api");
+              else if (tab === "account") setSettingsSection("account");
+              else setSettingsSection("general");
+            }}
             onClose={() => setCurrentView("chat")}
             onSignOut={() => {
               setIsSignedIn(false);
@@ -485,7 +496,6 @@ export function App({
               onMore={() => setCurrentView("settings")}
               onToggleSidebar={() => setIsSidebarOpen((prev) => !prev)}
             />
-
         {/* Stream: strictly centered, vertical scroll */}
         <div
           ref={streamRef}

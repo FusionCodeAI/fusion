@@ -24,11 +24,10 @@ describe("Cline Settings View Layout with Fusion API", () => {
     expect(html).toContain('data-testid="settings-font-increase"');
     expect(html).toContain('data-testid="settings-font-display"');
   });
-
-  test("renders back and close buttons when onClose is provided", () => {
-    let closed = false;
-    const html = renderToStaticMarkup(<SettingsView onClose={() => { closed = true; }} />);
-    expect(html).toContain('data-testid="settings-back-btn"');
-    expect(html).toContain('data-testid="settings-close-top-btn"');
+  test("renders clean PageHeader without inline back or close buttons", () => {
+    const html = renderToStaticMarkup(<SettingsView onClose={() => {}} />);
+    expect(html).not.toContain('data-testid="settings-back-btn"');
+    expect(html).not.toContain('data-testid="settings-close-top-btn"');
+    expect(html).toContain("Settings");
   });
 });

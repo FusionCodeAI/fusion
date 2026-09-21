@@ -23,8 +23,9 @@ import { getAllAvailableModels, type FusionModel } from "../models";
 import { checkAuthStatus, type AuthStatus } from "../lib/fusion-ipc";
 
 export type SettingsTab = "general" | "api" | "notifications" | "account";
-
 export interface SettingsViewProps {
+  activeSection?: SettingsTab;
+  onTabChange?: (tab: SettingsTab) => void;
   onClose?: () => void;
   className?: string;
   onSignOut?: () => void;
@@ -54,13 +55,25 @@ const DEFAULT_NOTIF: NotifSettings = {
   questionAsked: { enabled: true, sound: false },
   sessionError: { enabled: true, sound: true },
 };
-
 export function SettingsView({
+  activeSection,
+  onTabChange,
   onClose,
   className = "",
   onSignOut,
 }: SettingsViewProps) {
-  const [tab, setTab] = useState<SettingsTab>("general");
+  const [tab, setTab] = useState<SettingsTab>(activeSection || "general");
+
+  useEffect(() => {
+    if (activeSection) {
+      setTab(activeSection);
+    }
+  }, [activeSection]);
+
+  const handleTabClick = (t: SettingsTab) => {
+    setTab(t);
+    onTabChange?.(t);
+  };
 
   // General settings state
   const [darkMode, setDarkMode] = useState<boolean>(() => {
@@ -172,42 +185,15 @@ export function SettingsView({
     >
       {/* PageFrame matching Cline px-18 py-10 */}
       <div className="max-w-4xl mx-auto px-8 md:px-12 py-8">
-        {/* PageHeader matching Cline */}
+        {/* PageHeader matching Cline: clean heading, no inline back button */}
         <section className="mb-6 flex items-start justify-between gap-6 max-[860px]:flex-col">
           <div className="min-w-0">
-            <div className="flex items-center gap-3">
-              {onClose && (
-                <button
-                  type="button"
-                  data-testid="settings-back-btn"
-                  onClick={onClose}
-                  className="p-1.5 rounded-lg border border-zinc-200 hover:bg-zinc-100 text-zinc-600 transition-colors cursor-pointer mr-1"
-                  title="Back to conversation"
-                >
-                  <ArrowLeft className="size-4" />
-                </button>
-              )}
-              <h1 className="truncate text-2xl md:text-3xl font-semibold tracking-tight text-zinc-900">
-                Settings
-              </h1>
-            </div>
+            <h1 className="truncate text-2xl md:text-3xl font-semibold tracking-tight text-zinc-900">
+              Settings
+            </h1>
             <p className="mt-2 text-sm text-zinc-500 max-w-2xl leading-relaxed">
               Manage desktop preferences for this browser and CLI environment.
             </p>
-          </div>
-
-          <div className="flex shrink-0 items-center gap-2">
-            {onClose && (
-              <button
-                type="button"
-                data-testid="settings-close-top-btn"
-                onClick={onClose}
-                className="p-1.5 rounded-lg text-zinc-400 hover:text-zinc-700 hover:bg-zinc-100 transition-colors cursor-pointer"
-                title="Close"
-              >
-                <X className="size-4" />
-              </button>
-            )}
           </div>
         </section>
 
@@ -228,7 +214,7 @@ export function SettingsView({
                 type="button"
                 data-testid={`settings-tab-${tabItem.id}`}
                 aria-current={active ? "page" : undefined}
-                onClick={() => setTab(tabItem.id)}
+                onClick={() => handleTabClick(tabItem.id)}
                 className={`relative px-4 py-2.5 text-xs md:text-sm font-medium transition-colors cursor-pointer flex items-center gap-1.5 ${
                   active
                     ? "text-zinc-900 font-semibold"
