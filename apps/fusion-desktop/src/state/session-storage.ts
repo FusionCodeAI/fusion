@@ -44,6 +44,22 @@ export function clearMemoryStorage(): void {
   }
 }
 
+export function cleanThought(raw?: string): string | undefined {
+  if (!raw) return undefined;
+  const filtered = raw
+    .split("\n")
+    .map((l) => l.trim())
+    .filter((l) => {
+      const lower = l.toLowerCase();
+      if (lower.startsWith("connecting to fusion")) return false;
+      if (lower.startsWith("processing turn with")) return false;
+      if (lower.startsWith("waiting for model response")) return false;
+      return l.length > 0;
+    })
+    .join("\n");
+  return filtered.trim() ? filtered : undefined;
+}
+
 export function generateSessionId(): string {
   if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
     return crypto.randomUUID();
@@ -95,7 +111,12 @@ export function loadAllSessions(): ChatSessionRecord[] {
       createdAt: typeof s.createdAt === "number" ? s.createdAt : Date.now(),
       updatedAt: typeof s.updatedAt === "number" ? s.updatedAt : Date.now(),
       model: typeof s.model === "string" ? s.model : DEFAULT_FUSION_MODEL.id,
-      messages: Array.isArray(s.messages) ? s.messages : [],
+      messages: Array.isArray(s.messages)
+        ? (s.messages as ChatMessage[]).map((m) => ({
+            ...m,
+            thought: cleanThought(m.thought),
+          }))
+        : [],
     }));
 
     return sanitized;
@@ -253,7 +274,7 @@ export async function loadFullNativeSessionMessages(id: string): Promise<ChatMes
         id: typeof rec.id === "string" ? rec.id : `msg-${id}-${idx}`,
         role: (rec.role === "user" ? "user" : "assistant") as "user" | "assistant",
         content: typeof rec.content === "string" ? rec.content : "",
-        thought: typeof rec.thought === "string" ? rec.thought : undefined,
+        thought: cleanThought(typeof rec.thought === "string" ? rec.thought : undefined),
         steps: Array.isArray(rec.steps) ? (rec.steps as unknown as TurnStep[]) : undefined,
         timestamp: typeof rec.timestamp === "number" ? rec.timestamp : Date.now(),
       };
