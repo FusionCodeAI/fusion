@@ -163,7 +163,7 @@ describe("Sidebar Component", () => {
     const sessionEl2 = testRoot.renderer.findByTestId("sidebar-session-s2");
 
     expect(sessionEl1?.customProps?.["aria-selected"]).toBe(true);
-    expect(sessionEl1?.style?.backgroundColor).toBe("#1e293b");
+    expect(sessionEl1?.style?.backgroundColor).toBe("#ebebec");
 
     expect(sessionEl2?.customProps?.["aria-selected"]).toBe(false);
     expect(sessionEl2?.style?.backgroundColor).toBe("transparent");

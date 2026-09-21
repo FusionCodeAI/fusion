@@ -308,11 +308,11 @@ export class SessionStore {
 
     const lastMessage = session.messages[session.messages.length - 1];
     let assistantMessage: ChatMessage;
+    const stepSummary = turnStep.title + (turnStep.details ? `\n${turnStep.details}` : "");
 
     if (lastMessage && lastMessage.role === "assistant") {
       const existingSteps = lastMessage.steps ? [...lastMessage.steps] : [];
       existingSteps.push(turnStep);
-      const stepSummary = turnStep.title + (turnStep.details ? `\n${turnStep.details}` : "");
       const thought = lastMessage.thought
         ? `${lastMessage.thought}\n${stepSummary}`
         : stepSummary;
@@ -325,7 +325,6 @@ export class SessionStore {
       };
       session.messages[session.messages.length - 1] = assistantMessage;
     } else {
-      const stepSummary = turnStep.title + (turnStep.details ? `\n${turnStep.details}` : "");
       assistantMessage = {
         id: randomUUID(),
         role: "assistant",

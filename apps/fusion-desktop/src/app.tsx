@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useSyncExternalStore } from "react";
+import React, { useState, useEffect, useMemo, useSyncExternalStore } from "react";
 import { render } from "@gpuix/react";
 import { SessionStore } from "./state/session-store";
 import { AcpClient } from "./bridge/acp-client";
@@ -6,14 +6,19 @@ import { Sidebar } from "./ui/sidebar";
 import { HeroView } from "./ui/hero-view";
 import { ChatView } from "./ui/chat-view";
 import { Composer } from "./ui/composer";
+import { DEFAULT_FUSION_MODEL } from "./models";
 
 // Global singletons for hot-reloading stability
-const store = new SessionStore();
+const store = new SessionStore({
+  selectedModel: DEFAULT_FUSION_MODEL.id,
+});
 const client = new AcpClient({
   workspaceDir: process.cwd(),
 });
 
 export function App() {
+  const [isSidebarVisible, setIsSidebarVisible] = useState(true);
+
   const snapshot = useSyncExternalStore(
     (cb) => store.subscribe(cb),
     () => store.getSnapshot()
@@ -24,14 +29,21 @@ export function App() {
   }, [snapshot.sessions, snapshot.activeSessionId]);
 
   const isChatActive = activeSession && activeSession.messages.length > 0;
+  const toggleSidebar = () => {
+    setIsSidebarVisible((v) => !v);
+  };
 
-  // Initialize ACP sidecar process on startup
+  useEffect(() => {
+    globalToggleSidebar = toggleSidebar;
+    return () => {
+    };
+  }, []);
+
   useEffect(() => {
     client.spawn(snapshot.workspaceDir).catch((err) => {
       console.warn("ACP client spawn notice:", err.message);
     });
 
-    // Wire ACP streaming events directly to session store
     const unsubStep = client.onStep((step) => {
       store.appendThoughtStep({
         id: "step-" + Date.now(),
@@ -68,15 +80,14 @@ export function App() {
 
     let session = activeSession;
     if (!session) {
-      session = store.createSession("Chat: " + promptText.slice(0, 24));
+      session = store.createSession(promptText.slice(0, 24));
     }
 
-    // Append user prompt to store
     store.appendUserMessage(promptText, session.id);
     store.setGenerating(true);
 
     try {
-      await client.prompt(promptText, snapshot.selectedModel);
+      await client.prompt(promptText, snapshot.selectedModel || DEFAULT_FUSION_MODEL.id);
     } catch (err) {
       console.error("Failed to send prompt to agent:", err);
       store.appendAssistantChunk(
@@ -98,46 +109,55 @@ export function App() {
         flexDirection: "row",
         width: "100%",
         height: "100%",
-        backgroundColor: "#0d1117",
+        backgroundColor: "#ffffff",
+        overflow: "hidden",
       }}
     >
-      {/* Left Sidebar */}
-      <Sidebar
-        sessions={snapshot.sessions}
-        activeSessionId={snapshot.activeSessionId}
-        workspaceDir={snapshot.workspaceDir}
-        userName="Aung Myat Moe"
-        onNewChat={() => store.createSession("New Conversation")}
-        onSelectSession={(id) => store.selectSession(id)}
-        onDeleteSession={(id) => store.deleteSession(id)}
-        onSelectWorkspace={() => {
-          console.log("Workspace selector requested");
-        }}
-        onOpenSettings={() => {
-          console.log("Settings requested");
-        }}
-      />
+      {/* Left Sidebar (collapsible via Cmd+B or toggle button) */}
+      {isSidebarVisible && (
+        <Sidebar
+          sessions={snapshot.sessions}
+          activeSessionId={snapshot.activeSessionId}
+          workspaceDir={snapshot.workspaceDir}
+          userName="Aung Myat Moe"
+          onNewChat={() => store.createSession("New Conversation")}
+          onSelectSession={(id) => store.selectSession(id)}
+          onDeleteSession={(id) => store.deleteSession(id)}
+          onToggleSidebar={toggleSidebar}
+          onSelectWorkspace={() => {
+            console.log("Workspace selector requested");
+          }}
+          onOpenSettings={() => {
+            console.log("Settings requested");
+          }}
+        />
+      )}
 
-      {/* Main Agent Stage */}
+      {/* Main Agent Stage (Automatically centers content when sidebar is hidden) */}
       <div
         style={{
           flexGrow: 1,
+          minHeight: 0,
           height: "100%",
           display: "flex",
           flexDirection: "column",
-          backgroundColor: "#0d1117",
+          backgroundColor: "#ffffff",
+          overflow: "hidden",
         }}
       >
         {!isChatActive ? (
           <HeroView
             onSubmit={handleSendPrompt}
-            selectedModel={snapshot.selectedModel}
+            workspaceDir={snapshot.workspaceDir}
+            selectedModel={snapshot.selectedModel || DEFAULT_FUSION_MODEL.id}
+            onSelectModel={(modelId) => store.setSelectedModel(modelId)}
             onOpenFolder={() => console.log("Open folder clicked")}
           />
         ) : (
           <div
             style={{
               flexGrow: 1,
+              minHeight: 0,
               height: "100%",
               display: "flex",
               flexDirection: "column",
@@ -145,17 +165,18 @@ export function App() {
             }}
           >
             <ChatView
-              sessionTitle={activeSession?.title ?? "Conversation"}
+              sessionTitle={activeSession?.title ?? "General chat conversation"}
               messages={activeSession?.messages ?? []}
               isGenerating={snapshot.isGenerating}
+              onToggleSidebar={toggleSidebar}
             />
 
             <Composer
               onSend={handleSendPrompt}
               onCancel={handleCancel}
               isGenerating={snapshot.isGenerating}
-              selectedModel={snapshot.selectedModel}
-              onSelectModel={(model) => store.setSelectedModel(model)}
+              selectedModel={snapshot.selectedModel || DEFAULT_FUSION_MODEL.id}
+              onSelectModel={(modelId) => store.setSelectedModel(modelId)}
             />
           </div>
         )}
@@ -164,9 +185,24 @@ export function App() {
   );
 }
 
-// Start native GPUI window
+// Global window key listener reference
+let globalToggleSidebar: (() => void) | null = null;
+
+// Start native GPUI window with transparent titlebar, custom traffic lights, and Cmd+B key handler
 render(<App />, {
   title: "Fusion Agent",
-  width: 1140,
-  height: 760,
+  titlebarTransparent: true,
+  trafficLightX: 18,
+  trafficLightY: 18,
+  width: 1200,
+  height: 800,
+  onKeyDown(event) {
+    // Handle Cmd+B or Ctrl+B to toggle sidebar
+    if (
+      (event.key === "b" || event.key === "B") &&
+      (event.modifiers?.cmd || event.modifiers?.ctrl)
+    ) {
+      globalToggleSidebar?.();
+    }
+  },
 });
