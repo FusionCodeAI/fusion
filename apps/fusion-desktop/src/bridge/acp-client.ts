@@ -180,6 +180,7 @@ export class AcpClient {
   private buffer = "";
 
   private stepListeners = new Set<(step: TurnStepEvent) => void>();
+  private thoughtListeners = new Set<(delta: string) => void>();
   private chunkListeners = new Set<(delta: string) => void>();
   private doneListeners = new Set<(info?: TurnDoneEvent) => void>();
   private errorListeners = new Set<(err: Error) => void>();
@@ -430,7 +431,12 @@ export class AcpClient {
       this.chunkListeners.delete(cb);
     };
   }
-
+  onThought(cb: (delta: string) => void): () => void {
+    this.thoughtListeners.add(cb);
+    return () => {
+      this.thoughtListeners.delete(cb);
+    };
+  }
   onDone(cb: (info?: TurnDoneEvent) => void): () => void {
     this.doneListeners.add(cb);
     return () => {
@@ -565,11 +571,9 @@ export class AcpClient {
       case "agent_thought_chunk": {
         const content = update.content as Record<string, unknown> | undefined;
         const thought = (update.thought ?? content?.text ?? "") as string;
-        this.emitStep({
-          title: "Thinking",
-          status: "running",
-          details: thought || undefined,
-        });
+        if (thought) {
+          this.emitThought(thought);
+        }
         break;
       }
       case "tool_call": {
@@ -628,6 +632,16 @@ export class AcpClient {
     for (const cb of this.stepListeners) {
       try {
         cb(step);
+      } catch (err) {
+        this.emitError(err instanceof Error ? err : new Error(String(err)));
+      }
+    }
+  }
+
+  private emitThought(delta: string): void {
+    for (const cb of this.thoughtListeners) {
+      try {
+        cb(delta);
       } catch (err) {
         this.emitError(err instanceof Error ? err : new Error(String(err)));
       }

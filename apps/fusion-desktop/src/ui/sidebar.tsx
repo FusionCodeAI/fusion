@@ -60,7 +60,6 @@ export function Sidebar({
   onOpenSettings,
 }: SidebarProps) {
   const [searchQuery, setSearchQuery] = useState("");
-  const [isSearching, setIsSearching] = useState(false);
 
   const filteredSessions = useMemo(() => {
     const trimmed = searchQuery.trim().toLowerCase();
@@ -83,6 +82,7 @@ export function Sidebar({
         flexDirection: "column",
         justifyContent: "space-between",
         flexShrink: 0,
+        paddingTop: 52, // Clean clearance for native macOS traffic lights
       }}
     >
       {/* Top Header & Navigation */}
@@ -94,16 +94,17 @@ export function Sidebar({
           overflow: "hidden",
         }}
       >
-        {/* Top bar with traffic light clearance and navigation */}
+        {/* Navigation control row: Sidebar toggle and history arrows */}
         <div
           style={{
-            height: 44,
+            height: 36,
             paddingLeft: 14,
             paddingRight: 14,
             display: "flex",
             flexDirection: "row",
             alignItems: "center",
             justifyContent: "space-between",
+            marginBottom: 8,
           }}
         >
           <div
@@ -121,7 +122,7 @@ export function Sidebar({
             <svg source={icons.sidebarToggle} style={{ width: 14, height: 14, color: "#52525b" }} />
           </div>
 
-          <div style={{ display: "flex", flexDirection: "row", alignItems: "center", gap: 10 }}>
+          <div style={{ display: "flex", flexDirection: "row", alignItems: "center", gap: 8 }}>
             <div style={{ cursor: "pointer", display: "flex", alignItems: "center" }}>
               <svg source={icons.arrowLeft} style={{ width: 13, height: 13, color: "#8e8e93" }} />
             </div>
@@ -131,7 +132,7 @@ export function Sidebar({
           </div>
         </div>
 
-        {/* Primary Action Items */}
+        {/* Primary Navigation Actions */}
         <div
           testId="sidebar-header"
           style={{
@@ -139,7 +140,7 @@ export function Sidebar({
             flexDirection: "column",
             paddingLeft: 8,
             paddingRight: 8,
-            paddingBottom: 10,
+            paddingBottom: 8,
             gap: 2,
           }}
         >
@@ -166,7 +167,7 @@ export function Sidebar({
             <text style={{ fontSize: 13, color: "#27272a", fontWeight: "400" }}>New Chat</text>
           </div>
 
-          {/* Search Input */}
+          {/* Search Box */}
           <div
             style={{
               display: "flex",
@@ -194,61 +195,24 @@ export function Sidebar({
                 color: "#18181b",
                 backgroundColor: "transparent",
                 borderWidth: 0,
-              padding: 0,
-            }}
-          />
-          {searchQuery ? (
-            <div
-              testId="sidebar-clear-search"
-              role="button"
-              aria-label="Clear Search"
-              onClick={() => setSearchQuery("")}
-              style={{ paddingLeft: 4, cursor: "pointer" }}
-            >
-              <svg source={icons.close} style={{ width: 10, height: 10, color: "#8e8e93" }} />
-            </div>
-          ) : null}
-          </div>
-          {/* Automations */}
-          <div
-            style={{
-              display: "flex",
-              flexDirection: "row",
-              alignItems: "center",
-              gap: 8,
-              height: 30,
-              borderRadius: 6,
-              paddingLeft: 8,
-              paddingRight: 8,
-              cursor: "pointer",
-              hover: { backgroundColor: "#ececee" },
-            }}
-          >
-            <svg source={icons.automations} style={{ width: 13, height: 13, color: "#52525b" }} />
-            <text style={{ fontSize: 13, color: "#27272a" }}>Automations</text>
-          </div>
-
-          {/* Customize */}
-          <div
-            style={{
-              display: "flex",
-              flexDirection: "row",
-              alignItems: "center",
-              gap: 8,
-              height: 30,
-              borderRadius: 6,
-              paddingLeft: 8,
-              paddingRight: 8,
-              cursor: "pointer",
-              hover: { backgroundColor: "#ececee" },
-            }}
-          >
-            <svg source={icons.customize} style={{ width: 13, height: 13, color: "#52525b" }} />
-            <text style={{ fontSize: 13, color: "#27272a" }}>Customize</text>
+                padding: 0,
+              }}
+            />
+            {searchQuery ? (
+              <div
+                testId="sidebar-clear-search"
+                role="button"
+                aria-label="Clear Search"
+                onClick={() => setSearchQuery("")}
+                style={{ paddingLeft: 4, cursor: "pointer" }}
+              >
+                <svg source={icons.close} style={{ width: 10, height: 10, color: "#8e8e93" }} />
+              </div>
+            ) : null}
           </div>
         </div>
 
-        {/* Section: Projects */}
+        {/* Section: Projects (ONLY Projects - Repositories removed) */}
         <div
           style={{
             display: "flex",
@@ -267,46 +231,7 @@ export function Sidebar({
           </div>
         </div>
 
-        <div style={{ paddingLeft: 8, paddingRight: 8, paddingBottom: 10 }}>
-          <div
-            style={{
-              display: "flex",
-              flexDirection: "row",
-              alignItems: "center",
-              gap: 8,
-              height: 28,
-              paddingLeft: 8,
-              borderRadius: 6,
-              cursor: "pointer",
-              hover: { backgroundColor: "#ececee" },
-            }}
-          >
-            <svg source={icons.circleDashed} style={{ width: 12, height: 12, color: "#8e8e93" }} />
-            <text style={{ fontSize: 12, color: "#52525b" }}>New Project</text>
-          </div>
-        </div>
-
-        {/* Section: Repositories */}
-        <div
-          style={{
-            display: "flex",
-            flexDirection: "row",
-            alignItems: "center",
-            justifyContent: "space-between",
-            paddingLeft: 14,
-            paddingRight: 14,
-            paddingTop: 6,
-            paddingBottom: 4,
-          }}
-        >
-          <text style={{ fontSize: 11, fontWeight: "500", color: "#8e8e93" }}>Repositories</text>
-          <div style={{ display: "flex", flexDirection: "row", alignItems: "center", gap: 8 }}>
-            <svg source={icons.filter} style={{ width: 11, height: 11, color: "#8e8e93" }} />
-            <svg source={icons.folder} style={{ width: 11, height: 11, color: "#8e8e93" }} />
-          </div>
-        </div>
-
-        {/* Repository Items & Active Sessions */}
+        {/* Project Items List */}
         <div
           testId="sidebar-session-list"
           style={{
@@ -319,10 +244,44 @@ export function Sidebar({
             gap: 1,
           }}
         >
-          {/* No Repo Item */}
+          {/* Active Workspace / Project item */}
           <div
             testId="sidebar-workspace-chip"
             onClick={onSelectWorkspace}
+            style={{
+              display: "flex",
+              flexDirection: "row",
+              alignItems: "center",
+              gap: 8,
+              height: 30,
+              paddingLeft: 8,
+              paddingRight: 8,
+              borderRadius: 6,
+              cursor: "pointer",
+              overflow: "hidden",
+              hover: { backgroundColor: "#ececee" },
+            }}
+          >
+            <svg source={icons.folder} style={{ width: 13, height: 13, color: "#52525b" }} />
+            <text
+              testId="sidebar-workspace-folder"
+              style={{
+                fontSize: 13,
+                color: "#27272a",
+                fontWeight: "500",
+              }}
+            >
+              {folderName}
+            </text>
+            <div style={{ display: "none" }}>
+              <text testId="sidebar-workspace-path">
+                {`📁 ${truncatePath(workspaceDir, 28)}`}
+              </text>
+            </div>
+          </div>
+
+          {/* New Project Action */}
+          <div
             style={{
               display: "flex",
               flexDirection: "row",
@@ -336,22 +295,14 @@ export function Sidebar({
               hover: { backgroundColor: "#ececee" },
             }}
           >
-            <svg source={icons.home} style={{ width: 13, height: 13, color: "#71717a" }} />
-            <text
-              testId="sidebar-workspace-folder"
-              style={{ fontSize: 12, color: "#3f3f46" }}
-            >
-              {folderName || "No Repo"}
-            </text>
-            <text
-              testId="sidebar-workspace-path"
-              style={{ display: "none" }}
-            >
-              {`📁 ${truncatePath(workspaceDir, 28)}`}
-            </text>
+            <svg source={icons.circleDashed} style={{ width: 12, height: 12, color: "#8e8e93" }} />
+            <text style={{ fontSize: 12, color: "#71717a" }}>New Project</text>
           </div>
 
-          {/* Conversations List */}
+          {/* Divider */}
+          <div style={{ height: 1, backgroundColor: "#e5e5e8", marginTop: 6, marginBottom: 6 }} />
+
+          {/* Conversations inside project */}
           {filteredSessions.length === 0 ? (
             <div
               testId="sidebar-empty-state"
@@ -365,7 +316,7 @@ export function Sidebar({
             >
               <text
                 testId="sidebar-empty-title"
-                style={{ fontSize: 12, color: "#71717a", fontWeight: "500" }}
+                style={{ fontSize: 11, color: "#8e8e93" }}
               >
                 {searchQuery ? "No chats found" : "No chats yet"}
               </text>
@@ -422,8 +373,8 @@ export function Sidebar({
                         color: isActive ? "#18181b" : "#3f3f46",
                       }}
                     >
-                      {session.title.length > 28
-                        ? session.title.slice(0, 28) + "..."
+                      {session.title.length > 20
+                        ? session.title.slice(0, 20) + "..."
                         : session.title}
                     </text>
                   </div>

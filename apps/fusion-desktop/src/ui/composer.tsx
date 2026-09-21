@@ -29,6 +29,20 @@ export function Composer({
     if (trimmed && !isGenerating) {
       onSend(trimmed);
       setText("");
+      setIsModelPickerOpen(false);
+    }
+  };
+
+  const handleTextChange = (val: string) => {
+    setText(val);
+    if (isModelPickerOpen) {
+      setIsModelPickerOpen(false);
+    }
+  };
+
+  const handleInputFocus = () => {
+    if (isModelPickerOpen) {
+      setIsModelPickerOpen(false);
     }
   };
 
@@ -195,7 +209,7 @@ export function Composer({
           {/* Center: Input */}
           <input
             value={text}
-            onChange={(e: { value?: string }) => setText(e.value ?? "")}
+            onChange={(e: { value?: string }) => handleTextChange(e.value ?? "")}
             onSubmit={handleSend}
             placeholder="Send follow-up"
             style={{
@@ -234,7 +248,7 @@ export function Composer({
               <svg source={icons.chevronDown} style={{ width: 9, height: 9, color: "#71717a" }} />
             </div>
 
-            {/* Mic / Action Button (Circular black button with white icon) */}
+            {/* Mic / Action Button */}
             {isGenerating ? (
               <div
                 onClick={onCancel}

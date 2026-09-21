@@ -293,6 +293,33 @@ export class SessionStore {
     return targetMessage;
   }
 
+  appendThoughtChunk(delta: string, sessionId?: string): void {
+    const session = this.resolveSession(sessionId);
+    const lastMessage = session.messages[session.messages.length - 1];
+    const now = Date.now();
+
+    if (lastMessage && lastMessage.role === "assistant") {
+      session.messages[session.messages.length - 1] = {
+        ...lastMessage,
+        thought: (lastMessage.thought || "") + delta,
+        timestamp: now,
+      };
+    } else {
+      session.messages.push({
+        id: randomUUID(),
+        role: "assistant",
+        content: "",
+        thought: delta,
+        timestamp: now,
+      });
+    }
+
+    session.updatedAt = now;
+    this.updateSnapshot();
+    this.notify();
+    this.triggerAutoSave();
+  }
+
   appendThoughtStep(step: TurnStep | string, sessionId?: string): void {
     const session = this.resolveSession(sessionId);
     const now = Date.now();

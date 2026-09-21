@@ -36,7 +36,7 @@ export function ChatView({
         overflow: "hidden",
       }}
     >
-      {/* Top Navigation Header */}
+      {/* Top Navigation Header (No IDE stuff, only title and sidebar toggle) */}
       <div
         style={{
           flexShrink: 0,
@@ -60,99 +60,86 @@ export function ChatView({
           <svg source={icons.fileDrawer} style={{ width: 13, height: 13, color: "#71717a" }} />
         </div>
 
-        {/* Right Header: IDE link, dots, and sidebar toggle */}
-        <div style={{ display: "flex", flexDirection: "row", alignItems: "center", gap: 14 }}>
-          <div style={{ display: "flex", flexDirection: "row", alignItems: "center", gap: 4, cursor: "pointer" }}>
-            <text style={{ fontSize: 12, color: "#71717a" }}>IDE</text>
-            <svg source={icons.externalLink} style={{ width: 11, height: 11, color: "#71717a" }} />
-          </div>
-
-          <div style={{ cursor: "pointer", display: "flex", alignItems: "center" }}>
-            <svg source={icons.dotsHorizontal} style={{ width: 14, height: 14, color: "#71717a" }} />
-          </div>
-
-          <div
-            role="button"
-            onClick={onToggleSidebar}
-            style={{ cursor: "pointer", display: "flex", alignItems: "center" }}
-          >
-            <svg source={icons.sidebarToggle} style={{ width: 14, height: 14, color: "#71717a" }} />
-          </div>
+        {/* Right Header: Only the sidebar toggle icon */}
+        <div
+          role="button"
+          onClick={onToggleSidebar}
+          style={{
+            cursor: "pointer",
+            display: "flex",
+            alignItems: "center",
+            padding: 4,
+            borderRadius: 4,
+            hover: { backgroundColor: "#f0f0f2" },
+          }}
+        >
+          <svg source={icons.sidebarToggle} style={{ width: 14, height: 14, color: "#71717a" }} />
         </div>
       </div>
 
-      {/* Main Container: Chat Stream on Left/Center, Info Badges on Right */}
+      {/* Main Conversation Stream (Scrollable, centered, NO horizontal overflow!) */}
       <div
         style={{
           flexGrow: 1,
           minHeight: 0,
+          overflow: "scroll",
+          paddingTop: 20,
+          paddingBottom: 24,
+          paddingLeft: 32,
+          paddingRight: 32,
           display: "flex",
-          flexDirection: "row",
-          overflow: "hidden",
+          flexDirection: "column",
+          alignItems: "center",
+          width: "100%",
         }}
       >
-        {/* Scrollable Conversation Stream */}
         <div
           style={{
-            flexGrow: 1,
-            minHeight: 0,
-            overflow: "scroll",
-            paddingTop: 24,
-            paddingBottom: 24,
-            paddingLeft: 48,
-            paddingRight: 48,
+            width: "100%",
+            maxWidth: 680,
             display: "flex",
             flexDirection: "column",
-            alignItems: "center",
+            gap: 18,
           }}
         >
-          <div
-            style={{
-              width: "100%",
-              maxWidth: 760,
-              display: "flex",
-              flexDirection: "column",
-              gap: 20,
-            }}
-          >
-            {messages.map((msg) => {
-              if (msg.role === "user") {
-                return (
-                  <div
-                    key={msg.id}
-                    style={{
-                      width: "100%",
-                      backgroundColor: "#ffffff",
-                      borderWidth: 1,
-                      borderColor: "#e5e5e8",
-                      borderRadius: 14,
-                      paddingTop: 12,
-                      paddingBottom: 12,
-                      paddingLeft: 18,
-                      paddingRight: 18,
-                    }}
-                  >
-                    <text style={{ fontSize: 14, lineHeight: 22, color: "#18181b" }}>
-                      {msg.content}
-                    </text>
-                  </div>
-                );
-              }
-
-              // Assistant message
-              const isExpanded = !!expandedThoughts[msg.id];
+          {messages.map((msg) => {
+            if (msg.role === "user") {
               return (
                 <div
                   key={msg.id}
                   style={{
                     width: "100%",
-                    display: "flex",
-                    flexDirection: "column",
-                    gap: 8,
-                    paddingTop: 4,
+                    backgroundColor: "#ffffff",
+                    borderWidth: 1,
+                    borderColor: "#e5e5e8",
+                    borderRadius: 14,
+                    paddingTop: 12,
+                    paddingBottom: 12,
+                    paddingLeft: 16,
+                    paddingRight: 16,
                   }}
                 >
-                  {/* Thought briefly indicator */}
+                  <text style={{ fontSize: 14, lineHeight: 22, color: "#18181b" }}>
+                    {msg.content}
+                  </text>
+                </div>
+              );
+            }
+
+            // Assistant message
+            const isExpanded = !!expandedThoughts[msg.id];
+            return (
+              <div
+                key={msg.id}
+                style={{
+                  width: "100%",
+                  display: "flex",
+                  flexDirection: "column",
+                  gap: 8,
+                }}
+              >
+                {/* Thought briefly indicator (collapsed by default, neat inline row) */}
+                {msg.thought ? (
                   <div style={{ display: "flex", flexDirection: "column", alignSelf: "flex-start" }}>
                     <div
                       onClick={() => toggleThought(msg.id)}
@@ -173,7 +160,7 @@ export function ChatView({
                       />
                     </div>
 
-                    {isExpanded && msg.thought && (
+                    {isExpanded && (
                       <div
                         style={{
                           borderLeftWidth: 2,
@@ -182,7 +169,8 @@ export function ChatView({
                           paddingTop: 4,
                           paddingBottom: 4,
                           marginTop: 6,
-                          maxWidth: 700,
+                          width: "100%",
+                          maxWidth: 660,
                         }}
                       >
                         <text
@@ -198,122 +186,80 @@ export function ChatView({
                       </div>
                     )}
                   </div>
+                ) : null}
 
-                  {/* Tool execution steps if any */}
-                  {msg.steps && msg.steps.length > 0 && (
-                    <div style={{ display: "flex", flexDirection: "column", gap: 4, alignSelf: "flex-start" }}>
-                      {msg.steps
-                        .filter(
-                          (s) =>
-                            !s.title.toLowerCase().includes("think") &&
-                            !s.title.toLowerCase().includes("waiting")
-                        )
-                        .map((step: TurnStep) => (
-                          <div
-                            key={step.id}
-                            style={{
-                              paddingTop: 3,
-                              paddingBottom: 3,
-                              paddingLeft: 8,
-                              paddingRight: 8,
-                              borderRadius: 6,
-                              backgroundColor: "#f4f4f5",
-                              display: "flex",
-                              flexDirection: "row",
-                              alignItems: "center",
-                              gap: 6,
-                            }}
-                          >
-                            <text style={{ fontSize: 11, color: step.status === "completed" ? "#16a34a" : "#d97706" }}>
-                              {step.status === "completed" ? "✓" : "⚡"}
-                            </text>
-                            <text style={{ fontSize: 12, color: "#3f3f46" }}>{step.title}</text>
-                            {step.details && (
-                              <text style={{ fontSize: 11, color: "#71717a", paddingLeft: 4 }}>
-                                {step.details}
-                              </text>
-                            )}
-                          </div>
-                        ))}
-                    </div>
-                  )}
-
-                  {/* Assistant Markdown text */}
-                  <div style={{ paddingTop: 4, paddingBottom: 4 }}>
-                    <markdown
-                      source={msg.content || (isGenerating ? "Thinking..." : "")}
-                      theme={{
-                        appearance: "light",
-                        accent: "#2563eb",
-                      }}
-                      style={{ color: "#18181b", fontSize: 14, lineHeight: 24 }}
-                    />
+                {/* Tool execution steps if any */}
+                {msg.steps && msg.steps.length > 0 && (
+                  <div style={{ display: "flex", flexDirection: "column", gap: 4, alignSelf: "flex-start" }}>
+                    {msg.steps.map((step: TurnStep) => (
+                      <div
+                        key={step.id}
+                        style={{
+                          paddingTop: 3,
+                          paddingBottom: 3,
+                          paddingLeft: 8,
+                          paddingRight: 8,
+                          borderRadius: 6,
+                          backgroundColor: "#f4f4f5",
+                          display: "flex",
+                          flexDirection: "row",
+                          alignItems: "center",
+                          gap: 6,
+                        }}
+                      >
+                        <text style={{ fontSize: 11, color: step.status === "completed" ? "#16a34a" : "#d97706" }}>
+                          {step.status === "completed" ? "✓" : "⚡"}
+                        </text>
+                        <text style={{ fontSize: 12, color: "#3f3f46" }}>{step.title}</text>
+                        {step.details && (
+                          <text style={{ fontSize: 11, color: "#71717a", paddingLeft: 4 }}>
+                            {step.details}
+                          </text>
+                        )}
+                      </div>
+                    ))}
                   </div>
+                )}
 
-                  {/* Action Icons: Thumbs up, Thumbs down, Copy, Branch, Just now */}
-                  <div
-                    style={{
-                      display: "flex",
-                      flexDirection: "row",
-                      alignItems: "center",
-                      gap: 12,
-                      paddingTop: 4,
+                {/* Assistant Markdown text */}
+                <div style={{ paddingTop: 2, paddingBottom: 2 }}>
+                  <markdown
+                    source={msg.content || (isGenerating ? "Thinking..." : "")}
+                    theme={{
+                      appearance: "light",
+                      accent: "#2563eb",
                     }}
-                  >
-                    <div style={{ cursor: "pointer", display: "flex", alignItems: "center" }}>
-                      <svg source={icons.thumbsUp} style={{ width: 13, height: 13, color: "#a1a1aa" }} />
-                    </div>
-                    <div style={{ cursor: "pointer", display: "flex", alignItems: "center" }}>
-                      <svg source={icons.thumbsDown} style={{ width: 13, height: 13, color: "#a1a1aa" }} />
-                    </div>
-                    <div style={{ cursor: "pointer", display: "flex", alignItems: "center" }}>
-                      <svg source={icons.copy} style={{ width: 13, height: 13, color: "#a1a1aa" }} />
-                    </div>
-                    <div style={{ cursor: "pointer", display: "flex", alignItems: "center" }}>
-                      <svg source={icons.branch} style={{ width: 13, height: 13, color: "#a1a1aa" }} />
-                    </div>
-                    <text style={{ fontSize: 11, color: "#a1a1aa", marginLeft: 4 }}>Just now</text>
-                  </div>
+                    style={{ color: "#18181b", fontSize: 14, lineHeight: 24 }}
+                  />
                 </div>
-              );
-            })}
-          </div>
-        </div>
 
-        {/* Right Info Drawer (as shown in reference image) */}
-        <div
-          style={{
-            width: 140,
-            flexShrink: 0,
-            paddingTop: 24,
-            paddingRight: 20,
-            display: "flex",
-            flexDirection: "column",
-            gap: 10,
-          }}
-        >
-          <text style={{ fontSize: 12, color: "#71717a" }}>On kbtc-event</text>
-
-          <div style={{ display: "flex", flexDirection: "row", alignItems: "center", gap: 4 }}>
-            <text style={{ fontSize: 12, color: "#71717a" }}>± Changes</text>
-            <text style={{ fontSize: 12, color: "#16a34a", fontWeight: "500" }}>+4290</text>
-            <text style={{ fontSize: 12, color: "#ef4444", fontWeight: "500" }}>-3</text>
-          </div>
-
-          <div style={{ display: "flex", flexDirection: "row", alignItems: "center", gap: 8, cursor: "pointer", paddingTop: 4 }}>
-            <svg source={icons.browser} style={{ width: 13, height: 13, color: "#71717a" }} />
-            <text style={{ fontSize: 12, color: "#3f3f46" }}>Browser</text>
-          </div>
-
-          <div style={{ display: "flex", flexDirection: "row", alignItems: "center", gap: 8, cursor: "pointer" }}>
-            <svg source={icons.terminal} style={{ width: 13, height: 13, color: "#71717a" }} />
-            <text style={{ fontSize: 12, color: "#3f3f46" }}>Terminal</text>
-          </div>
-
-          <div style={{ display: "flex", flexDirection: "row", alignItems: "center", gap: 8, cursor: "pointer" }}>
-            <svg source={icons.files} style={{ width: 13, height: 13, color: "#71717a" }} />
-            <text style={{ fontSize: 12, color: "#3f3f46" }}>Files</text>
-          </div>
+                {/* Action Icons: Thumbs up, Thumbs down, Copy, Branch, Just now */}
+                <div
+                  style={{
+                    display: "flex",
+                    flexDirection: "row",
+                    alignItems: "center",
+                    gap: 12,
+                    paddingTop: 2,
+                  }}
+                >
+                  <div style={{ cursor: "pointer", display: "flex", alignItems: "center" }}>
+                    <svg source={icons.thumbsUp} style={{ width: 13, height: 13, color: "#a1a1aa" }} />
+                  </div>
+                  <div style={{ cursor: "pointer", display: "flex", alignItems: "center" }}>
+                    <svg source={icons.thumbsDown} style={{ width: 13, height: 13, color: "#a1a1aa" }} />
+                  </div>
+                  <div style={{ cursor: "pointer", display: "flex", alignItems: "center" }}>
+                    <svg source={icons.copy} style={{ width: 13, height: 13, color: "#a1a1aa" }} />
+                  </div>
+                  <div style={{ cursor: "pointer", display: "flex", alignItems: "center" }}>
+                    <svg source={icons.branch} style={{ width: 13, height: 13, color: "#a1a1aa" }} />
+                  </div>
+                  <text style={{ fontSize: 11, color: "#a1a1aa", marginLeft: 4 }}>Just now</text>
+                </div>
+              </div>
+            );
+          })}
         </div>
       </div>
     </div>
