@@ -34,9 +34,8 @@ export const icons = {
   // hugeicons:computer
   laptop: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="#000" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.6"><path d="M14 21h2m-2 0a1.5 1.5 0 0 1-1.5-1.5V17H12m2 4h-4m0 0H8m2 0a1.5 1.5 0 0 0 1.5-1.5V17h.5m0 0v4m4-18H8c-2.828 0-4.243 0-5.121.879C2 4.757 2 6.172 2 9v2c0 2.828 0 4.243.879 5.121C3.757 17 5.172 17 8 17h8c2.828 0 4.243 0 5.121-.879C22 15.243 22 13.828 22 11V9c0-2.828 0-4.243-.879-5.121C20.243 3 18.828 3 16 3"/></svg>`,
 
-  // hugeicons:git-branch
-  branch: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="#000" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.6"><path d="M7 19h6c2.828 0 4.243 0 5.121-.879C19 17.243 19 15.828 19 13v-3m0 0c.7 0 2.009 1.994 2.5 2.5M19 10c-.7 0-2.009 1.994-2.5 2.5M5 7v10"/><circle cx="5" cy="5" r="2"/><circle cx="19" cy="5" r="2"/><circle cx="5" cy="19" r="2"/></svg>`,
-
+  // lucide:git-branch
+  branch: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="#000" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="6" y1="3" x2="6" y2="15"/><circle cx="18" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><path d="M18 9a9 9 0 0 1-9 9"/></svg>`,
   // hugeicons:reload
   refresh: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="#000" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.6"><path d="M16.5 8H18c1.414 0 2.121 0 2.56-.44C21 7.121 21 6.414 21 5V3.5M3 12a9 9 0 0 1 9-9c3.571 0 6.095 1.73 8 4.083M21 12a9 9 0 0 1-9 9c-3.571 0-6.095-1.73-8-4.084M7.5 16H6c-1.414 0-2.121 0-2.56.44C3 16.877 3 17.584 3 19v1.5"/></svg>`,
 
@@ -75,4 +74,7 @@ export const icons = {
 
   // hugeicons:more-horizontal
   dotsHorizontal: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="#000"><circle cx="5" cy="12" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="19" cy="12" r="2"/></svg>`,
+
+  // Context window limit usage meter
+  contextMeter: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="#000" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9" stroke="#d4d4d8" stroke-width="2.2"/><path d="M12 3a9 9 0 0 1 6.36 2.64" stroke="#71717a" stroke-width="2.4"/></svg>`,
 };
