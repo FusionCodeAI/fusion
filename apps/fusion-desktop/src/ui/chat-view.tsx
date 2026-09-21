@@ -271,27 +271,6 @@ export function ChatView({
                     </div>
                   ) : null}
 
-                  {/* Action Icons: Thumbs up, Thumbs down, Copy, Branch, Timestamp */}
-                  <div
-                    style={{
-                      display: "flex",
-                      flexDirection: "row",
-                      alignItems: "center",
-                      gap: 12,
-                      paddingTop: 2,
-                    }}
-                  >
-                    <div style={{ cursor: "pointer", display: "flex", alignItems: "center" }}>
-                      <svg source={icons.thumbsUp} style={{ width: 13, height: 13, color: "#a1a1aa" }} />
-                    </div>
-                    <div style={{ cursor: "pointer", display: "flex", alignItems: "center" }}>
-                      <svg source={icons.thumbsDown} style={{ width: 13, height: 13, color: "#a1a1aa" }} />
-                    </div>
-                    <div style={{ cursor: "pointer", display: "flex", alignItems: "center" }}>
-                      <svg source={icons.copy} style={{ width: 13, height: 13, color: "#a1a1aa" }} />
-                    </div>
-                    <text style={{ fontSize: 11, color: "#a1a1aa", marginLeft: 4 }}>Just now</text>
-                  </div>
                 </div>
               );
             })}
