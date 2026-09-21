@@ -456,6 +456,9 @@ web-sys = { version = "0.3", optional = true, features = ["console", "Window", "
 
 [target.'cfg(all(not(target_arch = "wasm32"), not(target_os = "android")))'.dependencies]
 arboard = { workspace = true }
+
+[target.'cfg(target_os = "macos")'.dependencies]
+notify-rust = "4.18"
 [lib]
 crate-type = ["cdylib", "rlib"]
 

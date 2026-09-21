@@ -54,6 +54,12 @@ export type { NotificationModalProps, NotificationSettings } from "./Notificatio
 export { CustomizeView } from "./CustomizeView";
 export type { CustomizeViewProps } from "./CustomizeView";
 
+export { SlashCommandMenu } from "./SlashCommandMenu";
+export type { SlashCommandMenuProps } from "./SlashCommandMenu";
+
+export { AtMentionMenu } from "./AtMentionMenu";
+export type { AtMentionMenuProps } from "./AtMentionMenu";
+
 export { SettingsView } from "./SettingsView";
 export type { SettingsViewProps, SettingsSectionId } from "./SettingsView";
 

@@ -375,14 +375,20 @@ export function App({
     });
   }, [bridge]);
 
-  const handleSend = async (text: string) => {
+  const handleSend = async (text: string, images?: import("./types").ChatImageAttachment[]) => {
     const trimmed = text.trim();
-    if (!trimmed || isGenerating) return;
+    if ((!trimmed && (!images || images.length === 0)) || isGenerating) return;
+
+    if (trimmed === "/clear") {
+      setMessages([]);
+      return;
+    }
 
     const userMessage: ChatMessage = {
       id: `user-${Date.now()}`,
       role: "user",
       content: trimmed,
+      images: images && images.length > 0 ? images : undefined,
       timestamp: Date.now(),
     };
 
@@ -573,7 +579,7 @@ export function App({
             <div className="w-full max-w-[680px] flex flex-col gap-4">
               {messages.map((msg, index) => {
                 if (msg.role === "user") {
-                  return <UserMessage key={msg.id} content={msg.content} />;
+                  return <UserMessage key={msg.id} content={msg.content} images={msg.images} />;
                 }
 
                 const isCurrent = isGenerating && index === messages.length - 1;

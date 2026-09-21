@@ -1,9 +1,10 @@
 import React from "react";
 import { Sparkles } from "lucide-react";
 import { Composer, type ComposerProps } from "./Composer";
+import type { ChatImageAttachment } from "../types";
 
 export interface HeroViewProps {
-  onSend: (text: string) => void;
+  onSend: (text: string, images?: ChatImageAttachment[]) => void;
   onCancel?: () => void;
   isGenerating?: boolean;
   selectedModel?: string;

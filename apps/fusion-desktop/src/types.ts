@@ -1,5 +1,12 @@
 export type MessageRole = "user" | "assistant" | "system";
 
+export interface ChatImageAttachment {
+  id: string;
+  url: string; // Base64 data URL or local image path
+  name?: string;
+  size?: number;
+}
+
 export interface TurnStep {
   id: string;
   title: string;
@@ -15,6 +22,7 @@ export interface ChatMessage {
   thought?: string;
   steps?: TurnStep[];
   diffPatch?: string;
+  images?: ChatImageAttachment[];
   timestamp: number;
 }
 

@@ -3,6 +3,7 @@ import { ClineWatermark } from "./ClineWatermark";
 import { WorkspacePill } from "./WorkspacePill";
 import { ConnectModelBanner } from "./ConnectModelBanner";
 import { Composer } from "./Composer";
+import type { ChatImageAttachment } from "../types";
 
 export interface ClineHeroViewProps {
   workspaceName?: string;
@@ -11,7 +12,7 @@ export interface ClineHeroViewProps {
   onConnectModel?: () => void;
   effort?: "Low" | "Medium" | "High";
   onSelectEffort?: (effort: "Low" | "Medium" | "High") => void;
-  onSend: (text: string) => void;
+  onSend: (text: string, images?: ChatImageAttachment[]) => void;
   selectedModel?: string;
   onSelectModel?: (modelId: string) => void;
   billingProfile?: string;
@@ -48,10 +49,9 @@ export function ClineHeroView({
       {/* Main Foreground Container */}
       <div className="relative z-10 w-full max-w-[760px] flex flex-col items-center space-y-4">
         {/* Workspace Pill */}
-        <div className="flex justify-center">
+        <div className="w-full flex justify-start">
           <WorkspacePill name={workspaceName} onClick={onPickWorkspaceFolder} />
         </div>
-
         {/* Sign In / Connect Model Banner */}
         <ConnectModelBanner
           isSignedIn={isSignedIn}
