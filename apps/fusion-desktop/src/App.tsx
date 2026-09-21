@@ -10,6 +10,15 @@ import { Composer } from "./components/Composer";
 import { ClineAvatar } from "./components/ClineAvatar";
 import { MarkdownRenderer } from "./components/MarkdownRenderer";
 import { AgentBridge } from "./lib/agent-bridge";
+import {
+  loadAllSessions,
+  saveSession,
+  saveAllSessions,
+  deleteSessionFromStorage,
+  getStoredActiveSessionId,
+  setStoredActiveSessionId,
+  type ChatSessionRecord,
+} from "./state/session-storage";
 import { DEFAULT_FUSION_MODEL } from "./models";
 import type { ChatMessage, TurnStep } from "./types";
 
@@ -67,24 +76,64 @@ export function App({
   initialSessions,
 }: AppProps) {
   const [isSidebarOpen, setIsSidebarOpen] = useState(initialSidebarOpen);
-  const [selectedModel, setSelectedModel] = useState<string>(initialModel);
-  const [isGenerating, setIsGenerating] = useState(false);
-  const [messages, setMessages] = useState<ChatMessage[]>(initialMessages);
-  const [activeSessionId, setActiveSessionId] = useState<string>("session-default");
-  const [sessionTitle, setSessionTitle] = useState<string>("General chat conversation");
-  const [sessions, setSessions] = useState<SidebarSessionItem[]>(() => {
+  const [sessionsRecord, setSessionsRecord] = useState<ChatSessionRecord[]>(() => {
     if (initialSessions && initialSessions.length > 0) {
-      return initialSessions;
+      return initialSessions.map((s) => ({
+        id: s.id,
+        title: s.title,
+        createdAt: s.createdAt || Date.now(),
+        updatedAt: s.updatedAt || Date.now(),
+        model: initialModel,
+        messages: s.id === "session-default" ? initialMessages : [],
+      }));
     }
-    return [
-      {
-        id: "session-default",
-        title: "General chat conversation",
-        createdAt: Date.now() - 2 * 3600 * 1000,
-        updatedAt: Date.now() - 2 * 3600 * 1000,
-      },
-    ];
+    return loadAllSessions();
   });
+
+  const [activeSessionId, setActiveSessionId] = useState<string>(() => {
+    if (initialSessions && initialSessions.length > 0) return initialSessions[0].id;
+    const stored = getStoredActiveSessionId();
+    const found = sessionsRecord.find((s) => s.id === stored);
+    return found ? found.id : (sessionsRecord[0]?.id || "session-default");
+  });
+
+  const activeSession = sessionsRecord.find((s) => s.id === activeSessionId) || sessionsRecord[0];
+
+  const [selectedModel, setSelectedModel] = useState<string>(() => {
+    if (initialModel && initialModel !== DEFAULT_FUSION_MODEL.id) return initialModel;
+    return activeSession?.model || initialModel;
+  });
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [sessionTitle, setSessionTitle] = useState<string>(activeSession?.title || "General chat conversation");
+  const [messages, setMessages] = useState<ChatMessage[]>(() => {
+    if (initialMessages.length > 0) return initialMessages;
+    return activeSession?.messages || [];
+  });
+
+  // Keep active session in storage updated
+  useEffect(() => {
+    if (!activeSessionId) return;
+    setStoredActiveSessionId(activeSessionId);
+  }, [activeSessionId]);
+
+  // Persist messages and state to session storage
+  useEffect(() => {
+    if (!activeSessionId) return;
+    setSessionsRecord((prev) => {
+      const idx = prev.findIndex((s) => s.id === activeSessionId);
+      if (idx < 0) return prev;
+      const updated = [...prev];
+      updated[idx] = {
+        ...updated[idx],
+        title: sessionTitle,
+        model: selectedModel,
+        updatedAt: Date.now(),
+        messages,
+      };
+      saveAllSessions(updated);
+      return updated;
+    });
+  }, [messages, sessionTitle, selectedModel, activeSessionId]);
 
   // Lazily initialize AgentBridge if not provided
   const bridgeRef = useRef<AgentBridge | null>(null);
@@ -217,9 +266,6 @@ export function App({
     if (messages.length === 0) {
       const newTitle = trimmed.length > 28 ? `${trimmed.slice(0, 28)}...` : trimmed;
       setSessionTitle(newTitle);
-      setSessions((prev) =>
-        prev.map((s) => (s.id === activeSessionId ? { ...s, title: newTitle, updatedAt: Date.now() } : s))
-      );
     }
 
     try {
@@ -243,36 +289,49 @@ export function App({
 
   const handleNewChat = () => {
     const newSessionId = `session-${Date.now()}`;
-    const newSession: SidebarSessionItem = {
+    const newSession: ChatSessionRecord = {
       id: newSessionId,
       title: "General chat conversation",
       createdAt: Date.now(),
       updatedAt: Date.now(),
+      model: selectedModel,
+      messages: [],
     };
-    setSessions((prev) => [newSession, ...prev]);
+    saveSession(newSession);
+    setSessionsRecord((prev) => [newSession, ...prev]);
     setActiveSessionId(newSessionId);
+    setStoredActiveSessionId(newSessionId);
     setSessionTitle("General chat conversation");
     setMessages([]);
     setIsGenerating(false);
   };
 
   const handleSelectSession = (id: string) => {
-    setActiveSessionId(id);
-    const found = sessions.find((s) => s.id === id);
-    if (found) {
-      setSessionTitle(found.title);
+    if (id === activeSessionId) return;
+    const target = sessionsRecord.find((s) => s.id === id) || loadAllSessions().find((s) => s.id === id);
+    if (target) {
+      setActiveSessionId(target.id);
+      setStoredActiveSessionId(target.id);
+      setSessionTitle(target.title);
+      setSelectedModel(target.model || DEFAULT_FUSION_MODEL.id);
+      setMessages(target.messages || []);
+      setIsGenerating(false);
     }
   };
 
   const handleDeleteSession = (id: string) => {
-    setSessions((prev) => {
-      const updated = prev.filter((s) => s.id !== id);
-      if (activeSessionId === id && updated.length > 0) {
-        setActiveSessionId(updated[0].id);
-        setSessionTitle(updated[0].title);
+    const updated = deleteSessionFromStorage(id);
+    setSessionsRecord(updated);
+    if (activeSessionId === id) {
+      const nextSession = updated[0];
+      if (nextSession) {
+        setActiveSessionId(nextSession.id);
+        setStoredActiveSessionId(nextSession.id);
+        setSessionTitle(nextSession.title);
+        setSelectedModel(nextSession.model || DEFAULT_FUSION_MODEL.id);
+        setMessages(nextSession.messages || []);
       }
-      return updated;
-    });
+    }
   };
 
   const handleModelChange = (modelId: string) => {
@@ -284,11 +343,10 @@ export function App({
       data-testid="app-shell"
       className="h-screen w-screen flex flex-row overflow-hidden bg-white"
     >
-      {/* Sidebar: 220px, collapsed when isSidebarOpen is false */}
+      {/* Sidebar: collapsed when isSidebarOpen is false */}
       {isSidebarOpen && (
         <Sidebar
-          sessions={sessions}
-          activeSessionId={activeSessionId}
+          sessions={sessionsRecord}
           onNewChat={handleNewChat}
           onSelectSession={handleSelectSession}
           onDeleteSession={handleDeleteSession}
