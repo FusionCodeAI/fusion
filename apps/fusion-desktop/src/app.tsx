@@ -51,7 +51,7 @@ export function App() {
       console.warn("ACP client spawn notice:", err.message);
     });
 
-    // Pure thought stream handler (no duplicate "Thinking" prefixes!)
+    // Pure thought stream handler (no duplicate prefixes)
     const unsubThought = client.onThought((delta) => {
       store.appendThoughtChunk(delta);
     });
@@ -97,7 +97,9 @@ export function App() {
       session = store.createSession(promptText.slice(0, 24));
     }
 
+    // Append user prompt AND immediately create assistant placeholder for instant thinking feedback!
     store.appendUserMessage(promptText, session.id);
+    store.appendAssistantChunk("", session.id);
     store.setGenerating(true);
 
     try {
@@ -124,7 +126,7 @@ export function App() {
         overflow: "hidden",
       }}
     >
-      {/* Left Sidebar (toggled via Cmd+B or toggle button) */}
+      {/* Left Sidebar */}
       {isSidebarVisible && (
         <Sidebar
           sessions={snapshot.sessions}
@@ -144,7 +146,7 @@ export function App() {
         />
       )}
 
-      {/* Main Agent Stage (Automatically fills and centers when sidebar is hidden) */}
+      {/* Main Agent Stage */}
       <div
         style={{
           flexGrow: 1,
@@ -171,7 +173,7 @@ export function App() {
             {!isSidebarVisible && (
               <div
                 style={{
-                  height: 44,
+                  height: 40,
                   paddingLeft: 18,
                   paddingRight: 18,
                   display: "flex",
@@ -233,14 +235,14 @@ export function App() {
   );
 }
 
-// Start native GPUI window with transparent titlebar, custom traffic lights, and Cmd+B key handler
+// Start native GPUI window matching Image #1
 render(<App />, {
   title: "Fusion Agent",
   titlebarTransparent: true,
   trafficLightX: 18,
-  trafficLightY: 18,
-  width: 1200,
-  height: 800,
+  trafficLightY: 14,
+  width: 1240,
+  height: 820,
   onKeyDown(event) {
     if (
       (event.key === "b" || event.key === "B") &&

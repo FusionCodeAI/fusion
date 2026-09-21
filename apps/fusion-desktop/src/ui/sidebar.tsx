@@ -60,6 +60,7 @@ export function Sidebar({
   onOpenSettings,
 }: SidebarProps) {
   const [searchQuery, setSearchQuery] = useState("");
+  const [isSearching, setIsSearching] = useState(false);
 
   const filteredSessions = useMemo(() => {
     const trimmed = searchQuery.trim().toLowerCase();
@@ -93,11 +94,11 @@ export function Sidebar({
           overflow: "hidden",
         }}
       >
-        {/* Top Header Row (Height 40px, perfectly aligned with Main Stage Header) */}
+        {/* Top Header Row: macOS traffic lights clearance (paddingLeft: 78), sidebar toggle and arrows */}
         <div
           style={{
             height: 40,
-            paddingLeft: 12,
+            paddingLeft: 78, // Comfortable clearance for macOS traffic lights at x: 18, y: 14
             paddingRight: 12,
             display: "flex",
             flexDirection: "row",
@@ -133,7 +134,7 @@ export function Sidebar({
           </div>
         </div>
 
-        {/* Primary Action Items */}
+        {/* Primary Navigation Actions */}
         <div
           testId="sidebar-header"
           style={{
@@ -142,8 +143,8 @@ export function Sidebar({
             paddingLeft: 8,
             paddingRight: 8,
             paddingTop: 8,
-            paddingBottom: 8,
-            gap: 4,
+            paddingBottom: 6,
+            gap: 2,
           }}
         >
           {/* New Chat */}
@@ -169,7 +170,7 @@ export function Sidebar({
             <text style={{ fontSize: 13, color: "#27272a", fontWeight: "400" }}>New Chat</text>
           </div>
 
-          {/* Search Box */}
+          {/* Search Input Box */}
           <div
             style={{
               display: "flex",
@@ -212,9 +213,47 @@ export function Sidebar({
               </div>
             ) : null}
           </div>
+
+          {/* Automations */}
+          <div
+            style={{
+              display: "flex",
+              flexDirection: "row",
+              alignItems: "center",
+              gap: 8,
+              height: 30,
+              borderRadius: 6,
+              paddingLeft: 8,
+              paddingRight: 8,
+              cursor: "pointer",
+              hover: { backgroundColor: "#ececee" },
+            }}
+          >
+            <svg source={icons.automations} style={{ width: 13, height: 13, color: "#52525b" }} />
+            <text style={{ fontSize: 13, color: "#27272a" }}>Automations</text>
+          </div>
+
+          {/* Customize */}
+          <div
+            style={{
+              display: "flex",
+              flexDirection: "row",
+              alignItems: "center",
+              gap: 8,
+              height: 30,
+              borderRadius: 6,
+              paddingLeft: 8,
+              paddingRight: 8,
+              cursor: "pointer",
+              hover: { backgroundColor: "#ececee" },
+            }}
+          >
+            <svg source={icons.customize} style={{ width: 13, height: 13, color: "#52525b" }} />
+            <text style={{ fontSize: 13, color: "#27272a" }}>Customize</text>
+          </div>
         </div>
 
-        {/* Section: Projects (ONLY Projects - clean, no repositories) */}
+        {/* Section: Projects */}
         <div
           style={{
             display: "flex",
@@ -233,7 +272,46 @@ export function Sidebar({
           </div>
         </div>
 
-        {/* Project Items List */}
+        <div style={{ paddingLeft: 8, paddingRight: 8, paddingBottom: 6 }}>
+          <div
+            style={{
+              display: "flex",
+              flexDirection: "row",
+              alignItems: "center",
+              gap: 8,
+              height: 28,
+              paddingLeft: 8,
+              borderRadius: 6,
+              cursor: "pointer",
+              hover: { backgroundColor: "#ececee" },
+            }}
+          >
+            <svg source={icons.circleDashed} style={{ width: 12, height: 12, color: "#8e8e93" }} />
+            <text style={{ fontSize: 12, color: "#71717a" }}>New Project</text>
+          </div>
+        </div>
+
+        {/* Section: Repositories */}
+        <div
+          style={{
+            display: "flex",
+            flexDirection: "row",
+            alignItems: "center",
+            justifyContent: "space-between",
+            paddingLeft: 14,
+            paddingRight: 14,
+            paddingTop: 6,
+            paddingBottom: 4,
+          }}
+        >
+          <text style={{ fontSize: 11, fontWeight: "500", color: "#8e8e93" }}>Repositories</text>
+          <div style={{ display: "flex", flexDirection: "row", alignItems: "center", gap: 8 }}>
+            <svg source={icons.filter} style={{ width: 11, height: 11, color: "#8e8e93" }} />
+            <svg source={icons.folder} style={{ width: 11, height: 11, color: "#8e8e93" }} />
+          </div>
+        </div>
+
+        {/* Repositories & Active Conversations */}
         <div
           testId="sidebar-session-list"
           style={{
@@ -246,39 +324,10 @@ export function Sidebar({
             gap: 1,
           }}
         >
-          {/* Active Workspace / Project item (Clean single row, NO emoji, NO path overflow) */}
+          {/* No Repo / Active Project */}
           <div
             testId="sidebar-workspace-chip"
             onClick={onSelectWorkspace}
-            style={{
-              display: "flex",
-              flexDirection: "row",
-              alignItems: "center",
-              gap: 8,
-              height: 30,
-              paddingLeft: 8,
-              paddingRight: 8,
-              borderRadius: 6,
-              cursor: "pointer",
-              overflow: "hidden",
-              hover: { backgroundColor: "#ececee" },
-            }}
-          >
-            <svg source={icons.folder} style={{ width: 13, height: 13, color: "#52525b", flexShrink: 0 }} />
-            <text
-              testId="sidebar-workspace-folder"
-              style={{
-                fontSize: 13,
-                color: "#27272a",
-                fontWeight: "500",
-              }}
-            >
-              {folderName}
-            </text>
-          </div>
-
-          {/* New Project Action */}
-          <div
             style={{
               display: "flex",
               flexDirection: "row",
@@ -289,17 +338,20 @@ export function Sidebar({
               paddingRight: 8,
               borderRadius: 6,
               cursor: "pointer",
+              overflow: "hidden",
               hover: { backgroundColor: "#ececee" },
             }}
           >
-            <svg source={icons.circleDashed} style={{ width: 12, height: 12, color: "#8e8e93" }} />
-            <text style={{ fontSize: 12, color: "#71717a" }}>New Project</text>
+            <svg source={icons.home} style={{ width: 13, height: 13, color: "#71717a" }} />
+            <text
+              testId="sidebar-workspace-folder"
+              style={{ fontSize: 12, color: "#3f3f46" }}
+            >
+              {folderName || "No Repo"}
+            </text>
           </div>
 
-          {/* Divider */}
-          <div style={{ height: 1, backgroundColor: "#e5e5e8", marginTop: 6, marginBottom: 6 }} />
-
-          {/* Conversations inside project */}
+          {/* Conversations */}
           {filteredSessions.length === 0 ? (
             <div
               testId="sidebar-empty-state"
@@ -370,8 +422,8 @@ export function Sidebar({
                         color: isActive ? "#18181b" : "#3f3f46",
                       }}
                     >
-                      {session.title.length > 20
-                        ? session.title.slice(0, 20) + "..."
+                      {session.title.length > 28
+                        ? session.title.slice(0, 28) + "..."
                         : session.title}
                     </text>
                   </div>
