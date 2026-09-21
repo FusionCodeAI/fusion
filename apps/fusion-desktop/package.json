@@ -1,5 +1,5 @@
 {
-  "name": "fusion-desktop",
+  "name": "@fusioncode/fusion-desktop",
   "version": "2.0.0",
   "private": true,
   "type": "module",

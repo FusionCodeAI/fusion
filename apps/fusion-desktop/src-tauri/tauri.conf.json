@@ -1,8 +1,8 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "fusion-desktop",
+  "productName": "Fusion",
   "version": "2.0.0",
-  "identifier": "ai.fusion.desktop",
+  "identifier": "fusioncode.app.fusion",
   "build": {
     "beforeDevCommand": "bun run dev",
     "devUrl": "http://localhost:5173",

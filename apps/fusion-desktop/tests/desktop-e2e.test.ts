@@ -492,11 +492,11 @@ describe("Desktop E2E: AgentBridge", () => {
           name: "read_file",
           args: { path: "package.json" },
           success: true,
-          output: '{"name": "fusion-desktop"}',
+          output: '{"name": "@fusioncode/fusion-desktop"}',
         } as unknown as AgentEvent,
         {
           type: "text_delta",
-          delta: "I found package.json for fusion-desktop.",
+          delta: "I found package.json for @fusioncode/fusion-desktop.",
         } as unknown as AgentEvent,
         {
           type: "finished",
@@ -526,7 +526,7 @@ describe("Desktop E2E: AgentBridge", () => {
       expect(steps[0].title).toBe("Read package.json");
       expect(steps[0].status).toBe("running");
       expect(steps[1].status).toBe("completed");
-      expect(chunks).toContain("I found package.json for fusion-desktop.");
+      expect(chunks).toContain("I found package.json for @fusioncode/fusion-desktop.");
       expect(doneFired).toBe(true);
     });
   });
@@ -714,7 +714,7 @@ describe("Desktop E2E: Component Sanity (Render & Instantiation)", () => {
         id: "step-c1",
         title: "Read apps/fusion-desktop/package.json",
         status: "completed",
-        details: '{\n  "name": "fusion-desktop"\n}',
+        details: '{\n  "name": "@fusioncode/fusion-desktop"\n}',
       };
 
       const html = renderToStaticMarkup(
