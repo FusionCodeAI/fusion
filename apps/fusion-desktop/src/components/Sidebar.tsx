@@ -31,6 +31,7 @@ export interface SidebarProps {
   onHistoryBack?: () => void;
   onHistoryForward?: () => void;
   onSchedule?: () => void;
+  onCustomize?: () => void;
   onOpenSettings?: () => void;
   width?: number;
   onResize?: (width: number) => void;

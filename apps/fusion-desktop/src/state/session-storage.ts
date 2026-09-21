@@ -266,7 +266,7 @@ export function deleteSessionFromStorage(sessionId: string): ChatSessionRecord[]
   saveAllSessions(finalSessions);
 
   if (isTauriEnvironment()) {
-    deleteFusionSession(sessionId).catch((err) => {
+    deleteFusionSession(sessionId).catch((err: unknown) => {
       console.warn("[session-storage] deleteFusionSession failed:", err);
     });
   }

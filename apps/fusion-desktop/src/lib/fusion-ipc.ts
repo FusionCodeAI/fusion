@@ -80,3 +80,28 @@ export async function deleteFusionSession(id: string): Promise<boolean> {
     return false;
   }
 }
+
+/**
+ * Invokes the real Fusion native CLI / agent backend to execute a prompt turn.
+ */
+export async function executeFusionTurn(
+  prompt: string,
+  model?: string,
+  sessionId?: string,
+  cwd?: string
+): Promise<string | null> {
+  if (!isTauriEnvironment()) {
+    return null;
+  }
+  try {
+    return await invoke<string>("execute_fusion_turn", {
+      prompt,
+      model: model || undefined,
+      sessionId: sessionId || undefined,
+      cwd: cwd || undefined,
+    });
+  } catch (err) {
+    console.warn("[fusion-ipc] execute_fusion_turn error:", err);
+    throw err;
+  }
+}

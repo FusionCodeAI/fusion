@@ -2,6 +2,7 @@ import * as fs from "node:fs";
 import * as path from "node:path";
 import { FusionAgent } from "@fusioncode/sdk";
 import { DEFAULT_FUSION_MODEL, FUSION_MODELS } from "./models";
+import { isTauriEnvironment, executeFusionTurn } from "./fusion-ipc";
 import type { TurnStep } from "../types";
 
 export type BridgeEvent = "thought" | "chunk" | "step" | "diff" | "done" | "error";
@@ -25,6 +26,7 @@ export interface AgentBridgeOptions {
   defaultModel?: string;
   agent?: FusionAgent;
   forceLocalEngine?: boolean;
+  sessionId?: string;
 }
 
 const fsRecord = fs as unknown as Record<string, unknown>;
@@ -277,11 +279,14 @@ export class AgentBridge {
   private listeners = new Map<BridgeEvent, Set<Function>>();
   private activeModel: string;
   private forceLocalEngine: boolean = false;
+  private sessionId?: string;
+  private cwd?: string;
 
   constructor(options?: AgentBridgeOptions) {
     this.activeModel = options?.defaultModel ?? DEFAULT_FUSION_MODEL.id;
     this.forceLocalEngine = Boolean(options?.forceLocalEngine);
-
+    this.sessionId = options?.sessionId;
+    this.cwd = options?.cwd;
     if (options?.agent) {
       this.agent = options.agent;
     } else {
@@ -309,9 +314,10 @@ export class AgentBridge {
     }
   }
 
-  /**
-   * Sends a prompt turn to the agent, optionally specifying a model.
-   */
+  setSessionId(id: string): void {
+    this.sessionId = id;
+  }
+
   async prompt(text: string, model?: string): Promise<void> {
     const targetModel = model ?? this.activeModel;
     if (model && model !== this.activeModel) {
@@ -322,6 +328,40 @@ export class AgentBridge {
         // best-effort model switch
       }
     }
+
+    // When running inside Tauri, execute the real Fusion native CLI / agent turn!
+    if (!this.forceLocalEngine && isTauriEnvironment()) {
+      const modelObj = FUSION_MODELS.find((m) => m.id === targetModel);
+      const modelName = modelObj ? (modelObj.shortName || modelObj.name) : "DeepSeek 4 Flash";
+      this.emit("thought", `Connecting to Fusion native engine...\nProcessing turn with ${modelName}.\n`);
+
+      try {
+        const realResponse = await executeFusionTurn(text, targetModel, this.sessionId, this.cwd);
+        if (realResponse && realResponse.trim().length > 0) {
+          const { cleanText, steps } = parseAndStripDsml(realResponse);
+
+          for (const step of steps) {
+            this.emit("step", step);
+          }
+
+          const words = cleanText.split(" ");
+          for (let i = 0; i < words.length; i += 4) {
+            const piece = words.slice(i, i + 4).join(" ") + " ";
+            this.emit("chunk", piece);
+            await sleep(15);
+          }
+
+          this.emit("done", {
+            tokens: words.length * 2,
+            durationMs: 450,
+          });
+          return;
+        }
+      } catch (err) {
+        console.warn("[AgentBridge] Native executeFusionTurn error, falling back to local engine:", err);
+      }
+    }
+
     const isBrowserWithoutTauri =
       typeof window !== "undefined" &&
       !Boolean((window as unknown as Record<string, unknown>).__TAURI_INTERNALS__);
@@ -330,7 +370,6 @@ export class AgentBridge {
       await this.streamLocalTurn(text, targetModel);
       return;
     }
-
     let sdkSuccess = false;
     try {
       if (!this.isStarted) {

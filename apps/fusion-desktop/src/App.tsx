@@ -136,11 +136,6 @@ export function App({
     return activeSession?.messages || [];
   });
 
-  // Keep active session in storage updated
-  useEffect(() => {
-    if (!activeSessionId) return;
-    setStoredActiveSessionId(activeSessionId);
-  }, [activeSessionId]);
 
   // Persist messages and state to session storage
   useEffect(() => {
@@ -177,6 +172,12 @@ export function App({
   }
   const bridge = bridgeRef.current;
   const streamRef = useRef<HTMLDivElement>(null);
+  // Keep active session in storage updated and notify bridge
+  useEffect(() => {
+    if (!activeSessionId) return;
+    bridge.setSessionId?.(activeSessionId);
+    setStoredActiveSessionId(activeSessionId);
+  }, [activeSessionId, bridge]);
   // Keyboard shortcut: Cmd+B (Mac) or Ctrl+B (Windows/Linux) toggles sidebar
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {

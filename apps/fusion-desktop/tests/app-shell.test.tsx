@@ -167,7 +167,7 @@ describe("App Shell Component", () => {
     const html = renderToString(<App initialSidebarOpen={true} />);
 
     expect(html).toContain("data-testid=\"sidebar\"");
-    expect(html).toContain("w-64");
+    expect(html).toContain('style="width:260px"');
     expect(html).toContain("Session");
   });
   it("collapses Sidebar and expands conversation area when initialSidebarOpen is false", () => {
