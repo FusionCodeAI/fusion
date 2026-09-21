@@ -122,6 +122,17 @@ function fusionLocalSessionsPlugin() {
             return;
           }
         }
+        if (req.url && req.url.startsWith("/api/sound")) {
+          const soundPath = "/System/Library/Sounds/Ping.aiff";
+          if (fs.existsSync(soundPath)) {
+            import("node:child_process").then(({ spawn }) => {
+              spawn("afplay", [soundPath]);
+            });
+          }
+          res.setHeader("Content-Type", "application/json");
+          res.end(JSON.stringify({ ok: true }));
+          return;
+        }
 
         next();
       });

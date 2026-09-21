@@ -298,9 +298,8 @@ fn show_desktop_notification(
         let mut tried_rust = false;
         if macos_notification::configure(&app).is_ok() {
             let mut notification = notify_rust::Notification::new();
-            notification.summary(title).body(body).auto_icon();
             if should_sound {
-                notification.sound_name("Ping");
+                notification.sound_name("default");
             }
             if notification.show().is_ok() {
                 tried_rust = true;

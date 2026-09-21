@@ -230,12 +230,17 @@ export async function showDesktopNotification(
  * Plays an authentic macOS system sound (Ping, Glass, Hero, Pop, Basso).
  */
 export async function playSystemSound(sound: string = "Ping"): Promise<void> {
-  if (!isTauriEnvironment()) return;
-  try {
-    await invoke("play_system_sound", { sound });
-  } catch (err) {
-    console.warn("[fusion-ipc] play_system_sound error:", err);
+  if (isTauriEnvironment()) {
+    try {
+      await invoke("play_system_sound", { sound });
+      return;
+    } catch (err) {
+      console.warn("[fusion-ipc] play_system_sound error:", err);
+    }
   }
+  try {
+    await fetch(`/api/sound?name=${encodeURIComponent(sound)}`);
+  } catch {}
 }
 
 /**
