@@ -397,11 +397,13 @@ async fn stream_fusion_acp(
             if val.get("id") == Some(&serde_json::json!(3)) {
                 break;
             }
-
             if val.get("method") == Some(&serde_json::json!("session/update")) {
                 if let Some(params) = val.get("params") {
                     if let Some(update) = params.get("update") {
-                        let kind = update.get("sessionUpdate").and_then(|k| k.as_str()).unwrap_or("");
+                        let kind = update.get("sessionUpdate").and_then(|k| k.as_str())
+                            .or_else(|| update.get("kind").and_then(|k| k.as_str()))
+                            .unwrap_or("");
+
                         if kind == "agent_message_chunk" {
                             if let Some(text_val) = update.get("content").and_then(|c| c.get("text")).and_then(|t| t.as_str()) {
                                 full_text.push_str(text_val);
@@ -410,19 +412,37 @@ async fn stream_fusion_acp(
                                     "text": text_val
                                 }));
                             }
-                        } else if kind == "thought" {
-                            if let Some(t_val) = update.get("content").and_then(|c| c.get("text")).and_then(|t| t.as_str()) {
+                        } else if kind == "agent_thought_chunk" || kind == "thought" {
+                            let t_val = update.get("thought").and_then(|t| t.as_str())
+                                .or_else(|| update.get("content").and_then(|c| c.get("text")).and_then(|t| t.as_str()));
+                            if let Some(thought_text) = t_val {
                                 let _ = on_event.send(serde_json::json!({
                                     "type": "thought",
-                                    "text": t_val
+                                    "text": thought_text
+                                }));
+                            }
+                        } else if kind == "status" {
+                            if let Some(msg) = update.get("message").and_then(|m| m.as_str()) {
+                                let _ = on_event.send(serde_json::json!({
+                                    "type": "thought",
+                                    "text": format!("{}\n", msg)
                                 }));
                             }
                         } else if kind == "tool_call" {
-                            let title = update.get("title").and_then(|t| t.as_str()).unwrap_or("Tool execution");
+                            let name = update.get("name").and_then(|t| t.as_str()).unwrap_or("tool");
+                            let title = format!("Ran {}", name);
                             let _ = on_event.send(serde_json::json!({
                                 "type": "step",
                                 "title": title,
                                 "status": "running"
+                            }));
+                        } else if kind == "tool_call_result" {
+                            let name = update.get("name").and_then(|t| t.as_str()).unwrap_or("tool");
+                            let title = format!("Completed {}", name);
+                            let _ = on_event.send(serde_json::json!({
+                                "type": "step",
+                                "title": title,
+                                "status": "completed"
                             }));
                         }
                     }
