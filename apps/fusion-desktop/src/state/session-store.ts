@@ -109,7 +109,8 @@ export class SessionStore {
   }> = [];
   private lastSaveError: unknown = null;
   private needsSave = false;
-
+  private autoSaveTimer: NodeJS.Timeout | null = null;
+  private streamNotifyTimer: NodeJS.Timeout | null = null;
   constructor(options: SessionStoreOptions = {}) {
     this.storagePath = options.storagePath ?? join(homedir(), ".fusion", "desktop-sessions.json");
     this.autoSave = options.autoSave ?? false;
@@ -287,9 +288,8 @@ export class SessionStore {
     }
 
     session.updatedAt = Date.now();
-    this.updateSnapshot();
-    this.notify();
-    this.triggerAutoSave();
+    this.scheduleStreamNotify();
+    this.triggerAutoSave(false);
     return targetMessage;
   }
 
@@ -315,9 +315,8 @@ export class SessionStore {
     }
 
     session.updatedAt = now;
-    this.updateSnapshot();
-    this.notify();
-    this.triggerAutoSave();
+    this.scheduleStreamNotify();
+    this.triggerAutoSave(false);
   }
 
   appendThoughtStep(step: TurnStep | string, sessionId?: string): void {
@@ -337,12 +336,13 @@ export class SessionStore {
     let assistantMessage: ChatMessage;
     const stepSummary = turnStep.title + (turnStep.details ? `\n${turnStep.details}` : "");
 
+    const isStringStep = typeof step === "string";
     if (lastMessage && lastMessage.role === "assistant") {
       const existingSteps = lastMessage.steps ? [...lastMessage.steps] : [];
       existingSteps.push(turnStep);
-      const thought = lastMessage.thought
-        ? `${lastMessage.thought}\n${stepSummary}`
-        : stepSummary;
+      const thought = isStringStep
+        ? (lastMessage.thought ? `${lastMessage.thought}\n${stepSummary}` : stepSummary)
+        : lastMessage.thought;
 
       assistantMessage = {
         ...lastMessage,
@@ -356,7 +356,7 @@ export class SessionStore {
         id: randomUUID(),
         role: "assistant",
         content: "",
-        thought: stepSummary,
+        thought: isStringStep ? stepSummary : undefined,
         steps: [turnStep],
         timestamp: now,
       };
@@ -476,12 +476,44 @@ export class SessionStore {
 
   // --- Disk Persistence ---
 
-  private triggerAutoSave(): void {
-    if (this.autoSave) {
+  private triggerAutoSave(immediate = false): void {
+    if (!this.autoSave) return;
+    if (immediate) {
+      if (this.autoSaveTimer) {
+        clearTimeout(this.autoSaveTimer);
+        this.autoSaveTimer = null;
+      }
       void this.save().catch((err: unknown) => {
         console.error("[SessionStore] Auto-save error:", err);
       });
+      return;
     }
+    if (this.autoSaveTimer) return;
+    this.autoSaveTimer = setTimeout(() => {
+      this.autoSaveTimer = null;
+      void this.save().catch((err: unknown) => {
+        console.error("[SessionStore] Auto-save error:", err);
+      });
+    }, 1000);
+  }
+
+  private scheduleStreamNotify(): void {
+    if (this.streamNotifyTimer) return;
+    this.streamNotifyTimer = setTimeout(() => {
+      this.streamNotifyTimer = null;
+      this.updateSnapshot();
+      this.notify();
+    }, 25);
+  }
+
+  public flushStream(): void {
+    if (this.streamNotifyTimer) {
+      clearTimeout(this.streamNotifyTimer);
+      this.streamNotifyTimer = null;
+    }
+    this.updateSnapshot();
+    this.notify();
+    this.triggerAutoSave(true);
   }
 
   async save(): Promise<void> {
@@ -536,6 +568,11 @@ export class SessionStore {
   }
 
   async waitForPendingSave(): Promise<void> {
+    if (this.autoSaveTimer) {
+      clearTimeout(this.autoSaveTimer);
+      this.autoSaveTimer = null;
+      await this.save().catch(() => {});
+    }
     try {
       while (this.savePromise) {
         await this.savePromise;

@@ -176,7 +176,7 @@ export function ChatView({
                       gap: 8,
                     }}
                   >
-                    {/* Thought briefly (matching Image #1 exactly: no boxes, clean typography) */}
+                    {/* Thought header: Thinking while generating, Thought when complete */}
                     {msg.thought && msg.thought.trim().length > 0 ? (
                       <div style={{ display: "flex", flexDirection: "column", alignSelf: "flex-start", gap: 6 }}>
                         <div
@@ -191,15 +191,16 @@ export function ChatView({
                             paddingBottom: 2,
                           }}
                         >
-                          <text style={{ fontSize: 13, color: "#71717a" }}>Thought </text>
-                          <text style={{ fontSize: 13, color: "#8e8e93" }}>briefly</text>
+                          <text style={{ fontSize: 13, color: "#71717a" }}>
+                            {isGenerating && (!msg.content || msg.id === messages[messages.length - 1]?.id)
+                              ? "Thinking"
+                              : "Thought"}
+                          </text>
                           <svg
                             source={isCollapsed ? icons.chevronRight : icons.chevronDown}
                             style={{ width: 10, height: 10, color: "#8e8e93", marginLeft: 2 }}
                           />
                         </div>
-
-                        {/* Expanded thought text (clean unboxed muted gray markdown) */}
                         {!isCollapsed && (
                           <div
                             style={{
@@ -278,7 +279,7 @@ export function ChatView({
                           style={{ color: "#18181b", fontSize: 14, lineHeight: 24 }}
                         />
                       </div>
-                    ) : isGenerating ? (
+                    ) : isGenerating && !msg.thought ? (
                       <div style={{ paddingTop: 4, paddingBottom: 4 }}>
                         <text style={{ fontSize: 13, color: "#8e8e93" }}>Thinking...</text>
                       </div>
@@ -301,7 +302,7 @@ export function ChatView({
                       </div>
                     )}
 
-                    {/* Action Icons: Thumbs up, Thumbs down, Copy, Branch, Timestamp */}
+                    {/* Action: Only copy feature */}
                     <div
                       style={{
                         display: "flex",
@@ -311,64 +312,39 @@ export function ChatView({
                         paddingTop: 4,
                       }}
                     >
-                      <div style={{ cursor: "pointer", display: "flex", alignItems: "center" }}>
-                        <svg source={icons.thumbsUp} style={{ width: 13, height: 13, color: "#a1a1aa" }} />
-                      </div>
-                      <div style={{ cursor: "pointer", display: "flex", alignItems: "center" }}>
-                        <svg source={icons.thumbsDown} style={{ width: 13, height: 13, color: "#a1a1aa" }} />
-                      </div>
-                      <div style={{ cursor: "pointer", display: "flex", alignItems: "center" }}>
+                      <div
+                        role="button"
+                        onClick={() => {
+                          if (typeof navigator !== "undefined" && navigator.clipboard) {
+                            navigator.clipboard.writeText(msg.content).catch(() => {});
+                          }
+                        }}
+                        style={{ cursor: "pointer", display: "flex", alignItems: "center" }}
+                      >
                         <svg source={icons.copy} style={{ width: 13, height: 13, color: "#a1a1aa" }} />
                       </div>
-                      <text style={{ fontSize: 11, color: "#a1a1aa", marginLeft: 4 }}>Just now</text>
                     </div>
                   </div>
                 );
               })}
+
+              {/* If generating and waiting for assistant to start responding */}
+              {isGenerating && messages[messages.length - 1]?.role === "user" && (
+                <div
+                  style={{
+                    width: "100%",
+                    paddingBottom: 20,
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: 8,
+                  }}
+                >
+                  <div style={{ paddingTop: 4, paddingBottom: 4 }}>
+                    <text style={{ fontSize: 13, color: "#8e8e93" }}>Thinking...</text>
+                  </div>
+                </div>
+              )}
             </virtual-list>
-          </div>
-        </div>
-
-        {/* Right Info Drawer (matching Image #1) */}
-        <div
-          style={{
-            width: 130,
-            flexShrink: 0,
-            paddingTop: 20,
-            paddingRight: 16,
-            display: "flex",
-            flexDirection: "column",
-            gap: 10,
-          }}
-        >
-          <text style={{ fontSize: 11, color: "#8e8e93", fontWeight: "500" }}>Open Tabs</text>
-          <div style={{ display: "flex", flexDirection: "row", alignItems: "center", gap: 6, cursor: "pointer" }}>
-            <text style={{ fontSize: 12, color: "#3f3f46" }}>&gt;_ zsh</text>
-          </div>
-
-          <div style={{ height: 1, backgroundColor: "#f0f0f2", marginTop: 4, marginBottom: 4 }} />
-
-          <text style={{ fontSize: 11, color: "#8e8e93", fontWeight: "500" }}>On kbtc-event</text>
-
-          <div style={{ display: "flex", flexDirection: "row", alignItems: "center", gap: 4 }}>
-            <text style={{ fontSize: 12, color: "#71717a" }}>± Changes</text>
-            <text style={{ fontSize: 12, color: "#16a34a", fontWeight: "500" }}>+4290</text>
-            <text style={{ fontSize: 12, color: "#ef4444", fontWeight: "500" }}>-3</text>
-          </div>
-
-          <div style={{ display: "flex", flexDirection: "row", alignItems: "center", gap: 8, cursor: "pointer", paddingTop: 2 }}>
-            <svg source={icons.browser} style={{ width: 13, height: 13, color: "#71717a" }} />
-            <text style={{ fontSize: 12, color: "#3f3f46" }}>Browser</text>
-          </div>
-
-          <div style={{ display: "flex", flexDirection: "row", alignItems: "center", gap: 8, cursor: "pointer" }}>
-            <svg source={icons.terminal} style={{ width: 13, height: 13, color: "#71717a" }} />
-            <text style={{ fontSize: 12, color: "#3f3f46" }}>1 Terminal &gt;</text>
-          </div>
-
-          <div style={{ display: "flex", flexDirection: "row", alignItems: "center", gap: 8, cursor: "pointer" }}>
-            <svg source={icons.files} style={{ width: 13, height: 13, color: "#71717a" }} />
-            <text style={{ fontSize: 12, color: "#3f3f46" }}>Files</text>
           </div>
         </div>
       </div>

@@ -72,6 +72,7 @@ export function App() {
     });
 
     const unsubDone = client.onDone(() => {
+      store.flushStream();
       store.setGenerating(false);
     });
 
@@ -97,11 +98,10 @@ export function App() {
       session = store.createSession(promptText.slice(0, 24));
     }
 
-    // Append user prompt AND immediately create assistant placeholder for instant thinking feedback!
     store.appendUserMessage(promptText, session.id);
     store.appendAssistantChunk("", session.id);
+    store.flushStream();
     store.setGenerating(true);
-
     try {
       await client.prompt(promptText, snapshot.selectedModel || DEFAULT_FUSION_MODEL.id);
     } catch (err) {
