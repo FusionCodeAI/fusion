@@ -31,6 +31,9 @@ export type { FusionLogoProps } from "./FusionLogo";
 export { FusionWatermark } from "./FusionWatermark";
 export type { FusionWatermarkProps } from "./FusionWatermark";
 
+
+export { FusionMascot } from "./FusionMascot";
+export type { FusionMascotProps } from "./FusionMascot";
 export { WorkspacePill } from "./WorkspacePill";
 export type { WorkspacePillProps } from "./WorkspacePill";
 

@@ -1,5 +1,6 @@
 import React from "react";
 import { Sparkles } from "lucide-react";
+import { FusionMascot } from "./FusionMascot";
 import { Composer, type ComposerProps } from "./Composer";
 import type { ChatImageAttachment } from "../types";
 
@@ -33,8 +34,8 @@ export function HeroView({
     >
       {/* Header section */}
       <div className="flex flex-col items-center text-center mb-8">
-        <div className="w-11 h-11 rounded-2xl bg-zinc-100 border border-zinc-200/80 flex items-center justify-center mb-4 text-zinc-700 shadow-xs">
-          <Sparkles className="w-5 h-5 text-zinc-800" />
+        <div className="w-16 h-16 rounded-2xl bg-purple-50/60 border border-purple-200/50 flex items-center justify-center mb-4 text-zinc-700 shadow-xs p-1">
+          <FusionMascot className="w-14 h-14" animated={true} />
         </div>
         <h1 className="text-3xl sm:text-4xl font-semibold tracking-tight text-zinc-900">
           What should we build today?

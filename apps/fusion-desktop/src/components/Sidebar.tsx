@@ -17,6 +17,7 @@ import {
   Pin,
 } from "lucide-react";
 import { ClineAvatar } from "./ClineAvatar";
+import { FusionMascot } from "./FusionMascot";
 
 export interface SidebarSessionItem {
   id: string;
@@ -315,7 +316,7 @@ export function Sidebar({
             className="size-8 rounded-md flex items-center justify-center hover:bg-zinc-200/60 cursor-pointer"
             title="Home"
           >
-            <ClineAvatar className="w-5 h-5 cursor-pointer" />
+            <FusionMascot className="w-5 h-5 cursor-pointer" animated={true} />
           </button>
 
           <button
@@ -436,45 +437,8 @@ export function Sidebar({
         {/* Sessions Section Header & List: ONLY shown when NOT on settings page */}
         {currentView !== "settings" && (
           <>
-            <div className="px-3 pt-3 pb-1 flex items-center justify-between text-xs text-zinc-500">
-              <button
-                type="button"
-                onClick={() => setSortMode((prev) => (prev === "time" ? "project" : "time"))}
-                className="font-medium text-zinc-600 hover:text-zinc-900 transition-colors cursor-pointer flex items-center gap-1.5"
-                title={sortMode === "time" ? "Sorted by time — click to group by project" : "Grouped by project — click to sort by time"}
-              >
-                <span>{sortMode === "time" ? "Sessions" : "Projects"}</span>
-              </button>
-              <div className="flex items-center gap-1">
-                <button
-                  type="button"
-                  data-testid="sidebar-sort-toggle"
-                  onClick={() => setSortMode((prev) => (prev === "time" ? "project" : "time"))}
-                  className="p-1 rounded hover:bg-zinc-200/50 hover:text-zinc-800 transition-colors cursor-pointer"
-                  title={sortMode === "time" ? "Group by project" : "Sort by time"}
-                  aria-label="Toggle sort mode"
-                >
-                  {sortMode === "time" ? (
-                    <FolderTree className="w-3.5 h-3.5 text-zinc-500" />
-                  ) : (
-                    <Clock className="w-3.5 h-3.5 text-zinc-500" />
-                  )}
-                </button>
-                <button
-                  type="button"
-                  data-testid="sidebar-filter-toggle"
-                  onClick={() => setIsFilterCurrentWorkspace((prev) => !prev)}
-                  className={`p-1 rounded transition-colors cursor-pointer ${
-                    isFilterCurrentWorkspace
-                      ? "bg-purple-100 text-[#5100cd]"
-                      : "hover:bg-zinc-200/50 text-zinc-500 hover:text-zinc-800"
-                  }`}
-                  title={isFilterCurrentWorkspace ? "Showing current project only — click to show all" : "Filter by current project"}
-                  aria-label="Filter by current project"
-                >
-                  <Filter className="w-3.5 h-3.5" />
-                </button>
-              </div>
+            <div className="px-3 pt-3 pb-1 text-[11px] font-semibold text-zinc-400 uppercase tracking-wider">
+              Projects
             </div>
 
             {/* Session List: grouped by Project or flat by Time */}

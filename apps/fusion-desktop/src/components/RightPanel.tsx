@@ -1,23 +1,39 @@
-import React, { useState, useMemo, useRef } from "react";
+import React, { useState, useMemo, useRef, useEffect } from "react";
 import {
   FileCode,
   Folder,
   FolderTree,
-  Terminal,
+  Terminal as TerminalIcon,
   X,
   Search,
   ChevronRight,
-  ChevronDown,
   FileText,
   Copy,
   Check,
   RotateCcw,
-  Sparkles,
+  Play,
+  CornerDownLeft,
+  Loader2,
+  GitBranch,
 } from "lucide-react";
 import { DiffView } from "./DiffView";
-import type { WorkspaceEntry } from "../lib/fusion-ipc";
+import {
+  executeTerminalCommand,
+  getWorkspaceGitDiff,
+  type WorkspaceEntry,
+  type GitFileChange,
+  type WorkspaceGitStatus,
+} from "../lib/fusion-ipc";
 
 export type RightPanelTab = "changes" | "files" | "terminal";
+
+export interface TerminalEntry {
+  command: string;
+  stdout?: string;
+  stderr?: string;
+  exit_code?: number;
+  isRunning?: boolean;
+}
 
 export interface RightPanelProps {
   open: boolean;
@@ -27,7 +43,9 @@ export interface RightPanelProps {
   activeTab?: RightPanelTab;
   onSelectTab?: (tab: RightPanelTab) => void;
   diffPatch?: string;
+  workspaceDir?: string;
   workspaceEntries?: WorkspaceEntry[];
+  externalLogs?: Array<{ command: string; output?: string; status?: "running" | "completed" | "failed" }>;
   terminalLogs?: Array<{ command: string; output?: string; status?: "running" | "completed" | "failed" }>;
   onInsertMention?: (path: string) => void;
   className?: string;
@@ -40,19 +58,99 @@ export function RightPanel({
   onResize,
   activeTab: controlledTab,
   onSelectTab,
-  diffPatch = "",
+  diffPatch: initialPatch = "",
+  workspaceDir,
   workspaceEntries = [],
-  terminalLogs = [],
+  externalLogs = [],
+  terminalLogs: propTerminalLogs,
   onInsertMention,
   className = "",
 }: RightPanelProps) {
   const [internalTab, setInternalTab] = useState<RightPanelTab>("changes");
   const [fileSearch, setFileSearch] = useState("");
   const [copied, setCopied] = useState(false);
-  const [collapsedFolders, setCollapsedFolders] = useState<Set<string>>(() => new Set());
 
+  // Live Git Status
+  const [gitStatus, setGitStatus] = useState<WorkspaceGitStatus | null>(null);
+  const [selectedFileDiff, setSelectedFileDiff] = useState<GitFileChange | null>(null);
+
+  // Live Terminal State
+  const [terminalHistory, setTerminalHistory] = useState<TerminalEntry[]>(() => {
+    const logs = propTerminalLogs || externalLogs;
+    if (logs && logs.length > 0) {
+      return logs.map((l) => ({
+        command: l.command,
+        stdout: l.output,
+        exit_code: l.status === "failed" ? 1 : 0,
+        isRunning: l.status === "running",
+      }));
+    }
+    return [
+      {
+        command: "pwd",
+        stdout: workspaceDir || ".",
+        exit_code: 0,
+      },
+    ];
+  });
   const currentTab = controlledTab ?? internalTab;
   const setTab = onSelectTab ?? setInternalTab;
+  const [terminalInput, setTerminalInput] = useState("");
+  const [isTerminalExecuting, setIsTerminalExecuting] = useState(false);
+  const terminalScrollRef = useRef<HTMLDivElement>(null);
+  const terminalInputRef = useRef<HTMLInputElement>(null);
+
+  // Poll / fetch live git status when RightPanel is open
+  useEffect(() => {
+    if (!open) return;
+
+    let isMounted = true;
+    const fetchGit = async () => {
+      try {
+        const res = await getWorkspaceGitDiff(workspaceDir);
+        if (isMounted && res) {
+          setGitStatus(res);
+        }
+      } catch (err) {
+        console.warn("[RightPanel] git diff error:", err);
+      }
+    };
+
+    fetchGit();
+    const interval = setInterval(fetchGit, 3500);
+    return () => {
+      isMounted = false;
+      clearInterval(interval);
+    };
+  }, [open, workspaceDir]);
+
+  // Sync external logs into terminal history
+  useEffect(() => {
+    const logs = propTerminalLogs || externalLogs;
+    if (logs.length === 0) return;
+    setTerminalHistory((prev) => {
+      const newItems: TerminalEntry[] = [];
+      for (const log of logs) {
+        newItems.push({
+          command: log.command,
+          stdout: log.output,
+          exit_code: log.status === "failed" ? 1 : 0,
+          isRunning: log.status === "running",
+        });
+      }
+      if (newItems.length > 0) {
+        return [...prev, ...newItems];
+      }
+      return prev;
+    });
+  }, [externalLogs, propTerminalLogs]);
+
+  // Auto-scroll terminal
+  useEffect(() => {
+    if (currentTab === "terminal" && terminalScrollRef.current) {
+      terminalScrollRef.current.scrollTop = terminalScrollRef.current.scrollHeight;
+    }
+  }, [terminalHistory, currentTab]);
 
   // Resize drag handler
   const handleMouseDown = (e: React.MouseEvent) => {
@@ -76,13 +174,71 @@ export function RightPanel({
   };
 
   const handleCopyLogs = () => {
-    const text = terminalLogs
-      .map((l) => `$ ${l.command}\n${l.output || ""}`)
+    const text = terminalHistory
+      .map((l) => `$ ${l.command}\n${l.stdout || ""}${l.stderr ? `\n${l.stderr}` : ""}`)
       .join("\n\n");
     navigator.clipboard.writeText(text);
     setCopied(true);
     setTimeout(() => setCopied(false), 1500);
   };
+
+  // Execute terminal command
+  const handleTerminalSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const cmd = terminalInput.trim();
+    if (!cmd || isTerminalExecuting) return;
+
+    setTerminalInput("");
+    setIsTerminalExecuting(true);
+
+    const pendingEntry: TerminalEntry = {
+      command: cmd,
+      isRunning: true,
+    };
+    setTerminalHistory((prev) => [...prev, pendingEntry]);
+
+    try {
+      const result = await executeTerminalCommand(cmd, workspaceDir);
+      setTerminalHistory((prev) => {
+        const next = [...prev];
+        next[next.length - 1] = {
+          command: cmd,
+          stdout: result.stdout,
+          stderr: result.stderr,
+          exit_code: result.exit_code,
+          isRunning: false,
+        };
+        return next;
+      });
+    } catch (err) {
+      setTerminalHistory((prev) => {
+        const next = [...prev];
+        next[next.length - 1] = {
+          command: cmd,
+          stderr: String(err),
+          exit_code: 1,
+          isRunning: false,
+        };
+        return next;
+      });
+    } finally {
+      setIsTerminalExecuting(false);
+      setTimeout(() => {
+        terminalInputRef.current?.focus();
+      }, 50);
+    }
+  };
+
+  // Map of changed files for badges in Files tab
+  const gitChangesMap = useMemo(() => {
+    const map = new Map<string, GitFileChange>();
+    if (gitStatus?.changes) {
+      for (const change of gitStatus.changes) {
+        map.set(change.path, change);
+      }
+    }
+    return map;
+  }, [gitStatus]);
 
   const filteredEntries = useMemo(() => {
     if (!fileSearch.trim()) return workspaceEntries;
@@ -92,14 +248,9 @@ export function RightPanel({
     );
   }, [workspaceEntries, fileSearch]);
 
-  const toggleFolder = (folderPath: string) => {
-    setCollapsedFolders((prev) => {
-      const next = new Set(prev);
-      if (next.has(folderPath)) next.delete(folderPath);
-      else next.add(folderPath);
-      return next;
-    });
-  };
+  const activePatch = selectedFileDiff
+    ? selectedFileDiff.patch
+    : gitStatus?.full_diff || initialPatch;
 
   if (!open) return null;
 
@@ -124,7 +275,10 @@ export function RightPanel({
           <button
             type="button"
             data-testid="right-panel-tab-changes"
-            onClick={() => setTab("changes")}
+            onClick={() => {
+              setTab("changes");
+              setSelectedFileDiff(null);
+            }}
             className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md transition-all cursor-pointer ${
               currentTab === "changes"
                 ? "bg-white text-zinc-900 shadow-2xs font-semibold"
@@ -133,6 +287,11 @@ export function RightPanel({
           >
             <FileCode className="w-3.5 h-3.5" />
             <span>Changes</span>
+            {gitStatus?.changes && gitStatus.changes.length > 0 && (
+              <span className="text-[10px] px-1 py-0.2 rounded-full bg-zinc-900 text-white font-mono tabular-nums">
+                {gitStatus.changes.length}
+              </span>
+            )}
           </button>
 
           <button
@@ -159,7 +318,7 @@ export function RightPanel({
                 : "text-zinc-600 hover:text-zinc-900"
             }`}
           >
-            <Terminal className="w-3.5 h-3.5" />
+            <TerminalIcon className="w-3.5 h-3.5" />
             <span>Terminal</span>
           </button>
         </div>
@@ -170,7 +329,7 @@ export function RightPanel({
           data-testid="right-panel-close"
           onClick={onClose}
           className="p-1 rounded hover:bg-zinc-200 text-zinc-500 hover:text-zinc-800 transition-colors cursor-pointer"
-          title="Close panel"
+          title="Close panel (Cmd+J)"
           aria-label="Close panel"
         >
           <X className="w-4 h-4" />
@@ -180,28 +339,86 @@ export function RightPanel({
       {/* Tab 1: Changes (Git Diffs) */}
       {currentTab === "changes" && (
         <div data-testid="right-panel-changes" className="flex-1 overflow-y-auto p-3 space-y-3">
-          {diffPatch.trim().length > 0 ? (
-            <div className="space-y-3">
-              <div className="flex items-center justify-between text-xs text-zinc-500">
-                <span className="font-semibold uppercase text-[11px] tracking-wider text-zinc-400">
-                  Active Modifications
+          {/* Changes file list header */}
+          {gitStatus?.changes && gitStatus.changes.length > 0 && (
+            <div className="space-y-1 pb-2 border-b border-zinc-100">
+              <div className="flex items-center justify-between text-xs text-zinc-500 px-1">
+                <span className="font-semibold uppercase text-[10px] tracking-wider text-zinc-400">
+                  Modified Files ({gitStatus.changes.length})
                 </span>
+                {selectedFileDiff && (
+                  <button
+                    type="button"
+                    onClick={() => setSelectedFileDiff(null)}
+                    className="text-[11px] text-zinc-500 hover:text-zinc-900 cursor-pointer font-medium"
+                  >
+                    View all changes
+                  </button>
+                )}
               </div>
-              <DiffView patch={diffPatch} />
+
+              <div className="space-y-0.5">
+                {gitStatus.changes.map((change) => {
+                  const isSelected = selectedFileDiff?.path === change.path;
+                  return (
+                    <button
+                      key={change.path}
+                      type="button"
+                      data-testid={`changed-file-${change.path}`}
+                      onClick={() => setSelectedFileDiff(change)}
+                      className={`w-full text-left px-2 py-1.5 rounded-lg flex items-center justify-between gap-2 text-xs transition-colors cursor-pointer ${
+                        isSelected
+                          ? "bg-zinc-100 text-zinc-900 font-medium"
+                          : "hover:bg-zinc-50 text-zinc-700"
+                      }`}
+                    >
+                      <div className="flex items-center gap-2 truncate min-w-0">
+                        <span
+                          className={`text-[10px] font-mono px-1 rounded font-bold ${
+                            change.status.includes("D")
+                              ? "bg-red-100 text-red-700"
+                              : change.status.includes("A") || change.status.includes("?")
+                              ? "bg-emerald-100 text-emerald-700"
+                              : "bg-amber-100 text-amber-800"
+                          }`}
+                        >
+                          {change.status}
+                        </span>
+                        <span className="truncate font-mono text-[11px]">{change.path}</span>
+                      </div>
+
+                      <div className="flex items-center gap-1.5 shrink-0 text-[10px] font-mono tabular-nums">
+                        {change.additions > 0 && (
+                          <span className="text-emerald-600 font-semibold">+{change.additions}</span>
+                        )}
+                        {change.deletions > 0 && (
+                          <span className="text-rose-600 font-semibold">-{change.deletions}</span>
+                        )}
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {activePatch.trim().length > 0 ? (
+            <div className="space-y-2">
+              <DiffView patch={activePatch} />
             </div>
           ) : (
             <div className="flex flex-col items-center justify-center py-20 text-center text-zinc-400 space-y-2">
               <FileCode className="w-8 h-8 stroke-1 text-zinc-300" />
-              <p className="text-xs font-medium text-zinc-600">No active file changes</p>
+              <p className="text-xs font-medium text-zinc-600">No uncommitted changes</p>
               <p className="text-[11px] text-zinc-400 max-w-[220px]">
-                When the agent edits files, unified git diffs will appear here in real time.
+                Working tree is clean. When files are modified, live git diffs will stream here.
               </p>
             </div>
           )}
         </div>
       )}
 
-      {/* Tab 2: Files (Workspace Explorer) */}
+      {/* Tab 2: Files (Workspace Explorer with Git Status Badges) */}
       {currentTab === "files" && (
         <div data-testid="right-panel-files" className="flex-1 flex flex-col min-h-0">
           {/* File Search */}
@@ -228,12 +445,21 @@ export function RightPanel({
             ) : (
               filteredEntries.map((entry) => {
                 const isDir = entry.is_dir;
+                const change = gitChangesMap.get(entry.path);
+
                 return (
                   <div
                     key={entry.path}
                     data-testid={`workspace-file-${entry.path}`}
-                    onClick={() => onInsertMention?.(entry.path)}
-                    className="flex items-center justify-between px-2 py-1 rounded-md hover:bg-zinc-100 cursor-pointer transition-colors text-zinc-700 hover:text-zinc-900 group"
+                    onClick={() => {
+                      if (change) {
+                        setSelectedFileDiff(change);
+                        setTab("changes");
+                      } else {
+                        onInsertMention?.(entry.path);
+                      }
+                    }}
+                    className="flex items-center justify-between px-2 py-1.5 rounded-md hover:bg-zinc-100 cursor-pointer transition-colors text-zinc-700 hover:text-zinc-900 group"
                     title={entry.path}
                   >
                     <div className="flex items-center gap-2 truncate min-w-0">
@@ -245,9 +471,24 @@ export function RightPanel({
                       <span className="truncate font-mono text-[12px]">{entry.path}</span>
                     </div>
 
-                    <span className="opacity-0 group-hover:opacity-100 text-[10px] text-zinc-400 font-mono transition-opacity">
-                      @insert
-                    </span>
+                    <div className="flex items-center gap-1.5 shrink-0 font-mono text-[10px]">
+                      {change && (
+                        <span
+                          className={`px-1 py-0.2 rounded font-bold ${
+                            change.status.includes("D")
+                              ? "bg-red-100 text-red-700"
+                              : change.status.includes("A") || change.status.includes("?")
+                              ? "bg-emerald-100 text-emerald-700"
+                              : "bg-amber-100 text-amber-800"
+                          }`}
+                        >
+                          {change.status}
+                        </span>
+                      )}
+                      <span className="opacity-0 group-hover:opacity-100 text-zinc-400 transition-opacity">
+                        @insert
+                      </span>
+                    </div>
                   </div>
                 );
               })
@@ -256,7 +497,7 @@ export function RightPanel({
         </div>
       )}
 
-      {/* Tab 3: Terminal (Live Console Output) */}
+      {/* Tab 3: Terminal (REAL LIVE INTERACTIVE SHELL) */}
       {currentTab === "terminal" && (
         <div data-testid="right-panel-terminal" className="flex-1 flex flex-col min-h-0 bg-zinc-950 text-zinc-200 font-mono text-[12px]">
           {/* Terminal Toolbar */}
@@ -266,42 +507,81 @@ export function RightPanel({
               <span>Embedded Shell Output</span>
             </span>
 
-            <button
-              type="button"
-              onClick={handleCopyLogs}
-              className="flex items-center gap-1 hover:text-zinc-200 transition-colors cursor-pointer"
-              title="Copy terminal logs"
-            >
-              {copied ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
-              <span>{copied ? "Copied" : "Copy"}</span>
-            </button>
+            <div className="flex items-center gap-3">
+              <button
+                type="button"
+                onClick={() => setTerminalHistory([])}
+                className="hover:text-zinc-200 transition-colors cursor-pointer"
+                title="Clear terminal history"
+              >
+                Clear
+              </button>
+              <button
+                type="button"
+                onClick={handleCopyLogs}
+                className="flex items-center gap-1 hover:text-zinc-200 transition-colors cursor-pointer"
+                title="Copy terminal logs"
+              >
+                {copied ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
+                <span>{copied ? "Copied" : "Copy"}</span>
+              </button>
+            </div>
           </div>
 
-          {/* Terminal Logs Window */}
-          <div className="flex-1 overflow-y-auto p-3 space-y-3 select-text leading-relaxed">
-            {terminalLogs.length === 0 ? (
-              <div className="text-zinc-600 py-12 text-center text-xs">
-                No active command executions yet.
-              </div>
-            ) : (
-              terminalLogs.map((log, i) => (
-                <div key={i} className="space-y-1">
-                  <div className="flex items-center gap-2 text-zinc-400">
-                    <span className="text-emerald-400 font-bold">$</span>
-                    <span className="text-zinc-200">{log.command}</span>
-                    {log.status === "running" && (
-                      <span className="text-[10px] text-amber-400 animate-pulse">[running]</span>
-                    )}
-                  </div>
-                  {log.output && (
-                    <pre className="text-zinc-400 whitespace-pre-wrap break-all text-[11px] bg-zinc-900/60 p-2 rounded border border-zinc-800/80">
-                      {log.output}
-                    </pre>
+          {/* Terminal History Window */}
+          <div ref={terminalScrollRef} className="flex-1 overflow-y-auto p-3 space-y-3 select-text leading-relaxed">
+            {terminalHistory.map((item, i) => (
+              <div key={i} className="space-y-1">
+                <div className="flex items-center gap-2 text-zinc-400">
+                  <span className="text-emerald-400 font-bold">$</span>
+                  <span className="text-zinc-100">{item.command}</span>
+                  {item.isRunning && (
+                    <Loader2 className="w-3 h-3 text-amber-400 animate-spin" />
+                  )}
+                  {!item.isRunning && item.exit_code !== undefined && item.exit_code !== 0 && (
+                    <span className="text-[10px] text-rose-400">[exit {item.exit_code}]</span>
                   )}
                 </div>
-              ))
-            )}
+
+                {item.stdout && (
+                  <pre className="text-zinc-300 whitespace-pre-wrap break-all text-[11px] bg-zinc-900/50 p-2 rounded border border-zinc-800/60">
+                    {item.stdout}
+                  </pre>
+                )}
+
+                {item.stderr && (
+                  <pre className="text-rose-400 whitespace-pre-wrap break-all text-[11px] bg-rose-950/20 p-2 rounded border border-rose-900/40">
+                    {item.stderr}
+                  </pre>
+                )}
+              </div>
+            ))}
           </div>
+
+          {/* Interactive Shell Input Line matching genuine terminal */}
+          <form
+            onSubmit={handleTerminalSubmit}
+            className="border-t border-zinc-800 p-2 bg-zinc-900/90 flex items-center gap-2"
+          >
+            <span className="text-emerald-400 font-bold pl-1">$</span>
+            <input
+              ref={terminalInputRef}
+              data-testid="terminal-interactive-input"
+              type="text"
+              value={terminalInput}
+              onChange={(e) => setTerminalInput(e.target.value)}
+              placeholder="Run command in workspace..."
+              disabled={isTerminalExecuting}
+              className="flex-1 bg-transparent text-zinc-100 placeholder-zinc-500 outline-none text-xs font-mono disabled:opacity-50"
+            />
+            <button
+              type="submit"
+              disabled={!terminalInput.trim() || isTerminalExecuting}
+              className="px-2 py-0.5 rounded bg-zinc-800 hover:bg-zinc-700 text-zinc-300 disabled:opacity-30 cursor-pointer text-[10px] font-mono"
+            >
+              Run
+            </button>
+          </form>
         </div>
       )}
     </aside>
