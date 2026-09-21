@@ -8,6 +8,8 @@ export interface ClineHeroViewProps {
   workspaceName?: string;
   onConnectModel?: () => void;
   onModelSettings?: () => void;
+  effort?: "Low" | "Medium" | "High";
+  onSelectEffort?: (effort: "Low" | "Medium" | "High") => void;
   onSend: (text: string) => void;
   selectedModel?: string;
   onSelectModel?: (modelId: string) => void;

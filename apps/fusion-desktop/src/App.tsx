@@ -9,6 +9,8 @@ import { DiffView } from "./components/DiffView";
 import { Composer } from "./components/Composer";
 import { ClineAvatar } from "./components/ClineAvatar";
 import { MarkdownRenderer } from "./components/MarkdownRenderer";
+import { CustomizeModal } from "./components/CustomizeModal";
+import { NotificationModal } from "./components/NotificationModal";
 import { AgentBridge } from "./lib/agent-bridge";
 import { pickProjectFolder } from "./lib/fusion-ipc";
 import {
@@ -80,6 +82,9 @@ export function App({
   initialSessions,
 }: AppProps) {
   const [isSidebarOpen, setIsSidebarOpen] = useState(initialSidebarOpen);
+  const [isCustomizeOpen, setIsCustomizeOpen] = useState(false);
+  const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
+
   const [sidebarWidth, setSidebarWidth] = useState<number>(() => {
     if (typeof window !== "undefined" && window.localStorage) {
       const stored = window.localStorage.getItem("fusion_desktop_sidebar_width");
@@ -423,7 +428,8 @@ export function App({
           onResetWidth={handleSidebarResetWidth}
           onNewChat={handleNewChat}
           onSelectSession={handleSelectSession}
-          onDeleteSession={handleDeleteSession}
+          onCustomize={() => setIsCustomizeOpen(true)}
+          onOpenSettings={() => setIsNotificationsOpen(true)}
           onToggleSidebar={() => setIsSidebarOpen(false)}
         />
       )}
@@ -433,8 +439,8 @@ export function App({
         {/* TopHeader: 40px height, aligned with macOS traffic lights and sidebar */}
         <TopHeader
           title={sessionTitle}
+          onMore={() => setIsNotificationsOpen(true)}
           onToggleSidebar={() => setIsSidebarOpen((prev) => !prev)}
-          isSidebarOpen={isSidebarOpen}
         />
 
         {/* Stream: strictly centered, vertical scroll */}
@@ -508,6 +514,18 @@ export function App({
           />
         </footer>
       </main>
+
+      {/* Cline Customize Modal */}
+      <CustomizeModal
+        isOpen={isCustomizeOpen}
+        onClose={() => setIsCustomizeOpen(false)}
+      />
+
+      {/* Cline Notification Settings Modal */}
+      <NotificationModal
+        isOpen={isNotificationsOpen}
+        onClose={() => setIsNotificationsOpen(false)}
+      />
     </div>
   );
 }

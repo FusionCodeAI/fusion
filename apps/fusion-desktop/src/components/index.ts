@@ -44,4 +44,9 @@ export { ClineAvatar, ClineRobotSvg } from "./ClineAvatar";
 export type { ClineAvatarProps, ClineRobotSvgProps } from "./ClineAvatar";
 
 export { ClineWatermark } from "./ClineWatermark";
-export type { ClineWatermarkProps } from "./ClineWatermark";
+
+export { CustomizeModal } from "./CustomizeModal";
+export type { CustomizeModalProps, CustomizeTab } from "./CustomizeModal";
+
+export { NotificationModal } from "./NotificationModal";
+export type { NotificationModalProps, NotificationSettings } from "./NotificationModal";
