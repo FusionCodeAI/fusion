@@ -58,12 +58,41 @@ fn list_fusion_sessions() -> Result<Vec<DesktopSessionSummary>, String> {
         if path.is_file() && path.extension().and_then(|s| s.to_str()) == Some("json") {
             if let Ok(content) = fs::read_to_string(&path) {
                 if let Ok(val) = serde_json::from_str::<Value>(&content) {
+                    let created_at = val.get("created_at").and_then(|v| v.as_str()).unwrap_or("").to_string();
                     let id = val.get("id").and_then(|v| v.as_str()).unwrap_or_else(|| {
                         path.file_stem().and_then(|s| s.to_str()).unwrap_or("unknown")
                     }).to_string();
-
-                    let title = val.get("title").and_then(|v| v.as_str()).unwrap_or("General chat conversation").to_string();
-                    let created_at = val.get("created_at").and_then(|v| v.as_str()).unwrap_or("").to_string();
+                    let messages = val.get("messages").and_then(|v| v.as_array());
+                    let raw_title = val.get("title").and_then(|v| v.as_str()).unwrap_or("").trim();
+                    let title = if !raw_title.is_empty() && raw_title != "General chat conversation" {
+                        raw_title.to_string()
+                    } else {
+                        // Auto-derive title from first user message
+                        let mut derived = None;
+                        if let Some(msgs) = messages {
+                            for m in msgs {
+                                if m.get("role").and_then(|r| r.as_str()) == Some("user") {
+                                    if let Some(c) = m.get("content").and_then(|c| c.as_str()) {
+                                        let clean = c.trim();
+                                        if !clean.is_empty() {
+                                            let first_line = clean.lines().next().unwrap_or(clean);
+                                            let sentence = first_line.split(&['.', '?', '!'][..]).next().unwrap_or(first_line).trim();
+                                            let candidate = if sentence.is_empty() { first_line } else { sentence };
+                                            if candidate.chars().count() > 48 {
+                                                let mut tr: String = candidate.chars().take(46).collect();
+                                                tr.push_str("...");
+                                                derived = Some(tr);
+                                            } else {
+                                                derived = Some(candidate.to_string());
+                                            }
+                                            break;
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                        derived.unwrap_or_else(|| "New Conversation".to_string())
+                    };
                     let updated_at = val.get("updated_at").and_then(|v| v.as_str()).unwrap_or("").to_string();
                     let model = val.get("active_model").and_then(|v| v.as_str()).unwrap_or("deepseek-v4-flash-0731").to_string();
                     let messages = val.get("messages").and_then(|v| v.as_array());
@@ -602,10 +631,7 @@ async fn execute_fusion_turn(
     let stderr = String::from_utf8_lossy(&output.stderr).to_string();
 
     let cleaned_stdout = clean_terminal_output(&stdout);
-
-    if output.status.success() {
-        Ok(cleaned_stdout)
-    } else if !cleaned_stdout.is_empty() {
+    if output.status.success() || !cleaned_stdout.is_empty() {
         Ok(cleaned_stdout)
     } else {
         Err(if !stderr.trim().is_empty() { stderr } else { format!("Process exited with status {}", output.status) })

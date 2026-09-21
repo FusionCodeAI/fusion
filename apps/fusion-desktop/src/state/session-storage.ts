@@ -73,6 +73,33 @@ export function generateSessionId(): string {
 }
 
 
+export function generateSessionTitle(prompt: string): string {
+  const cleaned = prompt
+    .replace(/^@\S+\s*/g, "") // strip leading @mentions
+    .replace(/^\/\S+\s*/g, "") // strip leading /slash commands
+    .replace(/\[Image\s*#\d+[^\]]*\]/gi, "") // strip [Image #1] placeholders
+    .trim();
+
+  if (!cleaned) {
+    return "New Conversation";
+  }
+
+  const firstLine = cleaned.split("\n")[0].trim();
+  const sentence = firstLine.split(/[.?!]/)[0].trim();
+  const titleCandidate = sentence || firstLine;
+
+  if (titleCandidate.length <= 48) {
+    return titleCandidate.charAt(0).toUpperCase() + titleCandidate.slice(1);
+  }
+
+  const words = titleCandidate.slice(0, 46).split(/\s+/);
+  if (words.length > 1) {
+    words.pop();
+  }
+  const result = words.join(" ").trim();
+  return (result.charAt(0).toUpperCase() + result.slice(1)) + "...";
+}
+
 export function getInitialDefaultSession(): ChatSessionRecord {
   const now = Date.now();
   return {
@@ -224,10 +251,22 @@ export async function syncNativeFusionSessions(
       const existing = mergedMap.get(n.id);
       const parsedUpdated = n.updated_at ? new Date(n.updated_at).getTime() : Date.now();
       const parsedCreated = n.created_at ? new Date(n.created_at).getTime() : Date.now();
+      const rawTitle = n.title?.trim();
+      const derivedTitle =
+        rawTitle && rawTitle !== "General chat conversation"
+          ? rawTitle
+          : n.preview
+          ? generateSessionTitle(n.preview)
+          : "New Conversation";
+
       if (existing) {
+        const effectiveTitle =
+          existing.title && existing.title !== "General chat conversation"
+            ? existing.title
+            : derivedTitle;
         mergedMap.set(n.id, {
           ...existing,
-          title: n.title || existing.title,
+          title: effectiveTitle,
           updatedAt: Math.max(existing.updatedAt, isNaN(parsedUpdated) ? 0 : parsedUpdated),
           model: n.model || existing.model,
           workspace: n.workspace || existing.workspace,
@@ -236,7 +275,7 @@ export async function syncNativeFusionSessions(
       } else {
         mergedMap.set(n.id, {
           id: n.id,
-          title: n.title || "General chat conversation",
+          title: derivedTitle,
           createdAt: isNaN(parsedCreated) ? Date.now() : parsedCreated,
           updatedAt: isNaN(parsedUpdated) ? Date.now() : parsedUpdated,
           model: n.model || DEFAULT_FUSION_MODEL.id,
@@ -246,7 +285,6 @@ export async function syncNativeFusionSessions(
         });
       }
     }
-
     const result = Array.from(mergedMap.values());
     result.sort((a, b) => b.updatedAt - a.updatedAt);
     saveAllSessions(result);

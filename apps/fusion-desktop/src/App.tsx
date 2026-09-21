@@ -25,6 +25,7 @@ import {
   setStoredActiveSessionId,
   syncNativeFusionSessions,
   loadFullNativeSessionMessages,
+  generateSessionTitle,
   type ChatSessionRecord,
 } from "./state/session-storage";
 import { DEFAULT_FUSION_MODEL } from "./models";
@@ -384,6 +385,18 @@ export function App({
       return;
     }
 
+    // Auto-generate title from first user message if title is default placeholder
+    if (
+      sessionTitle === "General chat conversation" ||
+      sessionTitle === "New Conversation" ||
+      messages.length === 0
+    ) {
+      const derived = generateSessionTitle(trimmed);
+      setSessionTitle(derived);
+      setSessionsRecord((prev) =>
+        prev.map((s) => (s.id === activeSessionId ? { ...s, title: derived } : s))
+      );
+    }
     const userMessage: ChatMessage = {
       id: `user-${Date.now()}`,
       role: "user",
