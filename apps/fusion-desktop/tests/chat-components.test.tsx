@@ -30,14 +30,12 @@ describe("Chat UI Components", () => {
   });
 
   describe("UserMessage", () => {
-    it("renders right-aligned chat bubble with correct classes and content", () => {
+    it("renders Cline-style message container with correct classes and content", () => {
       const content = "Can you check the performance metrics?";
       const html = renderToString(<UserMessage content={content} />);
 
-      expect(html).toContain("justify-end");
-      expect(html).toContain("bg-zinc-100");
-      expect(html).toContain("rounded-2xl");
-      expect(html).toContain("text-[14px]");
+      expect(html).toContain("w-full");
+      expect(html).toContain("bg-zinc-100/90");
       expect(html).toContain(content);
     });
   });

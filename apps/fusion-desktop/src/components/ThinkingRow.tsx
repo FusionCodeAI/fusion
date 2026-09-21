@@ -1,80 +1,113 @@
-import React, { useState, useEffect } from "react";
-import { Brain, ChevronDown, ChevronUp } from "lucide-react";
+import React, { memo, useCallback, useEffect, useRef, useState } from "react";
+import { ChevronDown, ChevronRight } from "lucide-react";
 
 export interface ThinkingRowProps {
-  thought: string;
+  thought?: string;
   isGenerating?: boolean;
+  durationMs?: number;
 }
 
-export function ThinkingRow({ thought, isGenerating }: ThinkingRowProps) {
+export const ThinkingRow = memo(function ThinkingRow({
+  thought,
+  isGenerating = false,
+  durationMs,
+}: ThinkingRowProps) {
   const [isExpanded, setIsExpanded] = useState(false);
-  const [elapsedSec, setElapsedSec] = useState(0);
+  const [canScrollUp, setCanScrollUp] = useState(false);
+  const [canScrollDown, setCanScrollDown] = useState(false);
+  const [seconds, setSeconds] = useState(0);
+
+  const scrollRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (!isGenerating) return;
     const start = Date.now();
     const timer = setInterval(() => {
-      setElapsedSec(Math.max(1, Math.floor((Date.now() - start) / 1000)));
+      setSeconds(Math.max(1, Math.round((Date.now() - start) / 1000)));
     }, 1000);
     return () => clearInterval(timer);
   }, [isGenerating]);
 
-  // If there's no thought and not currently generating, do not render a thinking row
-  if (!thought && !isGenerating) {
+  const checkScrollable = useCallback(() => {
+    if (scrollRef.current) {
+      const { scrollTop, scrollHeight, clientHeight } = scrollRef.current;
+      setCanScrollUp(scrollTop > 1);
+      setCanScrollDown(scrollTop + clientHeight < scrollHeight - 1);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (scrollRef.current && isGenerating) {
+      scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+    }
+    checkScrollable();
+  }, [thought, isGenerating, checkScrollable]);
+
+  const cleanThought = thought?.trim();
+
+  // If not generating and no reasoning content, do not render anything
+  if (!isGenerating && !cleanThought) {
     return null;
   }
 
-  const isThinkingWithoutThought = Boolean(isGenerating && !thought);
-  const cleanParagraphs = thought
-    ? thought
-        .split("\n")
-        .map((line) => line.trim())
-        .filter((line) => line.length > 0)
-    : [];
-
-  if (isThinkingWithoutThought) {
-    return (
-      <div className="w-full py-1 select-none flex items-center gap-1.5 text-xs text-zinc-500">
-        <Brain className="w-3.5 h-3.5 text-[#5100cd] animate-pulse shrink-0" />
-        <span className="font-medium text-zinc-600 animate-pulse">
-          {elapsedSec > 0 ? `Thinking (${elapsedSec}s)...` : "Thinking..."}
-        </span>
-      </div>
-    );
-  }
-
-  // If generation finished and there are no thoughts, hide the row
-  if (!isGenerating && cleanParagraphs.length === 0) {
-    return null;
-  }
+  const durationSec = durationMs
+    ? Math.max(1, Math.round(durationMs / 1000))
+    : seconds;
+  const title = isGenerating
+    ? seconds > 0
+      ? `Thinking (${seconds}s)...`
+      : "Thinking..."
+    : durationSec > 1
+    ? `Thought for ${durationSec}s`
+    : "Thought briefly";
 
   return (
-    <div className="w-full py-1 select-none">
+    <div className="w-full my-1 pl-0 select-none">
+      {/* Trigger Button matching Cline ThinkingRow */}
       <button
         type="button"
+        data-testid="thinking-trigger"
         onClick={() => setIsExpanded((prev) => !prev)}
-        className="group inline-flex items-center gap-1.5 text-xs text-zinc-500 hover:text-zinc-800 transition-colors cursor-pointer"
+        className="inline-flex items-center gap-1 text-left text-xs font-medium text-zinc-500 hover:text-zinc-800 transition-colors cursor-pointer"
       >
-        <Brain className="w-3.5 h-3.5 text-zinc-400 group-hover:text-zinc-600 shrink-0" />
-        <span className="font-medium inline-flex items-center gap-1">
-          <span>{elapsedSec > 1 ? `Thought for ${elapsedSec}s` : "Thought briefly"}</span>
-          {isExpanded ? (
-            <ChevronUp className="w-3 h-3 text-zinc-400" />
-          ) : (
-            <ChevronDown className="w-3 h-3 text-zinc-400" />
-          )}
+        <span
+          className={
+            isGenerating
+              ? "animate-pulse text-[#5100cd] font-semibold"
+              : "text-zinc-600 font-medium"
+          }
+        >
+          {title}
         </span>
+        {isExpanded ? (
+          <ChevronDown className="w-3.5 h-3.5 text-zinc-400" />
+        ) : (
+          <ChevronRight className="w-3.5 h-3.5 text-zinc-400" />
+        )}
       </button>
 
-      {isExpanded && cleanParagraphs.length > 0 && (
-        <div className="mt-2 text-xs text-zinc-600 leading-relaxed font-sans space-y-1 border-l-2 border-purple-200/80 pl-3 my-1">
-          {cleanParagraphs.map((paragraph, index) => (
-            <p key={index}>{paragraph}</p>
-          ))}
+      {isExpanded && cleanThought ? (
+        <div className="relative mt-2 rounded-lg border-l-2 border-purple-300/80 pl-3 py-1 bg-purple-50/30 text-zinc-700">
+          <div
+            ref={scrollRef}
+            onScroll={checkScrollable}
+            className="max-h-[160px] overflow-y-auto text-[13px] leading-relaxed whitespace-pre-wrap break-words font-sans space-y-1.5 pr-2"
+          >
+            {cleanThought.split("\n\n").map((p, i) => (
+              <p key={i}>{p}</p>
+            ))}
+          </div>
+
+          {canScrollUp && (
+            <div className="absolute top-0 left-0 right-0 h-4 pointer-events-none bg-gradient-to-b from-purple-50/80 to-transparent" />
+          )}
+          {canScrollDown && (
+            <div className="absolute bottom-0 left-0 right-0 h-4 pointer-events-none bg-gradient-to-t from-purple-50/80 to-transparent" />
+          )}
         </div>
-      )}
+      ) : null}
     </div>
   );
-}
+});
 
 export default ThinkingRow;

@@ -669,7 +669,7 @@ describe("Desktop E2E: Component Sanity (Render & Instantiation)", () => {
         })
       );
       expect(html).toContain("Thought briefly");
-      expect(html).toContain("lucide-chevron-down");
+      expect(html).toContain("lucide-chevron-right");
     });
   });
 
@@ -685,8 +685,8 @@ describe("Desktop E2E: Component Sanity (Render & Instantiation)", () => {
       expect(html).toContain(prompt);
       expect(html).toContain("bg-zinc-100");
       expect(html).toContain("text-zinc-900");
-      expect(html).toContain("rounded-2xl");
-      expect(html).toContain("justify-end");
+      expect(html).toContain("rounded-xl");
+      expect(html).toContain("w-full");
     });
   });
 

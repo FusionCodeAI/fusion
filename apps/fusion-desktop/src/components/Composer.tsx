@@ -42,6 +42,7 @@ export function Composer({
   const [text, setText] = useState("");
   const [isModelMenuOpen, setIsModelMenuOpen] = useState(false);
   const [isEffortMenuOpen, setIsEffortMenuOpen] = useState(false);
+  const [mode, setMode] = useState<"plan" | "act">("act");
   const [effort, setEffort] = useState<"Low" | "Medium" | "High">(propEffort);
 
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -189,6 +190,37 @@ export function Composer({
           >
             <Paperclip className="w-3.5 h-3.5" />
           </button>
+
+          {/* Plan | Act Mode Toggle matching Cline */}
+          <div
+            data-testid="composer-mode-switcher"
+            className="inline-flex items-center rounded-lg border border-zinc-200 bg-zinc-100/90 p-0.5 text-[11px] font-medium select-none"
+          >
+            <button
+              type="button"
+              onClick={() => setMode("plan")}
+              className={`px-2 py-0.5 rounded-md transition-all cursor-pointer ${
+                mode === "plan"
+                  ? "bg-amber-100 text-amber-900 shadow-2xs font-semibold"
+                  : "text-zinc-500 hover:text-zinc-800"
+              }`}
+            >
+              Plan
+            </button>
+            <button
+              type="button"
+              onClick={() => setMode("act")}
+              className={`px-2 py-0.5 rounded-md transition-all cursor-pointer ${
+                mode === "act"
+                  ? "bg-purple-100 text-[#5100cd] shadow-2xs font-semibold"
+                  : "text-zinc-500 hover:text-zinc-800"
+              }`}
+            >
+              Act
+            </button>
+          </div>
+
+          <span className="text-zinc-200">|</span>
           <div className="relative">
             <button
               ref={modelButtonRef}
