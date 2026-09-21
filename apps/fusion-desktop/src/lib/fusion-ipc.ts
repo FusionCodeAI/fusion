@@ -211,6 +211,22 @@ export async function checkAuthStatus(): Promise<AuthStatus> {
 }
 
 /**
+ * Sends a native system notification via Tauri backend.
+ */
+export async function showDesktopNotification(
+  title: string,
+  body: string,
+  sound: boolean = true
+): Promise<void> {
+  if (!isTauriEnvironment()) return;
+  try {
+    await invoke("show_desktop_notification", { title, body, sound });
+  } catch (err) {
+    console.warn("[fusion-ipc] show_desktop_notification error:", err);
+  }
+}
+
+/**
  * Starts the Fusion login flow.
  */
 export async function startFusionLogin(): Promise<AuthStatus> {

@@ -17,7 +17,7 @@ describe("Cline Settings View Layout with Fusion API", () => {
     expect(html).toContain("Dark mode");
     expect(html).toContain("Font size");
     expect(html).toContain("Accent color");
-    expect(html).toContain("Desktop Notifications");
+    expect(html).toContain("Desktop notifications");
     expect(html).toContain('data-testid="settings-darkmode-toggle"');
     expect(html).toContain('data-testid="settings-font-decrease"');
     expect(html).toContain('data-testid="settings-font-increase"');

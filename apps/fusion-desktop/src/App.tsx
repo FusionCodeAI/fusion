@@ -13,6 +13,7 @@ import { CustomizeView } from "./components/CustomizeView";
 import { SettingsView } from "./components/SettingsView";
 import { SessionCommandBar } from "./components/SessionCommandBar";
 import { AgentBridge } from "./lib/agent-bridge";
+import { notifyDesktopEvent } from "./lib/desktop-notifications";
 import { pickProjectFolder, checkAuthStatus, startFusionLogin } from "./lib/fusion-ipc";
 import {
   loadAllSessions,
@@ -389,12 +390,19 @@ export function App({
       const newTitle = trimmed.length > 28 ? `${trimmed.slice(0, 28)}...` : trimmed;
       setSessionTitle(newTitle);
     }
-
     try {
       await bridge.prompt(trimmed, selectedModel);
+      notifyDesktopEvent("taskCompletion", {
+        title: "Task completed",
+        body: `Finished turn in "${sessionTitle}"`,
+      });
     } catch (err) {
       setIsGenerating(false);
       console.error("[App] prompt error:", err);
+      notifyDesktopEvent("sessionError", {
+        title: "Session error",
+        body: err instanceof Error ? err.message : String(err),
+      });
     }
   };
 

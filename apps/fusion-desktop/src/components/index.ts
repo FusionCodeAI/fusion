@@ -56,3 +56,6 @@ export type { CustomizeViewProps } from "./CustomizeView";
 
 export { SettingsView } from "./SettingsView";
 export type { SettingsViewProps, SettingsSectionId } from "./SettingsView";
+
+export { SessionCommandBar } from "./SessionCommandBar";
+export type { SessionCommandBarProps } from "./SessionCommandBar";

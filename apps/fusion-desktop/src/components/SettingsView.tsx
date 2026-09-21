@@ -319,14 +319,21 @@ export function SettingsView({
                 />
               </button>
             </div>
+            <div className="py-4 border-b border-zinc-100">
+              <div className="flex items-center justify-between gap-5">
+                <div>
+                  <p className="text-base font-semibold text-zinc-900">Desktop notifications</p>
+                  <p className="text-sm text-zinc-500 mt-0.5">
+                    Notify only while the Fusion window is in the background. Clicking a notification opens its session.
+                  </p>
+                </div>
+                <span className="shrink-0 text-xs font-medium text-zinc-400">
+                  Allowed by system
+                </span>
+              </div>
 
-            {/* Notifications Settings Table */}
-            <div className="pt-2 space-y-2">
-              <p className="text-xs font-semibold text-zinc-900 uppercase tracking-wider text-zinc-400">
-                Desktop Notifications
-              </p>
-              <div className="rounded-xl border border-zinc-200/80 bg-zinc-50/40 overflow-hidden">
-                <div className="grid grid-cols-[1fr_4rem_4rem] items-center gap-2 px-4 py-2 border-b border-zinc-200/60 bg-zinc-100/60 text-[11px] font-medium uppercase tracking-wider text-zinc-500">
+              <div className="mt-4 rounded-xl border border-zinc-200/80 bg-zinc-50/40 overflow-hidden">
+                <div className="grid grid-cols-[minmax(0,1fr)_5rem_4rem] items-center gap-3 border-b border-zinc-200/60 bg-zinc-100/60 px-4 py-2 text-xs font-medium uppercase tracking-wide text-zinc-500">
                   <span>Event</span>
                   <span className="text-center">Notify</span>
                   <span className="text-center">Sound</span>
@@ -334,21 +341,21 @@ export function SettingsView({
 
                 {(
                   [
-                    { id: "taskCompletion", label: "Task completed", desc: "When Fusion finishes an agent run or turn." },
-                    { id: "approvalNeeded", label: "Approval needed", desc: "When a tool or command is waiting for your approval." },
-                    { id: "questionAsked", label: "Question asked", desc: "When Fusion needs clarification before continuing." },
-                    { id: "sessionError", label: "Session error", desc: "When an agent turn stops because of an error." },
+                    { id: "taskCompletion", label: "Task completed", desc: "When Fusion finishes a task or turn." },
+                    { id: "approvalNeeded", label: "Approval needed", desc: "When a tool is waiting for your approval." },
+                    { id: "questionAsked", label: "Question asked", desc: "When Fusion needs an answer before continuing." },
+                    { id: "sessionError", label: "Session error", desc: "When a task stops because of an error." },
                   ] as const
                 ).map((ev) => {
                   const pref = notifSettings[ev.id];
                   return (
                     <div
                       key={ev.id}
-                      className="grid grid-cols-[1fr_4rem_4rem] items-center gap-2 px-4 py-3 border-b border-zinc-200/40 last:border-b-0 hover:bg-zinc-50/60 transition-colors"
+                      className="grid grid-cols-[minmax(0,1fr)_5rem_4rem] items-center gap-3 border-b border-zinc-200/40 px-4 py-3 last:border-b-0 hover:bg-zinc-50/60 transition-colors"
                     >
-                      <div className="min-w-0 pr-2">
-                        <p className="text-xs font-semibold text-zinc-800">{ev.label}</p>
-                        <p className="text-[11px] text-zinc-500 mt-0.5">{ev.desc}</p>
+                      <div className="min-w-0">
+                        <p className="text-sm font-medium text-zinc-900">{ev.label}</p>
+                        <p className="text-xs text-zinc-500 mt-0.5">{ev.desc}</p>
                       </div>
 
                       <div className="flex justify-center">

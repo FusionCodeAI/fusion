@@ -276,6 +276,28 @@ async fn pick_project_folder() -> Result<Option<String>, String> {
     }
 }
 
+#[tauri::command]
+fn show_desktop_notification(
+    title: String,
+    body: String,
+    sound: Option<bool>,
+) -> Result<(), String> {
+    #[cfg(target_os = "macos")]
+    {
+        let sound_clause = if sound.unwrap_or(true) { "sound name \"default\"" } else { "" };
+        let clean_body = body.replace('\\', "\\\\").replace('"', "\\\"");
+        let clean_title = title.replace('\\', "\\\\").replace('"', "\\\"");
+        let script = format!(
+            "display notification \"{}\" with title \"{}\" {}",
+            clean_body, clean_title, sound_clause
+        );
+        let _ = std::process::Command::new("osascript")
+            .arg("-e")
+            .arg(script)
+            .spawn();
+    }
+    Ok(())
+}
 fn fusion_dir() -> PathBuf {
     if let Ok(home) = std::env::var("HOME") {
         return PathBuf::from(home).join(".fusion");
@@ -674,9 +696,10 @@ fn main() {
             delete_fusion_session,
             execute_fusion_turn,
             stream_fusion_acp,
-            pick_project_folder,
             check_auth_status,
             start_fusion_login,
+            pick_project_folder,
+            show_desktop_notification,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
