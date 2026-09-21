@@ -2,7 +2,7 @@
   "$schema": "https://schema.tauri.app/config/2",
   "productName": "fusion-desktop",
   "version": "2.0.0",
-  "identifier": "com.fusioncode.desktop",
+  "identifier": "ai.fusion.desktop",
   "build": {
     "beforeDevCommand": "bun run dev",
     "devUrl": "http://localhost:5173",
@@ -12,26 +12,50 @@
   "app": {
     "windows": [
       {
+        "label": "main",
         "title": "Fusion Agent",
         "width": 1240,
         "height": 820,
-        "minWidth": 900,
-        "minHeight": 600,
+        "minWidth": 960,
+        "minHeight": 640,
         "resizable": true,
         "fullscreen": false,
         "titleBarStyle": "Overlay",
-        "hiddenTitle": true
+        "hiddenTitle": true,
+        "center": true
       }
     ],
     "security": {
-      "csp": null
+      "csp": null,
+      "capabilities": [
+        {
+          "identifier": "default",
+          "description": "Default permissions for Fusion Desktop",
+          "windows": [
+            "main"
+          ],
+          "permissions": [
+            "core:default",
+            "shell:default",
+            "shell:allow-execute",
+            "shell:allow-spawn"
+          ]
+        }
+      ]
     }
   },
   "bundle": {
     "active": true,
     "targets": "all",
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.icns",
+      "icons/icon.ico"
+    ],
     "externalBin": [
-      "fusion"
+      "bin/fusion"
     ]
   },
   "plugins": {

@@ -4,7 +4,7 @@ export interface TurnStep {
   id: string;
   title: string;
   status: "running" | "completed" | "failed";
-  timestamp: number;
+  timestamp?: number;
   details?: string;
 }
 
